@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+﻿import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import api from '@/lib/axios'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,12 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
 import type { RootState } from '@/store'
 
 type OrderSummary = {
   totalOrders: number
   totalRevenue: number
   statusCounts: Record<string, number>
+  paymentStatusCounts?: Record<string, number>
+  paidRevenue?: number
 }
 
 type OrderItem = {
@@ -38,6 +41,15 @@ type Order = {
   payment_method?: string
   payment_status?: string
   createdAt?: string
+  delivery_provider?: string
+  borzo?: {
+    order_id?: number
+    status?: string
+    status_description?: string
+    tracking_url?: string
+    courier?: { name?: string; phone?: string }
+    updated_at?: string
+  }
   user_id?: { name?: string; email?: string; phone?: string }
   shipping_address?: {
     full_name?: string
@@ -57,6 +69,7 @@ export const Route = createFileRoute('/_authenticated/order/')({
 })
 
 function OrdersPage() {
+  const BORZO_QUOTE_DEBOUNCE_MS = 600
   const [orders, setOrders] = useState<Order[]>([])
   const [summary, setSummary] = useState<OrderSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -66,6 +79,24 @@ function OrdersPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [borzoActionLoading, setBorzoActionLoading] = useState(false)
+  const [borzoQuoteLoading, setBorzoQuoteLoading] = useState(false)
+  const [borzoError, setBorzoError] = useState('')
+  const [borzoQuote, setBorzoQuote] = useState<{ amount?: number; warnings?: string[] } | null>(null)
+  const [pickupOverride, setPickupOverride] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    latitude: '',
+    longitude: '',
+  })
+  const [dropoffOverride, setDropoffOverride] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    latitude: '',
+    longitude: '',
+  })
   const role = useSelector((state: RootState) => state.auth?.user?.role)
   const isVendor = role === 'vendor'
 
@@ -115,8 +146,56 @@ function OrdersPage() {
     [orders, selectedId],
   )
 
+  const emptyOverride = { name: '', phone: '', address: '', latitude: '', longitude: '' }
+
+  const buildAddressString = (address?: Order['shipping_address']) => {
+    if (!address) return ''
+    return [address.line1, address.line2, address.city, address.state, address.pincode, address.country]
+      .filter((value) => value && String(value).trim().length)
+      .join(', ')
+  }
+
+  const mapPointToOverride = (point?: any) => {
+    if (!point) return null
+    return {
+      name: point?.contact_person?.name || '',
+      phone: point?.contact_person?.phone || '',
+      address: point?.address || '',
+      latitude: point?.latitude != null ? String(point?.latitude) : '',
+      longitude: point?.longitude != null ? String(point?.longitude) : '',
+    }
+  }
+
+  useEffect(() => {
+    setBorzoError('')
+    setBorzoQuote(null)
+
+    if (!selectedOrder) {
+      setPickupOverride(emptyOverride)
+      setDropoffOverride(emptyOverride)
+      return
+    }
+
+    const payload = (selectedOrder as any)?.borzo?.last_payload
+    const pickupFromPayload = mapPointToOverride(payload?.points?.[0])
+    const dropoffFromPayload = mapPointToOverride(payload?.points?.[1])
+    const shippingAddress = selectedOrder.shipping_address
+    const dropoffFromShipping = shippingAddress
+      ? {
+          name: shippingAddress.full_name || selectedOrder.user_id?.name || '',
+          phone: shippingAddress.phone || selectedOrder.user_id?.phone || '',
+          address: buildAddressString(shippingAddress),
+          latitude: '',
+          longitude: '',
+        }
+      : null
+
+    setPickupOverride(pickupFromPayload || emptyOverride)
+    setDropoffOverride(dropoffFromPayload || dropoffFromShipping || emptyOverride)
+  }, [selectedOrder?._id])
+
   const formatMoney = (value?: number) =>
-    `₹${Number(value || 0).toLocaleString()}`
+    `â‚¹${Number(value || 0).toLocaleString()}`
 
   const statusBadge = (value?: string) => {
     const key = value || 'pending'
@@ -142,7 +221,105 @@ function OrdersPage() {
       (acc, o) => acc + (isVendor ? o.vendor_subtotal || 0 : o.total || 0),
       0,
     )
+  const paidCount = summary?.paymentStatusCounts?.paid || 0
+  const failedCount = summary?.paymentStatusCounts?.failed || 0
+  const paidRevenue = summary?.paidRevenue || 0
   const pageCount = Math.max(Math.ceil(total / 20), 1)
+
+  const hasActiveBorzo =
+    Boolean(selectedOrder?.borzo?.order_id) &&
+    !['canceled', 'cancelled', 'failed'].includes(
+      String(selectedOrder?.borzo?.status || '').toLowerCase(),
+    )
+  const borzoBusy = borzoActionLoading || borzoQuoteLoading
+
+  const buildBorzoPayload = () => {
+    const hasPickupOverride = Object.values(pickupOverride).some((value) =>
+      String(value || '').trim().length,
+    )
+    const hasDropoffOverride = Object.values(dropoffOverride).some((value) =>
+      String(value || '').trim().length,
+    )
+    return {
+      ...(hasPickupOverride ? { pickup: pickupOverride } : {}),
+      ...(hasDropoffOverride ? { dropoff: dropoffOverride } : {}),
+    }
+  }
+
+  const handleCreateBorzo = async () => {
+    if (!selectedOrder?._id) return
+    if (hasActiveBorzo) {
+      toast.error('Borzo delivery already exists for this order.')
+      return
+    }
+    try {
+      setBorzoActionLoading(true)
+      setBorzoError('')
+      const payload = buildBorzoPayload()
+      await api.post(`/orders/${selectedOrder._id}/borzo/create`, payload)
+      await fetchOrders()
+      toast.success('Borzo delivery created.')
+    } catch (err: any) {
+      const details = err?.response?.data?.details
+      const detailText = details ? ` â€¢ ${JSON.stringify(details)}` : ''
+      const message = `${err?.response?.data?.message || 'Failed to create Borzo delivery'}${detailText}`
+      setBorzoError(message)
+      toast.error(message)
+    } finally {
+      setBorzoActionLoading(false)
+    }
+  }
+
+  const handleCalculateBorzo = async () => {
+    if (!selectedOrder?._id) return
+    try {
+      setBorzoQuoteLoading(true)
+      setBorzoError('')
+      const payload = buildBorzoPayload()
+      const res = await api.post(`/orders/${selectedOrder._id}/borzo/calculate`, payload)
+      const amount = Number(res?.data?.response?.order?.payment_amount || 0)
+      const warnings = res?.data?.response?.warnings || []
+      setBorzoQuote({ amount: Number.isFinite(amount) ? amount : 0, warnings })
+    } catch (err: any) {
+      const details = err?.response?.data?.details
+      const detailText = details ? ` â€¢ ${JSON.stringify(details)}` : ''
+      const message = `${err?.response?.data?.message || 'Failed to calculate Borzo delivery'}${detailText}`
+      setBorzoError(message)
+    } finally {
+      setBorzoQuoteLoading(false)
+    }
+  }
+
+  const handleCancelBorzo = async () => {
+    if (!selectedOrder?._id) return
+    try {
+      setBorzoActionLoading(true)
+      setBorzoError('')
+      await api.post(`/orders/${selectedOrder._id}/borzo/cancel`)
+      await fetchOrders()
+      toast.success('Borzo delivery cancelled.')
+    } catch (err: any) {
+      const details = err?.response?.data?.details
+      const detailText = details ? ` â€¢ ${JSON.stringify(details)}` : ''
+      const message = `${err?.response?.data?.message || 'Failed to cancel Borzo delivery'}${detailText}`
+      setBorzoError(message)
+      toast.error(message)
+    } finally {
+      setBorzoActionLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedOrder?._id) return
+    if (hasActiveBorzo) return
+    if (borzoActionLoading) return
+    if (borzoQuoteLoading) return
+    const timer = setTimeout(() => {
+      handleCalculateBorzo()
+    }, BORZO_QUOTE_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOrder?._id, pickupOverride, dropoffOverride])
 
   return (
     <div className='space-y-6'>
@@ -219,6 +396,27 @@ function OrdersPage() {
         </Card>
       </div>
 
+      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+        <Card>
+          <CardHeader className='pb-2'>
+            <CardTitle className='text-sm text-muted-foreground'>Payments Paid</CardTitle>
+          </CardHeader>
+          <CardContent className='text-2xl font-semibold'>{paidCount}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className='pb-2'>
+            <CardTitle className='text-sm text-muted-foreground'>Payments Failed</CardTitle>
+          </CardHeader>
+          <CardContent className='text-2xl font-semibold'>{failedCount}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className='pb-2'>
+            <CardTitle className='text-sm text-muted-foreground'>Paid Revenue</CardTitle>
+          </CardHeader>
+          <CardContent className='text-2xl font-semibold'>{formatMoney(paidRevenue)}</CardContent>
+        </Card>
+      </div>
+
       <div className='grid gap-6 xl:grid-cols-[360px_1fr]'>
         <Card className='h-fit'>
           <CardHeader className='pb-3'>
@@ -241,12 +439,12 @@ function OrdersPage() {
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
-                  <div className='flex items-center justify-between'>
+                  <div className='flex flex-wrap items-center justify-between gap-3'>
                     <span className='text-sm font-semibold'>#{order.order_number}</span>
                     {statusBadge(order.status)}
                   </div>
                   <div className='mt-2 text-xs text-muted-foreground'>
-                    {order.user_id?.name || order.shipping_address?.full_name || 'Customer'} •{' '}
+                    {order.user_id?.name || order.shipping_address?.full_name || 'Customer'} â€¢{' '}
                     {order.user_id?.email || order.shipping_address?.phone || 'N/A'}
                   </div>
                   <div className='mt-2 flex items-center justify-between text-sm font-semibold'>
@@ -413,6 +611,12 @@ function OrdersPage() {
 
                 <div className='grid gap-2 text-sm'>
                   <div className='flex justify-between'>
+                    <span className='text-muted-foreground'>Payment</span>
+                    <span className='font-semibold'>
+                      {selectedOrder.payment_method || 'cod'} ({selectedOrder.payment_status || 'pending'})
+                    </span>
+                  </div>
+                  <div className='flex justify-between'>
                     <span className='text-muted-foreground'>Items total</span>
                     <span className='font-semibold'>
                       {formatMoney(isVendor ? selectedOrder.vendor_subtotal : selectedOrder.subtotal)}
@@ -441,6 +645,133 @@ function OrdersPage() {
                     </div>
                   )}
                 </div>
+
+                <Separator />
+
+                <div className='space-y-4 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 shadow-sm'>
+                  <div className='flex flex-wrap items-center justify-between gap-3'>
+                    <div>
+                      <p className='text-sm font-semibold text-slate-900'>Borzo delivery</p>
+                      <p className='text-xs text-slate-600'>
+                        {selectedOrder.borzo?.order_id
+                          ? `Order ID ${selectedOrder.borzo.order_id} â€¢ ${selectedOrder.borzo.status || 'created'}`
+                          : 'No Borzo delivery created yet.'}
+                      </p>
+                      {hasActiveBorzo && (
+                        <p className='text-xs font-semibold text-amber-600'>
+                          A Borzo delivery is already active for this order.
+                        </p>
+                      )}
+                    </div>
+                    {selectedOrder.borzo?.tracking_url && (
+                      <a
+                        href={selectedOrder.borzo.tracking_url}
+                        target='_blank'
+                        rel='noreferrer'
+                        className='text-xs font-semibold text-indigo-700 underline'
+                      >
+                        Tracking
+                      </a>
+                    )}
+                  </div>
+
+                  {borzoError && (
+                    <p className='text-xs text-rose-600'>{borzoError}</p>
+                  )}
+
+                  <div className='grid gap-3 lg:grid-cols-2'>
+                    <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
+                    <p className='text-xs font-semibold text-slate-700'>Pickup address override (optional)</p>
+                    <Input
+                      placeholder='Pickup name'
+                      value={pickupOverride.name}
+                      onChange={(e) => setPickupOverride((prev) => ({ ...prev, name: e.target.value }))}
+                    />
+                    <Input
+                      placeholder='Pickup phone'
+                      value={pickupOverride.phone}
+                      onChange={(e) => setPickupOverride((prev) => ({ ...prev, phone: e.target.value }))}
+                    />
+                    <Input
+                      placeholder='Pickup address'
+                      value={pickupOverride.address}
+                      onChange={(e) => setPickupOverride((prev) => ({ ...prev, address: e.target.value }))}
+                    />
+                    <div className='grid gap-2 sm:grid-cols-2'>
+                      <Input
+                        placeholder='Pickup latitude'
+                        value={pickupOverride.latitude}
+                        onChange={(e) => setPickupOverride((prev) => ({ ...prev, latitude: e.target.value }))}
+                      />
+                      <Input
+                        placeholder='Pickup longitude'
+                        value={pickupOverride.longitude}
+                        onChange={(e) => setPickupOverride((prev) => ({ ...prev, longitude: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
+                    <p className='text-xs font-semibold text-slate-700'>Drop-off override (optional)</p>
+                    <Input
+                      placeholder='Drop-off name'
+                      value={dropoffOverride.name}
+                      onChange={(e) => setDropoffOverride((prev) => ({ ...prev, name: e.target.value }))}
+                    />
+                    <Input
+                      placeholder='Drop-off phone'
+                      value={dropoffOverride.phone}
+                      onChange={(e) => setDropoffOverride((prev) => ({ ...prev, phone: e.target.value }))}
+                    />
+                    <Input
+                      placeholder='Drop-off address'
+                      value={dropoffOverride.address}
+                      onChange={(e) => setDropoffOverride((prev) => ({ ...prev, address: e.target.value }))}
+                    />
+                    <div className='grid gap-2 sm:grid-cols-2'>
+                      <Input
+                        placeholder='Drop-off latitude'
+                        value={dropoffOverride.latitude}
+                        onChange={(e) => setDropoffOverride((prev) => ({ ...prev, latitude: e.target.value }))}
+                      />
+                      <Input
+                        placeholder='Drop-off longitude'
+                        value={dropoffOverride.longitude}
+                        onChange={(e) => setDropoffOverride((prev) => ({ ...prev, longitude: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  </div>
+
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <Button
+                      size='sm'
+                      onClick={handleCreateBorzo}
+                      disabled={borzoBusy || hasActiveBorzo}
+                      className='bg-gradient-to-r from-indigo-600 to-sky-600 text-white shadow-sm hover:from-indigo-500 hover:to-sky-500'
+                    >
+                      {borzoActionLoading ? 'Creating...' : hasActiveBorzo ? 'Already created' : 'Create Borzo delivery'}
+                    </Button>
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      onClick={handleCancelBorzo}
+                      disabled={borzoBusy || !selectedOrder.borzo?.order_id}
+                      className='border-indigo-200 text-indigo-700 hover:bg-indigo-50'
+                    >
+                      {borzoActionLoading ? 'Canceling...' : 'Cancel Borzo delivery'}
+                    </Button>
+                  </div>
+                  <div className='flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600'>
+                    <span>{borzoQuoteLoading ? 'Updating quote...' : 'Auto-quote updates as you type.'}</span>
+                    {borzoQuote && (
+                      <span className='font-semibold text-slate-900'>
+                        Quote: â‚¹{borzoQuote.amount?.toFixed?.(2) || borzoQuote.amount || 0}
+                        {borzoQuote.warnings?.length ? ` â€¢ ${borzoQuote.warnings.join(', ')}` : ''}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </>
             )}
           </CardContent>
@@ -449,3 +780,4 @@ function OrdersPage() {
     </div>
   )
 }
+

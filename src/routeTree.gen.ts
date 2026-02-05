@@ -40,12 +40,14 @@ import { Route as AuthenticatedTemplateOrdersIndexRouteImport } from './routes/_
 import { Route as AuthenticatedSitemapsIndexRouteImport } from './routes/_authenticated/sitemaps/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authenticated/products/index'
+import { Route as AuthenticatedPaymentsIndexRouteImport } from './routes/_authenticated/payments/index'
 import { Route as AuthenticatedOrderIndexRouteImport } from './routes/_authenticated/order/index'
 import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './routes/_authenticated/inventory-management/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedCommissionIndexRouteImport } from './routes/_authenticated/commission/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedCategoryIndexRouteImport } from './routes/_authenticated/category/index'
+import { Route as AuthenticatedBorzoReportIndexRouteImport } from './routes/_authenticated/borzo-report/index'
 import { Route as AuthenticatedAnalyticsIndexRouteImport } from './routes/_authenticated/analytics/index'
 import { Route as TemplateVendorIdRegisterRouteImport } from './routes/template/$vendorId/register'
 import { Route as TemplateVendorIdProfileRouteImport } from './routes/template/$vendorId/profile'
@@ -59,6 +61,7 @@ import { Route as ClerkAuthenticatedUserManagementRouteImport } from './routes/c
 import { Route as ClerkauthSignUpRouteImport } from './routes/clerk/(auth)/sign-up'
 import { Route as ClerkauthSignInRouteImport } from './routes/clerk/(auth)/sign-in'
 import { Route as AuthenticatedUsersUserIdRouteImport } from './routes/_authenticated/users/$userId'
+import { Route as AuthenticatedPaymentsGatewayRouteImport } from './routes/_authenticated/payments/$gateway'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedAnalyticsTrafficRouteImport } from './routes/_authenticated/analytics/traffic'
 import { Route as AuthenticatedAnalyticsReportsRouteImport } from './routes/_authenticated/analytics/reports'
@@ -241,6 +244,12 @@ const AuthenticatedProductsIndexRoute =
     path: '/products/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPaymentsIndexRoute =
+  AuthenticatedPaymentsIndexRouteImport.update({
+    id: '/payments/',
+    path: '/payments/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOrderIndexRoute = AuthenticatedOrderIndexRouteImport.update({
   id: '/order/',
   path: '/order/',
@@ -273,6 +282,12 @@ const AuthenticatedCategoryIndexRoute =
   AuthenticatedCategoryIndexRouteImport.update({
     id: '/category/',
     path: '/category/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedBorzoReportIndexRoute =
+  AuthenticatedBorzoReportIndexRouteImport.update({
+    id: '/borzo-report/',
+    path: '/borzo-report/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAnalyticsIndexRoute =
@@ -343,6 +358,12 @@ const AuthenticatedUsersUserIdRoute =
   AuthenticatedUsersUserIdRouteImport.update({
     id: '/users/$userId',
     path: '/users/$userId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPaymentsGatewayRoute =
+  AuthenticatedPaymentsGatewayRouteImport.update({
+    id: '/payments/$gateway',
+    path: '/payments/$gateway',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedErrorsErrorRoute =
@@ -450,6 +471,7 @@ export interface FileRoutesByFullPath {
   '/analytics/reports': typeof AuthenticatedAnalyticsReportsRoute
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/payments/$gateway': typeof AuthenticatedPaymentsGatewayRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
@@ -463,12 +485,14 @@ export interface FileRoutesByFullPath {
   '/template/$vendorId/profile': typeof TemplateVendorIdProfileRoute
   '/template/$vendorId/register': typeof TemplateVendorIdRegisterRoute
   '/analytics/': typeof AuthenticatedAnalyticsIndexRoute
+  '/borzo-report': typeof AuthenticatedBorzoReportIndexRoute
   '/category': typeof AuthenticatedCategoryIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
+  '/payments': typeof AuthenticatedPaymentsIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/sitemaps': typeof AuthenticatedSitemapsIndexRoute
@@ -512,6 +536,7 @@ export interface FileRoutesByTo {
   '/analytics/reports': typeof AuthenticatedAnalyticsReportsRoute
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/payments/$gateway': typeof AuthenticatedPaymentsGatewayRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
@@ -525,12 +550,14 @@ export interface FileRoutesByTo {
   '/template/$vendorId/profile': typeof TemplateVendorIdProfileRoute
   '/template/$vendorId/register': typeof TemplateVendorIdRegisterRoute
   '/analytics': typeof AuthenticatedAnalyticsIndexRoute
+  '/borzo-report': typeof AuthenticatedBorzoReportIndexRoute
   '/category': typeof AuthenticatedCategoryIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
+  '/payments': typeof AuthenticatedPaymentsIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/sitemaps': typeof AuthenticatedSitemapsIndexRoute
@@ -579,6 +606,7 @@ export interface FileRoutesById {
   '/_authenticated/analytics/reports': typeof AuthenticatedAnalyticsReportsRoute
   '/_authenticated/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/_authenticated/payments/$gateway': typeof AuthenticatedPaymentsGatewayRoute
   '/_authenticated/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/clerk/(auth)/sign-in': typeof ClerkauthSignInRoute
   '/clerk/(auth)/sign-up': typeof ClerkauthSignUpRoute
@@ -592,12 +620,14 @@ export interface FileRoutesById {
   '/template/$vendorId/profile': typeof TemplateVendorIdProfileRoute
   '/template/$vendorId/register': typeof TemplateVendorIdRegisterRoute
   '/_authenticated/analytics/': typeof AuthenticatedAnalyticsIndexRoute
+  '/_authenticated/borzo-report/': typeof AuthenticatedBorzoReportIndexRoute
   '/_authenticated/category/': typeof AuthenticatedCategoryIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/commission/': typeof AuthenticatedCommissionIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/inventory-management/': typeof AuthenticatedInventoryManagementIndexRoute
   '/_authenticated/order/': typeof AuthenticatedOrderIndexRoute
+  '/_authenticated/payments/': typeof AuthenticatedPaymentsIndexRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/sitemaps/': typeof AuthenticatedSitemapsIndexRoute
@@ -645,6 +675,7 @@ export interface FileRouteTypes {
     | '/analytics/reports'
     | '/analytics/traffic'
     | '/errors/$error'
+    | '/payments/$gateway'
     | '/users/$userId'
     | '/clerk/sign-in'
     | '/clerk/sign-up'
@@ -658,12 +689,14 @@ export interface FileRouteTypes {
     | '/template/$vendorId/profile'
     | '/template/$vendorId/register'
     | '/analytics/'
+    | '/borzo-report'
     | '/category'
     | '/chats'
     | '/commission'
     | '/help-center'
     | '/inventory-management'
     | '/order'
+    | '/payments'
     | '/products'
     | '/profile'
     | '/sitemaps'
@@ -707,6 +740,7 @@ export interface FileRouteTypes {
     | '/analytics/reports'
     | '/analytics/traffic'
     | '/errors/$error'
+    | '/payments/$gateway'
     | '/users/$userId'
     | '/clerk/sign-in'
     | '/clerk/sign-up'
@@ -720,12 +754,14 @@ export interface FileRouteTypes {
     | '/template/$vendorId/profile'
     | '/template/$vendorId/register'
     | '/analytics'
+    | '/borzo-report'
     | '/category'
     | '/chats'
     | '/commission'
     | '/help-center'
     | '/inventory-management'
     | '/order'
+    | '/payments'
     | '/products'
     | '/profile'
     | '/sitemaps'
@@ -773,6 +809,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analytics/reports'
     | '/_authenticated/analytics/traffic'
     | '/_authenticated/errors/$error'
+    | '/_authenticated/payments/$gateway'
     | '/_authenticated/users/$userId'
     | '/clerk/(auth)/sign-in'
     | '/clerk/(auth)/sign-up'
@@ -786,12 +823,14 @@ export interface FileRouteTypes {
     | '/template/$vendorId/profile'
     | '/template/$vendorId/register'
     | '/_authenticated/analytics/'
+    | '/_authenticated/borzo-report/'
     | '/_authenticated/category/'
     | '/_authenticated/chats/'
     | '/_authenticated/commission/'
     | '/_authenticated/help-center/'
     | '/_authenticated/inventory-management/'
     | '/_authenticated/order/'
+    | '/_authenticated/payments/'
     | '/_authenticated/products/'
     | '/_authenticated/profile/'
     | '/_authenticated/sitemaps/'
@@ -1064,6 +1103,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/payments/': {
+      id: '/_authenticated/payments/'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof AuthenticatedPaymentsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/order/': {
       id: '/_authenticated/order/'
       path: '/order'
@@ -1104,6 +1150,13 @@ declare module '@tanstack/react-router' {
       path: '/category'
       fullPath: '/category'
       preLoaderRoute: typeof AuthenticatedCategoryIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/borzo-report/': {
+      id: '/_authenticated/borzo-report/'
+      path: '/borzo-report'
+      fullPath: '/borzo-report'
+      preLoaderRoute: typeof AuthenticatedBorzoReportIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/analytics/': {
@@ -1195,6 +1248,13 @@ declare module '@tanstack/react-router' {
       path: '/users/$userId'
       fullPath: '/users/$userId'
       preLoaderRoute: typeof AuthenticatedUsersUserIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/payments/$gateway': {
+      id: '/_authenticated/payments/$gateway'
+      path: '/payments/$gateway'
+      fullPath: '/payments/$gateway'
+      preLoaderRoute: typeof AuthenticatedPaymentsGatewayRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/errors/$error': {
@@ -1326,13 +1386,16 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalyticsRouteRoute: typeof AuthenticatedAnalyticsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedPaymentsGatewayRoute: typeof AuthenticatedPaymentsGatewayRoute
   AuthenticatedUsersUserIdRoute: typeof AuthenticatedUsersUserIdRoute
+  AuthenticatedBorzoReportIndexRoute: typeof AuthenticatedBorzoReportIndexRoute
   AuthenticatedCategoryIndexRoute: typeof AuthenticatedCategoryIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedCommissionIndexRoute: typeof AuthenticatedCommissionIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
   AuthenticatedOrderIndexRoute: typeof AuthenticatedOrderIndexRoute
+  AuthenticatedPaymentsIndexRoute: typeof AuthenticatedPaymentsIndexRoute
   AuthenticatedProductsIndexRoute: typeof AuthenticatedProductsIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedSitemapsIndexRoute: typeof AuthenticatedSitemapsIndexRoute
@@ -1358,7 +1421,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedAnalyticsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedPaymentsGatewayRoute: AuthenticatedPaymentsGatewayRoute,
   AuthenticatedUsersUserIdRoute: AuthenticatedUsersUserIdRoute,
+  AuthenticatedBorzoReportIndexRoute: AuthenticatedBorzoReportIndexRoute,
   AuthenticatedCategoryIndexRoute: AuthenticatedCategoryIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedCommissionIndexRoute: AuthenticatedCommissionIndexRoute,
@@ -1366,6 +1431,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInventoryManagementIndexRoute:
     AuthenticatedInventoryManagementIndexRoute,
   AuthenticatedOrderIndexRoute: AuthenticatedOrderIndexRoute,
+  AuthenticatedPaymentsIndexRoute: AuthenticatedPaymentsIndexRoute,
   AuthenticatedProductsIndexRoute: AuthenticatedProductsIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedSitemapsIndexRoute: AuthenticatedSitemapsIndexRoute,

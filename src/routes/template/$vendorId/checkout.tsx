@@ -7,6 +7,23 @@ import {
   templateApiFetch,
 } from '@/features/template-preview/utils/templateAuth'
 
+declare global {
+  interface Window {
+    Razorpay: any
+  }
+}
+
+const loadRazorpayScript = () =>
+  new Promise<boolean>((resolve) => {
+    if (typeof window === 'undefined') return resolve(false)
+    if (window.Razorpay) return resolve(true)
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.onload = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.body.appendChild(script)
+  })
+
 type Address = {
   _id: string
   label?: string
@@ -50,6 +67,9 @@ function TemplateCheckout() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod'>('razorpay')
+  const [paymentProcessing, setPaymentProcessing] = useState(false)
   const formatAttrs = (attrs?: Record<string, string>) => {
     if (!attrs) return ''
     return Object.values(attrs)
@@ -100,6 +120,7 @@ function TemplateCheckout() {
     event.preventDefault()
     setCreating(true)
     setError('')
+    setSuccess('')
     try {
       const data = await templateApiFetch(vendorId, '/addresses', {
         method: 'POST',
@@ -126,26 +147,108 @@ function TemplateCheckout() {
     }
   }
 
+  const handleRazorpayPayment = async (order: any, payment: any) => {
+    const loaded = await loadRazorpayScript()
+    if (!loaded) {
+      throw new Error('Failed to load payment gateway')
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const options = {
+        key: payment.keyId,
+        order_id: payment.orderId,
+        amount: payment.amount,
+        currency: payment.currency,
+        name: 'Ophmate Store',
+        description: `Order ${order?.order_number || ''}`,
+        prefill: {
+          name: auth?.user?.name || '',
+          email: auth?.user?.email || '',
+          contact: auth?.user?.phone || '',
+        },
+        handler: async (response: any) => {
+          try {
+            await templateApiFetch(vendorId, `/orders/${order._id}/razorpay/verify`, {
+              method: 'POST',
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            })
+            resolve()
+          } catch (err) {
+            reject(err)
+          }
+        },
+        modal: {
+          ondismiss: async () => {
+            try {
+              await templateApiFetch(vendorId, `/orders/${order._id}/razorpay/failed`, {
+                method: 'POST',
+                body: JSON.stringify({ reason: 'dismissed' }),
+              })
+            } catch {
+              // ignore
+            }
+            reject(new Error('Payment cancelled'))
+          },
+        },
+        theme: {
+          color: '#1f2937',
+        },
+      }
+
+      const razorpay = new window.Razorpay(options)
+      razorpay.on('payment.failed', async (response: any) => {
+        try {
+          await templateApiFetch(vendorId, `/orders/${order._id}/razorpay/failed`, {
+            method: 'POST',
+            body: JSON.stringify({
+              reason: response?.error?.description || 'payment_failed',
+            }),
+          })
+        } catch {
+          // ignore
+        }
+        reject(new Error(response?.error?.description || 'Payment failed'))
+      })
+      razorpay.open()
+    })
+  }
+
   const handlePlaceOrder = async () => {
     if (!selectedAddress) {
       setError('Select an address before placing order.')
       return
     }
     setCreating(true)
+    setPaymentProcessing(true)
     setError('')
+    setSuccess('')
     try {
-      await templateApiFetch(vendorId, '/orders', {
+      const orderRes = await templateApiFetch(vendorId, '/orders', {
         method: 'POST',
         body: JSON.stringify({
           address_id: selectedAddress,
-          payment_method: 'cod',
+          payment_method: paymentMethod,
         }),
       })
+      if (paymentMethod === 'razorpay') {
+        if (!orderRes?.payment?.orderId) {
+          throw new Error('Payment initialization failed')
+        }
+        await handleRazorpayPayment(orderRes.order, orderRes.payment)
+        setSuccess('Payment successful')
+      } else {
+        setSuccess('Order placed')
+      }
       window.location.href = `/template/${vendorId}/orders`
     } catch (err: any) {
       setError(err?.message || 'Failed to place order')
     } finally {
       setCreating(false)
+      setPaymentProcessing(false)
     }
   }
 
@@ -191,6 +294,11 @@ function TemplateCheckout() {
             {error && (
               <div className='rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600'>
                 {error}
+              </div>
+            )}
+            {success && (
+              <div className='rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700'>
+                {success}
               </div>
             )}
 
@@ -368,6 +476,27 @@ function TemplateCheckout() {
                   </span>
                 </a>
               ))}
+              <div className='mt-4 space-y-2 border-t pt-3 text-sm'>
+                <p className='font-semibold text-slate-900'>Payment Method</p>
+                <label className='flex items-center gap-2'>
+                  <input
+                    type='radio'
+                    name='payment_method'
+                    checked={paymentMethod === 'razorpay'}
+                    onChange={() => setPaymentMethod('razorpay')}
+                  />
+                  Pay online (Razorpay)
+                </label>
+                <label className='flex items-center gap-2'>
+                  <input
+                    type='radio'
+                    name='payment_method'
+                    checked={paymentMethod === 'cod'}
+                    onChange={() => setPaymentMethod('cod')}
+                  />
+                  Cash on Delivery
+                </label>
+              </div>
               <div className='flex justify-between border-t pt-3 font-semibold text-slate-900'>
                 <span>Total</span>
                 <span>₹{total.toFixed(2)}</span>
@@ -375,10 +504,14 @@ function TemplateCheckout() {
             </div>
             <button
               onClick={handlePlaceOrder}
-              disabled={creating || !cart?.items?.length}
+              disabled={creating || paymentProcessing || !cart?.items?.length}
               className='mt-6 w-full rounded-full bg-slate-900 py-3 text-sm font-semibold text-white disabled:opacity-60'
             >
-              Place order (COD)
+              {creating || paymentProcessing
+                ? 'Processing...'
+                : paymentMethod === 'razorpay'
+                  ? 'Pay & Place Order'
+                  : 'Place order (COD)'}
             </button>
           </div>
         </div>
@@ -386,4 +519,6 @@ function TemplateCheckout() {
     </PreviewChrome>
   )
 }
+
+
 

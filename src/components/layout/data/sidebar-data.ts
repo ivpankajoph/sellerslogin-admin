@@ -5,6 +5,8 @@ import {
   ShieldCheck,
   ShoppingCart,
   Map,
+  CreditCard,
+  Truck,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -71,6 +73,12 @@ export const sidebarData: any = {
           ],
         },
         {
+          title: 'Payments',
+          url: '/payments',
+          icon: CreditCard,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+        },
+        {
           title: 'Storefront Analytics',
           url: '/analytics',
           icon: LayoutDashboard,
@@ -81,6 +89,12 @@ export const sidebarData: any = {
           url: '/profile',
           icon: Users,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
+        },
+        {
+          title: 'Borzo Report',
+          url: '/borzo-report',
+          icon: Truck,
+          roles: [ROLES.ADMIN],
         },
       ],
     },
