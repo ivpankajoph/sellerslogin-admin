@@ -1,10 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { VITE_PUBLIC_API_URL } from "@/config";
+
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 
-const BASE_URL = VITE_PUBLIC_API_URL as string;
-
+const BASE_URL = import.meta.env.VITE_PUBLIC_API_URL as string;
 /* -------------------------------------------------------------------------- */
 /*                                   THUNKS                                   */
 /* -------------------------------------------------------------------------- */

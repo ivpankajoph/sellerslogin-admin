@@ -17,7 +17,7 @@ import type { CSSProperties } from "react";
 import { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import axios from "axios";
-import { VITE_PUBLIC_API_URL } from "@/config";
+
 
 function StorefrontSelect() {
   const { source, setSource, options } = useAnalyticsSource();
@@ -82,7 +82,7 @@ function AnalyticsHubShell() {
     if (role !== "vendor" || !vendorId) return;
     const fetchTemplates = async () => {
       try {
-        const res = await axios.get(`${VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
+        const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
           params: { vendor_id: vendorId },
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });

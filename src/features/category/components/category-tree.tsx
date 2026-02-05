@@ -2,7 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { VITE_PUBLIC_API_URL } from "@/config";
+
 import { uploadImage } from "@/features/vendor-template/helper/fileupload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,10 +159,10 @@ export function CategoryTree({
 
       const endpoint =
         editTarget.type === "main"
-          ? `${VITE_PUBLIC_API_URL}/v1/maincategories/update/${editTarget.id}`
+          ? `${import.meta.env.VITE_PUBLIC_API_URL}/v1/maincategories/update/${editTarget.id}`
           : editTarget.type === "category"
-            ? `${VITE_PUBLIC_API_URL}/v1/categories/update/${editTarget.id}`
-            : `${VITE_PUBLIC_API_URL}/v1/subcategories/update/${editTarget.id}`;
+            ? `${import.meta.env.VITE_PUBLIC_API_URL}/v1/categories/update/${editTarget.id}`
+            : `${import.meta.env.VITE_PUBLIC_API_URL}/v1/subcategories/update/${editTarget.id}`;
 
       await axios.put(endpoint, payload, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -192,10 +192,10 @@ export function CategoryTree({
       setDeletingId(id);
       const url =
         type === "main"
-          ? `${VITE_PUBLIC_API_URL}/v1/maincategories/delete/${id}`
+          ? `${import.meta.env.VITE_PUBLIC_API_URL}/v1/maincategories/delete/${id}`
           : type === "category"
-            ? `${VITE_PUBLIC_API_URL}/v1/categories/delete/${id}`
-            : `${VITE_PUBLIC_API_URL}/v1/subcategories/${id}`;
+            ? `${import.meta.env.VITE_PUBLIC_API_URL}/v1/categories/delete/${id}`
+            : `${import.meta.env.VITE_PUBLIC_API_URL}/v1/subcategories/${id}`;
       await axios.delete(url, { headers: getHeaders() });
       onRefresh?.();
     } finally {

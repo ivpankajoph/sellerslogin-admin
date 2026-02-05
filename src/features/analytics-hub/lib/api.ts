@@ -1,9 +1,9 @@
-import { VITE_PUBLIC_API_URL } from "@/config";
+
 
 const apiBase =
-  VITE_PUBLIC_API_URL && VITE_PUBLIC_API_URL.endsWith("/v1")
-    ? VITE_PUBLIC_API_URL
-    : `${VITE_PUBLIC_API_URL}/v1`;
+  import.meta.env.VITE_PUBLIC_API_URL && import.meta.env.VITE_PUBLIC_API_URL.endsWith("/v1")
+    ? import.meta.env.VITE_PUBLIC_API_URL
+    : `${import.meta.env.VITE_PUBLIC_API_URL}/v1`;
 
 const normalizeBase = (value: string) => value.replace(/\/+$/, "");
 

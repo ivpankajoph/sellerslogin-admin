@@ -1,6 +1,5 @@
 "use client"
 
-import { VITE_PUBLIC_API_URL } from "@/config"
 
 export type TemplateAuthPayload = {
   token: string
@@ -14,9 +13,9 @@ export type TemplateAuthPayload = {
 }
 
 const API_BASE =
-  VITE_PUBLIC_API_URL && VITE_PUBLIC_API_URL.endsWith("/v1")
-    ? VITE_PUBLIC_API_URL
-    : `${VITE_PUBLIC_API_URL}/v1`
+  import.meta.env.VITE_PUBLIC_API_URL && import.meta.env.VITE_PUBLIC_API_URL.endsWith("/v1")
+    ? import.meta.env.VITE_PUBLIC_API_URL
+    : `${import.meta.env.VITE_PUBLIC_API_URL}/v1`
 
 const storageKey = (vendorId: string) => `template_auth_${vendorId}`
 

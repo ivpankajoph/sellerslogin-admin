@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { VITE_PUBLIC_API_URL } from "@/config";
+
 
 type Summary = {
   totals: {
@@ -107,7 +107,7 @@ export default function Analytics() {
       setLoading(true);
       try {
         const res = await axios.get(
-          `${VITE_PUBLIC_API_URL}/v1/analytics/summary`,
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/summary`,
           {
             params: { range },
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -127,7 +127,7 @@ export default function Analytics() {
     const fetchEvents = async () => {
       try {
         const res = await axios.get(
-          `${VITE_PUBLIC_API_URL}/v1/analytics/events`,
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/events`,
           {
             params: {
               range: selectedVisitor ? "all" : range,
@@ -155,7 +155,7 @@ export default function Analytics() {
     const fetchVisitors = async () => {
       try {
         const res = await axios.get(
-          `${VITE_PUBLIC_API_URL}/v1/analytics/visitors`,
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/visitors`,
           {
             params: { range: "all", page: 1, pageSize: 10 },
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,

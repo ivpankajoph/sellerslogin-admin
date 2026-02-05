@@ -24,7 +24,7 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
-import { VITE_PUBLIC_STOREFRONT_URL, VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND } from "@/config";
+
 import { useSelector } from "react-redux";
 
 const dashboardItems = [
@@ -41,8 +41,8 @@ const reportItems = [
 
 export function AnalyticsAppSidebar() {
   const location = useLocation({ select: (loc) => loc.pathname });
-  const storefrontUrl = VITE_PUBLIC_STOREFRONT_URL || "";
-  const templateStorefrontUrl = VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND || "";
+  const storefrontUrl = import.meta.env.VITE_PUBLIC_STOREFRONT_URL || "";
+  const templateStorefrontUrl = import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND || "";
   const role = useSelector((state: any) => state.auth?.user?.role);
 
   return (
