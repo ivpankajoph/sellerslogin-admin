@@ -14,7 +14,7 @@ import {
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store'
 import axios from 'axios'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 
 type Wallet = {
   _id: string
@@ -121,7 +121,7 @@ function TemplateWalletPage() {
         return
       }
       try {
-        const res = await axios.get(`${VITE_PUBLIC_API_URL}/v1/vendors/getall`, {
+        const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/vendors/getall`, {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })
         setVendors(res.data?.vendors || res.data?.data || [])
@@ -140,7 +140,7 @@ function TemplateWalletPage() {
         return
       }
       try {
-        const res = await axios.get(`${VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
+        const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
           params: { vendor_id: selectedVendor },
         })
         setTemplates(res.data?.data || [])

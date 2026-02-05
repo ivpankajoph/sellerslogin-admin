@@ -6,7 +6,7 @@ import {
   getTemplateAuth,
   templateApiFetch,
 } from '@/features/template-preview/utils/templateAuth'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 import { toast } from 'sonner'
 
 type OrderItem = {
@@ -45,9 +45,7 @@ type OrderDetail = {
 }
 
 const API_BASE =
-  VITE_PUBLIC_API_URL && VITE_PUBLIC_API_URL.endsWith('/v1')
-    ? VITE_PUBLIC_API_URL
-    : `${VITE_PUBLIC_API_URL}/v1`
+  import.meta.env.VITE_PUBLIC_API_URL
 
 const formatMoney = (value: number) => `Rs. ${Number(value || 0).toFixed(2)}`
 
@@ -90,7 +88,7 @@ function TemplateOrderDetail() {
     }
     try {
       const response = await fetch(
-        `${API_BASE}/template-users/orders/${orderId}/invoice`,
+        `${API_BASE}/v1/template-users/orders/${orderId}/invoice`,
         {
           headers: {
             Authorization: `Bearer ${auth.token}`,
