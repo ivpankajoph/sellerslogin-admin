@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
 interface CategoryState {
@@ -31,7 +31,7 @@ const initialState: CategoryState = {
   uploadError: null,
 }
 
-const BASE_URL = VITE_PUBLIC_API_URL
+const BASE_URL = import.meta.env.VITE_PUBLIC_API_URL
 
 export const createCategory = createAsyncThunk(
   'categories/create',

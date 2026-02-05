@@ -4,7 +4,7 @@ import { type JSX, useEffect, useMemo, useState } from 'react'
 import { Link2, Rocket, Wand2 } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
-import { VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND } from '@/config'
+
 import { DomainModal } from './components/DomainModel'
 import { TemplatePageLayout } from './components/TemplatePageLayout'
 import { TemplatePreviewPanel } from './components/TemplatePreviewPanel'
@@ -90,7 +90,7 @@ export default function TemplateForm() {
   }, [selectedSection])
 
   const previewBaseUrl = vendor_id
-    ? `${VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
+    ? `${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
     : undefined
   const previewQuery = selectedTemplateKey
     ? `?preview=${selectedTemplateKey}`
@@ -405,7 +405,7 @@ export default function TemplateForm() {
           activeKey={activeTemplateKey}
           previewBaseUrl={
             vendor_id
-              ? `${VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
+              ? `${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
               : undefined
           }
           onSelect={setSelectedTemplateKey}

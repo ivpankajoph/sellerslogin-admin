@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { type JSX, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
-import { VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND } from '@/config'
+
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
@@ -284,7 +284,7 @@ function VendorTemplateOther() {
   }
 
   const previewBaseUrl = vendor_id
-    ? `${VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
+    ? `${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
     : undefined
 
   const sections = useMemo(

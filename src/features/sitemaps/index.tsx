@@ -5,11 +5,7 @@ import { useSelector } from 'react-redux'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import {
-  VITE_PUBLIC_API_URL,
-  VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND,
-  VITE_PUBLIC_STOREFRONT_URL,
-} from '@/config'
+
 import type { RootState } from '@/store'
 
 type Product = {
@@ -120,14 +116,14 @@ export default function SitemapsPage() {
   )
 
   const apiBase = useMemo(() => {
-    if (!VITE_PUBLIC_API_URL) return ''
-    return VITE_PUBLIC_API_URL.endsWith('/v1')
-      ? VITE_PUBLIC_API_URL
-      : `${VITE_PUBLIC_API_URL}/v1`
+    if (!import.meta.env.VITE_PUBLIC_API_URL) return ''
+    return import.meta.env.VITE_PUBLIC_API_URL.endsWith('/v1')
+      ? import.meta.env.VITE_PUBLIC_API_URL
+      : `${import.meta.env.VITE_PUBLIC_API_URL}/v1`
   }, [])
 
-  const storefrontBase = VITE_PUBLIC_STOREFRONT_URL || ''
-  const templateBase = VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND || ''
+  const storefrontBase = import.meta.env.VITE_PUBLIC_STOREFRONT_URL || ''
+  const templateBase = import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND || ''
   const query = search.trim().toLowerCase()
 
   const loadData = async () => {

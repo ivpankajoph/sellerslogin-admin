@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import axios from 'axios'
 import { useSelector } from 'react-redux'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ConfigDrawer } from '@/components/config-drawer'
@@ -71,8 +71,8 @@ export function UserDetails() {
       setError(null)
       try {
         const url = isVendor
-          ? `${VITE_PUBLIC_API_URL}/v1/vendor/customers/${userId}/details`
-          : `${VITE_PUBLIC_API_URL}/v1/users/admin/${userId}/details`
+          ? `${import.meta.env.VITE_PUBLIC_API_URL}/v1/vendor/customers/${userId}/details`
+          : `${import.meta.env.VITE_PUBLIC_API_URL}/v1/users/admin/${userId}/details`
         const res = await axios.get(
           url,
           {

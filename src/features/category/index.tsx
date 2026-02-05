@@ -19,7 +19,7 @@ import { getAllCategories } from '@/store/slices/admin/categorySlice'
 import { Pagination } from '@/components/pagination'
 import { Input } from '@/components/ui/input'
 import axios from 'axios'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 import type { RootState } from '@/store'
 
 export function Category() {
@@ -73,7 +73,7 @@ export function Category() {
     const fetchMainCategories = async () => {
       try {
         const res = await axios.get(
-          `${VITE_PUBLIC_API_URL}/v1/maincategories/getall`,
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/maincategories/getall`,
           {
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           }

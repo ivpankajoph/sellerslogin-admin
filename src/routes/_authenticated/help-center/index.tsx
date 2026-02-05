@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 
 export const Route = createFileRoute('/_authenticated/help-center/')({
   component: HelpCenterPage,
@@ -113,14 +113,14 @@ function HelpCenterPage() {
   }, [tickets, search])
 
   const baseUrl =
-    VITE_PUBLIC_API_URL && VITE_PUBLIC_API_URL.endsWith('/v1')
-      ? VITE_PUBLIC_API_URL.replace(/\/v1$/, '')
-      : VITE_PUBLIC_API_URL || ''
+    import.meta.env.VITE_PUBLIC_API_URL && import.meta.env.VITE_PUBLIC_API_URL.endsWith('/v1')
+      ? import.meta.env.VITE_PUBLIC_API_URL.replace(/\/v1$/, '')
+      : import.meta.env.VITE_PUBLIC_API_URL || ''
 
   const cloudinaryBase =
-    VITE_PUBLIC_API_URL && VITE_PUBLIC_API_URL.endsWith('/v1')
-      ? VITE_PUBLIC_API_URL
-      : `${VITE_PUBLIC_API_URL}/v1`
+    import.meta.env.VITE_PUBLIC_API_URL && import.meta.env.VITE_PUBLIC_API_URL.endsWith('/v1')
+      ? import.meta.env.VITE_PUBLIC_API_URL
+      : `${import.meta.env.VITE_PUBLIC_API_URL}/v1`
 
   const isAbsoluteUrl = (value: string) =>
     /^https?:\/\//i.test(value)

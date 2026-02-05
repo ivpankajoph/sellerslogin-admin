@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { JSX, useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
-import { VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND } from '@/config'
+
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -370,7 +370,7 @@ function VendorTemplateContact() {
   }
 
   const previewBaseUrl = vendor_id
-    ? `${VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
+    ? `${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
     : undefined
 
   const sections = useMemo(

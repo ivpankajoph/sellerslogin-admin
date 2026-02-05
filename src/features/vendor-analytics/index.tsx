@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 import { useSelector } from 'react-redux'
 import {
   Card,
@@ -115,7 +115,7 @@ export default function VendorAnalytics() {
       setLoading(true)
       try {
         const res = await axios.get(
-          `${VITE_PUBLIC_API_URL}/v1/analytics/summary`,
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/summary`,
           {
             params: { range, vendorId },
           }
@@ -135,7 +135,7 @@ export default function VendorAnalytics() {
     const fetchEvents = async () => {
       try {
         const res = await axios.get(
-          `${VITE_PUBLIC_API_URL}/v1/analytics/events`,
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/events`,
           {
             params: {
               range: selectedVisitor ? 'all' : range,
@@ -172,7 +172,7 @@ export default function VendorAnalytics() {
     const fetchVisitors = async () => {
       try {
         const res = await axios.get(
-          `${VITE_PUBLIC_API_URL}/v1/analytics/visitors`,
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/visitors`,
           {
             params: { range: 'all', page: 1, pageSize: 10, vendorId },
           }

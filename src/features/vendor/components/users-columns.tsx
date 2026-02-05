@@ -35,7 +35,7 @@ import { Separator } from '@/components/ui/separator'
 import { DataTableColumnHeader } from '@/components/data-table'
 import { LongText } from '@/components/long-text'
 import { DataTableRowActions } from './data-table-row-actions'
-import { VITE_PUBLIC_API_URL_BANNERS } from '@/config'
+
 import Swal from 'sweetalert2'
 import { toast } from 'sonner'
 import { useDispatch } from 'react-redux'
@@ -44,7 +44,7 @@ import { fetchAllVendors } from '@/store/slices/admin/vendorSlice'
 import type { AppDispatch } from '@/store'
 
 // Base file path for vendor files
-const BASE_URL = VITE_PUBLIC_API_URL_BANNERS
+const BASE_URL = import.meta.env.VITE_PUBLIC_API_URL_BANNERS
 
 
 // 🧾 Vendor Type Definition

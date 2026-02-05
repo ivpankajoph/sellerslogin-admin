@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { VITE_PUBLIC_API_URL, VITE_PUBLIC_API_URL_BANNERS } from '@/config'
+
 import {
   clearTemplateAuth,
   getTemplateAuth,
@@ -51,11 +51,11 @@ export function PreviewChrome({
   children,
   footer,
 }: PreviewChromeProps) {
-  const API_BASE = VITE_PUBLIC_API_URL?.endsWith('/v1')
-    ? VITE_PUBLIC_API_URL
-    : `${VITE_PUBLIC_API_URL}/v1`
+  const API_BASE = import.meta.env.VITE_PUBLIC_API_URL?.endsWith('/v1')
+    ? import.meta.env.VITE_PUBLIC_API_URL
+    : `${import.meta.env.VITE_PUBLIC_API_URL}/v1`
   const analyticsUrl = `${API_BASE}/analytics/track`
-  const assetBase = VITE_PUBLIC_API_URL_BANNERS || VITE_PUBLIC_API_URL || ''
+  const assetBase = import.meta.env.VITE_PUBLIC_API_URL_BANNERS || import.meta.env.VITE_PUBLIC_API_URL || ''
   const resolvedLogoUrl =
     logoUrl && !logoUrl.startsWith('http')
       ? `${assetBase.replace(/\/$/, '')}/${logoUrl.replace(/^\//, '')}`

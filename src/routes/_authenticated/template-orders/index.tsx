@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 
 type OrderSummary = {
   totalOrders: number
@@ -116,7 +116,7 @@ function TemplateOrdersReport() {
     if (isVendor) return
     const fetchVendors = async () => {
       try {
-        const res = await axios.get(`${VITE_PUBLIC_API_URL}/v1/vendors/getall`, {
+        const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/vendors/getall`, {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })
         setVendors(res.data?.vendors || res.data?.data || [])
@@ -137,7 +137,7 @@ function TemplateOrdersReport() {
     const fetchTemplates = async () => {
       try {
         setTemplatesLoading(true)
-        const res = await axios.get(`${VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
+        const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
           params: { vendor_id: vendorFilter },
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })

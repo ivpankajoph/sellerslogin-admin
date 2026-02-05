@@ -8,7 +8,6 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import axios from 'axios'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store'
-import { VITE_PUBLIC_API_URL } from '@/config'
 
 type CommissionRule = {
   scope_type: 'main' | 'category' | 'subcategory'
@@ -71,7 +70,7 @@ function CommissionPage() {
     const fetchMainCategories = async () => {
       try {
         const res = await axios.get(
-          `${VITE_PUBLIC_API_URL}/v1/maincategories/getall`,
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/maincategories/getall`,
           {
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           }

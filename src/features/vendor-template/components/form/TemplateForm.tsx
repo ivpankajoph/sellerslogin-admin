@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND } from '@/config'
+
 import { AppDispatch } from '@/store'
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
 import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
@@ -250,7 +250,7 @@ export function TemplateForm() {
 
               <a
                 className='w-full sm:w-fit'
-                href={`${VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}?vendor_id=${vendor_id}`}
+                href={`${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}?vendor_id=${vendor_id}`}
                 target='_blank'
                 rel='noopener noreferrer'
               >

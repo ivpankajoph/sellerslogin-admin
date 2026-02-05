@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 import {
   createSlice,
   createAsyncThunk,
@@ -39,7 +39,7 @@ const initialState: VendorState = {
   error: null,
 }
 
-const BASE_URL = VITE_PUBLIC_API_URL
+const BASE_URL = import.meta.env.VITE_PUBLIC_API_URL
 
 export const fetchAllVendors = createAsyncThunk(
   'vendors/fetchAllVendors',

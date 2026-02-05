@@ -11,7 +11,7 @@ import { UsersTable } from './components/users-table'
 import { useEffect, useState } from 'react'
 import api from '@/lib/axios'
 import axios from 'axios'
-import { VITE_PUBLIC_API_URL } from '@/config'
+
 import { useSelector } from 'react-redux'
 import { type User } from './data/schema'
 
@@ -35,7 +35,7 @@ export function Users() {
         const res =
           role === 'vendor'
             ? await api.get('/customers')
-            : await axios.get(`${VITE_PUBLIC_API_URL}/v1/users/getall`, {
+            : await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/users/getall`, {
                 headers: {
                   Authorization: `Bearer ${token}`,
                 },
