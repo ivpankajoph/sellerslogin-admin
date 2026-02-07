@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { uploadImage } from '@/features/vendor-template/helper/fileupload'
+import { uploadImage } from '@/lib/upload-image'
 
 interface AddSubcategoryModalProps {
   open: boolean
@@ -171,3 +171,4 @@ export default function AddSubcategoryModal({
     </Dialog>
   )
 }
+

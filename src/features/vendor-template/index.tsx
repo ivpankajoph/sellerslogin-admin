@@ -22,6 +22,7 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ProfileDropdown } from '@/components/profile-dropdown'
+import { getVendorTemplateBaseUrl } from '@/lib/storefront-url'
 
 export default function TemplateForm() {
   const {
@@ -89,9 +90,7 @@ export default function TemplateForm() {
     }
   }, [selectedSection])
 
-  const previewBaseUrl = vendor_id
-    ? `${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
-    : undefined
+  const previewBaseUrl = getVendorTemplateBaseUrl(vendor_id)
   const previewQuery = selectedTemplateKey
     ? `?preview=${selectedTemplateKey}`
     : ''
@@ -403,11 +402,7 @@ export default function TemplateForm() {
           templates={templateCatalog}
           selectedKey={selectedTemplateKey}
           activeKey={activeTemplateKey}
-          previewBaseUrl={
-            vendor_id
-              ? `${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
-              : undefined
-          }
+          previewBaseUrl={getVendorTemplateBaseUrl(vendor_id)}
           onSelect={setSelectedTemplateKey}
           onApply={applyTemplateVariant}
           isApplying={isUpdatingTemplate}

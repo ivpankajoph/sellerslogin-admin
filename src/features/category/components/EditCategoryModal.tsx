@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { uploadImage } from '@/features/vendor-template/helper/fileupload'
+import { uploadImage } from '@/lib/upload-image'
 import { updateCategory } from '@/store/slices/admin/categorySlice'
 
 interface EditCategoryModalProps {
@@ -186,3 +186,4 @@ export default function EditCategoryModal({
     </Dialog>
   )
 }
+

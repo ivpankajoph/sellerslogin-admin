@@ -22,6 +22,7 @@ import { ThemeSettingsSection } from '../components/form/ThemeSettingsSection'
 import { updateFieldImmutable } from '../components/hooks/utils'
 import { initialData, type TemplateData } from '../data'
 import { uploadImage } from '../helper/fileupload'
+import { getVendorTemplateBaseUrl } from '@/lib/storefront-url'
 
 function VendorTemplateAbout() {
   const [data, setData] = useState<TemplateData>(initialData)
@@ -195,9 +196,7 @@ function VendorTemplateAbout() {
     }
   }
 
-  const previewBaseUrl = vendor_id
-    ? `${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
-    : undefined
+  const previewBaseUrl = getVendorTemplateBaseUrl(vendor_id)
 
   const sections = useMemo(
     () => [

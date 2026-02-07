@@ -3,7 +3,7 @@ import axios from "axios";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 
-import { uploadImage } from "@/features/vendor-template/helper/fileupload";
+import { uploadImage } from "@/lib/upload-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -533,3 +533,4 @@ export function CategoryTree({
     </div>
   );
 }
+

@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { getVendorTemplateBaseUrl } from '@/lib/storefront-url'
 import { initialData, TemplateData } from '../../data'
 import { uploadImage } from '../../helper/fileupload'
 import { ImageInput } from './ImageInput'
@@ -222,6 +223,8 @@ export function TemplateForm() {
     (state: any) => state?.vendorprofile?.profile?.vendor?.bound_url
   )
 
+  const previewBaseUrl = getVendorTemplateBaseUrl(vendor_id)
+
   return (
     <div className='space-y-6'>
       <Toaster position='top-right' />
@@ -250,7 +253,7 @@ export function TemplateForm() {
 
               <a
                 className='w-full sm:w-fit'
-                href={`${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}?vendor_id=${vendor_id}`}
+                href={previewBaseUrl}
                 target='_blank'
                 rel='noopener noreferrer'
               >

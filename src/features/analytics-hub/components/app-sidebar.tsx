@@ -42,7 +42,10 @@ const reportItems = [
 export function AnalyticsAppSidebar() {
   const location = useLocation({ select: (loc) => loc.pathname });
   const storefrontUrl = import.meta.env.VITE_PUBLIC_STOREFRONT_URL || "";
-  const templateStorefrontUrl = import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND || "";
+  const templateStorefrontUrl =
+    import.meta.env.VITE_PUBLIC_STOREFRONT_URL ||
+    import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND ||
+    "";
   const role = useSelector((state: any) => state.auth?.user?.role);
 
   return (

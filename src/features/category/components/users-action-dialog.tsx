@@ -26,7 +26,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { uploadImage } from '@/features/vendor-template/helper/fileupload'
+import { uploadImage } from '@/lib/upload-image'
 
 const formSchema = z.object({
   name: z.string().min(1, 'Category name is required.'),
@@ -292,3 +292,4 @@ const onSubmit = async (values: CategoryForm) => {
     </Dialog>
   )
 }
+

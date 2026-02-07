@@ -22,6 +22,7 @@ import { BASE_URL } from '@/store/slices/vendor/productSlice'
 
 import { useSelector } from 'react-redux'
 import { initialData, type TemplateData } from '../data'
+import { getVendorTemplateBaseUrl } from '@/lib/storefront-url'
 
 type PageSection = any
 
@@ -260,9 +261,7 @@ export default function VendorTemplatePages() {
   const selectedPage =
     (pages.find((page) => page.id === selectedPageId) as any) || pages[0]
 
-  const previewBaseUrl = vendor_id
-    ? `${import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND}/template/${vendor_id}`
-    : undefined
+  const previewBaseUrl = getVendorTemplateBaseUrl(vendor_id)
   const previewPath = selectedPage?.slug ? `/page/${selectedPage.slug}` : ''
 
   const sectionOrder = useMemo(() => {

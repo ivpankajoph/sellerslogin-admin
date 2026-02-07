@@ -123,7 +123,10 @@ export default function SitemapsPage() {
   }, [])
 
   const storefrontBase = import.meta.env.VITE_PUBLIC_STOREFRONT_URL || ''
-  const templateBase = import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND || ''
+  const templateBase =
+    import.meta.env.VITE_PUBLIC_STOREFRONT_URL ||
+    import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND ||
+    ''
   const query = search.trim().toLowerCase()
 
   const loadData = async () => {
