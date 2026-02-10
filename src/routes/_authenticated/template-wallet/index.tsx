@@ -14,6 +14,7 @@ import {
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store'
 import axios from 'axios'
+import { formatINR } from '@/lib/currency'
 
 
 type Wallet = {
@@ -151,7 +152,7 @@ function TemplateWalletPage() {
     fetchTemplates()
   }, [selectedVendor])
 
-  const formatMoney = (value?: number) => `Rs. ${Number(value || 0).toLocaleString()}`
+  const formatMoney = (value?: number) => formatINR(value)
   const sourceFiltered = useMemo(
     () =>
       transactions.filter(

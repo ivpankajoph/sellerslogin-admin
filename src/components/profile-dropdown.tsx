@@ -57,19 +57,19 @@ export function ProfileDropdown() {
             <DropdownMenuItem asChild>
               <Link to='/profile'>
                 Profile
-                <DropdownMenuShortcut>â‡§âŒ˜P</DropdownMenuShortcut>
+                <DropdownMenuShortcut>Shift+Ctrl+P</DropdownMenuShortcut>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to='/'>
                 Billing
-                <DropdownMenuShortcut>âŒ˜B</DropdownMenuShortcut>
+                <DropdownMenuShortcut>Ctrl+B</DropdownMenuShortcut>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to='/'>
                 Settings
-                <DropdownMenuShortcut>âŒ˜S</DropdownMenuShortcut>
+                <DropdownMenuShortcut>Ctrl+S</DropdownMenuShortcut>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem>New Team</DropdownMenuItem>
@@ -77,7 +77,7 @@ export function ProfileDropdown() {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>
             Sign out
-            <DropdownMenuShortcut>â‡§âŒ˜Q</DropdownMenuShortcut>
+            <DropdownMenuShortcut>Shift+Ctrl+Q</DropdownMenuShortcut>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { AnalyticsSummary } from "@/features/analytics-hub/lib/types";
 import { getQueryFn } from "@/features/analytics-hub/lib/query";
+import { formatINR } from "@/lib/currency";
 
 export default function Reports() {
   const { vendorId, source, templateId } = useAnalyticsContext();
@@ -67,7 +68,7 @@ export default function Reports() {
     },
     {
       title: 'Revenue',
-      value: `$${(data?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      value: formatINR(data?.totalRevenue, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       change: 22.8,
       icon: <DollarSign className="h-4 w-4" />,
     },
@@ -159,7 +160,7 @@ export default function Reports() {
             <div>
               <p className="text-sm font-medium text-green-500">Revenue Growth</p>
               <p className="text-sm text-muted-foreground">
-                Revenue increased by 22.8% compared to last month, with an average order value of ${(data?.avgOrderValue || 0).toFixed(2)}.
+                Revenue increased by 22.8% compared to last month, with an average order value of {formatINR(data?.avgOrderValue, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
               </p>
             </div>
           </div>
@@ -179,7 +180,10 @@ export default function Reports() {
               <p className="text-sm font-medium text-orange-500">Cart Abandonment</p>
               <p className="text-sm text-muted-foreground">
                 {data?.abandonedCarts?.toLocaleString() || 0} carts were abandoned, representing potential lost revenue of{' '}
-                ${((data?.abandonedCarts || 0) * (data?.avgOrderValue || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}.
+                {formatINR((data?.abandonedCarts || 0) * (data?.avgOrderValue || 0), {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}.
               </p>
             </div>
           </div>

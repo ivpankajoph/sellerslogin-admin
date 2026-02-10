@@ -33,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { formatINR } from '@/lib/currency'
 
 type UserDetailsResponse = {
   user?: any
@@ -97,18 +98,12 @@ export function UserDetails() {
   const addresses = data?.addresses || []
   const user = data?.user || {}
 
-  const orderTotal = (order: any) =>
-    Number(order?.total || order?.subtotal || 0).toLocaleString('en-IN')
+  const orderTotal = (order: any) => formatINR(order?.total || order?.subtotal || 0)
 
-  const spendLabel = useMemo(() => {
-    const currency = summary.currency || 'INR'
-    const formatter = new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    })
-    return formatter.format(Number(summary.totalSpend || 0))
-  }, [summary.currency, summary.totalSpend])
+  const spendLabel = useMemo(
+    () => formatINR(summary.totalSpend, { maximumFractionDigits: 2 }),
+    [summary.totalSpend],
+  )
 
   const country =
     user.country ||
@@ -389,7 +384,7 @@ export function UserDetails() {
                           </p>
                         </div>
                         <div className='text-sm font-semibold whitespace-nowrap'>
-                          {Number(item.total_price || 0).toLocaleString('en-IN')}
+                          {formatINR(item.total_price)}
                         </div>
                       </div>
                     </div>
@@ -424,29 +419,25 @@ export function UserDetails() {
                     <div className='flex justify-between'>
                       <span className='text-muted-foreground'>Subtotal</span>
                       <span className='font-medium'>
-                        {Number(selectedOrder.subtotal || 0).toLocaleString(
-                          'en-IN'
-                        )}
+                        {formatINR(selectedOrder.subtotal)}
                       </span>
                     </div>
                     <div className='flex justify-between'>
                       <span className='text-muted-foreground'>Shipping</span>
                       <span className='font-medium'>
-                        {Number(
-                          selectedOrder.shipping_fee || 0
-                        ).toLocaleString('en-IN')}
+                        {formatINR(selectedOrder.shipping_fee)}
                       </span>
                     </div>
                     <div className='flex justify-between'>
                       <span className='text-muted-foreground'>Discount</span>
                       <span className='font-medium'>
-                        -{Number(selectedOrder.discount || 0).toLocaleString('en-IN')}
+                        -{formatINR(selectedOrder.discount)}
                       </span>
                     </div>
                     <div className='flex justify-between text-base font-semibold'>
                       <span>Total</span>
                       <span>
-                        {Number(selectedOrder.total || 0).toLocaleString('en-IN')}
+                        {formatINR(selectedOrder.total)}
                       </span>
                     </div>
                   </div>

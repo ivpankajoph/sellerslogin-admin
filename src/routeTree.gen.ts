@@ -42,6 +42,7 @@ import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedPaymentsIndexRouteImport } from './routes/_authenticated/payments/index'
 import { Route as AuthenticatedOrderIndexRouteImport } from './routes/_authenticated/order/index'
 import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './routes/_authenticated/inventory-management/index'
+import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedCommissionIndexRouteImport } from './routes/_authenticated/commission/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
@@ -53,6 +54,7 @@ import { Route as ClerkauthSignUpRouteImport } from './routes/clerk/(auth)/sign-
 import { Route as ClerkauthSignInRouteImport } from './routes/clerk/(auth)/sign-in'
 import { Route as AuthenticatedUsersUserIdRouteImport } from './routes/_authenticated/users/$userId'
 import { Route as AuthenticatedPaymentsGatewayRouteImport } from './routes/_authenticated/payments/$gateway'
+import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedAnalyticsTrafficRouteImport } from './routes/_authenticated/analytics/traffic'
 import { Route as AuthenticatedAnalyticsReportsRouteImport } from './routes/_authenticated/analytics/reports'
@@ -242,6 +244,12 @@ const AuthenticatedInventoryManagementIndexRoute =
     path: '/inventory-management/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedIntegrationsIndexRoute =
+  AuthenticatedIntegrationsIndexRouteImport.update({
+    id: '/integrations/',
+    path: '/integrations/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedHelpCenterIndexRoute =
   AuthenticatedHelpCenterIndexRouteImport.update({
     id: '/help-center/',
@@ -305,6 +313,12 @@ const AuthenticatedPaymentsGatewayRoute =
     path: '/payments/$gateway',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedIntegrationsProviderRoute =
+  AuthenticatedIntegrationsProviderRouteImport.update({
+    id: '/integrations/$provider',
+    path: '/integrations/$provider',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedErrorsErrorRoute =
   AuthenticatedErrorsErrorRouteImport.update({
     id: '/errors/$error',
@@ -363,7 +377,6 @@ const AuthenticatedCategoryCreateCategoryIndexRoute =
 export interface FileRoutesByFullPath {
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/analytics': typeof AuthenticatedAnalyticsRouteRouteWithChildren
-  '/clerk/': typeof ClerkauthRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/sign-in': typeof authSignInRoute
   '/sign-in-2': typeof authSignIn2Route
@@ -380,6 +393,7 @@ export interface FileRoutesByFullPath {
   '/analytics/reports': typeof AuthenticatedAnalyticsReportsRoute
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/payments/$gateway': typeof AuthenticatedPaymentsGatewayRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
@@ -391,6 +405,7 @@ export interface FileRoutesByFullPath {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
+  '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
   '/payments': typeof AuthenticatedPaymentsIndexRoute
@@ -431,6 +446,7 @@ export interface FileRoutesByTo {
   '/analytics/reports': typeof AuthenticatedAnalyticsReportsRoute
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/payments/$gateway': typeof AuthenticatedPaymentsGatewayRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
@@ -442,6 +458,7 @@ export interface FileRoutesByTo {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
+  '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
   '/payments': typeof AuthenticatedPaymentsIndexRoute
@@ -487,6 +504,7 @@ export interface FileRoutesById {
   '/_authenticated/analytics/reports': typeof AuthenticatedAnalyticsReportsRoute
   '/_authenticated/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/_authenticated/payments/$gateway': typeof AuthenticatedPaymentsGatewayRoute
   '/_authenticated/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/clerk/(auth)/sign-in': typeof ClerkauthSignInRoute
@@ -498,6 +516,7 @@ export interface FileRoutesById {
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/commission/': typeof AuthenticatedCommissionIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
+  '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/inventory-management/': typeof AuthenticatedInventoryManagementIndexRoute
   '/_authenticated/order/': typeof AuthenticatedOrderIndexRoute
   '/_authenticated/payments/': typeof AuthenticatedPaymentsIndexRoute
@@ -525,7 +544,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/clerk'
     | '/analytics'
-    | '/clerk/'
     | '/forgot-password'
     | '/sign-in'
     | '/sign-in-2'
@@ -542,6 +560,7 @@ export interface FileRouteTypes {
     | '/analytics/reports'
     | '/analytics/traffic'
     | '/errors/$error'
+    | '/integrations/$provider'
     | '/payments/$gateway'
     | '/users/$userId'
     | '/clerk/sign-in'
@@ -553,6 +572,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/commission'
     | '/help-center'
+    | '/integrations'
     | '/inventory-management'
     | '/order'
     | '/payments'
@@ -593,6 +613,7 @@ export interface FileRouteTypes {
     | '/analytics/reports'
     | '/analytics/traffic'
     | '/errors/$error'
+    | '/integrations/$provider'
     | '/payments/$gateway'
     | '/users/$userId'
     | '/clerk/sign-in'
@@ -604,6 +625,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/commission'
     | '/help-center'
+    | '/integrations'
     | '/inventory-management'
     | '/order'
     | '/payments'
@@ -648,6 +670,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analytics/reports'
     | '/_authenticated/analytics/traffic'
     | '/_authenticated/errors/$error'
+    | '/_authenticated/integrations/$provider'
     | '/_authenticated/payments/$gateway'
     | '/_authenticated/users/$userId'
     | '/clerk/(auth)/sign-in'
@@ -659,6 +682,7 @@ export interface FileRouteTypes {
     | '/_authenticated/chats/'
     | '/_authenticated/commission/'
     | '/_authenticated/help-center/'
+    | '/_authenticated/integrations/'
     | '/_authenticated/inventory-management/'
     | '/_authenticated/order/'
     | '/_authenticated/payments/'
@@ -791,8 +815,8 @@ declare module '@tanstack/react-router' {
     }
     '/clerk/(auth)': {
       id: '/clerk/(auth)'
-      path: '/'
-      fullPath: '/clerk/'
+      path: ''
+      fullPath: '/clerk'
       preLoaderRoute: typeof ClerkauthRouteRouteImport
       parentRoute: typeof ClerkRouteRoute
     }
@@ -929,6 +953,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInventoryManagementIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/integrations/': {
+      id: '/_authenticated/integrations/'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof AuthenticatedIntegrationsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/help-center/': {
       id: '/_authenticated/help-center/'
       path: '/help-center'
@@ -1004,6 +1035,13 @@ declare module '@tanstack/react-router' {
       path: '/payments/$gateway'
       fullPath: '/payments/$gateway'
       preLoaderRoute: typeof AuthenticatedPaymentsGatewayRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/integrations/$provider': {
+      id: '/_authenticated/integrations/$provider'
+      path: '/integrations/$provider'
+      fullPath: '/integrations/$provider'
+      preLoaderRoute: typeof AuthenticatedIntegrationsProviderRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/errors/$error': {
@@ -1100,6 +1138,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalyticsRouteRoute: typeof AuthenticatedAnalyticsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
   AuthenticatedPaymentsGatewayRoute: typeof AuthenticatedPaymentsGatewayRoute
   AuthenticatedUsersUserIdRoute: typeof AuthenticatedUsersUserIdRoute
   AuthenticatedBorzoReportIndexRoute: typeof AuthenticatedBorzoReportIndexRoute
@@ -1107,6 +1146,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedCommissionIndexRoute: typeof AuthenticatedCommissionIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
+  AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
   AuthenticatedOrderIndexRoute: typeof AuthenticatedOrderIndexRoute
   AuthenticatedPaymentsIndexRoute: typeof AuthenticatedPaymentsIndexRoute
@@ -1135,6 +1175,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedAnalyticsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedIntegrationsProviderRoute:
+    AuthenticatedIntegrationsProviderRoute,
   AuthenticatedPaymentsGatewayRoute: AuthenticatedPaymentsGatewayRoute,
   AuthenticatedUsersUserIdRoute: AuthenticatedUsersUserIdRoute,
   AuthenticatedBorzoReportIndexRoute: AuthenticatedBorzoReportIndexRoute,
@@ -1142,6 +1184,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedCommissionIndexRoute: AuthenticatedCommissionIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
+  AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,
   AuthenticatedInventoryManagementIndexRoute:
     AuthenticatedInventoryManagementIndexRoute,
   AuthenticatedOrderIndexRoute: AuthenticatedOrderIndexRoute,

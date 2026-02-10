@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { AnalyticsSummary } from "@/features/analytics-hub/lib/types";
 import { getQueryFn } from "@/features/analytics-hub/lib/query";
+import { formatINR } from "@/lib/currency";
 
 export default function EcommerceAnalytics() {
   const { vendorId, source, templateId } = useAnalyticsContext();
@@ -68,7 +69,7 @@ export default function EcommerceAnalytics() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Total Revenue"
-          value={`$${(data?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatINR(data?.totalRevenue, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           description="All time"
           trend={18.5}
           icon={<DollarSign className="h-4 w-4" />}
@@ -93,7 +94,7 @@ export default function EcommerceAnalytics() {
         />
         <StatsCard
           title="Avg. Order Value"
-          value={`$${avgOrderValue.toFixed(2)}`}
+          value={formatINR(avgOrderValue, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           description="Per order"
           trend={5.8}
           icon={<ShoppingCart className="h-4 w-4" />}
@@ -144,7 +145,10 @@ export default function EcommerceAnalytics() {
             <div className="text-center border-l border-border pl-8">
               <div className="text-sm text-muted-foreground mb-2">Potential Lost Revenue</div>
               <div className="text-3xl font-bold text-orange-500 tabular-nums">
-                ${((data?.abandonedCarts || 0) * avgOrderValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {formatINR((data?.abandonedCarts || 0) * avgOrderValue, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </div>
               <div className="text-xs text-muted-foreground mt-1">Based on AOV</div>
             </div>
@@ -160,14 +164,14 @@ export default function EcommerceAnalytics() {
             { dataKey: 'revenue', color: 'var(--chart-1)', name: 'Revenue' },
           ]}
           isLoading={isLoading}
-          valuePrefix="$"
+          valuePrefix="₹"
           height={280}
         />
         <BarChart
           title="Revenue by Product"
           data={revenueByProduct}
           isLoading={isLoading}
-          valuePrefix="$"
+          valuePrefix="₹"
           height={280}
         />
       </div>
@@ -201,7 +205,7 @@ export default function EcommerceAnalytics() {
             header: 'Revenue', 
             accessorKey: (row) => (
               <span className="font-medium text-green-500">
-                ${row.value.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {formatINR(row.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             ),
             className: 'text-right tabular-nums'

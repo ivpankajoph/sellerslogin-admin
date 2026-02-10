@@ -1,4 +1,5 @@
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { formatINR } from '@/lib/currency'
 
 type OverviewPoint = {
   name: string
@@ -25,7 +26,7 @@ export function Overview({ data }: OverviewProps) {
           fontSize={12}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(value) => `$${value}`}
+          tickFormatter={(value) => formatINR(value)}
         />
         <Bar
           dataKey='total'

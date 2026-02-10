@@ -8,6 +8,7 @@ import { ActivePagesChart } from "@/features/analytics-hub/components/dashboard/
 import { Users, ShoppingCart, DollarSign, Eye, TrendingUp } from "lucide-react";
 import type { RealtimeAnalytics, AnalyticsSummary } from "@/features/analytics-hub/lib/types";
 import { getQueryFn } from "@/features/analytics-hub/lib/query";
+import { formatINR } from "@/lib/currency";
 
 export default function RealtimeDashboard() {
   const { vendorId, source, templateId } = useAnalyticsContext();
@@ -86,7 +87,7 @@ export default function RealtimeDashboard() {
         />
         <StatsCard
           title="Live Revenue"
-          value={`$${(liveData?.liveRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatINR(liveData?.liveRevenue, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           description="Today"
           trend={15.3}
           trendLabel="vs yesterday"
@@ -130,7 +131,7 @@ export default function RealtimeDashboard() {
         />
         <StatsCard
           title="Total Revenue"
-          value={`$${(summaryData?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatINR(summaryData?.totalRevenue, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           icon={<DollarSign className="h-4 w-4" />}
           isLoading={summaryLoading}
         />

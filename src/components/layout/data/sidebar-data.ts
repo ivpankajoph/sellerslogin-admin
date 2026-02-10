@@ -7,6 +7,7 @@ import {
   Map,
   CreditCard,
   Truck,
+  PlugZap,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -77,6 +78,38 @@ export const sidebarData: any = {
           url: '/payments',
           icon: CreditCard,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
+        },
+        {
+          title: 'Integrations',
+          icon: PlugZap,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          items: [
+            {
+              title: 'App Integrations',
+              url: '/integrations',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+            },
+            {
+              title: 'Razorpay',
+              url: '/integrations/razorpay',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+            },
+            {
+              title: 'Cashfree',
+              url: '/integrations/cashfree',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+            },
+            {
+              title: 'Borzo',
+              url: '/integrations/borzo',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+            },
+            {
+              title: 'Delhivery',
+              url: '/integrations/delhivery',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+            },
+          ],
         },
         {
           title: 'Storefront Analytics',

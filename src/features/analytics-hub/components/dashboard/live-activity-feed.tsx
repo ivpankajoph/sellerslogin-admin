@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { AnalyticsEvent } from "@/features/analytics-hub/lib/types";
 import { formatDistanceToNow } from "date-fns";
+import { formatINR } from "@/lib/currency";
 
 interface LiveActivityFeedProps {
   events: AnalyticsEvent[];
@@ -91,7 +92,10 @@ export function LiveActivityFeed({ events, maxItems = 20 }: LiveActivityFeedProp
                         )}
                         {event.cartTotal && (
                           <Badge variant="secondary" className="text-[10px] px-1 h-4">
-                            ${Number(event.cartTotal).toFixed(2)}
+                            {formatINR(event.cartTotal, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </Badge>
                         )}
                       </div>

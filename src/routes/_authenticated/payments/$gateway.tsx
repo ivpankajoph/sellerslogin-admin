@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store'
+import { formatINR } from '@/lib/currency'
 
 type OrderSummary = {
   totalOrders: number
@@ -140,7 +141,7 @@ function PaymentGatewayReport() {
     [orders, selectedId],
   )
 
-  const formatMoney = (value?: number) => `Rs. ${Number(value || 0).toLocaleString()}`
+  const formatMoney = (value?: number) => formatINR(value)
 
   const statusBadge = (value?: string) => {
     const key = value || 'pending'

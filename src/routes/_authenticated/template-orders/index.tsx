@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
+import { formatINR } from '@/lib/currency'
 
 
 type OrderSummary = {
@@ -245,8 +246,7 @@ function TemplateOrdersReport() {
     setDropoffOverride(dropoffFromPayload || dropoffFromShipping || emptyOverride)
   }, [selectedOrder?._id])
 
-  const formatMoney = (value?: number) =>
-    `â‚¹${Number(value || 0).toLocaleString()}`
+  const formatMoney = (value?: number) => formatINR(value)
 
   const formatAttrs = (attrs?: Record<string, string>) => {
     if (!attrs) return ''
@@ -321,7 +321,7 @@ function TemplateOrdersReport() {
       toast.success('Borzo delivery created.')
     } catch (err: any) {
       const details = err?.response?.data?.details
-      const detailText = details ? ` â€¢ ${JSON.stringify(details)}` : ''
+      const detailText = details ? ` | ${JSON.stringify(details)}` : ''
       const message = `${err?.response?.data?.message || 'Failed to create Borzo delivery'}${detailText}`
       setBorzoError(message)
       toast.error(message)
@@ -342,7 +342,7 @@ function TemplateOrdersReport() {
       setBorzoQuote({ amount: Number.isFinite(amount) ? amount : 0, warnings })
     } catch (err: any) {
       const details = err?.response?.data?.details
-      const detailText = details ? ` â€¢ ${JSON.stringify(details)}` : ''
+      const detailText = details ? ` | ${JSON.stringify(details)}` : ''
       const message = `${err?.response?.data?.message || 'Failed to calculate Borzo delivery'}${detailText}`
       setBorzoError(message)
     } finally {
@@ -360,7 +360,7 @@ function TemplateOrdersReport() {
       toast.success('Borzo delivery cancelled.')
     } catch (err: any) {
       const details = err?.response?.data?.details
-      const detailText = details ? ` â€¢ ${JSON.stringify(details)}` : ''
+      const detailText = details ? ` | ${JSON.stringify(details)}` : ''
       const message = `${err?.response?.data?.message || 'Failed to cancel Borzo delivery'}${detailText}`
       setBorzoError(message)
       toast.error(message)
@@ -544,7 +544,7 @@ function TemplateOrdersReport() {
                   </div>
                   <div className='mt-2 text-xs text-muted-foreground'>
                     {(order.user_id?.name || order.shipping_address?.full_name || 'Customer')}
-                    {order.user_id?.email ? ` â€¢ ${order.user_id.email}` : ''}
+                    {order.user_id?.email ? ` | ${order.user_id.email}` : ''}
                   </div>
                   {!isVendor && order.vendor_id && (
                     <div className='mt-2 text-xs text-slate-500'>
@@ -782,7 +782,7 @@ function TemplateOrdersReport() {
                       <p className='text-sm font-semibold text-slate-900'>Borzo delivery</p>
                       <p className='text-xs text-slate-600'>
                         {selectedOrder.borzo?.order_id
-                          ? `Order ID ${selectedOrder.borzo.order_id} â€¢ ${selectedOrder.borzo.status || 'created'}`
+                          ? `Order ID ${selectedOrder.borzo.order_id} | ${selectedOrder.borzo.status || 'created'}`
                           : 'No Borzo delivery created yet.'}
                       </p>
                       {hasActiveBorzo && (
@@ -894,8 +894,12 @@ function TemplateOrdersReport() {
                     <span>{borzoQuoteLoading ? 'Updating quote...' : 'Auto-quote updates as you type.'}</span>
                     {borzoQuote && (
                       <span className='font-semibold text-slate-900'>
-                        Quote: â‚¹{borzoQuote.amount?.toFixed?.(2) || borzoQuote.amount || 0}
-                        {borzoQuote.warnings?.length ? ` â€¢ ${borzoQuote.warnings.join(', ')}` : ''}
+                        Quote:{' '}
+                        {formatINR(borzoQuote.amount, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                        {borzoQuote.warnings?.length ? ` | ${borzoQuote.warnings.join(', ')}` : ''}
                       </span>
                     )}
                   </div>

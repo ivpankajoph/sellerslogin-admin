@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store'
+import { formatINR } from '@/lib/currency'
 
 type Wallet = {
   _id: string
@@ -84,7 +85,7 @@ function WalletPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const formatMoney = (value?: number) => `Rs. ${Number(value || 0).toLocaleString()}`
+  const formatMoney = (value?: number) => formatINR(value)
   const derivedBalance = useMemo(() => {
     return transactions.reduce((sum, tx) => {
       const amount = Number(tx.amount || 0)
