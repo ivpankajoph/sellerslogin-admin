@@ -1,0 +1,6 @@
+import { createFileRoute } from '@tanstack/react-router'
+import SeoManagerPage from '@/features/seo'
+
+export const Route = createFileRoute('/_authenticated/seo/')({
+  component: () => <SeoManagerPage section='rules' />,
+})

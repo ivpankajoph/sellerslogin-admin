@@ -8,6 +8,7 @@ import {
   CreditCard,
   Truck,
   PlugZap,
+  SearchCheck,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -80,6 +81,29 @@ export const sidebarData: any = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
+          title: 'Delivery Charges',
+          url: '/delivery-charges',
+          icon: Truck,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+        },
+        {
+          title: 'SEO Manager',
+          icon: SearchCheck,
+          roles: [ROLES.ADMIN],
+          items: [
+            {
+              title: 'SEO Rules',
+              url: '/seo',
+              roles: [ROLES.ADMIN],
+            },
+            {
+              title: 'Entity SEO',
+              url: '/seo/entities',
+              roles: [ROLES.ADMIN],
+            },
+          ],
+        },
+        {
           title: 'Integrations',
           icon: PlugZap,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
@@ -124,10 +148,10 @@ export const sidebarData: any = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
-          title: 'Borzo Report',
+          title: 'Delivery Tracking',
           url: '/borzo-report',
           icon: Truck,
-          roles: [ROLES.ADMIN],
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
       ],
     },

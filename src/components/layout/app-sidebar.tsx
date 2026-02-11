@@ -40,7 +40,11 @@ export function AppSidebar() {
     .filter((group: { items: string | any[] }) => group.items.length > 0)
 
   return (
-    <Sidebar collapsible={collapsible} variant={variant}>
+    <Sidebar
+      collapsible={collapsible}
+      variant={variant}
+      className='[&_[data-slot=sidebar-inner]]:border-e [&_[data-slot=sidebar-inner]]:border-rose-100 [&_[data-slot=sidebar-inner]]:bg-gradient-to-b [&_[data-slot=sidebar-inner]]:from-rose-50 [&_[data-slot=sidebar-inner]]:via-amber-50/60 [&_[data-slot=sidebar-inner]]:to-sky-50/80 [&_[data-slot=sidebar-inner]]:shadow-sm'
+    >
       <SidebarHeader>
         <SidebarFooter>
           <NavUser />

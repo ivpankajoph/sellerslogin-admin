@@ -42,6 +42,9 @@ interface Notification {
 
 export function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [expandedNotifications, setExpandedNotifications] = useState<string[]>(
+    []
+  )
 
   const [selectedTab, setSelectedTab] = useState<
     'all' | 'unread' | 'important'
@@ -100,6 +103,12 @@ export function Notifications() {
   // Handle notification selection
   const toggleNotification = (id: string) => {
     setSelectedNotifications((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  const toggleExpanded = (id: string) => {
+    setExpandedNotifications((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     )
   }
@@ -282,10 +291,15 @@ export function Notifications() {
           <>
             {filteredNotifications.map((notification) => {
               const typeStyle = getNotificationType(notification.type)
+              const isExpanded = expandedNotifications.includes(notification._id)
+              const metadataEntries = Object.entries(notification.metadata || {})
+              const visibleMetadata = isExpanded
+                ? metadataEntries
+                : metadataEntries.slice(0, 3)
               return (
               <Card
                 key={notification._id}
-                className={`transition-all duration-200 hover:shadow-md ${
+                className={`overflow-hidden transition-all duration-200 hover:shadow-sm ${
                   !notification.read
                     ? 'border-l-4 border-l-indigo-500 bg-gradient-to-r from-indigo-50/40 to-white'
                     : 'bg-white'
@@ -295,10 +309,10 @@ export function Notifications() {
                     : ''
                 }`}
               >
-                <CardContent className='p-6'>
-                <div className='flex items-start gap-4'>
+                <CardContent className='p-4 sm:p-5'>
+                <div className='flex items-start gap-3'>
                     {/* Checkbox */}
-                    <div className='pt-1'>
+                    <div className='pt-0.5'>
                       <Checkbox
                         id={`notification-${notification._id}`}
                         checked={selectedNotifications.includes(
@@ -312,87 +326,66 @@ export function Notifications() {
 
                     {/* Icon and Content */}
                     <div className='min-w-0 flex-1'>
-                      <div className='flex items-start justify-between'>
-                        <div className='flex items-start gap-3'>
-                          <div className='flex-shrink-0'>
+                      <div className='flex items-start gap-3'>
+                        <div className='flex-shrink-0'>
+                          <div className={`rounded-lg bg-white p-2 shadow-xs ring-1 ${typeStyle.ring}`}>
+                            {getSourceIcon(notification.source)}
+                          </div>
+                        </div>
+                        <div className='min-w-0 flex-1'>
+                          <div className='mb-1 flex flex-wrap items-center gap-2'>
+                            <h3 className='text-sm leading-tight font-semibold text-slate-900'>
+                              {notification.title}
+                            </h3>
+                            <Badge
+                              variant='outline'
+                              className={`border px-2 py-0.5 text-[11px] ${typeStyle.color}`}
+                            >
+                              {notification.type.charAt(0).toUpperCase() +
+                                notification.type.slice(1)}
+                            </Badge>
                             {notification.important && (
-                              <Badge
-                                variant='destructive'
-                                className='absolute -top-1 -right-1 z-10'
-                              >
+                              <Badge variant='destructive' className='text-[11px]'>
                                 Important
                               </Badge>
                             )}
-                            <div className={`rounded-lg bg-white p-2 shadow-xs ring-1 ${typeStyle.ring}`}>
-                              {getSourceIcon(notification.source)}
-                            </div>
                           </div>
-                          <div className='min-w-0'>
-                            <div className='mb-1 flex items-center gap-2'>
-                              <h3 className='text-sm leading-tight font-medium'>
-                                {notification.title}
-                              </h3>
-                              {notification.important && (
+
+                          <p
+                            className={`text-sm leading-5 text-slate-700 ${
+                              isExpanded ? '' : 'line-clamp-2'
+                            }`}
+                          >
+                            {notification.description}
+                          </p>
+
+                          {/* Metadata */}
+                          {metadataEntries.length > 0 && (
+                            <div className='mt-2 flex flex-wrap gap-1.5'>
+                              {visibleMetadata.map(([key, value]) => (
                                 <Badge
-                                  variant='destructive'
-                                  className='text-xs'
+                                  key={key}
+                                  variant='outline'
+                                  className='px-2 py-0.5 text-[11px] font-medium text-slate-700'
                                 >
-                                  Important
+                                  {key}: {String(value)}
+                                </Badge>
+                              ))}
+                              {!isExpanded && metadataEntries.length > 3 && (
+                                <Badge
+                                  variant='outline'
+                                  className='px-2 py-0.5 text-[11px] text-slate-500'
+                                >
+                                  +{metadataEntries.length - 3} more
                                 </Badge>
                               )}
                             </div>
-                            <p className='text-muted-foreground mb-3 line-clamp-2 text-sm'>
-                              {notification.description}
-                            </p>
-
-                            {/* Metadata */}
-                            {notification.metadata && (
-                              <div className='mb-3 flex flex-wrap gap-2'>
-                                {Object.entries(notification.metadata).map(
-                                  ([key, value]) => (
-                                    <Badge
-                                      key={key}
-                                      variant='outline'
-                                      className='px-2 py-1 text-xs'
-                                    >
-                                      {key}: {value}
-                                    </Badge>
-                                  )
-                                )}
-                              </div>
-                            )}
-
-                            {/* Action button */}
-                            {notification.action_url ? (
-                              <Button
-                                variant='link'
-                                size='sm'
-                                className='text-primary hover:text-primary/80 h-auto p-0'
-                                asChild
-                              >
-                                <Link to={notification.action_url}>
-                                  View
-                                  <ExternalLink className='ml-1 h-3 w-3' />
-                                </Link>
-                              </Button>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {/* Notification type badge */}
-                        <div className='ml-4 flex-shrink-0'>
-                          <Badge
-                            variant='outline'
-                            className={`px-2 py-1 text-xs border ${typeStyle.color}`}
-                          >
-                            {notification.type.charAt(0).toUpperCase() +
-                              notification.type.slice(1)}
-                          </Badge>
+                          )}
                         </div>
                       </div>
 
                       {/* Timestamp and read indicator */}
-                      <div className='mt-3 flex items-center justify-between'>
+                      <div className='mt-3 flex flex-wrap items-center justify-between gap-2'>
                         <div className='text-muted-foreground flex items-center gap-2 text-xs'>
                           <Clock className='h-3 w-3' />
                           {formatTimeAgo(notification.createdAt)}
@@ -401,16 +394,39 @@ export function Notifications() {
                           )}
                         </div>
 
-                        {!notification.read && (
+                        <div className='flex flex-wrap items-center gap-2'>
                           <Button
-                            variant='ghost'
+                            variant='outline'
                             size='sm'
-                            onClick={() => markAsRead(notification._id)}
-                            className='h-6 px-2 text-xs'
+                            className='h-7 px-2.5 text-xs'
+                            onClick={() => toggleExpanded(notification._id)}
                           >
-                            Mark as read
+                            {isExpanded ? 'Hide details' : 'View details'}
                           </Button>
-                        )}
+                          {notification.action_url ? (
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              className='h-7 px-2.5 text-xs'
+                              asChild
+                            >
+                              <Link to={notification.action_url}>
+                                View
+                                <ExternalLink className='ml-1 h-3 w-3' />
+                              </Link>
+                            </Button>
+                          ) : null}
+                          {!notification.read && (
+                            <Button
+                              variant='ghost'
+                              size='sm'
+                              onClick={() => markAsRead(notification._id)}
+                              className='h-7 px-2 text-xs'
+                            >
+                              Mark as read
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
