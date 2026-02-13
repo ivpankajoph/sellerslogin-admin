@@ -240,11 +240,11 @@ const VendorDetailsDialog = ({ vendor }: VendorDetailsDialogProps) => {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className='max-w-5xl w-[min(95vw,56rem)] max-h-[90vh] overflow-hidden p-0'>
+      <DialogContent className='max-w-[calc(100%-2rem)] sm:max-w-6xl max-h-[90vh] overflow-hidden p-0'>
         <div className='flex flex-col h-[90vh]'>
           <DialogHeader className='p-0'>
-            <DialogTitle className='text-2xl font-semibold'>{vendor.name}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className='text-2xl font-semibold p-4'>{vendor.name}</DialogTitle>
+            <DialogDescription className='p-4'>
               All data captured for {vendor.name}. Use the buttons below to verify or reject this vendor.
             </DialogDescription>
           </DialogHeader>
