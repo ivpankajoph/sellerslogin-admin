@@ -10,3 +10,12 @@ export const getVendorTemplateBaseUrl = (vendorId?: string) => {
   if (!vendorId || !STOREFRONT_URL) return undefined
   return `${STOREFRONT_URL}/template/${vendorId}`
 }
+
+export const getVendorTemplatePreviewUrl = (
+  vendorId?: string,
+  templateKey?: string
+) => {
+  const base = getVendorTemplateBaseUrl(vendorId)
+  if (!base || !templateKey) return base
+  return `${base}/preview/${encodeURIComponent(templateKey)}`
+}

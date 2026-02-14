@@ -16,6 +16,7 @@ type Props = {
   onSelect: (key: string) => void
   onApply: () => void
   isApplying?: boolean
+  showApplyControls?: boolean
 }
 
 export function TemplateVariantSelector({
@@ -26,6 +27,7 @@ export function TemplateVariantSelector({
   onSelect,
   onApply,
   isApplying,
+  showApplyControls = true,
 }: Props) {
   if (!templates.length) return null
 
@@ -39,17 +41,20 @@ export function TemplateVariantSelector({
           Pick a layout style for your vendor storefront. Set one as default to
           apply it across the live template and preview.
         </p>
+        {!showApplyControls ? (
+          <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-400'>
+            Click any template card to continue.
+          </p>
+        ) : null}
       </div>
 
-      <div className='mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+      <div className='mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
         {templates.map((template) => {
           const isSelected = selectedKey === template.key
           const isActive = activeKey === template.key
           return (
-            <button
+            <div
               key={template.key}
-              type='button'
-              onClick={() => onSelect(template.key)}
               className={cn(
                 'group flex h-full flex-col overflow-hidden rounded-2xl border text-left transition',
                 isSelected
@@ -57,66 +62,76 @@ export function TemplateVariantSelector({
                   : 'border-slate-200 hover:border-slate-300'
               )}
             >
-              <div className='relative h-32 w-full overflow-hidden bg-slate-100'>
-                {template.previewImage ? (
-                  <img
-                    src={template.previewImage}
-                    alt={template.name}
-                    className='h-full w-full object-cover transition-transform duration-300 group-hover:scale-105'
-                  />
-                ) : null}
-                {isActive ? (
-                  <span className='absolute left-3 top-3 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white'>
-                    Default
+              <button
+                type='button'
+                onClick={() => onSelect(template.key)}
+                className='flex h-full flex-col text-left'
+              >
+                <div className='relative h-32 w-full overflow-hidden bg-slate-100'>
+                  {template.previewImage ? (
+                    <img
+                      src={template.previewImage}
+                      alt={template.name}
+                      className='h-full w-full object-cover transition-transform duration-300 group-hover:scale-105'
+                    />
+                  ) : null}
+                  {isActive ? (
+                    <span className='absolute left-3 top-3 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white'>
+                      Default
+                    </span>
+                  ) : null}
+                </div>
+                <div className='flex flex-1 flex-col gap-2 p-4'>
+                  <h4 className='text-base font-semibold text-slate-900'>
+                    {template.name}
+                  </h4>
+                  <p className='text-xs text-slate-500'>
+                    {template.description || 'Template layout'}
+                  </p>
+                  <span
+                    className={cn(
+                      'mt-auto inline-flex w-fit items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold',
+                      isSelected
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 text-slate-600'
+                    )}
+                  >
+                    {isSelected ? 'Selected' : 'Select'}
                   </span>
-                ) : null}
-              </div>
-              <div className='flex flex-1 flex-col gap-2 p-4'>
-                <h4 className='text-base font-semibold text-slate-900'>
-                  {template.name}
-                </h4>
-                <p className='text-xs text-slate-500'>
-                  {template.description || 'Template layout'}
-                </p>
-                <span
-                  className={cn(
-                    'mt-auto inline-flex w-fit items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold',
-                    isSelected
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600'
-                  )}
-                >
-                  {isSelected ? 'Selected' : 'Select'}
-                </span>
-                {previewBaseUrl ? (
+                </div>
+              </button>
+              {previewBaseUrl ? (
+                <div className='px-4 pb-4'>
                   <a
-                    href={`${previewBaseUrl}?preview=${template.key}`}
+                    href={`${previewBaseUrl}/preview/${template.key}`}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='mt-2 text-xs font-semibold text-slate-600 underline underline-offset-4 hover:text-slate-900'
+                    className='text-xs font-semibold text-slate-600 underline underline-offset-4 hover:text-slate-900'
                   >
                     Preview template
                   </a>
-                ) : null}
-              </div>
-            </button>
+                </div>
+              ) : null}
+            </div>
           )
         })}
       </div>
 
-      <div className='mt-6 flex flex-wrap items-center gap-3'>
-        <Button
-          type='button'
-          onClick={onApply}
-          disabled={isApplying || selectedKey === activeKey}
-          className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
-        >
-          {isApplying ? 'Applying...' : 'Set as Default'}
-        </Button>
-        <span className='text-xs text-slate-500'>
-          Current default: {templates.find((t) => t.key === activeKey)?.name}
-        </span>
-      </div>
+      {showApplyControls ? (
+        <div className='mt-6 flex flex-wrap items-center gap-3'>
+          <Button
+            type='button'
+            onClick={onApply}
+            disabled={isApplying || selectedKey === activeKey}
+            className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
+          >
+            {isApplying ? 'Applying...' : 'Set as Default'}
+          </Button>
+          <span className='text-xs text-slate-500'>
+            Current default: {templates.find((t) => t.key === activeKey)?.name}
+          </span>
+        </div>
+      ) : null}
     </div>
   )
 }

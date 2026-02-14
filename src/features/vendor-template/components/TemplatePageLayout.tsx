@@ -15,8 +15,9 @@ interface TemplatePageLayoutProps {
   description: string
   activeKey: string
   actions?: ReactNode
+  topContent?: ReactNode
   preview?: ReactNode
-  children: ReactNode
+  children?: ReactNode
 }
 
 export function TemplatePageLayout({
@@ -24,9 +25,12 @@ export function TemplatePageLayout({
   description,
   activeKey,
   actions,
+  topContent,
   preview,
   children,
 }: TemplatePageLayoutProps) {
+  const hasMainContent = preview != null || children != null
+
   return (
     <div className='relative min-h-screen overflow-hidden font-manrope'>
       <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(15,23,42,0.08),transparent_45%),radial-gradient(circle_at_20%_80%,rgba(14,116,144,0.12),transparent_45%),radial-gradient(circle_at_80%_10%,rgba(244,114,182,0.16),transparent_40%)]' />
@@ -68,19 +72,32 @@ export function TemplatePageLayout({
           </div>
         </header>
 
-        <div className='grid gap-6 lg:grid-cols-[520px_minmax(0,1fr)] xl:grid-cols-[600px_minmax(0,1fr)]'>
-          {preview ? (
-            <div className='lg:sticky lg:top-6 lg:h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-2'>
-              {preview}
-            </div>
-          ) : null}
+        {topContent ? <div className='space-y-6'>{topContent}</div> : null}
+
+        {hasMainContent ? (
           <div
-            className='space-y-6 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm lg:h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-3'
-            data-editor-scroll-container='true'
+            className={cn(
+              'grid gap-6',
+              preview && children
+                ? 'lg:grid-cols-[520px_minmax(0,1fr)] xl:grid-cols-[600px_minmax(0,1fr)]'
+                : ''
+            )}
           >
-            {children}
+            {preview ? (
+              <div className='lg:sticky lg:top-6 lg:h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-2'>
+                {preview}
+              </div>
+            ) : null}
+            {children ? (
+              <div
+                className='space-y-6 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm lg:h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-3'
+                data-editor-scroll-container='true'
+              >
+                {children}
+              </div>
+            ) : null}
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   )

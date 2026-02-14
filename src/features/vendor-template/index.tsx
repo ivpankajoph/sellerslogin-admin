@@ -1,7 +1,7 @@
 'use client'
 
 import { type JSX, useEffect, useMemo, useState } from 'react'
-import { Link2, Rocket, Wand2 } from 'lucide-react'
+import { ArrowLeft, Link2, Rocket, Wand2 } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 
@@ -22,7 +22,10 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ProfileDropdown } from '@/components/profile-dropdown'
-import { getVendorTemplateBaseUrl } from '@/lib/storefront-url'
+import {
+  getVendorTemplateBaseUrl,
+  getVendorTemplatePreviewUrl,
+} from '@/lib/storefront-url'
 
 export default function TemplateForm() {
   const {
@@ -56,6 +59,7 @@ export default function TemplateForm() {
   const [domainOpen, setDomainOpen] = useState(false)
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false)
   const [sectionOrder, setSectionOrder] = useState([
     'branding',
     'hero',
@@ -90,16 +94,24 @@ export default function TemplateForm() {
     }
   }, [selectedSection])
 
-  const previewBaseUrl = getVendorTemplateBaseUrl(vendor_id)
-  const previewQuery = selectedTemplateKey
-    ? `?preview=${selectedTemplateKey}`
-    : ''
+  const storefrontBaseUrl = getVendorTemplateBaseUrl(vendor_id)
+  const previewBaseUrl = getVendorTemplatePreviewUrl(
+    vendor_id,
+    selectedTemplateKey
+  )
 
   const handleSubmitWithOrder = () => handleSubmit(sectionOrder)
 
   const handleSelectSection = (sectionId: string, componentId?: string) => {
     setSelectedSection(sectionId)
     setSelectedComponent(componentId || null)
+  }
+
+  const handleTemplateSelect = (templateKey: string) => {
+    setSelectedTemplateKey(templateKey)
+    setSelectedSection(null)
+    setSelectedComponent(null)
+    setIsBuilderOpen(true)
   }
 
   const sections = useMemo(
@@ -317,11 +329,42 @@ export default function TemplateForm() {
       <Toaster position='top-right' />
 
     <TemplatePageLayout
-        title='Website Builder'
-        description='Craft your storefront hero, brand story, and key metrics. Drag sections to reorder and sync to preview how products appear on your live template.'
+        title={isBuilderOpen ? 'Website Builder' : 'Choose Template'}
+        description={
+          isBuilderOpen
+            ? 'Craft your storefront hero, brand story, and key metrics. Drag sections to reorder and sync to preview how products appear on your live template.'
+            : 'Select a storefront template card first. The editor and live preview will open after selection.'
+        }
         activeKey='home'
+        topContent={!isBuilderOpen ? (
+          <TemplateVariantSelector
+            templates={templateCatalog}
+            selectedKey={selectedTemplateKey}
+            activeKey={activeTemplateKey}
+            previewBaseUrl={storefrontBaseUrl}
+            onSelect={handleTemplateSelect}
+            onApply={applyTemplateVariant}
+            isApplying={isUpdatingTemplate}
+            showApplyControls={false}
+          />
+        ) : null}
         actions={
+          isBuilderOpen ? (
           <>
+            <Button
+              variant='outline'
+              onClick={() => setIsBuilderOpen(false)}
+              className='rounded-full border-slate-300'
+            >
+              <ArrowLeft className='h-4 w-4' /> All Templates
+            </Button>
+            <Button
+              onClick={applyTemplateVariant}
+              disabled={isUpdatingTemplate || selectedTemplateKey === activeTemplateKey}
+              className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
+            >
+              {isUpdatingTemplate ? 'Applying...' : 'Set as Default'}
+            </Button>
             <Button
               onClick={handleSubmitWithOrder}
               disabled={isSubmitting || uploadingPaths.size > 0}
@@ -344,7 +387,7 @@ export default function TemplateForm() {
             </Button>
             {previewBaseUrl ? (
               <a
-                href={`${previewBaseUrl}${previewQuery}`}
+                href={previewBaseUrl}
                 target='_blank'
                 rel='noopener noreferrer'
               >
@@ -357,13 +400,14 @@ export default function TemplateForm() {
               </a>
             ) : null}
           </>
+          ) : null
         }
         preview={
+          isBuilderOpen ? (
           <TemplatePreviewPanel
             title='Live Website Preview'
             subtitle='Sync to refresh the right-side preview'
             baseSrc={previewBaseUrl}
-            previewQuery={previewQuery}
             defaultPath=''
             pageOptions={[
               { label: 'Home', path: '' },
@@ -386,41 +430,35 @@ export default function TemplateForm() {
             onSelectSection={handleSelectSection}
             onInlineEdit={handleInlineEdit}
           />
+          ) : undefined
         }
       >
+        {isBuilderOpen ? (
+          <>
+            <ThemeSettingsSection data={data} updateField={updateField} />
 
-        <ThemeSettingsSection data={data} updateField={updateField} />
+            <TemplateSectionOrder
+              title='Home Sections'
+              items={sections}
+              order={sectionOrder}
+              setOrder={setSectionOrder}
+            />
 
-        <TemplateSectionOrder
-          title='Home Sections'
-          items={sections}
-          order={sectionOrder}
-          setOrder={setSectionOrder}
-        />
-
-        <TemplateVariantSelector
-          templates={templateCatalog}
-          selectedKey={selectedTemplateKey}
-          activeKey={activeTemplateKey}
-          previewBaseUrl={getVendorTemplateBaseUrl(vendor_id)}
-          onSelect={setSelectedTemplateKey}
-          onApply={applyTemplateVariant}
-          isApplying={isUpdatingTemplate}
-        />
-
-        {sectionOrder.map((sectionId) => (
-          <div
-            key={sectionId}
-            data-editor-section={sectionId}
-            className={
-              selectedSection === sectionId
-                ? 'rounded-3xl ring-2 ring-slate-900/15 ring-offset-2 ring-offset-slate-50'
-                : undefined
-            }
-          >
-            {sectionBlocks[sectionId]}
-          </div>
-        ))}
+            {sectionOrder.map((sectionId) => (
+              <div
+                key={sectionId}
+                data-editor-section={sectionId}
+                className={
+                  selectedSection === sectionId
+                    ? 'rounded-3xl ring-2 ring-slate-900/15 ring-offset-2 ring-offset-slate-50'
+                    : undefined
+                }
+              >
+                {sectionBlocks[sectionId]}
+              </div>
+            ))}
+          </>
+        ) : null}
       </TemplatePageLayout>
 
       <DeploymentModal
