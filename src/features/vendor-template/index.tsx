@@ -1,6 +1,7 @@
 'use client'
 
 import { type JSX, useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Link2, Rocket, Wand2 } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -26,8 +27,15 @@ import {
   getVendorTemplateBaseUrl,
   getVendorTemplatePreviewUrl,
 } from '@/lib/storefront-url'
+import {
+  getStoredEditingTemplateKey,
+  normalizeTemplateParam,
+  setStoredEditingTemplateKey,
+} from './components/templateVariantParam'
 
 export default function TemplateForm() {
+  const navigate = useNavigate()
+  const pathname = useLocation({ select: (location) => location.pathname })
   const {
     data,
     updateField,
@@ -50,22 +58,32 @@ export default function TemplateForm() {
     deployMessage,
     handleCancel,
     loadedSectionOrder,
+    isAdmin,
+    deleteTemplateVariant,
+    isDeletingTemplateKey,
   } = useTemplateForm()
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setInlineEditVersion((prev) => prev + 1)
   }
 
   const [domainOpen, setDomainOpen] = useState(false)
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
   const [isBuilderOpen, setIsBuilderOpen] = useState(false)
+  const [inlineEditVersion, setInlineEditVersion] = useState(0)
   const [sectionOrder, setSectionOrder] = useState([
     'branding',
     'hero',
     'description',
     'products',
   ])
+  const pathnameTemplateKey = useMemo(() => {
+    const segments = pathname.split('/').filter(Boolean)
+    if (segments[0] !== 'vendor-template') return undefined
+    return normalizeTemplateParam(segments[1])
+  }, [pathname])
 
   useEffect(() => {
     if (loadedSectionOrder.length) {
@@ -94,6 +112,87 @@ export default function TemplateForm() {
     }
   }, [selectedSection])
 
+  useEffect(() => {
+    if (!selectedComponent) return
+    const escaped = selectedComponent.replace(/"/g, '\\"')
+    const target = document.querySelector(
+      `[data-editor-component="${escaped}"]`
+    ) as HTMLElement | null
+    if (!target) return
+
+    const container = document.querySelector(
+      '[data-editor-scroll-container="true"]'
+    ) as HTMLElement | null
+    if (container) {
+      const containerRect = container.getBoundingClientRect()
+      const targetRect = target.getBoundingClientRect()
+      const top = targetRect.top - containerRect.top + container.scrollTop - 20
+      container.scrollTo({ top, behavior: 'smooth' })
+    } else {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [selectedComponent])
+
+  useEffect(() => {
+    if (!vendor_id || !templateCatalog.length) return
+    if (pathnameTemplateKey) return
+    const storedTemplateKey = getStoredEditingTemplateKey(vendor_id)
+    if (!storedTemplateKey) return
+    if (!templateCatalog.some((item) => item.key === storedTemplateKey)) return
+    if (selectedTemplateKey === storedTemplateKey) return
+    setSelectedTemplateKey(storedTemplateKey)
+  }, [
+    vendor_id,
+    templateCatalog,
+    pathnameTemplateKey,
+    selectedTemplateKey,
+    setSelectedTemplateKey,
+  ])
+
+  useEffect(() => {
+    if (!vendor_id || !templateCatalog.length) return
+    if (!pathnameTemplateKey) {
+      setIsBuilderOpen(false)
+      return
+    }
+    const matchedTemplate = templateCatalog.find(
+      (item) => item.key === pathnameTemplateKey
+    )
+    if (!matchedTemplate) {
+      setIsBuilderOpen(false)
+      return
+    }
+    if (selectedTemplateKey !== matchedTemplate.key) {
+      setSelectedTemplateKey(matchedTemplate.key)
+    }
+    setStoredEditingTemplateKey(vendor_id, matchedTemplate.key)
+    setIsBuilderOpen(true)
+  }, [
+    vendor_id,
+    templateCatalog,
+    pathnameTemplateKey,
+    selectedTemplateKey,
+    setSelectedTemplateKey,
+  ])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('template')) return
+    url.searchParams.delete('template')
+    const nextSearch = url.searchParams.toString()
+    const nextUrl = nextSearch ? `${url.pathname}?${nextSearch}` : url.pathname
+    window.history.replaceState(window.history.state, '', nextUrl)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!isBuilderOpen || inlineEditVersion === 0) return
+    const timeout = window.setTimeout(() => {
+      void handleSubmit(sectionOrder, { silent: true })
+    }, 700)
+    return () => window.clearTimeout(timeout)
+  }, [inlineEditVersion, isBuilderOpen, handleSubmit, sectionOrder])
+
   const storefrontBaseUrl = getVendorTemplateBaseUrl(vendor_id)
   const previewBaseUrl = getVendorTemplatePreviewUrl(
     vendor_id,
@@ -109,9 +208,11 @@ export default function TemplateForm() {
 
   const handleTemplateSelect = (templateKey: string) => {
     setSelectedTemplateKey(templateKey)
+    setStoredEditingTemplateKey(vendor_id, templateKey)
     setSelectedSection(null)
     setSelectedComponent(null)
     setIsBuilderOpen(true)
+    void navigate({ to: `/vendor-template/${templateKey}` })
   }
 
   const sections = useMemo(
@@ -147,6 +248,7 @@ export default function TemplateForm() {
           data={data}
           handleImageChange={handleImageChange}
           uploadingPaths={uploadingPaths}
+          selectedComponent={selectedComponent}
         />
       </div>
     ),
@@ -161,7 +263,11 @@ export default function TemplateForm() {
     ),
     description: (
       <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
-        <DescriptionSection data={data} updateField={updateField} />
+        <DescriptionSection
+          data={data}
+          updateField={updateField}
+          selectedComponent={selectedComponent}
+        />
       </div>
     ),
     products: (
@@ -336,6 +442,8 @@ export default function TemplateForm() {
             : 'Select a storefront template card first. The editor and live preview will open after selection.'
         }
         activeKey='home'
+        editingTemplateKey={selectedTemplateKey}
+        showNavigation={isBuilderOpen}
         topContent={!isBuilderOpen ? (
           <TemplateVariantSelector
             templates={templateCatalog}
@@ -346,6 +454,9 @@ export default function TemplateForm() {
             onApply={applyTemplateVariant}
             isApplying={isUpdatingTemplate}
             showApplyControls={false}
+            canDeleteTemplates={isAdmin}
+            deletingKey={isDeletingTemplateKey}
+            onDelete={deleteTemplateVariant}
           />
         ) : null}
         actions={
@@ -353,7 +464,12 @@ export default function TemplateForm() {
           <>
             <Button
               variant='outline'
-              onClick={() => setIsBuilderOpen(false)}
+              onClick={() => {
+                setIsBuilderOpen(false)
+                setSelectedSection(null)
+                setSelectedComponent(null)
+                void navigate({ to: '/vendor-template' })
+              }}
               className='rounded-full border-slate-300'
             >
               <ArrowLeft className='h-4 w-4' /> All Templates

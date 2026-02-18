@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/consistent-type-imports */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { JSX, useEffect, useMemo, useRef, useState } from 'react'
+import { JSX, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
 
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
@@ -21,16 +21,32 @@ import { TemplatePreviewPanel } from '../components/TemplatePreviewPanel'
 import { TemplateSectionOrder } from '../components/TemplateSectionOrder'
 import { ImageInput } from '../components/form/ImageInput'
 import { ThemeSettingsSection } from '../components/form/ThemeSettingsSection'
+import { VendorProfileFieldsSection } from '../components/form/VendorProfileFieldsSection'
 import { updateFieldImmutable } from '../components/hooks/utils'
 import { initialData, type TemplateData } from '../data'
-import { getVendorTemplateBaseUrl } from '@/lib/storefront-url'
+import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import {
+  getStoredEditingTemplateKey,
+} from '../components/templateVariantParam'
 
 function VendorTemplateContact() {
   const [data, setData] = useState<TemplateData>(initialData)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
+  const [inlineEditVersion, setInlineEditVersion] = useState(0)
   const [isMapReady, setIsMapReady] = useState(false)
-  const [sectionOrder, setSectionOrder] = useState(['hero', 'details', 'map'])
+  const [sectionOrder, setSectionOrder] = useState([
+    'hero',
+    'details',
+    'map',
+    'vendor',
+  ])
+  const vendor_id = useSelector((state: any) => state.auth?.user?.id)
+  const token = useSelector((state: any) => state.auth?.token)
+  const selectedTemplateKey = useMemo(
+    () => getStoredEditingTemplateKey(vendor_id),
+    [vendor_id]
+  )
   const mapRef = useRef<HTMLDivElement>(null)
   const leafletMapRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -38,9 +54,6 @@ function VendorTemplateContact() {
   const [suggestions, setSuggestions] = useState<
     { display_name: string; lat: string; lon: string }[]
   >([])
-
-  const vendor_id = useSelector((state: any) => state.auth?.user?.id)
-  const token = useSelector((state: any) => state.auth?.token)
 
   useEffect(() => {
     if (!vendor_id) return
@@ -118,7 +131,10 @@ function VendorTemplateContact() {
               )
             )
             setData(mergeTemplate(payload as Record<string, unknown>))
-            if (order.length) setSectionOrder(order)
+            if (order.length) {
+              const normalizedOrder = Array.from(new Set([...order, 'vendor']))
+              setSectionOrder(normalizedOrder)
+            }
             return
           }
         } catch {
@@ -329,6 +345,7 @@ function VendorTemplateContact() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setInlineEditVersion((prev) => prev + 1)
   }
 
   const handleImageChange = async (path: string[], file: File | null) => {
@@ -356,21 +373,40 @@ function VendorTemplateContact() {
     }
   }
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async (options?: { silent?: boolean }) => {
     try {
       await axios.put(`${BASE_URL}/v1/templates/contact`, {
         vendor_id,
         components: data.components.contact_page,
+        vendor_profile: data.components.vendor_profile,
         theme: data.components.theme,
         section_order: sectionOrder,
       })
-      alert('Contact page saved successfully!')
+      if (!options?.silent) {
+        alert('Contact page saved successfully!')
+      }
     } catch {
-      alert('Failed to save contact page.')
+      if (!options?.silent) {
+        alert('Failed to save contact page.')
+      }
     }
-  }
+  }, [
+    data.components.contact_page,
+    data.components.theme,
+    data.components.vendor_profile,
+    sectionOrder,
+    vendor_id,
+  ])
 
-  const previewBaseUrl = getVendorTemplateBaseUrl(vendor_id)
+  useEffect(() => {
+    if (inlineEditVersion === 0 || uploadingPaths.size > 0) return
+    const timeout = window.setTimeout(() => {
+      void handleSave({ silent: true })
+    }, 700)
+    return () => window.clearTimeout(timeout)
+  }, [inlineEditVersion, uploadingPaths, handleSave])
+
+  const previewBaseUrl = getVendorTemplatePreviewUrl(vendor_id, selectedTemplateKey)
 
   const sections = useMemo(
     () => [
@@ -388,6 +424,11 @@ function VendorTemplateContact() {
         id: 'map',
         title: 'Map + Coordinates',
         description: 'Search, coordinates, and pin placement',
+      },
+      {
+        id: 'vendor',
+        title: 'Vendor Profile',
+        description: 'Override vendor details shown in About and Contact pages',
       },
     ],
     []
@@ -628,6 +669,12 @@ function VendorTemplateContact() {
         </div>
       </div>
     ),
+    vendor: (
+      <VendorProfileFieldsSection
+        vendorProfile={data.components.vendor_profile}
+        updateField={updateField}
+      />
+    ),
   }
 
   return (
@@ -644,9 +691,12 @@ function VendorTemplateContact() {
         title='Contact Page Builder'
         description='Configure contact hero content, location messaging, and pin placement. Sync to preview how customers will reach you.'
         activeKey='contact'
+        editingTemplateKey={selectedTemplateKey}
         actions={
           <Button
-            onClick={handleSave}
+            onClick={() => {
+              void handleSave()
+            }}
             disabled={uploadingPaths.size > 0}
             className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
           >
@@ -658,7 +708,6 @@ function VendorTemplateContact() {
             title='Live Contact Preview'
             subtitle='Sync to refresh the right-side preview'
             baseSrc={previewBaseUrl}
-            previewQuery=''
             defaultPath='/contact'
             pageOptions={[
               { label: 'Home', path: '' },

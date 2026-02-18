@@ -3,6 +3,7 @@ import {
   HelpCircle,
   Users,
   ShieldCheck,
+  LayoutTemplate,
   ShoppingCart,
   Map,
   CreditCard,
@@ -234,6 +235,19 @@ export const sidebarData: any = {
     },
 
     {
+      title: 'Template Admin',
+      roles: [ROLES.ADMIN],
+      items: [
+        {
+          title: 'All Templates',
+          url: '/template-catalog',
+          icon: LayoutTemplate,
+          roles: [ROLES.ADMIN],
+        },
+      ],
+    },
+
+    {
       title: 'Template',
       roles: [ROLES.VENDOR],
       items: [
@@ -245,6 +259,21 @@ export const sidebarData: any = {
             {
               title: 'Create Your Template',
               url: '/vendor-template',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Edit About Page',
+              url: '/vendor-template-about',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Edit Contact Page',
+              url: '/vendor-template-contact',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Edit Social + FAQs',
+              url: '/vendor-template-other',
               roles: [ROLES.VENDOR],
             },
             {

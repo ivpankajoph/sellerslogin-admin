@@ -14,6 +14,21 @@ type TemplateCatalogItem = {
   name: string
   description?: string
   previewImage?: string
+  isCore?: boolean
+  deletable?: boolean
+}
+
+const CORE_TEMPLATE_KEYS = new Set(['classic', 'studio', 'minimal', 'trend'])
+
+const normalizeTemplateKey = (value: unknown) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+
+const isCoreTemplate = (template: TemplateCatalogItem) => {
+  if (typeof template.isCore === 'boolean') return template.isCore
+  const key = normalizeTemplateKey(template.key)
+  return CORE_TEMPLATE_KEYS.has(key)
 }
 
 export function useTemplateForm() {
@@ -31,12 +46,17 @@ export function useTemplateForm() {
   const [isDeploying, setIsDeploying] = useState(false)
   const [deployMessage, setDeployMessage] = useState('Deploying website...')
   const [loadedSectionOrder, setLoadedSectionOrder] = useState<string[]>([])
+  const [isDeletingTemplateKey, setIsDeletingTemplateKey] = useState<
+    string | null
+  >(null)
 
   const vendor_id = useSelector((s: any) => s.auth?.user?.id)
+  const role = useSelector((s: any) => s.auth?.user?.role)
   const token = useSelector((s: any) => s.auth?.token)
   const vendor_weburl = useSelector(
     (s: any) => s.vendorprofile?.profile?.vendor?.bound_url
   )
+  const isAdmin = role === 'admin' || role === 'superadmin'
 
   const dispatch = useDispatch<AppDispatch>()
   useEffect(() => {
@@ -153,9 +173,18 @@ export function useTemplateForm() {
   useEffect(() => {
     const loadCatalog = async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/v1/templates/catalog`)
-        const items = Array.isArray(res.data?.data) ? res.data.data : []
-        setTemplateCatalog(items)
+      const res = await axios.get(`${BASE_URL}/v1/templates/catalog`)
+      const items = Array.isArray(res.data?.data) ? res.data.data : []
+      const normalizedItems = (items as TemplateCatalogItem[]).map((item) => ({
+        ...item,
+        key: normalizeTemplateKey(item.key),
+        isCore:
+          typeof item.isCore === 'boolean'
+            ? item.isCore
+            : CORE_TEMPLATE_KEYS.has(normalizeTemplateKey(item.key)),
+        deletable: typeof item.deletable === 'boolean' ? item.deletable : true,
+      }))
+      setTemplateCatalog(normalizedItems)
       } catch {
         setTemplateCatalog([])
       }
@@ -163,6 +192,23 @@ export function useTemplateForm() {
 
     loadCatalog()
   }, [])
+
+  useEffect(() => {
+    if (!templateCatalog.length) return
+
+    const fallbackKey =
+      templateCatalog.find((item) => item.key === 'classic')?.key ||
+      templateCatalog[0]?.key ||
+      'classic'
+
+    if (!templateCatalog.some((item) => item.key === selectedTemplateKey)) {
+      setSelectedTemplateKey(fallbackKey)
+    }
+
+    if (!templateCatalog.some((item) => item.key === activeTemplateKey)) {
+      setActiveTemplateKey(fallbackKey)
+    }
+  }, [templateCatalog, selectedTemplateKey, activeTemplateKey])
 
   // Update any nested value
   const updateField = (path: string[], value: any) => {
@@ -198,7 +244,10 @@ export function useTemplateForm() {
   }
 
   // Save template
-  const handleSubmit = async (sectionOrder?: string[]) => {
+  const handleSubmit = async (
+    sectionOrder?: string[],
+    options?: { silent?: boolean }
+  ) => {
     setIsSubmitting(true)
     setSubmitStatus('idle')
 
@@ -213,13 +262,17 @@ export function useTemplateForm() {
 
       if (res.status === 200 || res.status === 201) {
         setSubmitStatus('success')
-        toast.success('Template saved!')
+        if (!options?.silent) {
+          toast.success('Template saved!')
+        }
       } else {
         throw new Error()
       }
     } catch {
       setSubmitStatus('error')
-      toast.error('Save failed')
+      if (!options?.silent) {
+        toast.error('Save failed')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -253,6 +306,59 @@ export function useTemplateForm() {
       toast.error('Template update failed')
     } finally {
       setIsUpdatingTemplate(false)
+    }
+  }
+
+  const deleteTemplateVariant = async (templateKey: string) => {
+    if (!isAdmin) return
+
+    const target = templateCatalog.find((item) => item.key === templateKey)
+    if (!target) return
+
+    if (!token) {
+      toast.error('Unauthorized request')
+      return
+    }
+
+    const isCore = isCoreTemplate(target)
+    const confirmed = window.confirm(
+      `Delete template "${target.name}"?${
+        isCore ? '\n\nWARNING: This is a core template.' : ''
+      }\n\nThis will remove it from admin template options and fallback vendors using it to another template.`
+    )
+    if (!confirmed) return
+
+    setIsDeletingTemplateKey(templateKey)
+    try {
+      const res = await axios.delete(
+        `${BASE_URL}/v1/templates/catalog/${encodeURIComponent(templateKey)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+
+      const items = Array.isArray(res.data?.data)
+        ? (res.data.data as TemplateCatalogItem[])
+        : []
+
+      setTemplateCatalog(items)
+
+      const fallbackKey = items.find((item) => item.key === 'classic')?.key ||
+        items[0]?.key ||
+        'classic'
+
+      if (selectedTemplateKey === templateKey) {
+        setSelectedTemplateKey(fallbackKey)
+      }
+      if (activeTemplateKey === templateKey) {
+        setActiveTemplateKey(fallbackKey)
+      }
+
+      toast.success(res.data?.message || 'Template deleted')
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Template delete failed')
+    } finally {
+      setIsDeletingTemplateKey(null)
     }
   }
 
@@ -345,5 +451,8 @@ export function useTemplateForm() {
     handleDeploy,
     handleCancel,
     loadedSectionOrder,
+    isAdmin,
+    deleteTemplateVariant,
+    isDeletingTemplateKey,
   }
 }

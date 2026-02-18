@@ -18,21 +18,22 @@ export function AppSidebar() {
   const { collapsible, variant } = useLayout()
   const user = useSelector((state: any) => state.auth.user)
   const userType = user?.role
+  const effectiveRole = userType === 'superadmin' ? 'admin' : userType
 
   const filteredNavGroups = sidebarData.navGroups
     .filter(
       (group: { roles: string | any[] }) =>
-        !group.roles || group.roles.includes(userType)
+        !group.roles || group.roles.includes(effectiveRole)
     )
     .map((group: { items: any[] }) => ({
       ...group,
       items: group.items
-        ?.filter((item) => !item.roles || item.roles.includes(userType))
+        ?.filter((item) => !item.roles || item.roles.includes(effectiveRole))
         .map((item) => ({
           ...item,
           items: item.items?.filter(
             (subItem: { roles: string | any[] }) =>
-              !subItem.roles || subItem.roles.includes(userType)
+              !subItem.roles || subItem.roles.includes(effectiveRole)
           ),
         }))
         .filter((item) => !item.items || item.items.length > 0),

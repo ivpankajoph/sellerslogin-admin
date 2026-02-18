@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { type JSX, useEffect, useMemo, useState } from 'react'
+import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
@@ -21,7 +21,10 @@ import { ArrayField } from '../components/form/ArrayField'
 import { ThemeSettingsSection } from '../components/form/ThemeSettingsSection'
 import { updateFieldImmutable } from '../components/hooks/utils'
 import { initialData as importedInitialData, type TemplateData } from '../data'
-import { getVendorTemplateBaseUrl } from '@/lib/storefront-url'
+import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import {
+  getStoredEditingTemplateKey,
+} from '../components/templateVariantParam'
 
 const selectVendorId = (state: any): string | undefined => state?.auth?.user?.id
 
@@ -31,6 +34,13 @@ const safeInitialData: TemplateData = {
       templateColor: '#0f172a',
       bannerColor: '#0f172a',
       fontScale: 1,
+      headingFont: 'Poppins',
+      bodyFont: 'Poppins',
+      textColor: '#1f2937',
+      headingColor: '#0f172a',
+      surfaceColor: '#ffffff',
+      surfaceMutedColor: '#f8fafc',
+      borderColor: '#e2e8f0',
     },
     social_page: {
       facebook: '',
@@ -44,6 +54,7 @@ const safeInitialData: TemplateData = {
       },
     },
     logo: '',
+    vendor_profile: {},
     home_page: {
       header_text: '',
       backgroundImage: '',
@@ -126,6 +137,10 @@ const initialData: TemplateData = {
   components: {
     ...safeInitialData.components,
     ...importedInitialData?.components,
+    vendor_profile: {
+      ...safeInitialData.components.vendor_profile,
+      ...(importedInitialData?.components?.vendor_profile || {}),
+    },
     social_page: {
       ...safeInitialData.components.social_page,
       ...importedInitialData?.components?.social_page,
@@ -145,7 +160,12 @@ function VendorTemplateOther() {
   const token = useSelector((state: any) => state.auth?.token)
   const [data, setData] = useState<TemplateData>(initialData)
   const [isSaving, setIsSaving] = useState(false)
+  const [inlineEditVersion, setInlineEditVersion] = useState(0)
   const [sectionOrder, setSectionOrder] = useState(['faqs', 'social'])
+  const selectedTemplateKey = useMemo(
+    () => getStoredEditingTemplateKey(vendor_id),
+    [vendor_id]
+  )
 
   useEffect(() => {
     if (!vendor_id) return
@@ -241,11 +261,14 @@ function VendorTemplateOther() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setInlineEditVersion((prev) => prev + 1)
   }
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async (options?: { silent?: boolean }) => {
     if (!vendor_id) {
-      toast.error('Vendor ID is missing. Please log in again.')
+      if (!options?.silent) {
+        toast.error('Vendor ID is missing. Please log in again.')
+      }
       return
     }
 
@@ -255,6 +278,7 @@ function VendorTemplateOther() {
       const payload = {
         vendor_id,
         social_page: data.components.social_page,
+        vendor_profile: data.components.vendor_profile,
         theme: data.components.theme,
         section_order: sectionOrder,
       }
@@ -265,26 +289,46 @@ function VendorTemplateOther() {
       )
 
       if (response.data?.success) {
-        toast.success(response.data?.message || 'Saved successfully!')
+        if (!options?.silent) {
+          toast.success(response.data?.message || 'Saved successfully!')
+        }
       } else {
-        toast.error(response.data?.message || 'Failed to save.')
+        if (!options?.silent) {
+          toast.error(response.data?.message || 'Failed to save.')
+        }
       }
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        toast.error(
-          error.response?.data?.message ||
-            error.message ||
-            'An error occurred while saving.'
-        )
-      } else {
-        toast.error('Unexpected error occurred.')
+      if (!options?.silent) {
+        if (axios.isAxiosError(error)) {
+          toast.error(
+            error.response?.data?.message ||
+              error.message ||
+              'An error occurred while saving.'
+          )
+        } else {
+          toast.error('Unexpected error occurred.')
+        }
       }
     } finally {
       setIsSaving(false)
     }
-  }
+  }, [
+    data.components.social_page,
+    data.components.theme,
+    data.components.vendor_profile,
+    sectionOrder,
+    vendor_id,
+  ])
 
-  const previewBaseUrl = getVendorTemplateBaseUrl(vendor_id)
+  useEffect(() => {
+    if (inlineEditVersion === 0) return
+    const timeout = window.setTimeout(() => {
+      void handleSave({ silent: true })
+    }, 700)
+    return () => window.clearTimeout(timeout)
+  }, [inlineEditVersion, handleSave])
+
+  const previewBaseUrl = getVendorTemplatePreviewUrl(vendor_id, selectedTemplateKey)
 
   const sections = useMemo(
     () => [
@@ -436,9 +480,12 @@ function VendorTemplateOther() {
         title='Social + FAQ Builder'
         description='Configure FAQ content and social channels that appear across the template. Reorder sections to control the flow.'
         activeKey='other'
+        editingTemplateKey={selectedTemplateKey}
         actions={
           <Button
-            onClick={handleSave}
+            onClick={() => {
+              void handleSave()
+            }}
             disabled={isSaving || !vendor_id}
             className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
           >
@@ -450,7 +497,6 @@ function VendorTemplateOther() {
             title='Live Template Preview'
             subtitle='Sync to refresh the right-side preview'
             baseSrc={previewBaseUrl}
-            previewQuery=''
             defaultPath=''
             pageOptions={[
               { label: 'Home', path: '' },

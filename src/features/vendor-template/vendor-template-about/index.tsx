@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { type JSX, useEffect, useMemo, useState } from 'react'
+import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
@@ -19,25 +19,34 @@ import { TemplateSectionOrder } from '../components/TemplateSectionOrder'
 import { ArrayField } from '../components/form/ArrayField'
 import { ImageInput } from '../components/form/ImageInput'
 import { ThemeSettingsSection } from '../components/form/ThemeSettingsSection'
+import { VendorProfileFieldsSection } from '../components/form/VendorProfileFieldsSection'
 import { updateFieldImmutable } from '../components/hooks/utils'
 import { initialData, type TemplateData } from '../data'
 import { uploadImage } from '../helper/fileupload'
-import { getVendorTemplateBaseUrl } from '@/lib/storefront-url'
+import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import {
+  getStoredEditingTemplateKey,
+} from '../components/templateVariantParam'
 
 function VendorTemplateAbout() {
   const [data, setData] = useState<TemplateData>(initialData)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
+  const [inlineEditVersion, setInlineEditVersion] = useState(0)
   const [sectionOrder, setSectionOrder] = useState([
     'hero',
     'story',
     'values',
     'team',
     'stats',
+    'vendor',
   ])
-
   const vendor_id = useSelector((state: any) => state.auth.user.id)
   const token = useSelector((state: any) => state.auth?.token)
+  const selectedTemplateKey = useMemo(
+    () => getStoredEditingTemplateKey(vendor_id),
+    [vendor_id]
+  )
 
   useEffect(() => {
     if (!vendor_id) return
@@ -115,7 +124,10 @@ function VendorTemplateAbout() {
               )
             )
             setData(mergeTemplate(payload as Record<string, unknown>))
-            if (order.length) setSectionOrder(order)
+            if (order.length) {
+              const normalizedOrder = Array.from(new Set([...order, 'vendor']))
+              setSectionOrder(normalizedOrder)
+            }
             return
           }
         } catch {
@@ -153,6 +165,7 @@ function VendorTemplateAbout() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setInlineEditVersion((prev) => prev + 1)
   }
 
   const handleImageChange = async (path: string[], file: File | null) => {
@@ -182,21 +195,40 @@ function VendorTemplateAbout() {
     }
   }
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async (options?: { silent?: boolean }) => {
     try {
       await axios.put(`${BASE_URL}/v1/templates/about`, {
         vendor_id,
         components: data.components.about_page,
+        vendor_profile: data.components.vendor_profile,
         theme: data.components.theme,
         section_order: sectionOrder,
       })
-      alert('About page saved successfully!')
+      if (!options?.silent) {
+        alert('About page saved successfully!')
+      }
     } catch {
-      alert('Failed to save about page.')
+      if (!options?.silent) {
+        alert('Failed to save about page.')
+      }
     }
-  }
+  }, [
+    data.components.about_page,
+    data.components.theme,
+    data.components.vendor_profile,
+    sectionOrder,
+    vendor_id,
+  ])
 
-  const previewBaseUrl = getVendorTemplateBaseUrl(vendor_id)
+  useEffect(() => {
+    if (inlineEditVersion === 0 || uploadingPaths.size > 0) return
+    const timeout = window.setTimeout(() => {
+      void handleSave({ silent: true })
+    }, 700)
+    return () => window.clearTimeout(timeout)
+  }, [inlineEditVersion, uploadingPaths, handleSave])
+
+  const previewBaseUrl = getVendorTemplatePreviewUrl(vendor_id, selectedTemplateKey)
 
   const sections = useMemo(
     () => [
@@ -224,6 +256,11 @@ function VendorTemplateAbout() {
         id: 'stats',
         title: 'Highlight Stats',
         description: 'Numbers that build trust',
+      },
+      {
+        id: 'vendor',
+        title: 'Vendor Profile',
+        description: 'Override vendor details shown in About and Contact pages',
       },
     ],
     []
@@ -583,6 +620,12 @@ function VendorTemplateAbout() {
         />
       </div>
     ),
+    vendor: (
+      <VendorProfileFieldsSection
+        vendorProfile={data.components.vendor_profile}
+        updateField={updateField}
+      />
+    ),
   }
 
   return (
@@ -599,9 +642,12 @@ function VendorTemplateAbout() {
         title='About Page Builder'
         description='Tell your story, highlight your values, and introduce the team. Reorder sections to control how the narrative flows.'
         activeKey='about'
+        editingTemplateKey={selectedTemplateKey}
         actions={
           <Button
-            onClick={handleSave}
+            onClick={() => {
+              void handleSave()
+            }}
             disabled={uploadingPaths.size > 0}
             className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
           >
@@ -613,7 +659,6 @@ function VendorTemplateAbout() {
             title='Live About Preview'
             subtitle='Sync to refresh the right-side preview'
             baseSrc={previewBaseUrl}
-            previewQuery=''
             defaultPath='/about'
             pageOptions={[
               { label: 'Home', path: '' },

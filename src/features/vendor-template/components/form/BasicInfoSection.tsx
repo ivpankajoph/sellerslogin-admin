@@ -1,24 +1,36 @@
 import { Upload } from 'lucide-react'
 import { ImageInput } from './ImageInput'
+import { cn } from '@/lib/utils'
 
 interface Type {
   data: any
   handleImageChange: any
   uploadingPaths: any
+  selectedComponent?: string | null
 }
 export function BasicInfoSection({
   data,
   handleImageChange,
   uploadingPaths,
+  selectedComponent,
 }: Type) {
+  const bannerPath = 'components.home_page.backgroundImage'
+  const logoPath = 'components.logo'
   const isUploadingBanner = uploadingPaths.has(
-    'components.home_page.backgroundImage'
+    bannerPath
   )
-  const isUploadingLogo = uploadingPaths.has('components.logo')
+  const isUploadingLogo = uploadingPaths.has(logoPath)
 
   return (
     <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
-      <div className='rounded-xl border bg-white p-5'>
+      <div
+        className={cn(
+          'rounded-xl border bg-white p-5',
+          selectedComponent === bannerPath &&
+            'ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+        )}
+        data-editor-component={bannerPath}
+      >
         <ImageInput
           label='Banner Image'
           name='backgroundImage'
@@ -40,7 +52,14 @@ export function BasicInfoSection({
         )}
       </div>
 
-      <div className='rounded-xl border bg-white p-5'>
+      <div
+        className={cn(
+          'rounded-xl border bg-white p-5',
+          selectedComponent === logoPath &&
+            'ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+        )}
+        data-editor-component={logoPath}
+      >
         <ImageInput
           label='Company Logo'
           name='logo'

@@ -1,3 +1,4 @@
+import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -6,6 +7,7 @@ type TemplateVariant = {
   name: string
   description?: string
   previewImage?: string
+  deletable?: boolean
 }
 
 type Props = {
@@ -17,6 +19,9 @@ type Props = {
   onApply: () => void
   isApplying?: boolean
   showApplyControls?: boolean
+  canDeleteTemplates?: boolean
+  deletingKey?: string | null
+  onDelete?: (key: string) => void
 }
 
 export function TemplateVariantSelector({
@@ -28,6 +33,9 @@ export function TemplateVariantSelector({
   onApply,
   isApplying,
   showApplyControls = true,
+  canDeleteTemplates = false,
+  deletingKey = null,
+  onDelete,
 }: Props) {
   if (!templates.length) return null
 
@@ -56,7 +64,7 @@ export function TemplateVariantSelector({
             <div
               key={template.key}
               className={cn(
-                'group flex h-full flex-col overflow-hidden rounded-2xl border text-left transition',
+                'group relative flex h-full flex-col overflow-hidden rounded-2xl border text-left transition',
                 isSelected
                   ? 'border-slate-900 shadow-lg shadow-slate-900/10'
                   : 'border-slate-200 hover:border-slate-300'
@@ -100,6 +108,21 @@ export function TemplateVariantSelector({
                   </span>
                 </div>
               </button>
+              {canDeleteTemplates ? (
+                <button
+                  type='button'
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onDelete?.(template.key)
+                  }}
+                  disabled={deletingKey === template.key}
+                  className='absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-white/90 text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60'
+                  title='Delete template'
+                >
+                  <Trash2 className='h-4 w-4' />
+                </button>
+              ) : null}
               {previewBaseUrl ? (
                 <div className='px-4 pb-4'>
                   <a

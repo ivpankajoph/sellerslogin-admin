@@ -1,6 +1,9 @@
 import { type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
+import {
+  getTemplateDisplayName,
+} from './templateVariantParam'
 
 const navItems = [
   { key: 'home', label: 'Home', to: '/vendor-template' },
@@ -14,6 +17,8 @@ interface TemplatePageLayoutProps {
   title: string
   description: string
   activeKey: string
+  editingTemplateKey?: string
+  showNavigation?: boolean
   actions?: ReactNode
   topContent?: ReactNode
   preview?: ReactNode
@@ -24,12 +29,23 @@ export function TemplatePageLayout({
   title,
   description,
   activeKey,
+  editingTemplateKey,
+  showNavigation = true,
   actions,
   topContent,
   preview,
   children,
 }: TemplatePageLayoutProps) {
   const hasMainContent = preview != null || children != null
+  const templateName = getTemplateDisplayName(editingTemplateKey)
+  const resolvedNavItems = navItems.map((item) =>
+    item.key === 'home' && editingTemplateKey
+      ? {
+          ...item,
+          to: `/vendor-template/${editingTemplateKey}`,
+        }
+      : item
+  )
 
   return (
     <div className='relative min-h-screen overflow-hidden font-manrope'>
@@ -50,26 +66,34 @@ export function TemplatePageLayout({
               <p className='mt-2 max-w-2xl text-sm text-slate-600 sm:text-base'>
                 {description}
               </p>
+              <p className='mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600'>
+                Editing Template: {editingTemplateKey ? templateName : 'Default'}
+                <span className='rounded-full bg-slate-100 px-2 py-0.5 text-[11px] uppercase tracking-[0.12em] text-slate-500'>
+                  {editingTemplateKey || 'active'}
+                </span>
+              </p>
             </div>
             <div className='flex flex-wrap items-center gap-3'>{actions}</div>
           </div>
 
-          <div className='mt-6 flex flex-wrap gap-2'>
-            {navItems.map((item) => (
-              <Link
-                key={item.key}
-                to={item.to}
-                className={cn(
-                  'rounded-full border px-4 py-2 text-sm font-semibold transition-all',
-                  item.key === activeKey
-                    ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/20'
-                    : 'border-slate-200 bg-white/80 text-slate-600 hover:border-slate-400 hover:text-slate-900'
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
+          {showNavigation ? (
+            <div className='mt-6 flex flex-wrap gap-2'>
+              {resolvedNavItems.map((item) => (
+                <Link
+                  key={item.key}
+                  to={item.to}
+                  className={cn(
+                    'rounded-full border px-4 py-2 text-sm font-semibold transition-all',
+                    item.key === activeKey
+                      ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-900/20'
+                      : 'border-slate-200 bg-white/80 text-slate-600 hover:border-slate-400 hover:text-slate-900'
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </header>
 
         {topContent ? <div className='space-y-6'>{topContent}</div> : null}
@@ -79,21 +103,21 @@ export function TemplatePageLayout({
             className={cn(
               'grid gap-6',
               preview && children
-                ? 'lg:grid-cols-[520px_minmax(0,1fr)] xl:grid-cols-[600px_minmax(0,1fr)]'
+                ? 'lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] xl:grid-cols-[minmax(360px,480px)_minmax(0,1fr)]'
                 : ''
             )}
           >
-            {preview ? (
-              <div className='lg:sticky lg:top-6 lg:h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-2'>
-                {preview}
-              </div>
-            ) : null}
             {children ? (
               <div
                 className='space-y-6 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm lg:h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-3'
                 data-editor-scroll-container='true'
               >
                 {children}
+              </div>
+            ) : null}
+            {preview ? (
+              <div className='lg:sticky lg:top-6 lg:h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-2'>
+                {preview}
               </div>
             ) : null}
           </div>

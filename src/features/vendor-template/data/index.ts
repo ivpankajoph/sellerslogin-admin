@@ -15,10 +15,18 @@ export type TemplateData = {
   components: {
     social_page: any
     logo: string // ImageKit URL
+    vendor_profile: Record<string, string>
     theme: {
       templateColor: string
       bannerColor: string
       fontScale: number
+      headingFont: string
+      bodyFont: string
+      textColor: string
+      headingColor: string
+      surfaceColor: string
+      surfaceMutedColor: string
+      borderColor: string
     }
     home_page: {
       hero_kicker?: string
@@ -139,10 +147,18 @@ export const initialData: TemplateData = {
 
   components: {
     logo: '',
+    vendor_profile: {},
     theme: {
       templateColor: '#0f172a',
       bannerColor: '#0f172a',
       fontScale: 1,
+      headingFont: 'Poppins',
+      bodyFont: 'Poppins',
+      textColor: '#1f2937',
+      headingColor: '#0f172a',
+      surfaceColor: '#ffffff',
+      surfaceMutedColor: '#f8fafc',
+      borderColor: '#e2e8f0',
     },
     home_page: {
       hero_kicker: '',

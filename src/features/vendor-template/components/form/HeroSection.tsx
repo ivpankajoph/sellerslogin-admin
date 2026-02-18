@@ -1,13 +1,21 @@
 import { Zap } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
 interface Type {
   data: any
   updateField: any
   selectedComponent?: string | null
 }
-export function HeroSection({ data, updateField }: Type) {
+export function HeroSection({ data, updateField, selectedComponent }: Type) {
+  const titlePath = 'components.home_page.header_text'
+  const kickerPath = 'components.home_page.hero_kicker'
+  const subtitlePath = 'components.home_page.header_text_small'
+  const primaryButtonPath = 'components.home_page.button_header'
+  const secondaryButtonPath = 'components.home_page.button_secondary'
+  const badgePath = 'components.home_page.badge_text'
+
   return (
     <div className='rounded-xl border bg-white p-5 shadow-sm'>
       <h2 className='mb-4 flex items-center border-b pb-2 text-xl font-semibold text-gray-800'>
@@ -18,7 +26,14 @@ export function HeroSection({ data, updateField }: Type) {
       </h2>
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
-        <div className='space-y-2'>
+        <div
+          className={cn(
+            'space-y-2',
+            selectedComponent === titlePath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={titlePath}
+        >
           <label className='text-sm font-medium text-gray-700'>
             Hero Title
           </label>
@@ -35,7 +50,14 @@ export function HeroSection({ data, updateField }: Type) {
           />
         </div>
 
-        <div className='space-y-2'>
+        <div
+          className={cn(
+            'space-y-2',
+            selectedComponent === kickerPath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={kickerPath}
+        >
           <label className='text-sm font-medium text-gray-700'>
             Hero Eyebrow
           </label>
@@ -52,7 +74,14 @@ export function HeroSection({ data, updateField }: Type) {
           />
         </div>
 
-        <div className='space-y-2'>
+        <div
+          className={cn(
+            'space-y-2',
+            selectedComponent === subtitlePath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={subtitlePath}
+        >
           <label className='text-sm font-medium text-gray-700'>
             Hero Subtitle
           </label>
@@ -71,7 +100,14 @@ export function HeroSection({ data, updateField }: Type) {
       </div>
 
       <div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-2'>
-        <div className='space-y-2'>
+        <div
+          className={cn(
+            'space-y-2',
+            selectedComponent === primaryButtonPath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={primaryButtonPath}
+        >
           <label className='text-sm font-medium text-gray-700'>
             Header Button Text
           </label>
@@ -87,7 +123,14 @@ export function HeroSection({ data, updateField }: Type) {
             className='h-12'
           />
         </div>
-        <div className='space-y-2'>
+        <div
+          className={cn(
+            'space-y-2',
+            selectedComponent === secondaryButtonPath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={secondaryButtonPath}
+        >
           <label className='text-sm font-medium text-gray-700'>
             Secondary Button Text
           </label>
@@ -103,7 +146,14 @@ export function HeroSection({ data, updateField }: Type) {
             className='h-12'
           />
         </div>
-        <div className='space-y-2'>
+        <div
+          className={cn(
+            'space-y-2',
+            selectedComponent === badgePath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={badgePath}
+        >
           <label className='text-sm font-medium text-gray-700'>
             Badge Text
           </label>

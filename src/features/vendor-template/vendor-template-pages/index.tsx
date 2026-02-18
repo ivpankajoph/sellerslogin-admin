@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +22,10 @@ import { BASE_URL } from '@/store/slices/vendor/productSlice'
 
 import { useSelector } from 'react-redux'
 import { initialData, type TemplateData } from '../data'
-import { getVendorTemplateBaseUrl } from '@/lib/storefront-url'
+import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import {
+  getStoredEditingTemplateKey,
+} from '../components/templateVariantParam'
 
 type PageSection = any
 
@@ -229,8 +232,13 @@ export default function VendorTemplatePages() {
   const [data, setData] = useState<TemplateData>(initialData)
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [inlineEditVersion, setInlineEditVersion] = useState(0)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const vendor_id = useSelector((state: any) => state.auth?.user?.id)
+  const selectedTemplateKey = useMemo(
+    () => getStoredEditingTemplateKey(vendor_id),
+    [vendor_id]
+  )
 
   useEffect(() => {
     if (!vendor_id) return
@@ -240,15 +248,39 @@ export default function VendorTemplatePages() {
         const res = await axios.get(
           `${BASE_URL}/v1/templates/pages?vendor_id=${vendor_id}`
         )
+
+        const root = res.data as unknown
+        const record =
+          root && typeof root === 'object'
+            ? (root as Record<string, unknown>)
+            : null
         const payload =
-          res.data?.data?.components?.custom_pages ||
-          res.data?.components?.custom_pages ||
-          res.data?.custom_pages ||
+          (record?.data as Record<string, unknown>) ||
+          (record?.template as Record<string, unknown>) ||
+          record
+
+        const customPages =
+          (payload?.components as Record<string, unknown>)?.custom_pages ||
+          payload?.custom_pages ||
           []
+
+        const theme =
+          (payload?.components as Record<string, unknown>)?.theme ||
+          payload?.theme ||
+          {}
+
         const next = structuredClone(initialData)
-        next.components.custom_pages = payload
+        next.components.custom_pages = Array.isArray(customPages)
+          ? customPages
+          : []
+        next.components.theme = {
+          ...next.components.theme,
+          ...(typeof theme === 'object' && theme ? (theme as any) : {}),
+        }
         setData(next)
-        if (payload.length) setSelectedPageId(payload[0].id)
+        if (Array.isArray(customPages) && customPages.length) {
+          setSelectedPageId(customPages[0]?.id)
+        }
       } catch {
         setData(initialData)
       }
@@ -261,7 +293,7 @@ export default function VendorTemplatePages() {
   const selectedPage =
     (pages.find((page) => page.id === selectedPageId) as any) || pages[0]
 
-  const previewBaseUrl = getVendorTemplateBaseUrl(vendor_id)
+  const previewBaseUrl = getVendorTemplatePreviewUrl(vendor_id, selectedTemplateKey)
   const previewPath = selectedPage?.slug ? `/page/${selectedPage.slug}` : ''
 
   const sectionOrder = useMemo(() => {
@@ -437,7 +469,7 @@ export default function VendorTemplatePages() {
     }
   }
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!vendor_id) return
     setIsSaving(true)
     try {
@@ -449,7 +481,7 @@ export default function VendorTemplatePages() {
     } finally {
       setIsSaving(false)
     }
-  }
+  }, [data.components.theme, pages, vendor_id])
 
   const updateField = (path: string[], value: any) => {
     setData((prev) => updateFieldImmutable(prev, path, value))
@@ -457,7 +489,16 @@ export default function VendorTemplatePages() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setInlineEditVersion((prev) => prev + 1)
   }
+
+  useEffect(() => {
+    if (inlineEditVersion === 0 || uploadingPaths.size > 0) return
+    const timeout = window.setTimeout(() => {
+      void handleSave()
+    }, 700)
+    return () => window.clearTimeout(timeout)
+  }, [inlineEditVersion, uploadingPaths, handleSave])
 
   const sectionItems = useMemo(() => {
     const sections = (selectedPage?.sections as any[]) || []
@@ -485,6 +526,7 @@ export default function VendorTemplatePages() {
         title='Custom Pages Builder'
         description='Create additional pages for your storefront, organize sections, and keep the navbar in sync.'
         activeKey='pages'
+        editingTemplateKey={selectedTemplateKey}
         actions={
           <>
             <Button
@@ -508,7 +550,6 @@ export default function VendorTemplatePages() {
             title='Live Page Preview'
             subtitle='Custom pages render in the storefront'
             baseSrc={previewBaseUrl}
-            previewQuery=''
             defaultPath={previewPath}
             pageOptions={[
               { label: 'Home', path: '' },

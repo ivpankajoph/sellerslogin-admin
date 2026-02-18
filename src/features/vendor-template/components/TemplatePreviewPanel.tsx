@@ -28,6 +28,16 @@ interface TemplatePreviewPanelProps {
   onInlineEdit?: (path: string[], value: unknown) => void
 }
 
+const resolvePreviewOrigin = (src?: string) => {
+  if (typeof window === 'undefined') return undefined
+  if (!src) return window.location.origin
+  try {
+    return new URL(src, window.location.href).origin
+  } catch {
+    return window.location.origin
+  }
+}
+
 export function TemplatePreviewPanel({
   title,
   subtitle,
@@ -52,6 +62,13 @@ export function TemplatePreviewPanel({
   const [iframeHeight, setIframeHeight] = useState<number | null>(null)
   const [previewPath, setPreviewPath] = useState(defaultPath || '')
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const computedSrc = baseSrc
+    ? `${baseSrc}${previewPath}${previewQuery || ''}`
+    : src
+  const computedFullPreviewUrl = baseSrc
+    ? `${baseSrc}${previewPath}${previewQuery || ''}`
+    : fullPreviewUrl
+  const previewOrigin = resolvePreviewOrigin(computedSrc)
 
   const handleRefresh = () => setFrameKey((prev) => prev + 1)
 
@@ -91,33 +108,32 @@ export function TemplatePreviewPanel({
           payload: previewData,
           sectionOrder,
         },
-        window.location.origin
+        previewOrigin || '*'
       )
     }, 250)
 
     return () => window.clearTimeout(timeout)
-  }, [previewData, sectionOrder, vendorId, page])
+  }, [previewData, sectionOrder, vendorId, page, previewOrigin])
 
   useEffect(() => {
     setPreviewPath(defaultPath || '')
   }, [defaultPath])
 
   useEffect(() => {
-    const currentSrc = baseSrc
-      ? `${baseSrc}${previewPath}${previewQuery || ''}`
-      : src
-    if (!currentSrc) return
+    if (!computedSrc) return
     const timeout = window.setTimeout(() => {
       updateIframeHeight()
     }, 300)
     return () => window.clearTimeout(timeout)
-  }, [frameKey, device, previewData, sectionOrder, src, baseSrc, previewPath, previewQuery])
+  }, [frameKey, device, previewData, sectionOrder, computedSrc])
 
   useEffect(() => {
     if (!onSelectSection && !onInlineEdit) return
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
+      if (previewOrigin && event.origin !== previewOrigin) return
+      const previewWindow = iframeRef.current?.contentWindow
+      if (previewWindow && event.source !== previewWindow) return
       const data = event.data as {
         type?: string
         vendorId?: string
@@ -144,14 +160,7 @@ export function TemplatePreviewPanel({
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [onSelectSection, onInlineEdit, vendorId, page])
-
-  const computedSrc = baseSrc
-    ? `${baseSrc}${previewPath}${previewQuery || ''}`
-    : src
-  const computedFullPreviewUrl = baseSrc
-    ? `${baseSrc}${previewPath}${previewQuery || ''}`
-    : fullPreviewUrl
+  }, [onSelectSection, onInlineEdit, vendorId, page, previewOrigin])
 
   return (
     <div className='rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_30px_60px_-45px_rgba(15,23,42,0.4)] backdrop-blur'>
