@@ -31,6 +31,62 @@ const isJwtExpired = (token: string): boolean => {
   return payload.exp * 1000 <= Date.now() + 1000;
 };
 
+const getErrorMessage = (error: any): string => {
+  const raw =
+    error?.response?.data?.message ??
+    error?.response?.data?.error ??
+    error?.message ??
+    "";
+  return String(raw).trim().toLowerCase();
+};
+
+const shouldInvalidateSession = (error: any): boolean => {
+  const status = Number(error?.response?.status || 0);
+  if (![401, 403, 404].includes(status)) return false;
+
+  if (status === 401) return true;
+
+  const role = String(store.getState()?.auth?.user?.role || "").toLowerCase();
+  const message = getErrorMessage(error);
+  const requestUrl = String(error?.config?.url || "").toLowerCase();
+
+  const isProfileRequest =
+    requestUrl.endsWith("/profile") ||
+    requestUrl.includes("/vendor/profile") ||
+    requestUrl.includes("/admin/profile") ||
+    requestUrl.includes("/profile/admin");
+
+  if (
+    isProfileRequest &&
+    (message.includes("not found") ||
+      message.includes("unauthorized") ||
+      message.includes("invalid token"))
+  ) {
+    return true;
+  }
+
+  if (
+    role === "vendor" &&
+    (message.includes("vendor not found") ||
+      message.includes("unauthorized: vendor not found"))
+  ) {
+    return true;
+  }
+
+  if (
+    (role === "admin" || role === "superadmin") &&
+    message.includes("admin not found")
+  ) {
+    return true;
+  }
+
+  if (message.includes("account not found")) {
+    return true;
+  }
+
+  return false;
+};
+
 const handleExpiredSession = () => {
   if (isSessionRedirectInProgress) return;
   isSessionRedirectInProgress = true;
@@ -94,7 +150,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const token = store.getState()?.auth?.token;
-    if (error.response?.status === 401 && token) {
+    if (token && shouldInvalidateSession(error)) {
       handleExpiredSession();
     }
     return Promise.reject(error);

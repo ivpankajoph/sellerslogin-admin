@@ -239,7 +239,6 @@ const VendorDetailsDialog = ({ vendor }: VendorDetailsDialogProps) => {
           <Eye className='h-4 w-4' />
         </Button>
       </DialogTrigger>
-
       <DialogContent className='max-w-[calc(100%-2rem)] sm:max-w-6xl max-h-[90vh] overflow-hidden p-0'>
         <div className='flex flex-col h-[90vh]'>
           <DialogHeader className='p-0'>
