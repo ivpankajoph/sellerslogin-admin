@@ -11,9 +11,11 @@ import { Check, Pencil, Upload, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import type { ChangeEvent } from "react"
 import { useDispatch, useSelector } from "react-redux"
+import { useNavigate } from "@tanstack/react-router"
 
 export default function ProfilePage() {
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const user = useSelector((state: any) => state.auth.user)
   const isVendor = user?.role === "vendor"
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -160,11 +162,41 @@ export default function ProfilePage() {
 
     try {
       setPasswordSaving(true)
-      await api.put("/profile/password", {
+      const res = await api.put("/profile/password", {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
         confirmPassword: passwordForm.confirmPassword,
       })
+
+      if (isVendor) {
+        const vendorMeta = res.data?.vendor || {}
+        const wasMandatoryChange = Boolean(user?.must_change_password)
+        dispatch(
+          setUser({
+            ...user,
+            must_change_password:
+              typeof vendorMeta?.must_change_password === "boolean"
+                ? vendorMeta.must_change_password
+                : false,
+            temp_password_issued_at:
+              vendorMeta?.temp_password_issued_at ?? null,
+            temp_password_expires_at:
+              vendorMeta?.temp_password_expires_at ?? null,
+            password_changed_at:
+              vendorMeta?.password_changed_at ?? new Date().toISOString(),
+          })
+        )
+
+        if (wasMandatoryChange) {
+          setPasswordMessage(
+            "Password updated successfully. Redirecting to dashboard..."
+          )
+          setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+          navigate({ to: "/" })
+          return
+        }
+      }
+
       setPasswordMessage("Password updated successfully.")
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
     } catch (error: any) {
@@ -183,7 +215,7 @@ export default function ProfilePage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      <Card className="w-full max-w-3xl border bg-white/95 backdrop-blur-md shadow-xl rounded-3xl">
+      <Card className="w-full max-w-3xl border bg-white/95 text-slate-900 backdrop-blur-md shadow-xl rounded-3xl">
         <CardHeader className="flex flex-col items-center space-y-2 pb-4">
           <div className="relative">
             <Avatar className="w-24 h-24 border-4 border-white shadow-lg">
@@ -275,6 +307,11 @@ export default function ProfilePage() {
               {successMessage}
             </div>
           ) : null}
+          {isVendor && user?.must_change_password ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Temporary password detected. Change your password now to keep this account active.
+            </div>
+          ) : null}
 
           {!isVendor ? (
             <motion.div
@@ -286,21 +323,21 @@ export default function ProfilePage() {
               value={form.name}
               onChange={handleInputChange("name")}
               placeholder="Your name"
-              className="border-slate-200 bg-white"
+              className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               disabled={!isEditing}
             />
             <Input
               value={form.email}
               onChange={handleInputChange("email")}
               placeholder="Your email"
-              className="border-slate-200 bg-white"
+              className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               disabled={!isEditing}
             />
             <Input
               value={form.phone}
               onChange={handleInputChange("phone")}
               placeholder="Your phone"
-              className="border-slate-200 bg-white"
+              className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               disabled={!isEditing}
             />
             </motion.div>
@@ -322,19 +359,19 @@ export default function ProfilePage() {
                 value={passwordForm.currentPassword}
                 onChange={handlePasswordChange("currentPassword")}
                 placeholder="Current password"
-                className="border-slate-200 bg-white"
+                className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               />
               <PasswordInput
                 value={passwordForm.newPassword}
                 onChange={handlePasswordChange("newPassword")}
                 placeholder="New password"
-                className="border-slate-200 bg-white"
+                className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               />
               <PasswordInput
                 value={passwordForm.confirmPassword}
                 onChange={handlePasswordChange("confirmPassword")}
                 placeholder="Confirm new password"
-                className="border-slate-200 bg-white"
+                className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-400"
               />
               <div className="flex items-center">
                 <Button

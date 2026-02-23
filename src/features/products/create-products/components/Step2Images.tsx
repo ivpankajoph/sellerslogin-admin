@@ -14,7 +14,9 @@ const Step2Images: React.FC<Props> = ({ defaultImages, onUpload, onDelete }) => 
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-800">Images & Media</h2>
       <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700">Default Product Images *</label>
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          Product Images (Optional)
+        </label>
         <div className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center">
           <input type="file" multiple accept="image/*" onChange={onUpload} className="hidden" id="default-images" />
           <label htmlFor="default-images" className="cursor-pointer">

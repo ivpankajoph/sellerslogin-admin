@@ -1,18 +1,25 @@
-// src/components/ProductCreate/Step3Specifications.tsx
-
-import React, { useState } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react'
+import { Loader2, Plus, Sparkles } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 
 interface Props {
-  specificationKeys: string[];
-  specifications: Record<string, string>[];
-  isAvailable: boolean;
-  aiLoading: boolean;
-  onToggleAvailable: () => void;
-  onSpecChange: (key: string, value: string) => void;
-  onGenerate: () => void;
-  onAddKey: (key: string) => void;
+  specificationKeys: string[]
+  specifications: Record<string, string>[]
+  isAvailable: boolean
+  aiLoading: boolean
+  onToggleAvailable: () => void
+  onSpecChange: (key: string, value: string) => void
+  onGenerate: () => void
+  onAddKey: (key: string) => void
 }
+
+const toLabel = (value: string) =>
+  value
+    .replace(/[_-]/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
 
 const Step3Specifications: React.FC<Props> = ({
   specificationKeys,
@@ -24,83 +31,123 @@ const Step3Specifications: React.FC<Props> = ({
   onGenerate,
   onAddKey,
 }) => {
-  const [newKey, setNewKey] = useState('');
+  const [newKey, setNewKey] = useState('')
+
+  const activeSpecs = specifications[0] || {}
+  const filledCount = useMemo(
+    () =>
+      specificationKeys.filter(
+        (key) => String(activeSpecs[key] || '').trim().length > 0
+      ).length,
+    [activeSpecs, specificationKeys]
+  )
+
+  const handleAddKey = () => {
+    const normalized = newKey.trim()
+    if (!normalized) return
+    onAddKey(normalized)
+    setNewKey('')
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">Specifications</h2>
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={aiLoading}
-          className="flex items-center space-x-2 rounded-lg bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 disabled:opacity-50"
-        >
-          {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          <span>Generate with AI</span>
-        </button>
-      </div>
-      <div className="space-y-4">
-        {specificationKeys.map((key) => (
-          <div key={key}>
-            <label className="mb-2 block text-sm font-medium text-gray-700 capitalize">
-              {key.replace(/([A-Z])/g, ' $1').trim()}
-            </label>
-            <input
-              type="text"
-              value={specifications[0]?.[key] || ''}
-              onChange={(e) => onSpecChange(key, e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            />
+    <section className='space-y-5'>
+      <div className='rounded-2xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50/80 via-white to-sky-50/70 p-5'>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <h2 className='text-2xl font-extrabold tracking-tight text-slate-900'>
+              Specifications
+            </h2>
+            <p className='mt-1 text-sm text-slate-600'>
+              Build clean, searchable product specs for catalogs and filters.
+            </p>
           </div>
-        ))}
-      </div>
-      <div className="flex items-center space-x-2">
-        <input
-          type="checkbox"
-          checked={isAvailable}
-          onChange={onToggleAvailable}
-          className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
-        />
-        <label className="text-sm font-medium text-gray-700">Product Available</label>
+          <button
+            type='button'
+            onClick={onGenerate}
+            disabled={aiLoading}
+            className='inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+          >
+            {aiLoading ? (
+              <Loader2 className='h-4 w-4 animate-spin' />
+            ) : (
+              <Sparkles className='h-4 w-4' />
+            )}
+            Generate with AI
+          </button>
+        </div>
+        <div className='mt-4 flex flex-wrap gap-2'>
+          <Badge className='border border-cyan-200 bg-cyan-100/70 text-cyan-800'>
+            Keys: {specificationKeys.length}
+          </Badge>
+          <Badge className='border border-emerald-200 bg-emerald-100/70 text-emerald-800'>
+            Filled: {filledCount}
+          </Badge>
+          <Badge className='border border-slate-200 bg-white text-slate-700'>
+            Status: {isAvailable ? 'Available' : 'Hidden'}
+          </Badge>
+        </div>
       </div>
 
-      {/* Manual Key Addition */}
-      <div className="border-t pt-4">
-        <h3 className="mb-2 text-sm font-medium text-gray-700">Add Custom Specification</h3>
-        <div className="flex gap-2">
+      <div className='grid gap-4 sm:grid-cols-2'>
+        {specificationKeys.map((key) => (
+          <label
+            key={key}
+            className='rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm'
+          >
+            <span className='mb-2 block text-xs font-semibold uppercase tracking-[0.11em] text-slate-500'>
+              {toLabel(key)}
+            </span>
+            <input
+              type='text'
+              value={activeSpecs[key] || ''}
+              onChange={(event) => onSpecChange(key, event.target.value)}
+              className='h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
+              placeholder={`Enter ${toLabel(key).toLowerCase()}`}
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
+        <div className='mb-2 text-sm font-semibold text-slate-800'>
+          Add Custom Specification
+        </div>
+        <div className='flex flex-col gap-2 sm:flex-row'>
           <input
-            type="text"
+            type='text'
             value={newKey}
-            onChange={(e) => setNewKey(e.target.value)}
-            placeholder="Enter new specification name"
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                if (newKey.trim()) {
-                  onAddKey(newKey.trim());
-                  setNewKey('');
-                }
+            onChange={(event) => setNewKey(event.target.value)}
+            placeholder='e.g. battery_type'
+            className='h-10 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                handleAddKey()
               }
             }}
           />
           <button
-            type="button"
-            onClick={() => {
-              if (newKey.trim()) {
-                onAddKey(newKey.trim());
-                setNewKey('');
-              }
-            }}
-            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+            type='button'
+            onClick={handleAddKey}
+            className='inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-200'
           >
+            <Plus className='h-4 w-4' />
             Add
           </button>
         </div>
       </div>
-    </div>
-  );
-};
 
-export default Step3Specifications;
+      <label className='inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm'>
+        <input
+          type='checkbox'
+          checked={isAvailable}
+          onChange={onToggleAvailable}
+          className='h-4 w-4 rounded text-cyan-600 focus:ring-cyan-500'
+        />
+        Product Available
+      </label>
+    </section>
+  )
+}
+
+export default Step3Specifications

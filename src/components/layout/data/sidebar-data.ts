@@ -10,6 +10,8 @@ import {
   Truck,
   PlugZap,
   SearchCheck,
+  Info,
+  KeyRound,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -85,7 +87,7 @@ export const sidebarData: any = {
           title: 'Delivery Charges',
           url: '/delivery-charges',
           icon: Truck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          roles: [ROLES.ADMIN],
         },
         {
           title: 'SEO Manager',
@@ -118,21 +120,25 @@ export const sidebarData: any = {
               title: 'Razorpay',
               url: '/integrations/razorpay',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
+              requiresIntegration: 'razorpay',
             },
             {
               title: 'Cashfree',
               url: '/integrations/cashfree',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
+              requiresIntegration: 'cashfree',
             },
             {
               title: 'Borzo',
               url: '/integrations/borzo',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
+              requiresIntegration: 'borzo',
             },
             {
               title: 'Delhivery',
               url: '/integrations/delhivery',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
+              requiresIntegration: 'delhivery',
             },
           ],
         },
@@ -149,10 +155,17 @@ export const sidebarData: any = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
+          title: 'About',
+          url: '/vendor-about',
+          icon: Info,
+          roles: [ROLES.VENDOR],
+        },
+        {
           title: 'Delivery Tracking',
           url: '/borzo-report',
           icon: Truck,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
+          requiresIntegration: 'borzo',
         },
       ],
     },
@@ -170,6 +183,12 @@ export const sidebarData: any = {
               title: 'Show Categories',
               url: '/category',
               roles: [ROLES.ADMIN,ROLES.VENDOR],
+            },
+            {
+              title: 'Specification Keys',
+              url: '/specification-keys',
+              icon: KeyRound,
+              roles: [ROLES.ADMIN],
             },
             {
               title: 'Commission Rules',

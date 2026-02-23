@@ -1,4 +1,5 @@
 import { type LinkProps } from '@tanstack/react-router'
+import type { IntegrationProviderId } from '@/lib/vendor-integrations'
 
 type User = {
   name: string
@@ -17,6 +18,7 @@ type BaseNavItem = {
   badge?: string
   icon?: React.ElementType
   roles?: ("admin" | "vendor")[]
+  requiresIntegration?: IntegrationProviderId
 }
 
 type NavLink = BaseNavItem & {

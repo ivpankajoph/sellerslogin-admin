@@ -57,7 +57,37 @@ export function UserAuthForm({
     );
 
     if (resultAction.payload?.success) {
-      Swal.fire({
+      const authData = resultAction.payload?.data || {};
+      const isVendor = authData?.role === "vendor";
+      const mustChangePassword = isVendor && Boolean(authData?.must_change_password);
+
+      if (mustChangePassword) {
+        const hoursLeft = Number(authData?.hours_left_to_change_password);
+        const isReminder = Boolean(authData?.show_password_change_reminder);
+
+        await Swal.fire({
+          icon: "warning",
+          title: isReminder
+            ? "Reminder: Change Password"
+            : "Change Password Required",
+          html: `
+            <p>Use your temporary password only for now.</p>
+            <p>Please change it from <strong>Profile &gt; Change Password</strong>.</p>
+            ${
+              Number.isFinite(hoursLeft) && hoursLeft > 0
+                ? `<p><strong>${hoursLeft} hour(s)</strong> left before account deletion.</p>`
+                : `<p>Your account will be deleted if the password is not changed within 48 hours.</p>`
+            }
+          `,
+          confirmButtonText: "Go to Profile",
+          allowOutsideClick: false,
+        });
+
+        navigate({ to: "/profile" });
+        return;
+      }
+
+      await Swal.fire({
         icon: "success",
         title: resultAction.payload?.message || "Login successful",
         showConfirmButton: false,

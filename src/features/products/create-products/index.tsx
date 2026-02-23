@@ -1,13 +1,20 @@
 // src/components/ProductCreate/index.tsx
 import React, { useState, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Loader2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
+  PackagePlus,
+  Sparkles,
+} from 'lucide-react'
 import { useSelector } from 'react-redux'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { generateSpecifications, generateWithAI, generateSpecificationKeysHelper } from './aiHelpers'
+import { generateSpecifications, generateWithAI } from './aiHelpers'
 import { deleteFromCloudinary, uploadToCloudinary } from './cloudinary'
 import Step1BasicInfo from './components/Step1BasicInfo'
-import Step2Images from './components/Step2Images'
 import Step3Specifications from './components/Step3Specifications'
 import Step4SEO from './components/Step4SEO'
 import Step5Variants from './components/Step5Variants'
@@ -27,6 +34,7 @@ const ProductCreateForm: React.FC = () => {
     mainCategory: '',
     productName: '',
     productCategory: '',
+    productCategories: [],
     productSubCategories: [],
     brand: '',
     shortDescription: '',
@@ -45,7 +53,7 @@ const ProductCreateForm: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([])
   const [isMainCategoryLoading, setIsMainCategoryLoading] = useState(false)
   const [isCategoryLoading, setIsCategoryLoading] = useState(false)
-  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [selectedMainCategoryId, setSelectedMainCategoryId] = useState('')
   const [filteredSubcategories, setFilteredSubcategories] = useState<any[]>([])
   const [specificationKeys, setSpecificationKeys] = useState<string[]>(
@@ -88,6 +96,8 @@ const ProductCreateForm: React.FC = () => {
   useEffect(() => {
     if (!selectedMainCategoryId) {
       setCategories([])
+      setSelectedCategoryIds([])
+      setFilteredSubcategories([])
       return
     }
 
@@ -118,54 +128,97 @@ const ProductCreateForm: React.FC = () => {
   }, [selectedMainCategoryId])
 
   useEffect(() => {
-    if (!selectedCategoryId) {
+    if (!selectedCategoryIds.length) {
       setFilteredSubcategories([])
       return
     }
 
     const fetchSubcategories = async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/subcategories/category/${selectedCategoryId}`
+        const responses = await Promise.all(
+          selectedCategoryIds.map((categoryId) =>
+            fetch(
+              `${import.meta.env.VITE_PUBLIC_API_URL}/v1/subcategories/category/${categoryId}`
+            )
+          )
         )
 
-        if (!res.ok) {
-          setFilteredSubcategories([])
-          return
+        const categoryNameById = categories.reduce(
+          (acc: Record<string, string>, category: any) => {
+            acc[category._id] = category.name
+            return acc
+          },
+          {}
+        )
+
+        const merged: any[] = []
+        for (let index = 0; index < responses.length; index += 1) {
+          const response = responses[index]
+          if (!response.ok) continue
+
+          const json = await response.json()
+          if (!json?.success || !Array.isArray(json.data)) continue
+
+          const categoryId = selectedCategoryIds[index]
+          const categoryName = categoryNameById[categoryId] || 'Unknown Category'
+
+          merged.push(
+            ...json.data.map((subcategory: any) => ({
+              ...subcategory,
+              categoryName,
+            }))
+          )
         }
 
-        const json = await res.json()
-
-        if (json.success && Array.isArray(json.data)) {
-          setFilteredSubcategories(json.data)
-        } else {
-          setFilteredSubcategories([])
-        }
+        const unique = Array.from(
+          new Map(merged.map((subcategory) => [subcategory._id, subcategory])).values()
+        )
+        setFilteredSubcategories(unique)
       } catch (err) {
         setFilteredSubcategories([])
       }
     }
 
-    fetchSubcategories() // ✅ Call the function
-  }, [selectedCategoryId])
+    fetchSubcategories()
+  }, [selectedCategoryIds, categories])
 
-  // Update specification keys based on category
   useEffect(() => {
-    if (selectedCategoryId) {
-      const category = categories.find(
-        (cat: any) => cat._id === selectedCategoryId
-      )
-      if (category) {
-        generateSpecificationKeysHelper(
-          category.name,
-          formData.productName,
-          setAiLoading,
-          setSpecificationKeys,
-          setFormData
+    const applySpecificationKeys = (keys: string[]) => {
+      setSpecificationKeys(keys)
+      setFormData((prev: ProductFormData) => {
+        const existing = prev.specifications?.[0] || {}
+        const nextSpecs: Record<string, string> = {}
+        keys.forEach((key: string) => {
+          nextSpecs[key] = existing[key] || ''
+        })
+        return { ...prev, specifications: [nextSpecs] }
+      })
+    }
+
+    if (!selectedMainCategoryId) {
+      applySpecificationKeys(SPECIFICATION_TEMPLATES.default)
+      return
+    }
+
+    const fetchSpecificationKeys = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/specification-keys/main-category/${selectedMainCategoryId}`
         )
+
+        if (!res.ok) throw new Error('Failed to fetch specification keys')
+        const json = await res.json()
+        const apiKeys = Array.isArray(json?.data?.keys) ? json.data.keys : []
+        const nextKeys = apiKeys.length ? apiKeys : SPECIFICATION_TEMPLATES.default
+
+        applySpecificationKeys(nextKeys)
+      } catch (err) {
+        applySpecificationKeys(SPECIFICATION_TEMPLATES.default)
       }
     }
-  }, [selectedCategoryId, categories])
+
+    fetchSpecificationKeys()
+  }, [selectedMainCategoryId])
 
   // --- AI Handlers for Variants ---
   const handleGenerateVariantMetaTitle = async (vIndex: number) => {
@@ -284,61 +337,6 @@ const ProductCreateForm: React.FC = () => {
         [`variantMetaKeywords_${vIndex}`]: false,
       }))
     }
-  }
-
-  const handleDefaultImageUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length === 0) return
-
-    setFormData((prev: ProductFormData) => ({
-      ...prev,
-      defaultImages: [
-        ...prev.defaultImages,
-        ...files.map((file) => ({
-          url: URL.createObjectURL(file),
-          publicId: '',
-          uploading: true,
-        })),
-      ],
-    }))
-
-    const uploadedImages = await Promise.all(
-      files.map(async (file) => {
-        const result = await uploadToCloudinary(file)
-        if (!result) {
-          setFormData((prev: ProductFormData) => ({
-            ...prev,
-            defaultImages: prev.defaultImages.filter(
-              (img) => img.url !== URL.createObjectURL(file)
-            ),
-          }))
-        }
-        return result
-      })
-    )
-
-    setFormData((prev: ProductFormData) => {
-      const newImages = [...prev.defaultImages]
-      const startIndex = newImages.length - files.length
-      uploadedImages.forEach((img, i) => {
-        if (img) {
-          newImages[startIndex + i] = img
-        }
-      })
-      return { ...prev, defaultImages: newImages }
-    })
-  }
-
-  const handleDeleteDefaultImage = async (index: number) => {
-    const publicId = formData.defaultImages[index]?.publicId
-    if (publicId) {
-      await deleteFromCloudinary(publicId)
-    }
-    const newImages = [...formData.defaultImages]
-    newImages.splice(index, 1)
-    setFormData({ ...formData, defaultImages: newImages })
   }
 
   // --- AI Handlers ---
@@ -570,7 +568,8 @@ const ProductCreateForm: React.FC = () => {
       const payload = {
         ...formData,
         mainCategory: selectedMainCategoryId || formData.mainCategory,
-        productCategory: selectedCategoryId,
+        productCategory: selectedCategoryIds[0] || '',
+        productCategories: selectedCategoryIds,
         specifications: formData.specifications[0],
         variants: formData.variants.map((v) => ({
           ...v,
@@ -613,8 +612,8 @@ const ProductCreateForm: React.FC = () => {
             selectedMainCategoryId={selectedMainCategoryId}
             setSelectedMainCategoryId={setSelectedMainCategoryId}
             categories={categories}
-            selectedCategoryId={selectedCategoryId}
-            setSelectedCategoryId={setSelectedCategoryId}
+            selectedCategoryIds={selectedCategoryIds}
+            setSelectedCategoryIds={setSelectedCategoryIds}
             filteredSubcategories={filteredSubcategories}
             isMainCategoryLoading={isMainCategoryLoading}
             isCategoryLoading={isCategoryLoading}
@@ -624,14 +623,6 @@ const ProductCreateForm: React.FC = () => {
           />
         )
       case 2:
-        return (
-          <Step2Images
-            defaultImages={formData.defaultImages}
-            onUpload={handleDefaultImageUpload}
-            onDelete={handleDeleteDefaultImage}
-          />
-        )
-      case 3:
         return (
           <>
             <Step3Specifications
@@ -653,7 +644,7 @@ const ProductCreateForm: React.FC = () => {
               onGenerate={() =>
                 generateSpecifications(
                   formData,
-                  selectedCategoryId,
+                  selectedCategoryIds,
                   categories,
                   specificationKeys,
                   setAiLoading,
@@ -701,7 +692,7 @@ const ProductCreateForm: React.FC = () => {
             </div>
           </>
         )
-      case 4:
+      case 3:
         return (
           <>
             <Step4SEO
@@ -764,7 +755,12 @@ const ProductCreateForm: React.FC = () => {
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         field: 'metaKeywords',
-                        context: `Product: ${formData.productName}, Description: ${formData.shortDescription}, Category: ${categories.find(c => c._id === selectedCategoryId)?.name || ''}`
+                        context: `Product: ${formData.productName}, Description: ${formData.shortDescription}, Categories: ${categories
+                          .filter((category: any) =>
+                            selectedCategoryIds.includes(category._id)
+                          )
+                          .map((category: any) => category.name)
+                          .join(', ')}`
                       }),
                     }
                   )
@@ -832,73 +828,144 @@ const ProductCreateForm: React.FC = () => {
     }
   }
 
-  return (
-    <div className='min-h-screen bg-gray-50 px-4 py-8'>
-      <div className='mx-auto max-w-3xl'>
-        <div className='rounded-xl bg-white p-8 shadow-lg'>
-          <h1 className='mb-8 text-3xl font-bold text-gray-900'>
-            Create New Product
-          </h1>
+  const steps = [
+    {
+      title: 'Basics',
+      description: 'Identity and category mapping',
+    },
+    {
+      title: 'Specs & Variants',
+      description: 'Technical details and sellable options',
+    },
+    {
+      title: 'SEO & FAQs',
+      description: 'Search visibility and buyer guidance',
+    },
+  ]
 
+  return (
+    <div className='relative min-h-screen overflow-x-clip px-4 py-6 sm:py-8'>
+      <div className='pointer-events-none absolute inset-0 -z-10 overflow-hidden'>
+        <div className='absolute -left-24 -top-24 h-72 w-72 rounded-full bg-cyan-300/20 blur-3xl' />
+        <div className='absolute -right-24 top-10 h-96 w-96 rounded-full bg-amber-300/20 blur-3xl' />
+        <div className='absolute bottom-[-8rem] left-1/3 h-80 w-80 rounded-full bg-indigo-300/15 blur-3xl' />
+      </div>
+
+      <div className='mx-auto max-w-5xl space-y-5'>
+        <section className='rounded-3xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50/80 via-white to-indigo-50/70 p-6 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.6)]'>
+          <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
+            <div>
+              <div className='mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700'>
+                <Sparkles className='h-3.5 w-3.5' />
+                Product Studio
+              </div>
+              <h1 className='text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl'>
+                Create New Product
+              </h1>
+              <p className='mt-1 text-sm text-slate-600 sm:text-base'>
+                Build category-ready products with structured specs, variants, and
+                SEO details.
+              </p>
+            </div>
+            <div className='flex flex-wrap items-center gap-2'>
+              <Badge className='border border-cyan-200 bg-cyan-100/70 text-cyan-800'>
+                Step {currentStep} / {steps.length}
+              </Badge>
+              <Badge className='border border-slate-200 bg-white text-slate-700'>
+                Draft Mode
+              </Badge>
+            </div>
+          </div>
+        </section>
+
+        <div className='rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur-sm sm:p-8'>
           <Link to='/upload-products'>
-            <Button variant='outline' className='mb-12 bg-white'>
+            <Button
+              variant='outline'
+              className='mb-8 h-11 rounded-xl border-slate-300 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50'
+            >
+              <PackagePlus className='mr-2 h-4 w-4' />
               Upload Excel or Download Template
             </Button>
           </Link>
 
-          {/* Progress Bar */}
-          <div className='mb-8'>
-            <div className='flex items-center justify-between'>
-              {['Basic', 'Images', 'Specs & Variants', 'SEO & FAQs'].map(
-                (step, i) => (
-                  <div key={i} className='flex flex-col items-center'>
+          <div className='mb-8 grid gap-3 md:grid-cols-3'>
+            {steps.map((step, i) => {
+              const stepIndex = i + 1
+              const isActive = currentStep === stepIndex
+              const isCompleted = currentStep > stepIndex
+
+              return (
+                <div
+                  key={step.title}
+                  className={`rounded-2xl border p-4 transition ${
+                    isActive
+                      ? 'border-cyan-300 bg-cyan-50/70 shadow-sm'
+                      : isCompleted
+                        ? 'border-emerald-300 bg-emerald-50/70'
+                        : 'border-slate-200 bg-slate-50/70'
+                  }`}
+                >
+                  <div className='flex items-start gap-3'>
                     <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full font-semibold ${currentStep === i + 1
-                        ? 'bg-blue-600 text-white'
-                        : currentStep > i + 1
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-200 text-gray-600'
-                        }`}
+                      className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                        isActive
+                          ? 'bg-cyan-600 text-white'
+                          : isCompleted
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-300 text-slate-700'
+                      }`}
                     >
-                      {i + 1}
+                      {isCompleted ? (
+                        <CheckCircle2 className='h-4 w-4' />
+                      ) : (
+                        stepIndex
+                      )}
                     </div>
-                    <span className='mt-1 text-xs text-gray-600'>{step}</span>
+                    <div>
+                      <p className='text-sm font-bold text-slate-900'>{step.title}</p>
+                      <p className='text-xs text-slate-600'>{step.description}</p>
+                    </div>
                   </div>
-                )
-              )}
-            </div>
+                </div>
+              )
+            })}
           </div>
 
-          <form onSubmit={(e) => e.preventDefault()}>
+          <form onSubmit={(e) => e.preventDefault()} className='space-y-6'>
             {renderCurrentStep()}
 
-            <div className='mt-8 flex justify-between'>
+            <div className='flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4'>
               <button
                 type='button'
                 onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
                 disabled={currentStep === 1}
-                className='rounded-lg border border-gray-300 px-6 py-3 text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50'
+                className='inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
               >
+                <ArrowLeft className='h-4 w-4' />
                 Previous
               </button>
 
-              {currentStep < 4 ? (
+              {currentStep < steps.length ? (
                 <button
                   type='button'
-                  onClick={() => setCurrentStep((prev) => Math.min(4, prev + 1))}
-                  className='rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700'
+                  onClick={() =>
+                    setCurrentStep((prev) => Math.min(steps.length, prev + 1))
+                  }
+                  className='inline-flex h-11 items-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-semibold text-white transition hover:bg-cyan-700'
                 >
                   Next
+                  <ArrowRight className='h-4 w-4' />
                 </button>
               ) : (
                 <button
                   type='button'
                   onClick={handleSubmit}
                   disabled={loading}
-                  className='flex items-center space-x-2 rounded-lg bg-green-600 px-6 py-3 text-white hover:bg-green-700 disabled:opacity-70'
+                  className='inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70'
                 >
                   {loading && <Loader2 className='h-4 w-4 animate-spin' />}
-                  <span>Create Product</span>
+                  Create Product
                 </button>
               )}
             </div>

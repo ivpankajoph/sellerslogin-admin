@@ -7,11 +7,13 @@ type PasswordInputProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   'type'
 > & {
+  containerClassName?: string
   ref?: React.Ref<HTMLInputElement>
 }
 
 export function PasswordInput({
   className,
+  containerClassName,
   disabled,
   ref,
   ...props
@@ -19,10 +21,13 @@ export function PasswordInput({
   const [showPassword, setShowPassword] = React.useState(false)
 
   return (
-    <div className={cn('relative rounded-md', className)}>
+    <div className={cn('relative rounded-md', containerClassName)}>
       <input
         type={showPassword ? 'text' : 'password'}
-        className='border-input placeholder:text-muted-foreground focus-visible:ring-ring flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-1 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50'
+        className={cn(
+          'border-input text-foreground caret-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground focus-visible:ring-ring flex h-9 w-full rounded-md border bg-transparent px-3 py-1 pr-10 text-sm shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-1 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50',
+          className
+        )}
         ref={ref}
         disabled={disabled}
         {...props}
@@ -32,7 +37,7 @@ export function PasswordInput({
         size='icon'
         variant='ghost'
         disabled={disabled}
-        className='text-muted-foreground absolute end-1 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md'
+        className='text-muted-foreground absolute end-1 top-1/2 z-10 h-6 w-6 -translate-y-1/2 rounded-md hover:bg-muted'
         onClick={() => setShowPassword((prev) => !prev)}
       >
         {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}

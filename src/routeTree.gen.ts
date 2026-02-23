@@ -32,11 +32,13 @@ import { Route as AuthenticatedVendorTemplateOtherIndexRouteImport } from './rou
 import { Route as AuthenticatedVendorTemplateContactIndexRouteImport } from './routes/_authenticated/vendor-template-contact/index'
 import { Route as AuthenticatedVendorTemplateAboutIndexRouteImport } from './routes/_authenticated/vendor-template-about/index'
 import { Route as AuthenticatedVendorAnalyticsIndexRouteImport } from './routes/_authenticated/vendor-analytics/index'
+import { Route as AuthenticatedVendorAboutIndexRouteImport } from './routes/_authenticated/vendor-about/index'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedUploadProductsIndexRouteImport } from './routes/_authenticated/upload-products/index'
 import { Route as AuthenticatedTemplateWalletIndexRouteImport } from './routes/_authenticated/template-wallet/index'
 import { Route as AuthenticatedTemplateOrdersIndexRouteImport } from './routes/_authenticated/template-orders/index'
 import { Route as AuthenticatedTemplateCatalogIndexRouteImport } from './routes/_authenticated/template-catalog/index'
+import { Route as AuthenticatedSpecificationKeysIndexRouteImport } from './routes/_authenticated/specification-keys/index'
 import { Route as AuthenticatedSitemapsIndexRouteImport } from './routes/_authenticated/sitemaps/index'
 import { Route as AuthenticatedSeoIndexRouteImport } from './routes/_authenticated/seo/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
@@ -192,6 +194,12 @@ const AuthenticatedVendorAnalyticsIndexRoute =
     path: '/vendor-analytics/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedVendorAboutIndexRoute =
+  AuthenticatedVendorAboutIndexRouteImport.update({
+    id: '/vendor-about/',
+    path: '/vendor-about/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -219,6 +227,12 @@ const AuthenticatedTemplateCatalogIndexRoute =
   AuthenticatedTemplateCatalogIndexRouteImport.update({
     id: '/template-catalog/',
     path: '/template-catalog/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedSpecificationKeysIndexRoute =
+  AuthenticatedSpecificationKeysIndexRouteImport.update({
+    id: '/specification-keys/',
+    path: '/specification-keys/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedSitemapsIndexRoute =
@@ -458,11 +472,13 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/seo': typeof AuthenticatedSeoIndexRoute
   '/sitemaps': typeof AuthenticatedSitemapsIndexRoute
+  '/specification-keys': typeof AuthenticatedSpecificationKeysIndexRoute
   '/template-catalog': typeof AuthenticatedTemplateCatalogIndexRoute
   '/template-orders': typeof AuthenticatedTemplateOrdersIndexRoute
   '/template-wallet': typeof AuthenticatedTemplateWalletIndexRoute
   '/upload-products': typeof AuthenticatedUploadProductsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
   '/vendor-analytics': typeof AuthenticatedVendorAnalyticsIndexRoute
   '/vendor-template-about': typeof AuthenticatedVendorTemplateAboutIndexRoute
   '/vendor-template-contact': typeof AuthenticatedVendorTemplateContactIndexRoute
@@ -517,11 +533,13 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/seo': typeof AuthenticatedSeoIndexRoute
   '/sitemaps': typeof AuthenticatedSitemapsIndexRoute
+  '/specification-keys': typeof AuthenticatedSpecificationKeysIndexRoute
   '/template-catalog': typeof AuthenticatedTemplateCatalogIndexRoute
   '/template-orders': typeof AuthenticatedTemplateOrdersIndexRoute
   '/template-wallet': typeof AuthenticatedTemplateWalletIndexRoute
   '/upload-products': typeof AuthenticatedUploadProductsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
   '/vendor-analytics': typeof AuthenticatedVendorAnalyticsIndexRoute
   '/vendor-template-about': typeof AuthenticatedVendorTemplateAboutIndexRoute
   '/vendor-template-contact': typeof AuthenticatedVendorTemplateContactIndexRoute
@@ -581,11 +599,13 @@ export interface FileRoutesById {
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/seo/': typeof AuthenticatedSeoIndexRoute
   '/_authenticated/sitemaps/': typeof AuthenticatedSitemapsIndexRoute
+  '/_authenticated/specification-keys/': typeof AuthenticatedSpecificationKeysIndexRoute
   '/_authenticated/template-catalog/': typeof AuthenticatedTemplateCatalogIndexRoute
   '/_authenticated/template-orders/': typeof AuthenticatedTemplateOrdersIndexRoute
   '/_authenticated/template-wallet/': typeof AuthenticatedTemplateWalletIndexRoute
   '/_authenticated/upload-products/': typeof AuthenticatedUploadProductsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
+  '/_authenticated/vendor-about/': typeof AuthenticatedVendorAboutIndexRoute
   '/_authenticated/vendor-analytics/': typeof AuthenticatedVendorAnalyticsIndexRoute
   '/_authenticated/vendor-template-about/': typeof AuthenticatedVendorTemplateAboutIndexRoute
   '/_authenticated/vendor-template-contact/': typeof AuthenticatedVendorTemplateContactIndexRoute
@@ -643,11 +663,13 @@ export interface FileRouteTypes {
     | '/profile'
     | '/seo'
     | '/sitemaps'
+    | '/specification-keys'
     | '/template-catalog'
     | '/template-orders'
     | '/template-wallet'
     | '/upload-products'
     | '/users'
+    | '/vendor-about'
     | '/vendor-analytics'
     | '/vendor-template-about'
     | '/vendor-template-contact'
@@ -702,11 +724,13 @@ export interface FileRouteTypes {
     | '/profile'
     | '/seo'
     | '/sitemaps'
+    | '/specification-keys'
     | '/template-catalog'
     | '/template-orders'
     | '/template-wallet'
     | '/upload-products'
     | '/users'
+    | '/vendor-about'
     | '/vendor-analytics'
     | '/vendor-template-about'
     | '/vendor-template-contact'
@@ -765,11 +789,13 @@ export interface FileRouteTypes {
     | '/_authenticated/profile/'
     | '/_authenticated/seo/'
     | '/_authenticated/sitemaps/'
+    | '/_authenticated/specification-keys/'
     | '/_authenticated/template-catalog/'
     | '/_authenticated/template-orders/'
     | '/_authenticated/template-wallet/'
     | '/_authenticated/upload-products/'
     | '/_authenticated/users/'
+    | '/_authenticated/vendor-about/'
     | '/_authenticated/vendor-analytics/'
     | '/_authenticated/vendor-template-about/'
     | '/_authenticated/vendor-template-contact/'
@@ -960,6 +986,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVendorAnalyticsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/vendor-about/': {
+      id: '/_authenticated/vendor-about/'
+      path: '/vendor-about'
+      fullPath: '/vendor-about'
+      preLoaderRoute: typeof AuthenticatedVendorAboutIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/users/': {
       id: '/_authenticated/users/'
       path: '/users'
@@ -993,6 +1026,13 @@ declare module '@tanstack/react-router' {
       path: '/template-catalog'
       fullPath: '/template-catalog'
       preLoaderRoute: typeof AuthenticatedTemplateCatalogIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/specification-keys/': {
+      id: '/_authenticated/specification-keys/'
+      path: '/specification-keys'
+      fullPath: '/specification-keys'
+      preLoaderRoute: typeof AuthenticatedSpecificationKeysIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/sitemaps/': {
@@ -1277,11 +1317,13 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedSeoIndexRoute: typeof AuthenticatedSeoIndexRoute
   AuthenticatedSitemapsIndexRoute: typeof AuthenticatedSitemapsIndexRoute
+  AuthenticatedSpecificationKeysIndexRoute: typeof AuthenticatedSpecificationKeysIndexRoute
   AuthenticatedTemplateCatalogIndexRoute: typeof AuthenticatedTemplateCatalogIndexRoute
   AuthenticatedTemplateOrdersIndexRoute: typeof AuthenticatedTemplateOrdersIndexRoute
   AuthenticatedTemplateWalletIndexRoute: typeof AuthenticatedTemplateWalletIndexRoute
   AuthenticatedUploadProductsIndexRoute: typeof AuthenticatedUploadProductsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
+  AuthenticatedVendorAboutIndexRoute: typeof AuthenticatedVendorAboutIndexRoute
   AuthenticatedVendorAnalyticsIndexRoute: typeof AuthenticatedVendorAnalyticsIndexRoute
   AuthenticatedVendorTemplateAboutIndexRoute: typeof AuthenticatedVendorTemplateAboutIndexRoute
   AuthenticatedVendorTemplateContactIndexRoute: typeof AuthenticatedVendorTemplateContactIndexRoute
@@ -1324,12 +1366,15 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedSeoIndexRoute: AuthenticatedSeoIndexRoute,
   AuthenticatedSitemapsIndexRoute: AuthenticatedSitemapsIndexRoute,
+  AuthenticatedSpecificationKeysIndexRoute:
+    AuthenticatedSpecificationKeysIndexRoute,
   AuthenticatedTemplateCatalogIndexRoute:
     AuthenticatedTemplateCatalogIndexRoute,
   AuthenticatedTemplateOrdersIndexRoute: AuthenticatedTemplateOrdersIndexRoute,
   AuthenticatedTemplateWalletIndexRoute: AuthenticatedTemplateWalletIndexRoute,
   AuthenticatedUploadProductsIndexRoute: AuthenticatedUploadProductsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
+  AuthenticatedVendorAboutIndexRoute: AuthenticatedVendorAboutIndexRoute,
   AuthenticatedVendorAnalyticsIndexRoute:
     AuthenticatedVendorAnalyticsIndexRoute,
   AuthenticatedVendorTemplateAboutIndexRoute:

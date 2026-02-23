@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { formatINR } from '@/lib/currency'
+import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 
 
 type OrderSummary = {
@@ -110,6 +111,8 @@ function TemplateOrdersReport() {
   const role = useSelector((state: RootState) => state.auth?.user?.role)
   const token = useSelector((state: RootState) => state.auth?.token)
   const isVendor = role === 'vendor'
+  const { isProviderVisible } = useVendorIntegrations()
+  const canUseBorzo = !isVendor || isProviderVisible('borzo')
 
   const fetchOrders = async () => {
     try {
@@ -308,6 +311,10 @@ function TemplateOrdersReport() {
 
   const handleCreateBorzo = async () => {
     if (!selectedOrder?._id) return
+    if (!canUseBorzo) {
+      toast.error('Connect Borzo first to create delivery requests.')
+      return
+    }
     if (hasActiveBorzo) {
       toast.error('Borzo delivery already exists for this order.')
       return
@@ -332,6 +339,7 @@ function TemplateOrdersReport() {
 
   const handleCalculateBorzo = async () => {
     if (!selectedOrder?._id) return
+    if (!canUseBorzo) return
     try {
       setBorzoQuoteLoading(true)
       setBorzoError('')
@@ -352,6 +360,10 @@ function TemplateOrdersReport() {
 
   const handleCancelBorzo = async () => {
     if (!selectedOrder?._id) return
+    if (!canUseBorzo) {
+      toast.error('Connect Borzo first to manage delivery requests.')
+      return
+    }
     try {
       setBorzoActionLoading(true)
       setBorzoError('')
@@ -371,6 +383,7 @@ function TemplateOrdersReport() {
 
   useEffect(() => {
     if (!selectedOrder?._id) return
+    if (!canUseBorzo) return
     if (hasActiveBorzo) return
     if (borzoActionLoading) return
     if (borzoQuoteLoading) return
@@ -379,7 +392,7 @@ function TemplateOrdersReport() {
     }, BORZO_QUOTE_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedOrder?._id, pickupOverride, dropoffOverride])
+  }, [selectedOrder?._id, pickupOverride, dropoffOverride, canUseBorzo])
 
   return (
     <div className='space-y-6'>
@@ -774,136 +787,140 @@ function TemplateOrdersReport() {
                   </div>
                 </div>
 
-                <Separator />
+                {canUseBorzo && (
+                  <>
+                    <Separator />
 
-                <div className='space-y-4 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 shadow-sm'>
-                  <div className='flex flex-wrap items-center justify-between gap-3'>
-                    <div>
-                      <p className='text-sm font-semibold text-slate-900'>Borzo delivery</p>
-                      <p className='text-xs text-slate-600'>
-                        {selectedOrder.borzo?.order_id
-                          ? `Order ID ${selectedOrder.borzo.order_id} | ${selectedOrder.borzo.status || 'created'}`
-                          : 'No Borzo delivery created yet.'}
-                      </p>
-                      {hasActiveBorzo && (
-                        <p className='text-xs font-semibold text-amber-600'>
-                          A Borzo delivery is already active for this order.
-                        </p>
+                    <div className='space-y-4 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 shadow-sm'>
+                      <div className='flex flex-wrap items-center justify-between gap-3'>
+                        <div>
+                          <p className='text-sm font-semibold text-slate-900'>Borzo delivery</p>
+                          <p className='text-xs text-slate-600'>
+                            {selectedOrder.borzo?.order_id
+                              ? `Order ID ${selectedOrder.borzo.order_id} | ${selectedOrder.borzo.status || 'created'}`
+                              : 'No Borzo delivery created yet.'}
+                          </p>
+                          {hasActiveBorzo && (
+                            <p className='text-xs font-semibold text-amber-600'>
+                              A Borzo delivery is already active for this order.
+                            </p>
+                          )}
+                        </div>
+                        {selectedOrder.borzo?.tracking_url && (
+                          <a
+                            href={selectedOrder.borzo.tracking_url}
+                            target='_blank'
+                            rel='noreferrer'
+                            className='text-xs font-semibold text-indigo-700 underline'
+                          >
+                            Tracking
+                          </a>
+                        )}
+                      </div>
+
+                      {borzoError && (
+                        <p className='text-xs text-rose-600'>{borzoError}</p>
                       )}
+
+                      <div className='grid gap-3 lg:grid-cols-2'>
+                        <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
+                          <p className='text-xs font-semibold text-slate-700'>Pickup address override (optional)</p>
+                          <Input
+                            placeholder='Pickup name'
+                            value={pickupOverride.name}
+                            onChange={(e) => setPickupOverride((prev) => ({ ...prev, name: e.target.value }))}
+                          />
+                          <Input
+                            placeholder='Pickup phone'
+                            value={pickupOverride.phone}
+                            onChange={(e) => setPickupOverride((prev) => ({ ...prev, phone: e.target.value }))}
+                          />
+                          <Input
+                            placeholder='Pickup address'
+                            value={pickupOverride.address}
+                            onChange={(e) => setPickupOverride((prev) => ({ ...prev, address: e.target.value }))}
+                          />
+                          <div className='grid gap-2 sm:grid-cols-2'>
+                            <Input
+                              placeholder='Pickup latitude'
+                              value={pickupOverride.latitude}
+                              onChange={(e) => setPickupOverride((prev) => ({ ...prev, latitude: e.target.value }))}
+                            />
+                            <Input
+                              placeholder='Pickup longitude'
+                              value={pickupOverride.longitude}
+                              onChange={(e) => setPickupOverride((prev) => ({ ...prev, longitude: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+
+                        <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
+                          <p className='text-xs font-semibold text-slate-700'>Drop-off override (optional)</p>
+                          <Input
+                            placeholder='Drop-off name'
+                            value={dropoffOverride.name}
+                            onChange={(e) => setDropoffOverride((prev) => ({ ...prev, name: e.target.value }))}
+                          />
+                          <Input
+                            placeholder='Drop-off phone'
+                            value={dropoffOverride.phone}
+                            onChange={(e) => setDropoffOverride((prev) => ({ ...prev, phone: e.target.value }))}
+                          />
+                          <Input
+                            placeholder='Drop-off address'
+                            value={dropoffOverride.address}
+                            onChange={(e) => setDropoffOverride((prev) => ({ ...prev, address: e.target.value }))}
+                          />
+                          <div className='grid gap-2 sm:grid-cols-2'>
+                            <Input
+                              placeholder='Drop-off latitude'
+                              value={dropoffOverride.latitude}
+                              onChange={(e) => setDropoffOverride((prev) => ({ ...prev, latitude: e.target.value }))}
+                            />
+                            <Input
+                              placeholder='Drop-off longitude'
+                              value={dropoffOverride.longitude}
+                              onChange={(e) => setDropoffOverride((prev) => ({ ...prev, longitude: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className='flex flex-wrap items-center gap-2'>
+                        <Button
+                          size='sm'
+                          onClick={handleCreateBorzo}
+                          disabled={borzoBusy || hasActiveBorzo}
+                          className='bg-gradient-to-r from-indigo-600 to-sky-600 text-white shadow-sm hover:from-indigo-500 hover:to-sky-500'
+                        >
+                          {borzoActionLoading ? 'Creating...' : hasActiveBorzo ? 'Already created' : 'Create Borzo delivery'}
+                        </Button>
+                        <Button
+                          size='sm'
+                          variant='outline'
+                          onClick={handleCancelBorzo}
+                          disabled={borzoBusy || !selectedOrder.borzo?.order_id}
+                          className='border-indigo-200 text-indigo-700 hover:bg-indigo-50'
+                        >
+                          {borzoActionLoading ? 'Canceling...' : 'Cancel Borzo delivery'}
+                        </Button>
+                      </div>
+                      <div className='flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600'>
+                        <span>{borzoQuoteLoading ? 'Updating quote...' : 'Auto-quote updates as you type.'}</span>
+                        {borzoQuote && (
+                          <span className='font-semibold text-slate-900'>
+                            Quote:{' '}
+                            {formatINR(borzoQuote.amount, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                            {borzoQuote.warnings?.length ? ` | ${borzoQuote.warnings.join(', ')}` : ''}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    {selectedOrder.borzo?.tracking_url && (
-                      <a
-                        href={selectedOrder.borzo.tracking_url}
-                        target='_blank'
-                        rel='noreferrer'
-                        className='text-xs font-semibold text-indigo-700 underline'
-                      >
-                        Tracking
-                      </a>
-                    )}
-                  </div>
-
-                  {borzoError && (
-                    <p className='text-xs text-rose-600'>{borzoError}</p>
-                  )}
-
-                  <div className='grid gap-3 lg:grid-cols-2'>
-                    <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
-                    <p className='text-xs font-semibold text-slate-700'>Pickup address override (optional)</p>
-                    <Input
-                      placeholder='Pickup name'
-                      value={pickupOverride.name}
-                      onChange={(e) => setPickupOverride((prev) => ({ ...prev, name: e.target.value }))}
-                    />
-                    <Input
-                      placeholder='Pickup phone'
-                      value={pickupOverride.phone}
-                      onChange={(e) => setPickupOverride((prev) => ({ ...prev, phone: e.target.value }))}
-                    />
-                    <Input
-                      placeholder='Pickup address'
-                      value={pickupOverride.address}
-                      onChange={(e) => setPickupOverride((prev) => ({ ...prev, address: e.target.value }))}
-                    />
-                    <div className='grid gap-2 sm:grid-cols-2'>
-                      <Input
-                        placeholder='Pickup latitude'
-                        value={pickupOverride.latitude}
-                        onChange={(e) => setPickupOverride((prev) => ({ ...prev, latitude: e.target.value }))}
-                      />
-                      <Input
-                        placeholder='Pickup longitude'
-                        value={pickupOverride.longitude}
-                        onChange={(e) => setPickupOverride((prev) => ({ ...prev, longitude: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
-                    <p className='text-xs font-semibold text-slate-700'>Drop-off override (optional)</p>
-                    <Input
-                      placeholder='Drop-off name'
-                      value={dropoffOverride.name}
-                      onChange={(e) => setDropoffOverride((prev) => ({ ...prev, name: e.target.value }))}
-                    />
-                    <Input
-                      placeholder='Drop-off phone'
-                      value={dropoffOverride.phone}
-                      onChange={(e) => setDropoffOverride((prev) => ({ ...prev, phone: e.target.value }))}
-                    />
-                    <Input
-                      placeholder='Drop-off address'
-                      value={dropoffOverride.address}
-                      onChange={(e) => setDropoffOverride((prev) => ({ ...prev, address: e.target.value }))}
-                    />
-                    <div className='grid gap-2 sm:grid-cols-2'>
-                      <Input
-                        placeholder='Drop-off latitude'
-                        value={dropoffOverride.latitude}
-                        onChange={(e) => setDropoffOverride((prev) => ({ ...prev, latitude: e.target.value }))}
-                      />
-                      <Input
-                        placeholder='Drop-off longitude'
-                        value={dropoffOverride.longitude}
-                        onChange={(e) => setDropoffOverride((prev) => ({ ...prev, longitude: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                  </div>
-
-                  <div className='flex flex-wrap items-center gap-2'>
-                    <Button
-                      size='sm'
-                      onClick={handleCreateBorzo}
-                      disabled={borzoBusy || hasActiveBorzo}
-                      className='bg-gradient-to-r from-indigo-600 to-sky-600 text-white shadow-sm hover:from-indigo-500 hover:to-sky-500'
-                    >
-                      {borzoActionLoading ? 'Creating...' : hasActiveBorzo ? 'Already created' : 'Create Borzo delivery'}
-                    </Button>
-                    <Button
-                      size='sm'
-                      variant='outline'
-                      onClick={handleCancelBorzo}
-                      disabled={borzoBusy || !selectedOrder.borzo?.order_id}
-                      className='border-indigo-200 text-indigo-700 hover:bg-indigo-50'
-                    >
-                      {borzoActionLoading ? 'Canceling...' : 'Cancel Borzo delivery'}
-                    </Button>
-                  </div>
-                  <div className='flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600'>
-                    <span>{borzoQuoteLoading ? 'Updating quote...' : 'Auto-quote updates as you type.'}</span>
-                    {borzoQuote && (
-                      <span className='font-semibold text-slate-900'>
-                        Quote:{' '}
-                        {formatINR(borzoQuote.amount, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                        {borzoQuote.warnings?.length ? ` | ${borzoQuote.warnings.join(', ')}` : ''}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                  </>
+                )}
               </>
             )}
           </CardContent>

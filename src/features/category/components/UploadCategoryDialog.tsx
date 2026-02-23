@@ -132,8 +132,8 @@ export default function UploadCategoryDialog() {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="w-[min(96vw,42rem)] max-h-[92vh] overflow-hidden p-0 sm:max-w-[42rem]">
+        <DialogHeader className="border-b px-6 pt-6 pb-4">
           <DialogTitle>Upload Category File</DialogTitle>
           <DialogDescription>
             Upload an <strong>Excel (.xlsx)</strong> or{" "}
@@ -154,137 +154,139 @@ export default function UploadCategoryDialog() {
           </Button>
         </DialogHeader>
 
-        {/* Drag & Drop Area */}
-        <motion.div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-          }}
-          onDrop={handleDrop}
-          className={`mt-4 flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
-            isDragging
-              ? "border-primary bg-primary/10"
-              : "border-muted bg-muted/30 hover:bg-muted/50"
-          }`}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-        >
-          {!file ? (
-            <>
-              <Upload className="w-10 h-10 text-primary mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Drag & drop your file here or{" "}
-                <label
-                  htmlFor="file-upload"
-                  className="text-primary font-medium cursor-pointer"
-                >
-                  browse
-                </label>
-              </p>
-              <input
-                type="file"
-                accept=".xlsx,.csv"
-                id="file-upload"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-            </>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-3 bg-background p-3 rounded-lg shadow-sm w-full justify-between"
-            >
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="text-primary" size={22} />
-                <span className="text-sm font-medium truncate max-w-[180px]">
-                  {file.name}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setFile(null);
-                  setUploadSummary(null);
-                }}
-                className="text-muted-foreground hover:text-destructive transition"
+        <div className="max-h-[calc(92vh-12rem)] overflow-y-auto px-6 py-4">
+          {/* Drag & Drop Area */}
+          <motion.div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+            }}
+            onDrop={handleDrop}
+            className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
+              isDragging
+                ? "border-primary bg-primary/10"
+                : "border-muted bg-muted/30 hover:bg-muted/50"
+            }`}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+          >
+            {!file ? (
+              <>
+                <Upload className="mb-2 h-10 w-10 text-primary" />
+                <p className="text-sm text-muted-foreground">
+                  Drag & drop your file here or{" "}
+                  <label
+                    htmlFor="file-upload"
+                    className="cursor-pointer font-medium text-primary"
+                  >
+                    browse
+                  </label>
+                </p>
+                <input
+                  type="file"
+                  accept=".xlsx,.csv"
+                  id="file-upload"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+              </>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex w-full items-center justify-between gap-3 rounded-lg bg-background p-3 shadow-sm"
               >
-                <XCircle size={20} />
-              </button>
-            </motion.div>
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="text-primary" size={22} />
+                  <span className="max-w-[180px] truncate text-sm font-medium">
+                    {file.name}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setFile(null);
+                    setUploadSummary(null);
+                  }}
+                  className="text-muted-foreground transition hover:text-destructive"
+                >
+                  <XCircle size={20} />
+                </button>
+              </motion.div>
+            )}
+          </motion.div>
+
+          {uploadStatus === "loading" && (
+            <div className="mt-4 space-y-2">
+              <div className="text-xs text-muted-foreground">Uploading file...</div>
+              <Progress value={uploadProgress} />
+            </div>
           )}
-        </motion.div>
-
-        {uploadStatus === "loading" && (
-          <div className="mt-4 space-y-2">
-            <div className="text-xs text-muted-foreground">Uploading file...</div>
-            <Progress value={uploadProgress} />
-          </div>
-        )}
-        {uploadSummary && uploadStatus !== "loading" && (
-          <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3 text-sm">
-            <div className="flex items-center justify-between font-medium">
-              <span>Upload Summary</span>
-              <span>{uploadSummary.totalRows || 0} rows</span>
-            </div>
-            <div className="mt-2 text-xs text-muted-foreground">
-              Inserted {uploadSummary.mainCategories?.inserted || 0} main categories,
-              {uploadSummary.categories?.inserted || 0} categories,
-              {uploadSummary.subcategories?.inserted || 0} subcategories.
-            </div>
-            <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-              <div>
-                <div className="font-medium text-foreground">
-                  {uploadSummary.mainCategories?.inserted || 0}
-                </div>
-                <div>Main categories</div>
+          {uploadSummary && uploadStatus !== "loading" && (
+            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+              <div className="flex items-center justify-between font-medium">
+                <span>Upload Summary</span>
+                <span>{uploadSummary.totalRows || 0} rows</span>
               </div>
-              <div>
-                <div className="font-medium text-foreground">
-                  {uploadSummary.categories?.inserted || 0}
-                </div>
-                <div>Categories</div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                Inserted {uploadSummary.mainCategories?.inserted || 0} main categories,
+                {uploadSummary.categories?.inserted || 0} categories,
+                {uploadSummary.subcategories?.inserted || 0} subcategories.
               </div>
-              <div>
-                <div className="font-medium text-foreground">
-                  {uploadSummary.subcategories?.inserted || 0}
-                </div>
-                <div>Subcategories</div>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs">
-              <span>Skipped</span>
-              <span>{uploadSummary.skippedRows?.length || 0}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span>Failed</span>
-              <span>{uploadSummary.failedRows?.length || 0}</span>
-            </div>
-            {uploadSummary.skippedRows?.length ? (
-              <div className="mt-2 max-h-24 overflow-auto text-xs text-amber-600">
-                {uploadSummary.skippedRows.map((row: any, idx: number) => (
-                  <div key={idx}>
-                    Row {row.row}: {row.reason}
+              <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                <div>
+                  <div className="font-medium text-foreground">
+                    {uploadSummary.mainCategories?.inserted || 0}
                   </div>
-                ))}
-              </div>
-            ) : null}
-            {uploadSummary.failedRows?.length ? (
-              <div className="mt-2 max-h-24 overflow-auto text-xs text-red-500">
-                {uploadSummary.failedRows.map((row: any, idx: number) => (
-                  <div key={idx}>
-                    Row {row.row}: {row.reason}
+                  <div>Main categories</div>
+                </div>
+                <div>
+                  <div className="font-medium text-foreground">
+                    {uploadSummary.categories?.inserted || 0}
                   </div>
-                ))}
+                  <div>Categories</div>
+                </div>
+                <div>
+                  <div className="font-medium text-foreground">
+                    {uploadSummary.subcategories?.inserted || 0}
+                  </div>
+                  <div>Subcategories</div>
+                </div>
               </div>
-            ) : null}
-          </div>
-        )}
+              <div className="mt-3 flex items-center justify-between text-xs">
+                <span>Skipped</span>
+                <span>{uploadSummary.skippedRows?.length || 0}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span>Failed</span>
+                <span>{uploadSummary.failedRows?.length || 0}</span>
+              </div>
+              {uploadSummary.skippedRows?.length ? (
+                <div className="mt-2 max-h-24 overflow-auto text-xs text-amber-600">
+                  {uploadSummary.skippedRows.map((row: any, idx: number) => (
+                    <div key={idx}>
+                      Row {row.row}: {row.reason}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {uploadSummary.failedRows?.length ? (
+                <div className="mt-2 max-h-24 overflow-auto text-xs text-red-500">
+                  {uploadSummary.failedRows.map((row: any, idx: number) => (
+                    <div key={idx}>
+                      Row {row.row}: {row.reason}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
 
-        <DialogFooter className="mt-6">
+        <DialogFooter className="border-t px-6 py-4">
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>

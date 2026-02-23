@@ -34,13 +34,13 @@ import {
 } from './types'
 
 const ICON_ACCENTS = [
-  { chip: 'bg-rose-100', icon: 'text-rose-600' },
-  { chip: 'bg-orange-100', icon: 'text-orange-600' },
-  { chip: 'bg-amber-100', icon: 'text-amber-700' },
-  { chip: 'bg-emerald-100', icon: 'text-emerald-600' },
-  { chip: 'bg-sky-100', icon: 'text-sky-600' },
-  { chip: 'bg-indigo-100', icon: 'text-indigo-600' },
-  { chip: 'bg-fuchsia-100', icon: 'text-fuchsia-600' },
+  { chip: 'bg-rose-100 dark:bg-rose-500/20', icon: 'text-rose-600 dark:text-rose-300' },
+  { chip: 'bg-orange-100 dark:bg-orange-500/20', icon: 'text-orange-600 dark:text-orange-300' },
+  { chip: 'bg-amber-100 dark:bg-amber-500/20', icon: 'text-amber-700 dark:text-amber-300' },
+  { chip: 'bg-emerald-100 dark:bg-emerald-500/20', icon: 'text-emerald-600 dark:text-emerald-300' },
+  { chip: 'bg-sky-100 dark:bg-sky-500/20', icon: 'text-sky-600 dark:text-sky-300' },
+  { chip: 'bg-indigo-100 dark:bg-indigo-500/20', icon: 'text-indigo-600 dark:text-indigo-300' },
+  { chip: 'bg-fuchsia-100 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-600 dark:text-fuchsia-300' },
 ]
 
 const iconAccentByKey = (key: string) => {
@@ -53,7 +53,7 @@ export function NavGroup({ title, items }: NavGroupProps) {
   const href = useLocation({ select: (location) => location.href })
   return (
     <SidebarGroup>
-      <SidebarGroupLabel className='font-semibold tracking-wide text-indigo-700/80'>
+      <SidebarGroupLabel className='font-semibold tracking-wide text-sidebar-foreground/70'>
         {title}
       </SidebarGroupLabel>
       <SidebarMenu>
@@ -77,7 +77,7 @@ export function NavGroup({ title, items }: NavGroupProps) {
 
 function NavBadge({ children }: { children: ReactNode }) {
   return (
-    <Badge className='rounded-full border-rose-200 bg-rose-100 px-1.5 py-0 text-xs text-rose-700'>
+    <Badge className='rounded-full border-sidebar-border bg-sidebar-accent px-1.5 py-0 text-xs text-sidebar-accent-foreground'>
       {children}
     </Badge>
   )
@@ -108,7 +108,7 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
         asChild
         isActive={isActive}
         tooltip={item.title}
-        className='text-slate-700/95 transition-all hover:bg-orange-100/80 hover:text-slate-900 data-[active=true]:bg-gradient-to-r data-[active=true]:from-rose-500/20 data-[active=true]:to-amber-500/20 data-[active=true]:text-rose-900 data-[active=true]:ring-1 data-[active=true]:ring-rose-200 data-[active=true]:shadow-sm'
+        className='text-sidebar-foreground/90 data-[active=true]:text-sidebar-accent-foreground'
       >
         <Link to={item.url} onClick={() => setOpenMobile(false)}>
           <SidebarItemIcon icon={item.icon} seed={item.title} />
@@ -140,7 +140,7 @@ function SidebarMenuCollapsible({
           <SidebarMenuButton
             tooltip={item.title}
             isActive={isActive}
-            className='text-slate-700/95 transition-all hover:bg-orange-100/80 hover:text-slate-900 data-[active=true]:bg-gradient-to-r data-[active=true]:from-rose-500/20 data-[active=true]:to-amber-500/20 data-[active=true]:text-rose-900 data-[active=true]:ring-1 data-[active=true]:ring-rose-200 data-[active=true]:shadow-sm'
+            className='text-sidebar-foreground/90 data-[active=true]:text-sidebar-accent-foreground'
           >
             <SidebarItemIcon icon={item.icon} seed={item.title} />
             <span>{item.title}</span>
@@ -155,7 +155,7 @@ function SidebarMenuCollapsible({
                 <SidebarMenuSubButton
                   asChild
                   isActive={checkIsActive(href, subItem)}
-                  className='text-slate-700/90 hover:bg-amber-100/80 hover:text-slate-900 data-[active=true]:bg-rose-100/85 data-[active=true]:text-rose-900 data-[active=true]:ring-1 data-[active=true]:ring-rose-200'
+                  className='text-sidebar-foreground/85 data-[active=true]:text-sidebar-accent-foreground'
                 >
                   <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
                     <SidebarItemIcon icon={subItem.icon} seed={subItem.title} />
@@ -187,7 +187,7 @@ function SidebarMenuCollapsedDropdown({
           <SidebarMenuButton
             tooltip={item.title}
             isActive={isActive}
-            className='text-slate-700/95 transition-all hover:bg-orange-100/80 hover:text-slate-900 data-[active=true]:bg-gradient-to-r data-[active=true]:from-rose-500/20 data-[active=true]:to-amber-500/20 data-[active=true]:text-rose-900 data-[active=true]:ring-1 data-[active=true]:ring-rose-200 data-[active=true]:shadow-sm'
+            className='text-sidebar-foreground/90 data-[active=true]:text-sidebar-accent-foreground'
           >
             <SidebarItemIcon icon={item.icon} seed={item.title} />
             <span>{item.title}</span>

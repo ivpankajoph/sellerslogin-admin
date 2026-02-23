@@ -9,6 +9,8 @@ import { Separator } from '@/components/ui/separator'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store'
 import { formatINR } from '@/lib/currency'
+import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
+import type { IntegrationProviderId } from '@/lib/vendor-integrations'
 
 type OrderSummary = {
   totalOrders: number
@@ -82,6 +84,13 @@ function PaymentGatewayReport() {
   const gatewayMeta = gatewayMetaMap[normalizedGateway]
   const role = useSelector((state: RootState) => state.auth?.user?.role)
   const isVendor = role === 'vendor'
+  const { loading: integrationsLoading, isProviderVisible } = useVendorIntegrations()
+  const requiresConnectedIntegration =
+    normalizedGateway === 'razorpay' || normalizedGateway === 'cashfree'
+  const canAccessGateway =
+    !isVendor ||
+    !requiresConnectedIntegration ||
+    isProviderVisible(normalizedGateway as IntegrationProviderId)
 
   const [orders, setOrders] = useState<Order[]>([])
   const [summary, setSummary] = useState<OrderSummary | null>(null)
@@ -94,7 +103,7 @@ function PaymentGatewayReport() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const fetchOrders = async () => {
-    if (!gatewayMeta) return
+    if (!gatewayMeta || !canAccessGateway || (isVendor && integrationsLoading)) return
     try {
       setLoading(true)
       setError('')
@@ -122,9 +131,10 @@ function PaymentGatewayReport() {
   }
 
   useEffect(() => {
+    if (!canAccessGateway || (isVendor && integrationsLoading)) return
     fetchOrders()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, paymentStatus, normalizedGateway])
+  }, [page, paymentStatus, normalizedGateway, canAccessGateway, integrationsLoading, isVendor])
 
   useEffect(() => {
     if (!orders.length) {
@@ -187,6 +197,16 @@ function PaymentGatewayReport() {
   const paidRevenue = summary?.paidRevenue || 0
   const pageCount = Math.max(Math.ceil(total / 20), 1)
 
+  if (isVendor && integrationsLoading) {
+    return (
+      <Card>
+        <CardContent className='py-8 text-sm text-muted-foreground'>
+          Loading connected payment apps...
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (!gatewayMeta) {
     return (
       <div className='space-y-4'>
@@ -204,6 +224,29 @@ function PaymentGatewayReport() {
           </CardHeader>
           <CardContent className='text-sm text-muted-foreground'>
             The requested payment gateway is not configured.
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!canAccessGateway) {
+    return (
+      <div className='space-y-4'>
+        <div className='flex items-center gap-2'>
+          <Button asChild variant='ghost' size='sm'>
+            <Link to='/payments'>
+              <ArrowLeft className='h-4 w-4' />
+              Back to payments
+            </Link>
+          </Button>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className='text-base'>Gateway not connected</CardTitle>
+          </CardHeader>
+          <CardContent className='text-sm text-muted-foreground'>
+            Connect this payment app from Integrations before viewing its report.
           </CardContent>
         </Card>
       </div>

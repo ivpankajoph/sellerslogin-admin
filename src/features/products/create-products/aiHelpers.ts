@@ -33,7 +33,7 @@ export const generateWithAI = async (
 
 export const generateSpecifications = async (
   formData: any,
-  selectedCategoryId: string,
+  selectedCategoryIds: string[],
   categories: any[],
   specificationKeys: string[],
   setAiLoading: AiLoadingSetter,
@@ -41,10 +41,14 @@ export const generateSpecifications = async (
 ) => {
   setAiLoading((prev: any) => ({ ...prev, specifications: true }));
   try {
-    const category = categories.find((cat: any) => cat._id === selectedCategoryId);
+    const categoryNames = categories
+      .filter((cat: any) => selectedCategoryIds.includes(cat._id))
+      .map((cat: any) => cat.name)
+      .filter(Boolean);
+
     const context = `
 Product: ${formData.productName}
-Category: ${category?.name}
+Categories: ${categoryNames.join(", ") || "N/A"}
 Brand: ${formData.brand}
 `;
     const res = await fetch(

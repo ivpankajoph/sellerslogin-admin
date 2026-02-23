@@ -1,91 +1,132 @@
-// src/components/ProductCreate/Step6FAQs.tsx
-
-import React from 'react';
-import { Plus, Trash2, Sparkles, Loader2 } from 'lucide-react';
+import React from 'react'
+import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react'
 
 interface FAQ {
-  question: string;
-  answer: string;
+  question: string
+  answer: string
 }
 
 interface Props {
-  faqs: FAQ[];
-  onFAQChange: (index: number, field: 'question' | 'answer', value: string) => void;
-  onAddFAQ: () => void;
-  onRemoveFAQ: (index: number) => void;
-  onGenerate: () => void;
-  aiLoading: boolean;
+  faqs: FAQ[]
+  onFAQChange: (
+    index: number,
+    field: 'question' | 'answer',
+    value: string
+  ) => void
+  onAddFAQ: () => void
+  onRemoveFAQ: (index: number) => void
+  onGenerate: () => void
+  aiLoading: boolean
 }
 
-const Step6FAQs: React.FC<Props> = ({ faqs, onFAQChange, onAddFAQ, onRemoveFAQ, onGenerate, aiLoading }) => {
+const Step6FAQs: React.FC<Props> = ({
+  faqs,
+  onFAQChange,
+  onAddFAQ,
+  onRemoveFAQ,
+  onGenerate,
+  aiLoading,
+}) => {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">Frequently Asked Questions (FAQs)</h2>
-        <div className="flex space-x-2">
-          <button
-            type="button"
-            onClick={onGenerate}
-            disabled={aiLoading}
-            className="flex items-center space-x-2 rounded-lg bg-purple-100 px-4 py-2 text-purple-700 hover:bg-purple-200 disabled:opacity-50"
-          >
-            {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            <span>Generate with AI</span>
-          </button>
-          <button
-            type="button"
-            onClick={onAddFAQ}
-            className="flex items-center space-x-1 rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add FAQ</span>
-          </button>
+    <section className='space-y-5'>
+      <div className='rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50/85 via-white to-orange-50/75 p-5'>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <h2 className='text-2xl font-extrabold tracking-tight text-slate-900'>
+              FAQs
+            </h2>
+            <p className='mt-1 text-sm text-slate-600'>
+              Anticipate buyer questions and improve conversion confidence.
+            </p>
+          </div>
+          <div className='flex flex-wrap gap-2'>
+            <button
+              type='button'
+              onClick={onGenerate}
+              disabled={aiLoading}
+              className='inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60'
+            >
+              {aiLoading ? (
+                <Loader2 className='h-4 w-4 animate-spin' />
+              ) : (
+                <Sparkles className='h-4 w-4' />
+              )}
+              Generate with AI
+            </button>
+            <button
+              type='button'
+              onClick={onAddFAQ}
+              className='inline-flex items-center gap-1 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800'
+            >
+              <Plus className='h-4 w-4' />
+              Add FAQ
+            </button>
+          </div>
         </div>
       </div>
 
       {faqs.length === 0 ? (
-        <p className="text-gray-500">No FAQs added yet. Click "Add FAQ" to get started.</p>
+        <div className='rounded-xl border border-slate-200 bg-white/90 p-5 text-sm text-slate-500 shadow-sm'>
+          No FAQs added yet. Click <span className='font-semibold'>"Add FAQ"</span>{' '}
+          to start.
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div className='space-y-4'>
           {faqs.map((faq, index) => (
-            <div key={index} className="rounded-lg border border-gray-200 p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 space-y-3">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Question</label>
-                    <textarea
-                      value={faq.question}
-                      onChange={(e) => onFAQChange(index, 'question', e.target.value)}
-                      rows={2}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter question..."
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Answer</label>
-                    <textarea
-                      value={faq.answer}
-                      onChange={(e) => onFAQChange(index, 'answer', e.target.value)}
-                      rows={3}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter answer..."
-                    />
-                  </div>
-                </div>
+            <article
+              key={index}
+              className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'
+            >
+              <div className='mb-3 flex items-center justify-between gap-3'>
+                <h3 className='text-sm font-bold uppercase tracking-[0.11em] text-slate-500'>
+                  FAQ {index + 1}
+                </h3>
                 <button
-                  type="button"
+                  type='button'
                   onClick={() => onRemoveFAQ(index)}
-                  className="ml-4 mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600 hover:bg-red-200"
+                  className='inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100'
+                  aria-label={`Remove FAQ ${index + 1}`}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className='h-4 w-4' />
                 </button>
               </div>
-            </div>
+
+              <div className='space-y-3'>
+                <div>
+                  <label className='mb-1 block text-sm font-semibold text-slate-700'>
+                    Question
+                  </label>
+                  <textarea
+                    value={faq.question}
+                    onChange={(event) =>
+                      onFAQChange(index, 'question', event.target.value)
+                    }
+                    rows={2}
+                    className='w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200'
+                    placeholder='What will customers ask first?'
+                  />
+                </div>
+                <div>
+                  <label className='mb-1 block text-sm font-semibold text-slate-700'>
+                    Answer
+                  </label>
+                  <textarea
+                    value={faq.answer}
+                    onChange={(event) =>
+                      onFAQChange(index, 'answer', event.target.value)
+                    }
+                    rows={3}
+                    className='w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200'
+                    placeholder='Provide a clear and concise answer.'
+                  />
+                </div>
+              </div>
+            </article>
           ))}
         </div>
       )}
-    </div>
-  );
-};
+    </section>
+  )
+}
 
-export default Step6FAQs;
+export default Step6FAQs

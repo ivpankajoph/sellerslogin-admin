@@ -18,6 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import type { RootState } from '@/store'
+import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import {
   fetchBorzoOrderDetailsById,
   fetchBorzoReportData,
@@ -40,6 +41,8 @@ function BorzoOrderDetailsPage() {
 
   const role = useSelector((state: RootState) => state.auth?.user?.role)
   const isVendor = role === 'vendor'
+  const { loading: integrationsLoading, isProviderVisible } = useVendorIntegrations()
+  const canAccessBorzoReport = !isVendor || isProviderVisible('borzo')
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -111,8 +114,10 @@ function BorzoOrderDetailsPage() {
   }
 
   useEffect(() => {
+    if (isVendor && (integrationsLoading || !canAccessBorzoReport)) return
     loadOrder(true)
-  }, [parsedOrderId, isVendor])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsedOrderId, isVendor, integrationsLoading, canAccessBorzoReport])
 
   const trackingUrl = useMemo(() => {
     if (!order?.points?.length) return ''
@@ -134,6 +139,29 @@ function BorzoOrderDetailsPage() {
     .join('')
     .toUpperCase()
   const statusBadgeClass = statusPillClass(order?.status)
+
+  if (isVendor && integrationsLoading) {
+    return (
+      <Card>
+        <CardContent className='py-8 text-sm text-muted-foreground'>
+          Loading connected delivery apps...
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (isVendor && !canAccessBorzoReport) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className='text-base'>Borzo not connected</CardTitle>
+        </CardHeader>
+        <CardContent className='text-sm text-muted-foreground'>
+          Connect Borzo from Integrations to open delivery tracking details.
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className='space-y-5 pb-4'>

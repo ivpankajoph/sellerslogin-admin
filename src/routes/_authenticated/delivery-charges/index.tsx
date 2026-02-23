@@ -213,8 +213,13 @@ function DeliveryChargesPage() {
   }
 
   useEffect(() => {
+    if (!isAdmin) {
+      setLoading(false)
+      return
+    }
     fetchConfig()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
 
   const setProviderState = (
     appSource: AppSource,
@@ -294,6 +299,19 @@ function DeliveryChargesPage() {
     }, 0)
   }, [config])
 
+  if (!isAdmin) {
+    return (
+      <Card className='border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50'>
+        <CardHeader>
+          <CardTitle className='text-lg text-amber-900'>Delivery Charges is admin only</CardTitle>
+        </CardHeader>
+        <CardContent className='text-sm text-amber-800'>
+          Vendors can use connected delivery apps, but charge configuration is managed by admin.
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className='space-y-6 pb-4'>
       <Card className='relative overflow-hidden border-0 bg-gradient-to-r from-sky-500 via-cyan-500 to-emerald-500 text-white shadow-xl shadow-cyan-200/70'>
@@ -352,12 +370,6 @@ function DeliveryChargesPage() {
           </div>
         </CardContent>
       </Card>
-
-      {!isAdmin && (
-        <div className='rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 text-sm text-amber-800 shadow-sm'>
-          Read-only mode for vendor accounts. Login as admin to update charges.
-        </div>
-      )}
 
       {error && (
         <div className='rounded-xl border border-rose-200 bg-gradient-to-r from-rose-50 to-red-50 px-4 py-3 text-sm text-rose-700 shadow-sm'>
