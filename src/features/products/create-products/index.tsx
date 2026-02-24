@@ -36,6 +36,7 @@ const ProductCreateForm: React.FC = () => {
     productCategory: '',
     productCategories: [],
     productSubCategories: [],
+    availableCities: [],
     brand: '',
     shortDescription: '',
     description: '',
@@ -51,8 +52,10 @@ const ProductCreateForm: React.FC = () => {
 
   const [mainCategories, setMainCategories] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
+  const [cities, setCities] = useState<any[]>([])
   const [isMainCategoryLoading, setIsMainCategoryLoading] = useState(false)
   const [isCategoryLoading, setIsCategoryLoading] = useState(false)
+  const [isCityLoading, setIsCityLoading] = useState(false)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [selectedMainCategoryId, setSelectedMainCategoryId] = useState('')
   const [filteredSubcategories, setFilteredSubcategories] = useState<any[]>([])
@@ -91,6 +94,26 @@ const ProductCreateForm: React.FC = () => {
     }
 
     fetchMainCategories()
+  }, [])
+
+  useEffect(() => {
+    const fetchCities = async () => {
+      setIsCityLoading(true)
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities?includeInactive=false`
+        )
+        if (!res.ok) throw new Error('Failed to fetch cities')
+        const json = await res.json()
+        setCities(Array.isArray(json?.data) ? json.data : [])
+      } catch {
+        setCities([])
+      } finally {
+        setIsCityLoading(false)
+      }
+    }
+
+    fetchCities()
   }, [])
 
   useEffect(() => {
@@ -412,16 +435,11 @@ const ProductCreateForm: React.FC = () => {
     setFormData((prev: ProductFormData) => ({ ...prev, variants: newVariants }))
   }
 
-  const handleVariantImageUpload = async (
-    variantIndex: number,
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const files = Array.from(e.target.files || [])
-    if (!files.length) return
+  const uploadVariantFiles = async (variantIndex: number, files: File[]) => {
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'))
+    if (!imageFiles.length) return
 
-    e.target.value = '' // prevent reselect bug
-
-    const tempImages = files.map((file, idx) => ({
+    const tempImages = imageFiles.map((file, idx) => ({
       url: URL.createObjectURL(file),
       publicId: '',
       uploading: true,
@@ -440,8 +458,8 @@ const ProductCreateForm: React.FC = () => {
       return { ...prev, variants }
     })
 
-    for (let i = 0; i < files.length; i++) {
-      const result = await uploadToCloudinary(files[i])
+    for (let i = 0; i < imageFiles.length; i++) {
+      const result = await uploadToCloudinary(imageFiles[i])
       if (!result) continue
 
       setFormData((prev: ProductFormData) => {
@@ -468,6 +486,21 @@ const ProductCreateForm: React.FC = () => {
         return { ...prev, variants }
       })
     }
+  }
+
+  const handleVariantImageUpload = async (
+    variantIndex: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+
+    e.target.value = '' // prevent reselect bug
+    await uploadVariantFiles(variantIndex, files)
+  }
+
+  const handleVariantImageDrop = async (variantIndex: number, files: File[]) => {
+    await uploadVariantFiles(variantIndex, files)
   }
 
   const handleVariantImageDelete = async (
@@ -565,11 +598,18 @@ const ProductCreateForm: React.FC = () => {
         return
       }
 
+      if (!Array.isArray(formData.availableCities) || formData.availableCities.length === 0) {
+        alert('Please select at least one city in Basic Information.')
+        setLoading(false)
+        return
+      }
+
       const payload = {
         ...formData,
         mainCategory: selectedMainCategoryId || formData.mainCategory,
         productCategory: selectedCategoryIds[0] || '',
         productCategories: selectedCategoryIds,
+        availableCities: formData.availableCities,
         specifications: formData.specifications[0],
         variants: formData.variants.map((v) => ({
           ...v,
@@ -591,10 +631,25 @@ const ProductCreateForm: React.FC = () => {
         }
       )
 
-      if (!res.ok) throw new Error('Failed to create product')
-      alert('Product created successfully!')
-    } catch (err) {
-      alert('Failed to create product')
+      let responseBody: any = null
+      try {
+        responseBody = await res.json()
+      } catch {
+        responseBody = null
+      }
+
+      if (!res.ok || responseBody?.success === false) {
+        const backendMessage =
+          responseBody?.message ||
+          responseBody?.error ||
+          (Array.isArray(responseBody?.errors) && responseBody.errors[0]?.message) ||
+          `Failed to create product (HTTP ${res.status})`
+        throw new Error(String(backendMessage))
+      }
+
+      alert(responseBody?.message || 'Product created successfully!')
+    } catch (err: any) {
+      alert(err?.message || 'Failed to create product')
     } finally {
       setLoading(false)
     }
@@ -614,9 +669,11 @@ const ProductCreateForm: React.FC = () => {
             categories={categories}
             selectedCategoryIds={selectedCategoryIds}
             setSelectedCategoryIds={setSelectedCategoryIds}
+            cities={cities}
             filteredSubcategories={filteredSubcategories}
             isMainCategoryLoading={isMainCategoryLoading}
             isCategoryLoading={isCategoryLoading}
+            isCityLoading={isCityLoading}
             aiLoading={aiLoading}
             generateWithAI={generateShortDesc}
             generateDescription={generateDescription}
@@ -679,6 +736,7 @@ const ProductCreateForm: React.FC = () => {
                 onRemoveAttributeFromVariant={removeAttributeFromVariant}
                 onVariantFieldChange={handleVariantFieldChange}
                 onVariantImageUpload={handleVariantImageUpload}
+                onVariantImageDrop={handleVariantImageDrop}
                 onVariantImageDelete={handleVariantImageDelete}
                 onAddMetaKeywordToVariant={addMetaKeywordToVariant}
                 onRemoveMetaKeywordFromVariant={removeMetaKeywordFromVariant}

@@ -35,6 +35,7 @@ import { Route as AuthenticatedVendorAnalyticsIndexRouteImport } from './routes/
 import { Route as AuthenticatedVendorAboutIndexRouteImport } from './routes/_authenticated/vendor-about/index'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedUploadProductsIndexRouteImport } from './routes/_authenticated/upload-products/index'
+import { Route as AuthenticatedTemplateWorkspaceIndexRouteImport } from './routes/_authenticated/template-workspace/index'
 import { Route as AuthenticatedTemplateWalletIndexRouteImport } from './routes/_authenticated/template-wallet/index'
 import { Route as AuthenticatedTemplateOrdersIndexRouteImport } from './routes/_authenticated/template-orders/index'
 import { Route as AuthenticatedTemplateCatalogIndexRouteImport } from './routes/_authenticated/template-catalog/index'
@@ -50,6 +51,7 @@ import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedDeliveryChargesIndexRouteImport } from './routes/_authenticated/delivery-charges/index'
 import { Route as AuthenticatedCommissionIndexRouteImport } from './routes/_authenticated/commission/index'
+import { Route as AuthenticatedCitiesIndexRouteImport } from './routes/_authenticated/cities/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedCategoryIndexRouteImport } from './routes/_authenticated/category/index'
 import { Route as AuthenticatedBorzoReportIndexRouteImport } from './routes/_authenticated/borzo-report/index'
@@ -211,6 +213,12 @@ const AuthenticatedUploadProductsIndexRoute =
     path: '/upload-products/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedTemplateWorkspaceIndexRoute =
+  AuthenticatedTemplateWorkspaceIndexRouteImport.update({
+    id: '/template-workspace/',
+    path: '/template-workspace/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTemplateWalletIndexRoute =
   AuthenticatedTemplateWalletIndexRouteImport.update({
     id: '/template-wallet/',
@@ -297,6 +305,12 @@ const AuthenticatedCommissionIndexRoute =
   AuthenticatedCommissionIndexRouteImport.update({
     id: '/commission/',
     path: '/commission/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCitiesIndexRoute =
+  AuthenticatedCitiesIndexRouteImport.update({
+    id: '/cities/',
+    path: '/cities/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexRouteImport.update({
@@ -461,6 +475,7 @@ export interface FileRoutesByFullPath {
   '/borzo-report': typeof AuthenticatedBorzoReportIndexRoute
   '/category': typeof AuthenticatedCategoryIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/cities': typeof AuthenticatedCitiesIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
@@ -476,6 +491,7 @@ export interface FileRoutesByFullPath {
   '/template-catalog': typeof AuthenticatedTemplateCatalogIndexRoute
   '/template-orders': typeof AuthenticatedTemplateOrdersIndexRoute
   '/template-wallet': typeof AuthenticatedTemplateWalletIndexRoute
+  '/template-workspace': typeof AuthenticatedTemplateWorkspaceIndexRoute
   '/upload-products': typeof AuthenticatedUploadProductsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
@@ -522,6 +538,7 @@ export interface FileRoutesByTo {
   '/borzo-report': typeof AuthenticatedBorzoReportIndexRoute
   '/category': typeof AuthenticatedCategoryIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/cities': typeof AuthenticatedCitiesIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
@@ -537,6 +554,7 @@ export interface FileRoutesByTo {
   '/template-catalog': typeof AuthenticatedTemplateCatalogIndexRoute
   '/template-orders': typeof AuthenticatedTemplateOrdersIndexRoute
   '/template-wallet': typeof AuthenticatedTemplateWalletIndexRoute
+  '/template-workspace': typeof AuthenticatedTemplateWorkspaceIndexRoute
   '/upload-products': typeof AuthenticatedUploadProductsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
@@ -588,6 +606,7 @@ export interface FileRoutesById {
   '/_authenticated/borzo-report/': typeof AuthenticatedBorzoReportIndexRoute
   '/_authenticated/category/': typeof AuthenticatedCategoryIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
+  '/_authenticated/cities/': typeof AuthenticatedCitiesIndexRoute
   '/_authenticated/commission/': typeof AuthenticatedCommissionIndexRoute
   '/_authenticated/delivery-charges/': typeof AuthenticatedDeliveryChargesIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
@@ -603,6 +622,7 @@ export interface FileRoutesById {
   '/_authenticated/template-catalog/': typeof AuthenticatedTemplateCatalogIndexRoute
   '/_authenticated/template-orders/': typeof AuthenticatedTemplateOrdersIndexRoute
   '/_authenticated/template-wallet/': typeof AuthenticatedTemplateWalletIndexRoute
+  '/_authenticated/template-workspace/': typeof AuthenticatedTemplateWorkspaceIndexRoute
   '/_authenticated/upload-products/': typeof AuthenticatedUploadProductsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/vendor-about/': typeof AuthenticatedVendorAboutIndexRoute
@@ -652,6 +672,7 @@ export interface FileRouteTypes {
     | '/borzo-report'
     | '/category'
     | '/chats'
+    | '/cities'
     | '/commission'
     | '/delivery-charges'
     | '/help-center'
@@ -667,6 +688,7 @@ export interface FileRouteTypes {
     | '/template-catalog'
     | '/template-orders'
     | '/template-wallet'
+    | '/template-workspace'
     | '/upload-products'
     | '/users'
     | '/vendor-about'
@@ -713,6 +735,7 @@ export interface FileRouteTypes {
     | '/borzo-report'
     | '/category'
     | '/chats'
+    | '/cities'
     | '/commission'
     | '/delivery-charges'
     | '/help-center'
@@ -728,6 +751,7 @@ export interface FileRouteTypes {
     | '/template-catalog'
     | '/template-orders'
     | '/template-wallet'
+    | '/template-workspace'
     | '/upload-products'
     | '/users'
     | '/vendor-about'
@@ -778,6 +802,7 @@ export interface FileRouteTypes {
     | '/_authenticated/borzo-report/'
     | '/_authenticated/category/'
     | '/_authenticated/chats/'
+    | '/_authenticated/cities/'
     | '/_authenticated/commission/'
     | '/_authenticated/delivery-charges/'
     | '/_authenticated/help-center/'
@@ -793,6 +818,7 @@ export interface FileRouteTypes {
     | '/_authenticated/template-catalog/'
     | '/_authenticated/template-orders/'
     | '/_authenticated/template-wallet/'
+    | '/_authenticated/template-workspace/'
     | '/_authenticated/upload-products/'
     | '/_authenticated/users/'
     | '/_authenticated/vendor-about/'
@@ -1007,6 +1033,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUploadProductsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/template-workspace/': {
+      id: '/_authenticated/template-workspace/'
+      path: '/template-workspace'
+      fullPath: '/template-workspace'
+      preLoaderRoute: typeof AuthenticatedTemplateWorkspaceIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/template-wallet/': {
       id: '/_authenticated/template-wallet/'
       path: '/template-wallet'
@@ -1110,6 +1143,13 @@ declare module '@tanstack/react-router' {
       path: '/commission'
       fullPath: '/commission'
       preLoaderRoute: typeof AuthenticatedCommissionIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/cities/': {
+      id: '/_authenticated/cities/'
+      path: '/cities'
+      fullPath: '/cities'
+      preLoaderRoute: typeof AuthenticatedCitiesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/chats/': {
@@ -1306,6 +1346,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBorzoReportIndexRoute: typeof AuthenticatedBorzoReportIndexRoute
   AuthenticatedCategoryIndexRoute: typeof AuthenticatedCategoryIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
+  AuthenticatedCitiesIndexRoute: typeof AuthenticatedCitiesIndexRoute
   AuthenticatedCommissionIndexRoute: typeof AuthenticatedCommissionIndexRoute
   AuthenticatedDeliveryChargesIndexRoute: typeof AuthenticatedDeliveryChargesIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
@@ -1321,6 +1362,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTemplateCatalogIndexRoute: typeof AuthenticatedTemplateCatalogIndexRoute
   AuthenticatedTemplateOrdersIndexRoute: typeof AuthenticatedTemplateOrdersIndexRoute
   AuthenticatedTemplateWalletIndexRoute: typeof AuthenticatedTemplateWalletIndexRoute
+  AuthenticatedTemplateWorkspaceIndexRoute: typeof AuthenticatedTemplateWorkspaceIndexRoute
   AuthenticatedUploadProductsIndexRoute: typeof AuthenticatedUploadProductsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedVendorAboutIndexRoute: typeof AuthenticatedVendorAboutIndexRoute
@@ -1353,6 +1395,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBorzoReportIndexRoute: AuthenticatedBorzoReportIndexRoute,
   AuthenticatedCategoryIndexRoute: AuthenticatedCategoryIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
+  AuthenticatedCitiesIndexRoute: AuthenticatedCitiesIndexRoute,
   AuthenticatedCommissionIndexRoute: AuthenticatedCommissionIndexRoute,
   AuthenticatedDeliveryChargesIndexRoute:
     AuthenticatedDeliveryChargesIndexRoute,
@@ -1372,6 +1415,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedTemplateCatalogIndexRoute,
   AuthenticatedTemplateOrdersIndexRoute: AuthenticatedTemplateOrdersIndexRoute,
   AuthenticatedTemplateWalletIndexRoute: AuthenticatedTemplateWalletIndexRoute,
+  AuthenticatedTemplateWorkspaceIndexRoute:
+    AuthenticatedTemplateWorkspaceIndexRoute,
   AuthenticatedUploadProductsIndexRoute: AuthenticatedUploadProductsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
   AuthenticatedVendorAboutIndexRoute: AuthenticatedVendorAboutIndexRoute,

@@ -28,6 +28,7 @@ export interface ProductFormData {
   productCategory: string
   productCategories: string[]
   productSubCategories: string[]
+  availableCities: string[]
   brand: string
   shortDescription: string
   description: string

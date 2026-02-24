@@ -339,6 +339,16 @@ export default function SpecificationKeysPage() {
     setKeysInput(nextKeys.join('\n'))
   }
 
+  const handleMainCategoryChange = (nextMainCategoryId: string) => {
+    if (nextMainCategoryId === selectedMainCategoryId) return
+
+    setSelectedMainCategoryId(nextMainCategoryId)
+    setKeysInput('')
+    setQuickKeyInput('')
+    setMessage('')
+    setError('')
+  }
+
   const handleGenerateKeysWithAI = async () => {
     if (!selectedMainCategory?.name) {
       setError('Select a main category first to generate keys with AI.')
@@ -469,7 +479,7 @@ export default function SpecificationKeysPage() {
               </div>
             ) : null}
 
-            <div className='grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]'>
+            <div className='grid items-start gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]'>
               <Card className='border border-slate-200 bg-white/90 shadow-sm backdrop-blur-sm'>
                 <CardHeader className='pb-3'>
                   <CardTitle className='flex items-center gap-2 text-xl text-slate-900'>
@@ -489,7 +499,7 @@ export default function SpecificationKeysPage() {
                     <MainCategorySelect
                       categories={sortedMainCategories}
                       value={selectedMainCategoryId}
-                      onChange={setSelectedMainCategoryId}
+                      onChange={handleMainCategoryChange}
                     />
                     <p className='mt-2 text-xs text-slate-500'>
                       Selected:{' '}
@@ -556,7 +566,7 @@ export default function SpecificationKeysPage() {
                       onChange={(event) => setKeysInput(event.target.value)}
                       placeholder='Enter keys separated by comma or new line'
                       rows={7}
-                      className='rounded-xl border-slate-300 bg-slate-50 font-mono text-sm'
+                      className='min-h-[220px] max-h-[52vh] resize-y overflow-y-auto rounded-xl border-slate-300 bg-slate-50 font-mono text-sm [field-sizing:fixed]'
                     />
                     <p className='mt-2 text-xs text-slate-500'>
                       Example: `warranty`, `weight`, `material`, `power_consumption`

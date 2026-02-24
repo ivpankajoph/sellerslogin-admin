@@ -32,9 +32,11 @@ interface Props {
   categories: any[]
   selectedCategoryIds: string[]
   setSelectedCategoryIds: React.Dispatch<React.SetStateAction<string[]>>
+  cities: any[]
   filteredSubcategories: any[]
   isMainCategoryLoading: boolean
   isCategoryLoading: boolean
+  isCityLoading: boolean
   aiLoading: Record<string, boolean>
   generateWithAI: () => void
   generateDescription: () => void
@@ -112,7 +114,18 @@ const SearchableMultiSelect: React.FC<{
   placeholder: string
   disabled?: boolean
   loading?: boolean
-}> = ({ values, onChange, options, placeholder, disabled, loading }) => {
+  searchPlaceholder?: string
+  emptyLabel?: string
+}> = ({
+  values,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+  loading,
+  searchPlaceholder,
+  emptyLabel,
+}) => {
   const [open, setOpen] = useState(false)
 
   const selectedLabels = useMemo(() => {
@@ -153,9 +166,9 @@ const SearchableMultiSelect: React.FC<{
       </PopoverTrigger>
       <PopoverContent className='w-[--radix-popover-trigger-width] p-0' align='start'>
         <Command>
-          <CommandInput placeholder='Search categories...' />
+          <CommandInput placeholder={searchPlaceholder || 'Search options...'} />
           <CommandList className='max-h-72'>
-            <CommandEmpty>No categories found.</CommandEmpty>
+            <CommandEmpty>{emptyLabel || 'No options found.'}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
                 const checked = values.includes(option.value)
@@ -195,9 +208,11 @@ const Step1BasicInfo: React.FC<Props> = ({
   categories,
   selectedCategoryIds,
   setSelectedCategoryIds,
+  cities,
   filteredSubcategories,
   isMainCategoryLoading,
   isCategoryLoading,
+  isCityLoading,
   aiLoading,
   generateWithAI,
   generateDescription,
@@ -243,6 +258,19 @@ const Step1BasicInfo: React.FC<Props> = ({
     [categories]
   )
 
+  const cityOptions = useMemo(
+    () =>
+      cities
+        .map((city: any) => ({
+          value: city._id,
+          label: [city.name, city.state].filter(Boolean).join(', '),
+        }))
+        .sort((a: SelectOption, b: SelectOption) =>
+          a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+        ),
+    [cities]
+  )
+
   const visibleSubcategories = useMemo(() => {
     if (!subCategorySearch.trim()) return filteredSubcategories
     const search = subCategorySearch.trim().toLowerCase()
@@ -261,6 +289,13 @@ const Step1BasicInfo: React.FC<Props> = ({
     const map = new Map(categoryOptions.map((option) => [option.value, option.label]))
     return selectedCategoryIds.map((id) => map.get(id)).filter(Boolean) as string[]
   }, [categoryOptions, selectedCategoryIds])
+
+  const selectedCityLabels = useMemo(() => {
+    const map = new Map(cityOptions.map((option) => [option.value, option.label]))
+    return (formData.availableCities || [])
+      .map((id: string) => map.get(id))
+      .filter(Boolean) as string[]
+  }, [cityOptions, formData.availableCities])
 
   return (
     <section className='space-y-5'>
@@ -370,6 +405,37 @@ const Step1BasicInfo: React.FC<Props> = ({
               </Badge>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
+        <label className='mb-2 block text-sm font-semibold text-slate-700'>
+          Available Cities *
+        </label>
+        <SearchableMultiSelect
+          values={formData.availableCities || []}
+          onChange={(values) =>
+            setFormData((prev: any) => ({
+              ...prev,
+              availableCities: values,
+            }))
+          }
+          options={cityOptions}
+          placeholder='Select one or more cities'
+          loading={isCityLoading}
+          searchPlaceholder='Search cities...'
+          emptyLabel='No cities found.'
+        />
+        <div className='mt-2 flex flex-wrap gap-1.5'>
+          {selectedCityLabels.map((label) => (
+            <Badge
+              key={label}
+              variant='outline'
+              className='border-emerald-200 bg-emerald-100/70 text-emerald-800'
+            >
+              {label}
+            </Badge>
+          ))}
         </div>
       </div>
 

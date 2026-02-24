@@ -1,5 +1,5 @@
-import React from 'react'
-import { Loader2, Plus, Sparkles, Trash2, X } from 'lucide-react'
+import React, { useState } from 'react'
+import { Loader2, Plus, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 interface Variant {
@@ -37,6 +37,7 @@ interface Props {
     variantIndex: number,
     e: React.ChangeEvent<HTMLInputElement>
   ) => void
+  onVariantImageDrop: (variantIndex: number, files: File[]) => void
   onVariantImageDelete: (variantIndex: number, imageIndex: number) => void
   onAddMetaKeywordToVariant: (variantIndex: number) => void
   onRemoveMetaKeywordFromVariant: (
@@ -69,6 +70,7 @@ const Step5Variants: React.FC<Props> = ({
   onRemoveAttributeFromVariant,
   onVariantFieldChange,
   onVariantImageUpload,
+  onVariantImageDrop,
   onVariantImageDelete,
   onAddMetaKeywordToVariant,
   onRemoveMetaKeywordFromVariant,
@@ -76,6 +78,8 @@ const Step5Variants: React.FC<Props> = ({
   onGenerateVariantMetaDescription,
   onGenerateVariantMetaKeywords,
 }) => {
+  const [dragOverVariantIndex, setDragOverVariantIndex] = useState<number | null>(null)
+
   return (
     <section className='space-y-5'>
       <div className='rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-50/80 via-white to-cyan-50/80 p-5'>
@@ -236,7 +240,32 @@ const Step5Variants: React.FC<Props> = ({
                   <label className='mb-2 block text-sm font-semibold text-slate-700'>
                     Variant Images
                   </label>
-                  <div className='rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/60 p-4 text-center'>
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'copy'
+                      setDragOverVariantIndex(vIndex)
+                    }}
+                    onDragLeave={(e) => {
+                      const nextTarget = e.relatedTarget as Node | null
+                      if (nextTarget && e.currentTarget.contains(nextTarget)) return
+                      if (dragOverVariantIndex === vIndex) {
+                        setDragOverVariantIndex(null)
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setDragOverVariantIndex(null)
+                      const files = Array.from(e.dataTransfer.files || [])
+                      if (!files.length) return
+                      onVariantImageDrop(vIndex, files)
+                    }}
+                    className={`rounded-xl border-2 border-dashed p-4 text-center transition ${
+                      dragOverVariantIndex === vIndex
+                        ? 'border-cyan-500 bg-cyan-50/80'
+                        : 'border-slate-300 bg-slate-50/60'
+                    }`}
+                  >
                     <input
                       type='file'
                       multiple
@@ -247,9 +276,13 @@ const Step5Variants: React.FC<Props> = ({
                     />
                     <label
                       htmlFor={`variant-img-${vIndex}`}
-                      className='cursor-pointer text-sm font-semibold text-cyan-700 underline'
+                      className='flex cursor-pointer flex-col items-center gap-1 text-sm font-semibold text-cyan-700'
                     >
-                      Click to upload images
+                      <Upload className='h-5 w-5' />
+                      <span className='underline'>Click to upload images</span>
+                      <span className='text-xs font-medium text-slate-500 no-underline'>
+                        or drag and drop images here
+                      </span>
                     </label>
                   </div>
 

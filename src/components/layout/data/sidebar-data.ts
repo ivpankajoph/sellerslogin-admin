@@ -12,6 +12,7 @@ import {
   SearchCheck,
   Info,
   KeyRound,
+  MapPinned,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -255,13 +256,25 @@ export const sidebarData: any = {
 
     {
       title: 'Template Admin',
-      roles: [ROLES.ADMIN],
+      roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
           title: 'All Templates',
           url: '/template-catalog',
           icon: LayoutTemplate,
           roles: [ROLES.ADMIN],
+        },
+        {
+          title: 'All Work Dashboard',
+          url: '/template-workspace',
+          icon: LayoutTemplate,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+        },
+        {
+          title: 'Manage Cities',
+          url: '/cities',
+          icon: MapPinned,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
       ],
     },
