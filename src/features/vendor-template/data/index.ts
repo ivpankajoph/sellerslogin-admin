@@ -36,6 +36,8 @@ export type TemplateData = {
       backgroundImage:string
       button_header: string
       button_secondary?: string
+      catalog_button_label?: string
+      catalog_pdf_url?: string
       hero_style?: {
         titleColor?: string
         titleSize?: number
@@ -45,6 +47,9 @@ export type TemplateData = {
         badgeSize?: number
         primaryButtonColor?: string
         secondaryButtonColor?: string
+        overlayColor?: string
+        overlayAccentColor?: string
+        overlayOpacity?: number
       }
       products_heading?: string
       products_kicker?: string
@@ -54,6 +59,33 @@ export type TemplateData = {
         titleSize?: number
         kickerColor?: string
         kickerSize?: number
+      }
+      benefits?: {
+        kicker?: string
+        heading?: string
+        subtitle?: string
+        cards?: Array<{
+          title?: string
+          description?: string
+        }>
+      }
+      advantage?: {
+        kicker?: string
+        heading?: string
+        subtitle?: string
+        ctaLabel?: string
+        topTag?: string
+        image?: string
+        badgeValue?: string
+        badgeLabel?: string
+        cards?: Array<{
+          title?: string
+          description?: string
+        }>
+        highlights?: Array<{
+          value?: string
+          label?: string
+        }>
       }
       description: {
         large_text: string
@@ -65,6 +97,7 @@ export type TemplateData = {
     about_page: {
       hero: {
         backgroundImage: string // ImageKit URL
+        kicker?: string
         title: string
         subtitle: string
       }
@@ -78,6 +111,15 @@ export type TemplateData = {
         heading: string
         paragraphs: string[]
         image: string // ImageKit URL
+      }
+      vendorStories: {
+        heading: string
+        subtitle: string
+        items: Array<{
+          tag: string
+          title: string
+          narrative: string
+        }>
       }
       values: Array<{ icon: string; title: string; description: string }>
       team: Array<{ name: string; role: string; image: string }> // ImageKit URL
@@ -168,6 +210,8 @@ export const initialData: TemplateData = {
       backgroundImage:'',
       button_header: '',
       button_secondary: '',
+      catalog_button_label: 'Download Catalog',
+      catalog_pdf_url: '',
       hero_style: {
         titleColor: '',
         titleSize: 0,
@@ -177,6 +221,9 @@ export const initialData: TemplateData = {
         badgeSize: 0,
         primaryButtonColor: '',
         secondaryButtonColor: '',
+        overlayColor: '',
+        overlayAccentColor: '',
+        overlayOpacity: 0,
       },
       products_heading: '',
       products_kicker: '',
@@ -186,6 +233,35 @@ export const initialData: TemplateData = {
         titleSize: 0,
         kickerColor: '',
         kickerSize: 0,
+      },
+      benefits: {
+        kicker: '',
+        heading: '',
+        subtitle: '',
+        cards: [
+          { title: '', description: '' },
+          { title: '', description: '' },
+          { title: '', description: '' },
+        ],
+      },
+      advantage: {
+        kicker: '',
+        heading: '',
+        subtitle: '',
+        ctaLabel: '',
+        topTag: '',
+        image: '',
+        badgeValue: '',
+        badgeLabel: '',
+        cards: [
+          { title: '', description: '' },
+          { title: '', description: '' },
+          { title: '', description: '' },
+        ],
+        highlights: [
+          { value: '', label: '' },
+          { value: '', label: '' },
+        ],
       },
       description: {
         large_text: '',
@@ -197,6 +273,7 @@ export const initialData: TemplateData = {
     about_page: {
       hero: {
         backgroundImage: '',
+        kicker: '',
         title: '',
         subtitle: '',
       },
@@ -211,7 +288,49 @@ export const initialData: TemplateData = {
         paragraphs: [''],
         image: '',
       },
-      values: [{ icon: '', title: '', description: '' }],
+      vendorStories: {
+        heading: 'Vendor Stories',
+        subtitle: "Short highlights that tell this vendor's journey.",
+        items: [
+          {
+            tag: 'Since 2025',
+            title: 'How It Started',
+            narrative: '',
+          },
+          {
+            tag: 'Catalog',
+            title: 'What We Focus On',
+            narrative: '',
+          },
+          {
+            tag: 'Service',
+            title: 'How We Serve',
+            narrative: '',
+          },
+          {
+            tag: 'Scale',
+            title: 'Team & Growth',
+            narrative: '',
+          },
+        ],
+      },
+      values: [
+        {
+          icon: 'award',
+          title: 'Integrity',
+          description: 'We maintain honesty in all our dealings.',
+        },
+        {
+          icon: 'heart',
+          title: 'Innovation',
+          description: 'We constantly evolve to meet customer needs.',
+        },
+        {
+          icon: 'users',
+          title: 'Customer Focus',
+          description: 'We prioritize practical solutions for every client.',
+        },
+      ],
       team: [{ name: '', role: '', image: '' }],
       stats: [{ value: '', label: '' }],
     },

@@ -2,9 +2,10 @@
 
 import { type JSX, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Link2, Rocket, Wand2 } from 'lucide-react'
+import { ArrowLeft, Link2, Rocket, Search as SearchIcon, Wand2 } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 import { DomainModal } from './components/DomainModel'
 import { TemplatePageLayout } from './components/TemplatePageLayout'
@@ -33,6 +34,14 @@ import {
   setStoredEditingTemplateKey,
 } from './components/templateVariantParam'
 
+type BuilderSearchTarget = {
+  id: string
+  label: string
+  sectionId: string
+  componentId?: string
+  keywords?: string[]
+}
+
 export default function TemplateForm() {
   const navigate = useNavigate()
   const pathname = useLocation({ select: (location) => location.pathname })
@@ -40,6 +49,7 @@ export default function TemplateForm() {
     data,
     updateField,
     handleImageChange,
+    handleDocumentChange,
     handleSubmit,
     vendor_id,
     uploadingPaths,
@@ -73,6 +83,8 @@ export default function TemplateForm() {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
   const [isBuilderOpen, setIsBuilderOpen] = useState(false)
   const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [templateSearchTerm, setTemplateSearchTerm] = useState('')
+  const [builderSearchTerm, setBuilderSearchTerm] = useState('')
   const [sectionOrder, setSectionOrder] = useState([
     'branding',
     'hero',
@@ -211,8 +223,15 @@ export default function TemplateForm() {
     setStoredEditingTemplateKey(vendor_id, templateKey)
     setSelectedSection(null)
     setSelectedComponent(null)
+    setBuilderSearchTerm('')
     setIsBuilderOpen(true)
     void navigate({ to: `/vendor-template/${templateKey}` })
+  }
+
+  const handleBuilderSearchSelect = (target: BuilderSearchTarget) => {
+    setSelectedSection(target.sectionId)
+    setSelectedComponent(target.componentId || null)
+    setBuilderSearchTerm(target.label)
   }
 
   const sections = useMemo(
@@ -241,6 +260,207 @@ export default function TemplateForm() {
     []
   )
 
+  const sectionTitleById = useMemo(
+    () =>
+      sections.reduce<Record<string, string>>((acc, section) => {
+        acc[section.id] = section.title
+        return acc
+      }, {}),
+    [sections]
+  )
+
+  const productsKickerPath = 'components.home_page.products_kicker'
+  const productsHeadingPath = 'components.home_page.products_heading'
+  const productsSubtitlePath = 'components.home_page.products_subtitle'
+
+  const builderSearchTargets = useMemo<BuilderSearchTarget[]>(
+    () => [
+      {
+        id: 'branding-banner',
+        label: 'Banner Image',
+        sectionId: 'branding',
+        componentId: 'components.home_page.backgroundImage',
+        keywords: ['hero background', 'cover image'],
+      },
+      {
+        id: 'branding-logo',
+        label: 'Company Logo',
+        sectionId: 'branding',
+        componentId: 'components.logo',
+        keywords: ['brand logo'],
+      },
+      {
+        id: 'hero-title',
+        label: 'Hero Title',
+        sectionId: 'hero',
+        componentId: 'components.home_page.header_text',
+        keywords: ['headline', 'welcome text'],
+      },
+      {
+        id: 'hero-eyebrow',
+        label: 'Hero Eyebrow',
+        sectionId: 'hero',
+        componentId: 'components.home_page.hero_kicker',
+        keywords: ['kicker', 'top label'],
+      },
+      {
+        id: 'hero-subtitle',
+        label: 'Hero Subtitle',
+        sectionId: 'hero',
+        componentId: 'components.home_page.header_text_small',
+        keywords: ['subheading'],
+      },
+      {
+        id: 'hero-primary-button',
+        label: 'Header Button Text',
+        sectionId: 'hero',
+        componentId: 'components.home_page.button_header',
+        keywords: ['cta', 'primary button'],
+      },
+      {
+        id: 'hero-secondary-button',
+        label: 'Secondary Button Text',
+        sectionId: 'hero',
+        componentId: 'components.home_page.button_secondary',
+        keywords: ['secondary cta'],
+      },
+      {
+        id: 'hero-badge',
+        label: 'Hero Badge Text',
+        sectionId: 'hero',
+        componentId: 'components.home_page.badge_text',
+        keywords: ['badge'],
+      },
+      {
+        id: 'hero-catalog-label',
+        label: 'Catalog Button Label',
+        sectionId: 'hero',
+        componentId: 'components.home_page.catalog_button_label',
+        keywords: ['download catalog text', 'catalog button'],
+      },
+      {
+        id: 'hero-catalog-pdf',
+        label: 'Catalog PDF Upload',
+        sectionId: 'hero',
+        componentId: 'components.home_page.catalog_pdf_url',
+        keywords: ['pdf', 'download file', 'catalog document'],
+      },
+      {
+        id: 'description-large',
+        label: 'Large Description',
+        sectionId: 'description',
+        componentId: 'components.home_page.description.large_text',
+        keywords: ['about text', 'long text'],
+      },
+      {
+        id: 'description-summary',
+        label: 'Description Summary',
+        sectionId: 'description',
+        componentId: 'components.home_page.description.summary',
+        keywords: ['summary'],
+      },
+      {
+        id: 'description-percent-value',
+        label: 'Percent Number',
+        sectionId: 'description',
+        componentId:
+          'components.home_page.description.percent.percent_in_number',
+        keywords: ['metric percent'],
+      },
+      {
+        id: 'description-percent-label',
+        label: 'Percent Label',
+        sectionId: 'description',
+        componentId: 'components.home_page.description.percent.percent_text',
+      },
+      {
+        id: 'description-sold-value',
+        label: 'Sold Number',
+        sectionId: 'description',
+        componentId: 'components.home_page.description.sold.sold_number',
+      },
+      {
+        id: 'description-sold-label',
+        label: 'Sold Label',
+        sectionId: 'description',
+        componentId: 'components.home_page.description.sold.sold_text',
+      },
+      {
+        id: 'benefits-heading',
+        label: 'Benefits Heading',
+        sectionId: 'description',
+        componentId: 'components.home_page.benefits.heading',
+      },
+      {
+        id: 'benefits-subtitle',
+        label: 'Benefits Subtitle',
+        sectionId: 'description',
+        componentId: 'components.home_page.benefits.subtitle',
+      },
+      {
+        id: 'advantage-heading',
+        label: 'Advantage Heading',
+        sectionId: 'description',
+        componentId: 'components.home_page.advantage.heading',
+      },
+      {
+        id: 'advantage-subtitle',
+        label: 'Advantage Subtitle',
+        sectionId: 'description',
+        componentId: 'components.home_page.advantage.subtitle',
+      },
+      {
+        id: 'advantage-image',
+        label: 'Advantage Image',
+        sectionId: 'description',
+        componentId: 'components.home_page.advantage.image',
+      },
+      {
+        id: 'products-kicker',
+        label: 'Products Kicker',
+        sectionId: 'products',
+        componentId: productsKickerPath,
+      },
+      {
+        id: 'products-heading',
+        label: 'Products Heading',
+        sectionId: 'products',
+        componentId: productsHeadingPath,
+      },
+      {
+        id: 'products-subtitle',
+        label: 'Products Subtitle',
+        sectionId: 'products',
+        componentId: productsSubtitlePath,
+      },
+    ],
+    [productsHeadingPath, productsKickerPath, productsSubtitlePath]
+  )
+
+  const filteredTemplateCatalog = useMemo(() => {
+    const query = templateSearchTerm.trim().toLowerCase()
+    if (!query) return templateCatalog
+    return templateCatalog.filter((template) => {
+      const haystack = `${template.name} ${template.key} ${template.description || ''}`
+        .trim()
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [templateCatalog, templateSearchTerm])
+
+  const filteredBuilderSearchTargets = useMemo(() => {
+    const query = builderSearchTerm.trim().toLowerCase()
+    if (!query) return []
+    return builderSearchTargets
+      .filter((target) => {
+        const haystack = `${target.label} ${target.sectionId} ${target.keywords?.join(' ') || ''}`
+          .trim()
+          .toLowerCase()
+        return haystack.includes(query)
+      })
+      .slice(0, 12)
+  }, [builderSearchTargets, builderSearchTerm])
+
   const sectionBlocks: Record<string, JSX.Element> = {
     branding: (
       <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
@@ -257,6 +477,8 @@ export default function TemplateForm() {
         <HeroSection
           data={data}
           updateField={updateField}
+          handleDocumentChange={handleDocumentChange}
+          uploadingPaths={uploadingPaths}
           selectedComponent={selectedComponent}
         />
       </div>
@@ -266,6 +488,8 @@ export default function TemplateForm() {
         <DescriptionSection
           data={data}
           updateField={updateField}
+          handleImageChange={handleImageChange}
+          uploadingPaths={uploadingPaths}
           selectedComponent={selectedComponent}
         />
       </div>
@@ -285,7 +509,14 @@ export default function TemplateForm() {
             Product grid settings
           </h3>
           <div className='grid gap-4 md:grid-cols-2'>
-            <div className='space-y-2'>
+            <div
+              className={cn(
+                'space-y-2',
+                selectedComponent === productsKickerPath &&
+                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              )}
+              data-editor-component={productsKickerPath}
+            >
               <label className='text-sm font-medium text-gray-700'>
                 Products Kicker
               </label>
@@ -301,7 +532,14 @@ export default function TemplateForm() {
                 placeholder='Catalog'
               />
             </div>
-            <div className='space-y-2'>
+            <div
+              className={cn(
+                'space-y-2',
+                selectedComponent === productsHeadingPath &&
+                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              )}
+              data-editor-component={productsHeadingPath}
+            >
               <label className='text-sm font-medium text-gray-700'>
                 Products Heading
               </label>
@@ -318,7 +556,14 @@ export default function TemplateForm() {
               />
             </div>
           </div>
-          <div className='space-y-2'>
+          <div
+            className={cn(
+              'space-y-2',
+              selectedComponent === productsSubtitlePath &&
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component={productsSubtitlePath}
+          >
             <label className='text-sm font-medium text-gray-700'>
               Products Subtitle
             </label>
@@ -444,21 +689,45 @@ export default function TemplateForm() {
         activeKey='home'
         editingTemplateKey={selectedTemplateKey}
         showNavigation={isBuilderOpen}
-        topContent={!isBuilderOpen ? (
-          <TemplateVariantSelector
-            templates={templateCatalog}
-            selectedKey={selectedTemplateKey}
-            activeKey={activeTemplateKey}
-            previewBaseUrl={storefrontBaseUrl}
-            onSelect={handleTemplateSelect}
-            onApply={applyTemplateVariant}
-            isApplying={isUpdatingTemplate}
-            showApplyControls={false}
-            canDeleteTemplates={isAdmin}
-            deletingKey={isDeletingTemplateKey}
-            onDelete={deleteTemplateVariant}
-          />
-        ) : null}
+        topContent={
+          !isBuilderOpen ? (
+            <>
+              <div className='rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
+                <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+                  Template Search
+                </p>
+                <div className='relative mt-3'>
+                  <SearchIcon className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
+                  <input
+                    type='text'
+                    value={templateSearchTerm}
+                    onChange={(event) => setTemplateSearchTerm(event.target.value)}
+                    placeholder='Search template by name, key, or description'
+                    className='h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10'
+                  />
+                </div>
+              </div>
+              <TemplateVariantSelector
+                templates={filteredTemplateCatalog}
+                selectedKey={selectedTemplateKey}
+                activeKey={activeTemplateKey}
+                previewBaseUrl={storefrontBaseUrl}
+                onSelect={handleTemplateSelect}
+                onApply={applyTemplateVariant}
+                isApplying={isUpdatingTemplate}
+                showApplyControls={false}
+                canDeleteTemplates={isAdmin}
+                deletingKey={isDeletingTemplateKey}
+                onDelete={deleteTemplateVariant}
+              />
+              {filteredTemplateCatalog.length === 0 ? (
+                <p className='text-sm text-slate-500'>
+                  No templates found for "{templateSearchTerm.trim()}".
+                </p>
+              ) : null}
+            </>
+          ) : null
+        }
         actions={
           isBuilderOpen ? (
           <>
@@ -551,6 +820,57 @@ export default function TemplateForm() {
       >
         {isBuilderOpen ? (
           <>
+            <div className='rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
+              <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+                Quick Field Search
+              </p>
+              <div className='relative mt-3'>
+                <SearchIcon className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
+                <input
+                  type='text'
+                  value={builderSearchTerm}
+                  onChange={(event) => setBuilderSearchTerm(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return
+                    if (!filteredBuilderSearchTargets.length) return
+                    event.preventDefault()
+                    handleBuilderSearchSelect(filteredBuilderSearchTargets[0])
+                  }}
+                  placeholder='Find any editable field (hero, products, story, catalog...)'
+                  className='h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10'
+                />
+              </div>
+              {builderSearchTerm.trim() ? (
+                <div className='mt-3 grid gap-2 sm:grid-cols-2'>
+                  {filteredBuilderSearchTargets.length > 0 ? (
+                    filteredBuilderSearchTargets.map((target) => (
+                      <button
+                        key={target.id}
+                        type='button'
+                        onClick={() => handleBuilderSearchSelect(target)}
+                        className='rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:border-slate-400 hover:bg-white'
+                      >
+                        <p className='text-sm font-semibold text-slate-900'>
+                          {target.label}
+                        </p>
+                        <p className='text-xs text-slate-500'>
+                          {sectionTitleById[target.sectionId] || target.sectionId}
+                        </p>
+                      </button>
+                    ))
+                  ) : (
+                    <p className='text-sm text-slate-500'>
+                      No matching fields found for "{builderSearchTerm.trim()}".
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className='mt-2 text-xs text-slate-500'>
+                  Start typing to jump to a section or editable field.
+                </p>
+              )}
+            </div>
+
             <ThemeSettingsSection data={data} updateField={updateField} />
 
             <TemplateSectionOrder

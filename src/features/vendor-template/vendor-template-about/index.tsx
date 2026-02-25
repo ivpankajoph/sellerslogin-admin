@@ -39,6 +39,7 @@ function VendorTemplateAbout() {
     'values',
     'team',
     'stats',
+    'vendorStories',
     'vendor',
   ])
   const vendor_id = useSelector((state: any) => state.auth.user.id)
@@ -84,6 +85,77 @@ function VendorTemplateAbout() {
           payload.about_page as TemplateData['components']['about_page']
       }
 
+      const valueFallbacks = [
+        {
+          icon: 'award',
+          title: 'Integrity',
+          description: 'We maintain honesty in all our dealings.',
+        },
+        {
+          icon: 'heart',
+          title: 'Innovation',
+          description: 'We constantly evolve to meet customer needs.',
+        },
+        {
+          icon: 'users',
+          title: 'Customer Focus',
+          description: 'We prioritize practical solutions for every client.',
+        },
+      ]
+      const normalizedValues = Array.isArray(merged.components.about_page.values)
+        ? [...merged.components.about_page.values]
+        : []
+      while (normalizedValues.length < 3) {
+        normalizedValues.push(valueFallbacks[normalizedValues.length] || valueFallbacks[0])
+      }
+      merged.components.about_page.values = normalizedValues
+
+      const vendorStoryFallbacks = [
+        {
+          tag: 'Since 2025',
+          title: 'How It Started',
+          narrative: 'Share how your business started and who you serve.',
+        },
+        {
+          tag: 'Catalog',
+          title: 'What We Focus On',
+          narrative: 'Describe your main product categories and strengths.',
+        },
+        {
+          tag: 'Service',
+          title: 'How We Serve',
+          narrative: 'Explain support, delivery, and return process in simple words.',
+        },
+        {
+          tag: 'Scale',
+          title: 'Team & Growth',
+          narrative: 'Add team size, operations, and growth highlights.',
+        },
+      ]
+      const vendorStories =
+        merged.components.about_page.vendorStories &&
+        typeof merged.components.about_page.vendorStories === 'object'
+          ? { ...merged.components.about_page.vendorStories }
+          : {
+              heading: '',
+              subtitle: '',
+              items: [],
+            }
+      const normalizedVendorStoryItems = Array.isArray(vendorStories.items)
+        ? [...vendorStories.items]
+        : []
+      while (normalizedVendorStoryItems.length < 4) {
+        normalizedVendorStoryItems.push(
+          vendorStoryFallbacks[normalizedVendorStoryItems.length] || vendorStoryFallbacks[0]
+        )
+      }
+      vendorStories.heading =
+        typeof vendorStories.heading === 'string' ? vendorStories.heading : ''
+      vendorStories.subtitle =
+        typeof vendorStories.subtitle === 'string' ? vendorStories.subtitle : ''
+      vendorStories.items = normalizedVendorStoryItems
+      merged.components.about_page.vendorStories = vendorStories
+
       return merged
     }
 
@@ -125,7 +197,9 @@ function VendorTemplateAbout() {
             )
             setData(mergeTemplate(payload as Record<string, unknown>))
             if (order.length) {
-              const normalizedOrder = Array.from(new Set([...order, 'vendor']))
+              const normalizedOrder = Array.from(
+                new Set([...order, 'vendorStories', 'vendor'])
+              )
               setSectionOrder(normalizedOrder)
             }
             return
@@ -258,6 +332,11 @@ function VendorTemplateAbout() {
         description: 'Numbers that build trust',
       },
       {
+        id: 'vendorStories',
+        title: 'Vendor Stories',
+        description: 'Journey cards shown below About sections',
+      },
+      {
         id: 'vendor',
         title: 'Vendor Profile',
         description: 'Override vendor details shown in About and Contact pages',
@@ -289,6 +368,16 @@ function VendorTemplateAbout() {
             ) && <p className='text-sm text-slate-500'>Uploading...</p>}
           </div>
 
+          <Input
+            value={data.components.about_page.hero.kicker || ''}
+            onChange={(e) =>
+              updateField(
+                ['components', 'about_page', 'hero', 'kicker'],
+                e.target.value
+              )
+            }
+            placeholder='Hero Eyebrow (e.g. Built for Industry)'
+          />
           <Input
             value={data.components.about_page.hero.title}
             onChange={(e) =>
@@ -467,6 +556,7 @@ function VendorTemplateAbout() {
             )
           }
           onRemove={(i) => {
+            if (data.components.about_page.values.length <= 3) return
             const list = [...data.components.about_page.values]
             list.splice(i, 1)
             updateField(['components', 'about_page', 'values'], list)
@@ -618,6 +708,95 @@ function VendorTemplateAbout() {
             </div>
           )}
         />
+      </div>
+    ),
+    vendorStories: (
+      <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
+        <div className='space-y-4'>
+          <Input
+            value={data.components.about_page.vendorStories.heading}
+            onChange={(e) =>
+              updateField(
+                ['components', 'about_page', 'vendorStories', 'heading'],
+                e.target.value
+              )
+            }
+            placeholder='Section Heading (e.g. Vendor Stories)'
+          />
+          <Input
+            value={data.components.about_page.vendorStories.subtitle}
+            onChange={(e) =>
+              updateField(
+                ['components', 'about_page', 'vendorStories', 'subtitle'],
+                e.target.value
+              )
+            }
+            placeholder='Section Subtitle'
+          />
+
+          <ArrayField
+            label='Story Cards'
+            items={data.components.about_page.vendorStories.items}
+            onAdd={() => {
+              if (data.components.about_page.vendorStories.items.length >= 4) return
+              updateField(
+                ['components', 'about_page', 'vendorStories', 'items'],
+                [
+                  ...data.components.about_page.vendorStories.items,
+                  { tag: '', title: '', narrative: '' },
+                ]
+              )
+            }}
+            onRemove={(i) => {
+              if (data.components.about_page.vendorStories.items.length <= 4) return
+              const list = [...data.components.about_page.vendorStories.items]
+              list.splice(i, 1)
+              updateField(['components', 'about_page', 'vendorStories', 'items'], list)
+            }}
+            renderItem={(item, idx) => (
+              <div className='space-y-2'>
+                <div className='grid grid-cols-1 gap-2 md:grid-cols-2'>
+                  <Input
+                    placeholder='Tag (e.g. Since 2025)'
+                    value={item.tag}
+                    onChange={(e) => {
+                      const list = [...data.components.about_page.vendorStories.items]
+                      list[idx].tag = e.target.value
+                      updateField(
+                        ['components', 'about_page', 'vendorStories', 'items'],
+                        list
+                      )
+                    }}
+                  />
+                  <Input
+                    placeholder='Card Title'
+                    value={item.title}
+                    onChange={(e) => {
+                      const list = [...data.components.about_page.vendorStories.items]
+                      list[idx].title = e.target.value
+                      updateField(
+                        ['components', 'about_page', 'vendorStories', 'items'],
+                        list
+                      )
+                    }}
+                  />
+                </div>
+                <Textarea
+                  placeholder='Card Description'
+                  value={item.narrative}
+                  onChange={(e) => {
+                    const list = [...data.components.about_page.vendorStories.items]
+                    list[idx].narrative = e.target.value
+                    updateField(
+                      ['components', 'about_page', 'vendorStories', 'items'],
+                      list
+                    )
+                  }}
+                />
+              </div>
+            )}
+          />
+        </div>
       </div>
     ),
     vendor: (

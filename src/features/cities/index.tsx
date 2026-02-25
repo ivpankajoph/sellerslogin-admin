@@ -100,6 +100,10 @@ export default function CitiesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [loadingStateCities, setLoadingStateCities] = useState(false)
+  const [stateCityOptions, setStateCityOptions] = useState<string[]>([])
+  const [selectedStateCities, setSelectedStateCities] = useState<string[]>([])
+  const [stateCitySearch, setStateCitySearch] = useState('')
   const [form, setForm] = useState({
     name: '',
     state: '',
@@ -129,13 +133,82 @@ export default function CitiesPage() {
     }
   }, [token])
 
+  const loadStateCities = useCallback(
+    async (state: string, country: string) => {
+      const safeState = String(state || '').trim()
+      const safeCountry = String(country || '').trim() || 'India'
+      if (!safeState || !token) {
+        setStateCityOptions([])
+        setSelectedStateCities([])
+        return
+      }
+
+      setLoadingStateCities(true)
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities/discover?state=${encodeURIComponent(
+            safeState
+          )}&country=${encodeURIComponent(safeCountry)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
+        const data = await res.json()
+        if (!res.ok || data?.success === false) {
+          throw new Error(data?.message || `Failed to fetch state cities (HTTP ${res.status})`)
+        }
+
+        const options = Array.isArray(data?.cities)
+          ? data.cities
+              .map((city: unknown) => String(city || '').trim())
+              .filter(Boolean)
+          : []
+
+        setStateCityOptions(options)
+        setSelectedStateCities((prev) => {
+          const optionSet = new Set(options.map((item: string) => item.toLowerCase()))
+          return prev.filter((item) => optionSet.has(item.toLowerCase()))
+        })
+      } catch (error: any) {
+        toast.error(error?.message || 'Failed to fetch cities for selected state')
+        setStateCityOptions([])
+        setSelectedStateCities([])
+      } finally {
+        setLoadingStateCities(false)
+      }
+    },
+    [token]
+  )
+
   useEffect(() => {
     if (!canAccess) return
     loadCities()
   }, [canAccess, loadCities])
 
+  useEffect(() => {
+    if (!canAccess) return
+    if (editingId) {
+      setStateCityOptions([])
+      setSelectedStateCities([])
+      setStateCitySearch('')
+      return
+    }
+    if (!form.state) {
+      setStateCityOptions([])
+      setSelectedStateCities([])
+      setStateCitySearch('')
+      return
+    }
+    loadStateCities(form.state, form.country)
+  }, [canAccess, editingId, form.state, form.country, loadStateCities])
+
   const resetForm = () => {
     setEditingId(null)
+    setStateCityOptions([])
+    setSelectedStateCities([])
+    setStateCitySearch('')
     setForm({
       name: '',
       state: '',
@@ -146,6 +219,59 @@ export default function CitiesPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+
+    const bulkCities = Array.from(
+      new Set(
+        selectedStateCities
+          .map((city) => String(city || '').trim())
+          .filter(Boolean)
+      )
+    )
+
+    if (!editingId && bulkCities.length > 0) {
+      if (!form.state.trim()) {
+        toast.error('State is required for bulk city create')
+        return
+      }
+
+      setSaving(true)
+      try {
+        const res = await fetch(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities/bulk`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            state: form.state,
+            country: form.country,
+            isActive: form.isActive,
+            cities: bulkCities,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok || data?.success === false) {
+          throw new Error(data?.message || `Failed to create cities (HTTP ${res.status})`)
+        }
+
+        const createdCount = Number(data?.createdCount || 0)
+        const skippedCount = Number(data?.skippedCount || 0)
+        toast.success(
+          createdCount > 0
+            ? `${createdCount} cities created${skippedCount ? `, ${skippedCount} skipped` : ''}`
+            : `No new city created${skippedCount ? ` (${skippedCount} already existed)` : ''}`
+        )
+
+        resetForm()
+        loadCities()
+      } catch (error: any) {
+        toast.error(error?.message || 'Failed to create cities')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
     if (!form.name.trim()) {
       toast.error('City name is required')
       return
@@ -190,6 +316,9 @@ export default function CitiesPage() {
     }
 
     setEditingId(city._id)
+    setStateCityOptions([])
+    setSelectedStateCities([])
+    setStateCitySearch('')
     setForm({
       name: city.name || '',
       state: city.state || '',
@@ -263,6 +392,12 @@ export default function CitiesPage() {
     return india ? [india, ...rest.sort((a, b) => a.localeCompare(b))] : rest
   }, [cities])
 
+  const filteredStateCityOptions = useMemo(() => {
+    const search = stateCitySearch.trim().toLowerCase()
+    if (!search) return stateCityOptions
+    return stateCityOptions.filter((city) => city.toLowerCase().includes(search))
+  }, [stateCityOptions, stateCitySearch])
+
   if (!canAccess) {
     return (
       <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
@@ -316,8 +451,18 @@ export default function CitiesPage() {
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, name: toTitleCase(e.target.value) }))
                   }
-                  placeholder='e.g. Bangalore'
+                  placeholder={
+                    !editingId && selectedStateCities.length
+                      ? 'Bulk mode active: using selected cities below'
+                      : 'e.g. Bangalore'
+                  }
+                  disabled={!editingId && selectedStateCities.length > 0}
                 />
+                {!editingId ? (
+                  <p className='mt-1 text-xs text-slate-500'>
+                    Enter one city manually, or select multiple cities from state dropdown below.
+                  </p>
+                ) : null}
               </div>
               <div>
                 <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
@@ -352,6 +497,90 @@ export default function CitiesPage() {
                   ))}
                 </select>
               </div>
+              {!editingId ? (
+                <div>
+                  <div className='mb-1 flex items-center justify-between gap-2'>
+                    <label className='block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+                      Cities In Selected State
+                    </label>
+                    <div className='flex gap-1'>
+                      <Button
+                        type='button'
+                        size='sm'
+                        variant='outline'
+                        onClick={() =>
+                          setSelectedStateCities((prev) => {
+                            const merged = new Set([...prev, ...filteredStateCityOptions])
+                            return Array.from(merged)
+                          })
+                        }
+                        disabled={!filteredStateCityOptions.length || loadingStateCities}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        type='button'
+                        size='sm'
+                        variant='outline'
+                        onClick={() => setSelectedStateCities([])}
+                        disabled={!selectedStateCities.length}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                  <Input
+                    value={stateCitySearch}
+                    onChange={(e) => setStateCitySearch(e.target.value)}
+                    placeholder='Search state cities...'
+                    disabled={!form.state || loadingStateCities}
+                    className='mb-2'
+                  />
+                  <div className='border-input dark:bg-input/30 dark:hover:bg-input/50 max-h-[220px] w-full space-y-1 overflow-y-auto rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs'>
+                    {!filteredStateCityOptions.length ? (
+                      <p className='py-2 text-xs text-slate-500'>
+                        {form.state ? 'No cities found.' : 'Select state to load cities.'}
+                      </p>
+                    ) : (
+                      filteredStateCityOptions.map((city) => {
+                        const checked = selectedStateCities.includes(city)
+                        return (
+                          <label
+                            key={city}
+                            className='flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-slate-100'
+                          >
+                            <input
+                              type='checkbox'
+                              checked={checked}
+                              onChange={(e) =>
+                                setSelectedStateCities((prev) => {
+                                  if (e.target.checked) {
+                                    if (prev.includes(city)) return prev
+                                    return [...prev, city]
+                                  }
+                                  return prev.filter((item) => item !== city)
+                                })
+                              }
+                              disabled={loadingStateCities}
+                              className='h-4 w-4'
+                            />
+                            <span className='text-sm text-slate-700'>{city}</span>
+                          </label>
+                        )
+                      })
+                    )}
+                  </div>
+                  <p className='mt-1 text-xs text-slate-500'>
+                    {loadingStateCities
+                      ? 'Loading cities from internet...'
+                      : !form.state
+                        ? 'Select state to load city list.'
+                        : filteredStateCityOptions.length
+                          ? `Selected ${selectedStateCities.length} cities.`
+                          : 'No city data found for selected state.'}
+                  </p>
+                </div>
+              ) : null}
               <label className='flex items-center gap-2 text-sm text-slate-700'>
                 <input
                   type='checkbox'
@@ -367,7 +596,7 @@ export default function CitiesPage() {
             <div className='mt-5 flex gap-2'>
               <Button type='submit' disabled={saving} className='flex-1'>
                 {saving ? <Loader2 className='h-4 w-4 animate-spin' /> : <Plus className='h-4 w-4' />}
-                {editingId ? 'Update' : 'Create'}
+                {editingId ? 'Update' : selectedStateCities.length ? `Create ${selectedStateCities.length}` : 'Create'}
               </Button>
               {editingId ? (
                 <Button type='button' variant='outline' onClick={resetForm}>

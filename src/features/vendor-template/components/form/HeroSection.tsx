@@ -1,4 +1,4 @@
-import { Zap } from 'lucide-react'
+import { FileText, Upload, Zap } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
@@ -6,15 +6,27 @@ import { cn } from '@/lib/utils'
 interface Type {
   data: any
   updateField: any
+  handleDocumentChange?: (path: string[], file: File | null) => Promise<void> | void
+  uploadingPaths?: Set<string>
   selectedComponent?: string | null
 }
-export function HeroSection({ data, updateField, selectedComponent }: Type) {
+export function HeroSection({
+  data,
+  updateField,
+  handleDocumentChange,
+  uploadingPaths,
+  selectedComponent,
+}: Type) {
   const titlePath = 'components.home_page.header_text'
   const kickerPath = 'components.home_page.hero_kicker'
   const subtitlePath = 'components.home_page.header_text_small'
   const primaryButtonPath = 'components.home_page.button_header'
   const secondaryButtonPath = 'components.home_page.button_secondary'
   const badgePath = 'components.home_page.badge_text'
+  const catalogLabelPath = 'components.home_page.catalog_button_label'
+  const catalogPdfPath = 'components.home_page.catalog_pdf_url'
+  const catalogPdfUrl = String(data?.components?.home_page?.catalog_pdf_url || '')
+  const isUploadingCatalogPdf = Boolean(uploadingPaths?.has(catalogPdfPath))
 
   return (
     <div className='rounded-xl border bg-white p-5 shadow-sm'>
@@ -169,7 +181,91 @@ export function HeroSection({ data, updateField, selectedComponent }: Type) {
             className='h-12'
           />
         </div>
+        <div
+          className={cn(
+            'space-y-2',
+            selectedComponent === catalogLabelPath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={catalogLabelPath}
+        >
+          <label className='text-sm font-medium text-gray-700'>
+            Catalog Button Label
+          </label>
+          <Input
+            placeholder='Download Catalog'
+            value={data.components.home_page.catalog_button_label || ''}
+            onChange={(e) =>
+              updateField(
+                ['components', 'home_page', 'catalog_button_label'],
+                e.target.value
+              )
+            }
+            className='h-12'
+          />
+        </div>
       </div>
+
+      <div
+        className={cn(
+          'mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4',
+          selectedComponent === catalogPdfPath &&
+            'ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+        )}
+        data-editor-component={catalogPdfPath}
+      >
+        <div className='flex items-center gap-2'>
+          <FileText className='h-4 w-4 text-slate-600' />
+          <p className='text-sm font-semibold text-slate-900'>Catalog PDF Upload</p>
+        </div>
+        <p className='mt-1 text-xs text-slate-500'>
+          Upload the PDF catalog customers will download from the website.
+        </p>
+        <Input
+          type='file'
+          accept='application/pdf'
+          className='mt-3'
+          onChange={(event) => {
+            const file = event.target.files?.[0] || null
+            if (!handleDocumentChange) return
+            void handleDocumentChange(
+              ['components', 'home_page', 'catalog_pdf_url'],
+              file
+            )
+          }}
+        />
+        {isUploadingCatalogPdf ? (
+          <p className='mt-2 flex items-center text-sm text-gray-600'>
+            <Upload className='mr-2 h-4 w-4 animate-pulse' /> Uploading catalog
+            PDF...
+          </p>
+        ) : null}
+        {catalogPdfUrl ? (
+          <div className='mt-2 flex flex-wrap items-center gap-3 text-sm'>
+            <a
+              href={catalogPdfUrl}
+              target='_blank'
+              rel='noreferrer'
+              className='font-medium text-indigo-600 underline underline-offset-2'
+            >
+              View uploaded catalog
+            </a>
+            <button
+              type='button'
+              onClick={() =>
+                updateField(['components', 'home_page', 'catalog_pdf_url'], '')
+              }
+              className='font-medium text-rose-600 underline underline-offset-2'
+            >
+              Remove file
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      <p className='mt-4 text-xs text-slate-500'>
+        Banner image is managed from <span className='font-semibold'>Branding + Media</span> and uploaded via Cloudinary.
+      </p>
 
       <div className='mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4'>
         <p className='text-xs font-semibold uppercase tracking-[0.3em] text-slate-500'>
@@ -281,6 +377,59 @@ export function HeroSection({ data, updateField, selectedComponent }: Type) {
                 )
               }
               className='h-12'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>Overlay Base Color</Label>
+            <Input
+              type='color'
+              value={data.components.home_page.hero_style?.overlayColor || '#0f172a'}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'hero_style', 'overlayColor'],
+                  e.target.value
+                )
+              }
+              className='h-12'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label>Overlay Accent Color</Label>
+            <Input
+              type='color'
+              value={
+                data.components.home_page.hero_style?.overlayAccentColor || '#f59e0b'
+              }
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'hero_style', 'overlayAccentColor'],
+                  e.target.value
+                )
+              }
+              className='h-12'
+            />
+          </div>
+          <div className='space-y-2 md:col-span-2'>
+            <Label>
+              Overlay Opacity{' '}
+              {Number.isFinite(
+                Number(data.components.home_page.hero_style?.overlayOpacity)
+              )
+                ? Number(data.components.home_page.hero_style?.overlayOpacity)
+                : 70}
+              %
+            </Label>
+            <Input
+              type='range'
+              min='0'
+              max='100'
+              value={data.components.home_page.hero_style?.overlayOpacity ?? 70}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'hero_style', 'overlayOpacity'],
+                  Number(e.target.value || 0)
+                )
+              }
             />
           </div>
           <div className='space-y-2'>

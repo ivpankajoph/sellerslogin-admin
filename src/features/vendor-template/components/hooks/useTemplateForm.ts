@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import { useSelector, useDispatch } from 'react-redux'
 import { initialData } from '../../data'
 import { updateFieldImmutable } from './utils'
-import { uploadImage } from '../../helper/fileupload'
+import { uploadFile, uploadImage } from '../../helper/fileupload'
 
 type TemplateCatalogItem = {
   key: string
@@ -278,6 +278,33 @@ export function useTemplateForm() {
     }
   }
 
+  const handleDocumentChange = async (path: string[], file: File | null) => {
+    const pathKey = path.join('.')
+
+    if (!file) {
+      updateField(path, '')
+      setUploadingPaths((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(pathKey)
+        return newSet
+      })
+      return
+    }
+
+    setUploadingPaths((prev) => new Set(prev).add(pathKey))
+
+    try {
+      const url = await uploadFile(file, 'template_documents')
+      updateField(path, url || '')
+    } finally {
+      setUploadingPaths((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(pathKey)
+        return newSet
+      })
+    }
+  }
+
   const applyTemplateVariant = async () => {
     if (!vendor_id) return
     setIsUpdatingTemplate(true)
@@ -432,6 +459,7 @@ export function useTemplateForm() {
     setData,
     updateField,
     handleImageChange,
+    handleDocumentChange,
     handleSubmit,
     templateCatalog,
     selectedTemplateKey,
