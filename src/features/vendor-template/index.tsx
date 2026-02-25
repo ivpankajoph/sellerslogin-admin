@@ -27,6 +27,7 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import {
   getVendorTemplateBaseUrl,
   getVendorTemplatePreviewUrl,
+  resolvePreviewCityFromVendorProfile,
 } from '@/lib/storefront-url'
 import {
   getStoredEditingTemplateKey,
@@ -71,6 +72,7 @@ export default function TemplateForm() {
     isAdmin,
     deleteTemplateVariant,
     isDeletingTemplateKey,
+    vendor_default_city_slug,
   } = useTemplateForm()
 
   const handleInlineEdit = (path: string[], value: unknown) => {
@@ -206,9 +208,18 @@ export default function TemplateForm() {
   }, [inlineEditVersion, isBuilderOpen, handleSubmit, sectionOrder])
 
   const storefrontBaseUrl = getVendorTemplateBaseUrl(vendor_id)
+  const previewCity = useMemo(
+    () =>
+      resolvePreviewCityFromVendorProfile(
+        data?.components?.vendor_profile,
+        vendor_default_city_slug
+      ),
+    [data?.components?.vendor_profile, vendor_default_city_slug]
+  )
   const previewBaseUrl = getVendorTemplatePreviewUrl(
     vendor_id,
-    selectedTemplateKey
+    selectedTemplateKey,
+    previewCity.slug
   )
 
   const handleSubmitWithOrder = () => handleSubmit(sectionOrder)
@@ -791,7 +802,7 @@ export default function TemplateForm() {
           isBuilderOpen ? (
           <TemplatePreviewPanel
             title='Live Website Preview'
-            subtitle='Sync to refresh the right-side preview'
+            subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
             baseSrc={previewBaseUrl}
             defaultPath=''
             pageOptions={[

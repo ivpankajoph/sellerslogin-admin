@@ -36,6 +36,8 @@ type CityRow = {
   _id: string
   name: string
   slug: string
+  state?: string
+  country?: string
   isActive: boolean
 }
 
@@ -119,11 +121,7 @@ type WorkspaceProduct = {
   variants?: ProductVariantRow[]
   faqs?: FaqItem[]
   availableCities?: Array<{ _id: string; name: string; slug: string }>
-}
-
-type WorkspaceTemplateData = {
-  template?: any
-  products?: WorkspaceProduct[]
+  availableCityData?: Array<{ _id: string; name: string; slug: string }>
 }
 
 type ProductPageCityContext = {
@@ -193,6 +191,54 @@ const normalizeCitySlug = (value?: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'all'
+
+const toTitleCase = (value: string) =>
+  value
+    .split(' ')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+
+const getCitySeoLabel = (cityName = '', citySlug = '') => {
+  const normalizedName = String(cityName || '').trim()
+  if (normalizedName && normalizeCitySlug(normalizedName) !== 'all') return normalizedName
+
+  const normalizedSlug = normalizeCitySlug(citySlug)
+  if (!normalizedSlug || normalizedSlug === 'all') return ''
+  return toTitleCase(normalizedSlug.replace(/-/g, ' '))
+}
+
+const normalizeSeoComparable = (value = '') =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+const hasCityInSeoText = (text = '', cityLabel = '') => {
+  const normalizedText = normalizeSeoComparable(text)
+  const normalizedCity = normalizeSeoComparable(cityLabel)
+  if (!normalizedText || !normalizedCity) return false
+  return normalizedText.includes(normalizedCity)
+}
+
+const ensureCityInSeoTitle = (title = '', cityLabel = '', fallback = '') => {
+  const baseTitle = String(title || fallback || '').trim()
+  if (!baseTitle || !cityLabel) return baseTitle
+  if (hasCityInSeoText(baseTitle, cityLabel)) return baseTitle
+  return `${baseTitle} | ${cityLabel}`
+}
+
+const ensureCityInSeoDescription = (
+  description = '',
+  cityLabel = '',
+  fallback = ''
+) => {
+  const baseDescription = String(description || fallback || '').trim()
+  if (!baseDescription || !cityLabel) return baseDescription
+  if (hasCityInSeoText(baseDescription, cityLabel)) return baseDescription
+  const cleanSuffix = `Available in ${cityLabel}.`
+  const needsDot = !/[.!?]$/.test(baseDescription)
+  return `${baseDescription}${needsDot ? '.' : ''} ${cleanSuffix}`
+}
 
 const toObjectIdString = (value: unknown) => {
   if (!value) return ''
@@ -282,81 +328,109 @@ const defaultEditor = (
     citySlug: 'all',
     cityName: 'All Cities',
   }
-): ProductEditor => ({
-  _id: product._id,
-  editScope: pageCity.scope,
-  editCityId: pageCity.cityId,
-  editCitySlug: pageCity.citySlug,
-  editCityName: pageCity.cityName,
-  productName: product.productName || '',
-  slug: product.slug || '',
-  baseSku: product.baseSku || '',
-  mainCategoryId: toObjectIdString(product.mainCategory),
-  productCategoryId: toObjectIdString(product.productCategory),
-  productCategoryIds: toObjectIdList(product.productCategories),
-  productSubCategoryIds: toObjectIdList(product.productSubCategories),
-  brand: product.brand || '',
-  shortDescription: product.shortDescription || '',
-  description: product.description || '',
-  metaTitle: product.metaTitle || '',
-  metaDescription: product.metaDescription || '',
-  metaKeywords: Array.isArray(product.metaKeywords)
-    ? product.metaKeywords.join(', ')
-    : '',
-  defaultImages: (Array.isArray(product.defaultImages) ? product.defaultImages : [])
-    .map((image, index) => normalizeImageAsset(image, `default-${index + 1}`))
-    .filter((image): image is ImageAsset => Boolean(image)),
-  specificationRows: (
-    Array.isArray(product.specifications) ? product.specifications : []
-  ).flatMap((row) =>
-    row && typeof row === 'object'
-      ? Object.entries(row).map(([key, value]) => ({
-          key: String(key || ''),
-          value: String(value || ''),
-        }))
+): ProductEditor => {
+  const isCityScoped = pageCity.scope === 'city'
+  const citySeoLabel = isCityScoped
+    ? getCitySeoLabel(pageCity.cityName, pageCity.citySlug)
+    : ''
+  const normalizedMappedCities = Array.isArray(product.availableCities)
+    ? product.availableCities
+    : Array.isArray(product.availableCityData)
+      ? product.availableCityData
       : []
-  ),
-  variants: (() => {
-    const mappedVariants = (Array.isArray(product.variants) ? product.variants : []).map(
-      (variant, index) => ({
-        tempId: `variant-${variant?._id || index}`,
-        _id: variant?._id,
-        variantSku: String(variant?.variantSku || ''),
-        variantAttributes: objectToAttributeItems(variant?.variantAttributes),
-        actualPrice:
-          variant?.actualPrice !== undefined ? String(variant.actualPrice) : '',
-        finalPrice: variant?.finalPrice !== undefined ? String(variant.finalPrice) : '',
-        stockQuantity:
-          variant?.stockQuantity !== undefined ? String(variant.stockQuantity) : '',
-        isActive: variant?.isActive !== false,
-        variantsImageUrls: (Array.isArray(variant?.variantsImageUrls)
-          ? variant.variantsImageUrls
-          : []
+  const baseMetaTitle = String(product.metaTitle || '').trim()
+  const baseMetaDescription = String(product.metaDescription || '').trim()
+
+  return {
+    _id: product._id,
+    editScope: pageCity.scope,
+    editCityId: pageCity.cityId,
+    editCitySlug: pageCity.citySlug,
+    editCityName: pageCity.cityName,
+    productName: product.productName || '',
+    slug: product.slug || '',
+    baseSku: product.baseSku || '',
+    mainCategoryId: toObjectIdString(product.mainCategory),
+    productCategoryId: toObjectIdString(product.productCategory),
+    productCategoryIds: toObjectIdList(product.productCategories),
+    productSubCategoryIds: toObjectIdList(product.productSubCategories),
+    brand: product.brand || '',
+    shortDescription: product.shortDescription || '',
+    description: product.description || '',
+    metaTitle: isCityScoped
+      ? ensureCityInSeoTitle(baseMetaTitle, citySeoLabel, product.productName || '')
+      : baseMetaTitle,
+    metaDescription: isCityScoped
+      ? ensureCityInSeoDescription(
+          baseMetaDescription,
+          citySeoLabel,
+          product.shortDescription || product.description || product.productName || ''
         )
-          .map((image, imageIndex) =>
-            normalizeImageAsset(image, `variant-${index + 1}-${imageIndex + 1}`)
+      : baseMetaDescription,
+    metaKeywords: Array.isArray(product.metaKeywords)
+      ? product.metaKeywords.join(', ')
+      : '',
+    defaultImages: (Array.isArray(product.defaultImages) ? product.defaultImages : [])
+      .map((image, index) => normalizeImageAsset(image, `default-${index + 1}`))
+      .filter((image): image is ImageAsset => Boolean(image)),
+    specificationRows: (
+      Array.isArray(product.specifications) ? product.specifications : []
+    ).flatMap((row) =>
+      row && typeof row === 'object'
+        ? Object.entries(row).map(([key, value]) => ({
+            key: String(key || ''),
+            value: String(value || ''),
+          }))
+        : []
+    ),
+    variants: (() => {
+      const mappedVariants = (Array.isArray(product.variants) ? product.variants : []).map(
+        (variant, index) => ({
+          tempId: `variant-${variant?._id || index}`,
+          _id: variant?._id,
+          variantSku: String(variant?.variantSku || ''),
+          variantAttributes: objectToAttributeItems(variant?.variantAttributes),
+          actualPrice:
+            variant?.actualPrice !== undefined ? String(variant.actualPrice) : '',
+          finalPrice: variant?.finalPrice !== undefined ? String(variant.finalPrice) : '',
+          stockQuantity:
+            variant?.stockQuantity !== undefined ? String(variant.stockQuantity) : '',
+          isActive: variant?.isActive !== false,
+          variantsImageUrls: (Array.isArray(variant?.variantsImageUrls)
+            ? variant.variantsImageUrls
+            : []
           )
-          .filter((image): image is ImageAsset => Boolean(image)),
-        variantMetaTitle: String(variant?.variantMetaTitle || ''),
-        variantMetaDescription: String(variant?.variantMetaDescription || ''),
-        variantMetaKeywords: Array.isArray(variant?.variantMetaKeywords)
-          ? variant.variantMetaKeywords.join(', ')
-          : '',
-        variantCanonicalUrl: String(variant?.variantCanonicalUrl || ''),
-      })
-    )
-    return mappedVariants.length ? mappedVariants : [createEmptyVariantEditor()]
-  })(),
-  faqs: (Array.isArray(product.faqs) ? product.faqs : []).map((faq) => ({
-    question: String(faq?.question || ''),
-    answer: String(faq?.answer || ''),
-  })),
-  status: product.status || 'pending',
-  isAvailable: product.isAvailable !== false,
-  availableCities: Array.isArray(product.availableCities)
-    ? product.availableCities.map((city) => city?._id).filter(Boolean)
-    : [],
-})
+            .map((image, imageIndex) =>
+              normalizeImageAsset(image, `variant-${index + 1}-${imageIndex + 1}`)
+            )
+            .filter((image): image is ImageAsset => Boolean(image)),
+          variantMetaTitle: String(variant?.variantMetaTitle || ''),
+          variantMetaDescription: String(variant?.variantMetaDescription || ''),
+          variantMetaKeywords: Array.isArray(variant?.variantMetaKeywords)
+            ? variant.variantMetaKeywords.join(', ')
+            : '',
+          variantCanonicalUrl: String(variant?.variantCanonicalUrl || ''),
+        })
+      )
+      return mappedVariants.length ? mappedVariants : [createEmptyVariantEditor()]
+    })(),
+    faqs: (Array.isArray(product.faqs) ? product.faqs : []).map((faq) => ({
+      question: String(faq?.question || ''),
+      answer: String(faq?.answer || ''),
+    })),
+    status: product.status || 'pending',
+    isAvailable: product.isAvailable !== false,
+    availableCities: Array.isArray(normalizedMappedCities)
+      ? Array.from(
+          new Set(
+            normalizedMappedCities
+              .map((city) => toObjectIdString(city))
+              .filter(Boolean)
+          )
+        )
+      : [],
+  }
+}
 
 export default function TemplateWorkspacePage() {
   const token = useSelector((state: any) => state.auth?.token || '')
@@ -372,7 +446,6 @@ export default function TemplateWorkspacePage() {
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [subCategories, setSubCategories] = useState<SubCategoryOption[]>([])
   const [templates, setTemplates] = useState<TemplateRow[]>([])
-  const [templateData, setTemplateData] = useState<WorkspaceTemplateData>({})
   const [products, setProducts] = useState<WorkspaceProduct[]>([])
   const [loadingVendors, setLoadingVendors] = useState(false)
   const [loadingCategoryMeta, setLoadingCategoryMeta] = useState(false)
@@ -383,6 +456,8 @@ export default function TemplateWorkspacePage() {
   const [selectedVendorId, setSelectedVendorId] = useState('')
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('')
   const [selectedCitySlug, setSelectedCitySlug] = useState('all')
+  const [selectedStateName, setSelectedStateName] = useState('all')
+  const [stateCitySearchTerm, setStateCitySearchTerm] = useState('')
   const [vendorDefaultCitySlug, setVendorDefaultCitySlug] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [editingProduct, setEditingProduct] = useState<ProductEditor | null>(null)
@@ -432,12 +507,13 @@ export default function TemplateWorkspacePage() {
       })
       setTemplates([])
       setSelectedTemplateKey('')
-      setTemplateData({})
       setProducts([])
       setEditingProduct(null)
       setSearchTerm('')
       setVendorDefaultCitySlug('all')
       setSelectedCitySlug('all')
+      setSelectedStateName('all')
+      setStateCitySearchTerm('')
 
       setCities(Array.isArray(citiesBody?.data) ? citiesBody.data : [])
     } catch (error: any) {
@@ -447,12 +523,13 @@ export default function TemplateWorkspacePage() {
       setSelectedVendorId('')
       setTemplates([])
       setSelectedTemplateKey('')
-      setTemplateData({})
       setProducts([])
       setEditingProduct(null)
       setSearchTerm('')
       setVendorDefaultCitySlug('all')
       setSelectedCitySlug('all')
+      setSelectedStateName('all')
+      setStateCitySearchTerm('')
     } finally {
       setLoadingVendors(false)
     }
@@ -618,7 +695,6 @@ export default function TemplateWorkspacePage() {
 
   const loadWorkspace = useCallback(async () => {
     if (!selectedVendorId) {
-      setTemplateData({})
       setProducts([])
       return
     }
@@ -626,52 +702,97 @@ export default function TemplateWorkspacePage() {
     setLoadingWorkspace(true)
     try {
       const productListCityScope = normalizeCitySlug(selectedCitySlug)
-      const [templateRes, productsRes] = await Promise.all([
-        fetch(
-          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/${selectedVendorId}/preview?city=${encodeURIComponent(effectiveCitySlug)}`
-        ),
-        fetch(
-          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/all?ownerId=${selectedVendorId}&city=${encodeURIComponent(productListCityScope)}`
-        ),
-      ])
-
-      const templateBody = await templateRes.json()
+      const productsRes = await fetch(
+        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/all?ownerId=${selectedVendorId}&city=${encodeURIComponent(productListCityScope)}`
+      )
       const productsBody = await productsRes.json()
 
-      setTemplateData(templateBody?.data || {})
       setProducts(Array.isArray(productsBody?.products) ? productsBody.products : [])
     } catch (error: any) {
       toast.error(error?.message || 'Failed to load template workspace')
-      setTemplateData({})
       setProducts([])
     } finally {
       setLoadingWorkspace(false)
     }
-  }, [selectedVendorId, effectiveCitySlug, selectedCitySlug])
+  }, [selectedVendorId, selectedCitySlug])
 
   useEffect(() => {
     if (!selectedVendorId) return
     loadWorkspace()
   }, [selectedVendorId, effectiveCitySlug, loadWorkspace])
 
-  const templatePages = useMemo(() => {
-    const basePages = [
-      { id: 'home', label: 'Home Page', route: '' },
-      { id: 'about', label: 'About Page', route: '/about' },
-      { id: 'contact', label: 'Contact Page', route: '/contact' },
-      { id: 'social', label: 'Social + FAQs', route: '/social-faqs' },
-      { id: 'catalog', label: 'All Products', route: '/all-products' },
-    ]
-    const customPages = Array.isArray(templateData?.template?.components?.custom_pages)
-      ? templateData.template.components.custom_pages
-      : []
-    const customRows = customPages.map((page: any) => ({
-      id: page?.id || page?.slug,
-      label: page?.title || page?.slug || 'Custom Page',
-      route: `/page/${page?.slug || page?.id}`,
-    }))
-    return [...basePages, ...customRows]
-  }, [templateData])
+  const stateOptions = useMemo(() => {
+    const states = Array.from(
+      new Set(
+        cities
+          .filter((city) => city?.isActive)
+          .map((city) => String(city?.state || '').trim())
+          .filter(Boolean)
+      )
+    )
+    return states.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  }, [cities])
+
+  const citiesForSelectedState = useMemo(() => {
+    const selectedState = String(selectedStateName || 'all').trim()
+    const search = stateCitySearchTerm.trim().toLowerCase()
+
+    const visibleCities = cities
+      .filter((city) => city?.isActive)
+      .filter((city) =>
+        selectedState === 'all'
+          ? true
+          : String(city?.state || '').trim() === selectedState
+      )
+      .filter((city) => {
+        if (!search) return true
+        return `${city.name} ${city.slug} ${city.state || ''}`
+          .toLowerCase()
+          .includes(search)
+      })
+
+    return visibleCities.sort((a, b) =>
+      String(a?.name || '').localeCompare(String(b?.name || ''), undefined, {
+        sensitivity: 'base',
+      })
+    )
+  }, [cities, selectedStateName, stateCitySearchTerm])
+
+  useEffect(() => {
+    if (!stateOptions.length) {
+      setSelectedStateName('all')
+      return
+    }
+    setSelectedStateName((current) => {
+      if (current === 'all') return current
+      return stateOptions.includes(current) ? current : 'all'
+    })
+  }, [stateOptions])
+
+  useEffect(() => {
+    const selectedSlug = normalizeCitySlug(selectedCitySlug)
+    if (selectedSlug === 'all') return
+    const selectedCity = cities.find(
+      (city) => normalizeCitySlug(city.slug) === selectedSlug
+    )
+    const selectedState = String(selectedCity?.state || '').trim()
+    if (!selectedState) return
+    setSelectedStateName((current) => (current === selectedState ? current : selectedState))
+  }, [selectedCitySlug, cities])
+
+  useEffect(() => {
+    if (selectedStateName === 'all') return
+    const selectedSlug = normalizeCitySlug(selectedCitySlug)
+    if (selectedSlug === 'all') return
+    const selectedCity = cities.find(
+      (city) => normalizeCitySlug(city.slug) === selectedSlug
+    )
+    const selectedState = String(selectedCity?.state || '').trim()
+    if (!selectedState || selectedState !== selectedStateName) {
+      setSelectedCitySlug('all')
+      setStoredTemplatePreviewCity('all')
+    }
+  }, [selectedStateName, selectedCitySlug, cities])
 
   const searchedProducts = useMemo(() => {
     const search = searchTerm.trim().toLowerCase()
@@ -765,6 +886,30 @@ export default function TemplateWorkspacePage() {
       getVendorTemplatePreviewUrl(selectedVendorId, selectedTemplateKey, effectiveCitySlug) || ''
     )
   }, [selectedVendorId, selectedTemplateKey, effectiveCitySlug])
+
+  const getProductPreviewUrl = useCallback(
+    (row: WorkspaceProductPageRow) => {
+      if (!selectedVendorId || !selectedTemplateKey || !row?.product?._id) return ''
+
+      const selectedSlug = normalizeCitySlug(selectedCitySlug)
+      const citySlugForPreview =
+        row.pageCity.scope === 'city'
+          ? normalizeCitySlug(row.pageCity.citySlug)
+          : selectedSlug !== 'all'
+            ? selectedSlug
+            : normalizeCitySlug(effectiveCitySlug)
+
+      const baseUrl =
+        getVendorTemplatePreviewUrl(
+          selectedVendorId,
+          selectedTemplateKey,
+          citySlugForPreview
+        ) || ''
+      if (!baseUrl) return ''
+      return `${baseUrl.replace(/\/$/, '')}/product/${row.product._id}`
+    },
+    [selectedVendorId, selectedTemplateKey, selectedCitySlug, effectiveCitySlug]
+  )
 
   const mainCategoryNameById = useMemo(
     () =>
@@ -1451,26 +1596,83 @@ export default function TemplateWorkspacePage() {
 
         <div className='grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]'>
           <div className='min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-            <h3 className='text-lg font-semibold text-slate-900'>Template Pages</h3>
+            <h3 className='text-lg font-semibold text-slate-900'>State & City Products</h3>
             <p className='mt-1 text-sm text-slate-500'>
-              All pages under selected template dashboard.
+              State select karo, phir city choose karo. City choose karte hi us city ke products
+              right side me load honge.
             </p>
 
-            <div className='mt-4 space-y-2'>
-              {templatePages.map((page) => (
-                <div
-                  key={page.id}
-                  className='rounded-lg border border-slate-200 bg-slate-50 px-3 py-2'
-                >
-                  <p className='text-sm font-medium text-slate-800'>{page.label}</p>
-                  <p className='text-xs text-slate-500'>
-                    {page.route || '/'}
-                  </p>
-                </div>
-              ))}
-              {!templatePages.length ? (
-                <div className='rounded-lg border border-dashed border-slate-300 px-3 py-5 text-center text-sm text-slate-500'>
-                  Select a vendor to load template pages.
+            <div className='mt-4'>
+              <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+                State
+              </label>
+              <select
+                value={selectedStateName}
+                onChange={(e) => setSelectedStateName(e.target.value)}
+                className='h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm'
+              >
+                <option value='all'>All States</option>
+                {stateOptions.map((stateName) => (
+                  <option key={stateName} value={stateName}>
+                    {stateName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className='mt-3 flex items-center justify-between'>
+              <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+                Cities
+              </p>
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                className='h-7 px-2 text-xs'
+                onClick={() => {
+                  setSelectedCitySlug('all')
+                  setStoredTemplatePreviewCity('all')
+                }}
+              >
+                Show All Cities
+              </Button>
+            </div>
+
+            <Input
+              value={stateCitySearchTerm}
+              onChange={(e) => setStateCitySearchTerm(e.target.value)}
+              placeholder='Search city...'
+              className='mt-2'
+            />
+
+            <div className='mt-3 max-h-[420px] space-y-2 overflow-y-auto pe-1'>
+              {citiesForSelectedState.map((city) => {
+                const citySlug = normalizeCitySlug(city.slug)
+                const selected = normalizeCitySlug(selectedCitySlug) === citySlug
+                return (
+                  <button
+                    key={city._id}
+                    type='button'
+                    onClick={() => {
+                      setSelectedCitySlug(citySlug)
+                      setStoredTemplatePreviewCity(citySlug)
+                    }}
+                    className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                      selected
+                        ? 'border-cyan-300 bg-cyan-50'
+                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    <p className='text-sm font-medium text-slate-800'>{city.name}</p>
+                    <p className='text-xs text-slate-500'>
+                      {city.state || 'State N/A'} - {city.country || 'India'}
+                    </p>
+                  </button>
+                )
+              })}
+              {!citiesForSelectedState.length ? (
+                <div className='rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500'>
+                  No cities found for selected state.
                 </div>
               ) : null}
             </div>
@@ -1497,16 +1699,17 @@ export default function TemplateWorkspacePage() {
             </div>
 
             <div className='w-full overflow-x-auto pb-2'>
-              <table className='w-full min-w-[980px] table-fixed'>
+              <table className='w-full min-w-[1560px] table-auto'>
                 <thead>
                   <tr className='border-b border-slate-200 text-left text-xs uppercase tracking-[0.2em] text-slate-500'>
-                    <th className='w-[20%] pb-2 pe-3'>Product</th>
-                    <th className='w-[14%] pb-2 pe-3'>Slug</th>
-                    <th className='w-[20%] pb-2 pe-3'>SEO Title</th>
-                    <th className='w-[14%] pb-2 pe-3'>Page City</th>
-                    <th className='w-[16%] pb-2 pe-3'>Mapped Cities</th>
-                    <th className='w-[8%] pb-2 pe-3'>Status</th>
-                    <th className='w-[8%] pb-2 text-right'>Action</th>
+                    <th className='w-[220px] pb-2 pe-3 whitespace-nowrap'>Product</th>
+                    <th className='w-[170px] pb-2 pe-3 whitespace-nowrap'>Slug</th>
+                    <th className='w-[240px] pb-2 pe-3 whitespace-nowrap'>SEO Title</th>
+                    <th className='w-[150px] pb-2 pe-3 whitespace-nowrap'>Page City</th>
+                    <th className='w-[220px] pb-2 pe-3 whitespace-nowrap'>Mapped Cities</th>
+                    <th className='w-[110px] pb-2 pe-3 whitespace-nowrap'>Status</th>
+                    <th className='w-[190px] pb-2 pe-3 whitespace-nowrap'>Preview URL</th>
+                    <th className='w-[220px] pb-2 text-right whitespace-nowrap'>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1514,6 +1717,7 @@ export default function TemplateWorkspacePage() {
                     const product = row.product
                     const isCityScopedRow = row.pageCity.scope === 'city'
                     const isOpeningEditor = openingEditorRowKey === row.rowKey
+                    const rowPreviewUrl = getProductPreviewUrl(row)
 
                     return (
                     <tr key={row.rowKey} className='border-b border-slate-100'>
@@ -1564,11 +1768,32 @@ export default function TemplateWorkspacePage() {
                       <td className='py-3 pe-3 align-top text-sm text-slate-600'>
                         <p className='truncate'>{product.status}</p>
                       </td>
+                      <td className='py-3 pe-3 align-top'>
+                        {rowPreviewUrl ? (
+                          <div className='min-w-[170px]'>
+                            <a href={rowPreviewUrl} target='_blank' rel='noreferrer'>
+                              <Button size='sm' variant='outline' className='h-8 whitespace-nowrap'>
+                                <ExternalLink className='h-3.5 w-3.5' />
+                                Open Preview
+                              </Button>
+                            </a>
+                            <p
+                              className='mt-1 max-w-[180px] truncate text-[11px] text-slate-500'
+                              title={rowPreviewUrl}
+                            >
+                              {rowPreviewUrl}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className='text-xs text-slate-400'>N/A</span>
+                        )}
+                      </td>
                       <td className='py-3 text-right align-top'>
-                        <div className='flex flex-col items-end gap-1'>
+                        <div className='flex min-w-[200px] flex-col items-end gap-1'>
                           <Button
                             size='sm'
                             variant='outline'
+                            className='whitespace-nowrap'
                             onClick={() => openEditor(row)}
                             disabled={isOpeningEditor}
                           >
@@ -1811,80 +2036,126 @@ export default function TemplateWorkspacePage() {
               </label>
               <label className='text-sm'>
                 <span className='mb-1 block font-medium text-slate-700'>Categories</span>
-                <select
-                  multiple
-                  value={editingProduct.productCategoryIds}
-                  onChange={(e) =>
-                    setEditingProduct((prev) => {
-                      if (!prev) return prev
-                      const selected = Array.from(e.target.selectedOptions).map(
-                        (option) => option.value
-                      )
-                      const nextPrimary =
-                        selected.includes(prev.productCategoryId) && prev.productCategoryId
-                          ? prev.productCategoryId
-                          : selected[0] || ''
-                      const nextSubCategoryIds = prev.productSubCategoryIds.filter((subId) =>
-                        subCategories.some(
-                          (sub) => sub._id === subId && selected.includes(sub.categoryId)
-                        )
-                      )
-                      return {
-                        ...prev,
-                        productCategoryIds: selected,
-                        productCategoryId: nextPrimary,
-                        productSubCategoryIds: nextSubCategoryIds,
-                      }
-                    })
-                  }
-                  className='min-h-[112px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm'
-                  disabled={!editingProduct.mainCategoryId || loadingCategoryMeta || isCityScopedEditor}
+                <div
+                  className={`max-h-[132px] space-y-2 overflow-y-auto rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ${
+                    !editingProduct.mainCategoryId || loadingCategoryMeta || isCityScopedEditor
+                      ? 'opacity-70'
+                      : ''
+                  }`}
                 >
                   {editorCategoryOptions.length ? (
-                    editorCategoryOptions.map((item) => (
-                      <option key={`category-${item._id}`} value={item._id}>
-                        {item.name}
-                      </option>
-                    ))
+                    editorCategoryOptions.map((item) => {
+                      const checked = editingProduct.productCategoryIds.includes(item._id)
+                      return (
+                        <label
+                          key={`category-${item._id}`}
+                          className='flex items-center gap-2 text-slate-700'
+                        >
+                          <input
+                            type='checkbox'
+                            checked={checked}
+                            disabled={
+                              !editingProduct.mainCategoryId ||
+                              loadingCategoryMeta ||
+                              isCityScopedEditor
+                            }
+                            onChange={(e) =>
+                              setEditingProduct((prev) => {
+                                if (!prev) return prev
+
+                                const nextCategories = e.target.checked
+                                  ? Array.from(new Set([...prev.productCategoryIds, item._id]))
+                                  : prev.productCategoryIds.filter((id) => id !== item._id)
+
+                                const nextPrimary =
+                                  prev.productCategoryId &&
+                                  nextCategories.includes(prev.productCategoryId)
+                                    ? prev.productCategoryId
+                                    : nextCategories[0] || ''
+
+                                const nextSubCategoryIds = prev.productSubCategoryIds.filter(
+                                  (subId) =>
+                                    subCategories.some(
+                                      (sub) =>
+                                        sub._id === subId &&
+                                        nextCategories.includes(sub.categoryId)
+                                    )
+                                )
+
+                                return {
+                                  ...prev,
+                                  productCategoryIds: nextCategories,
+                                  productCategoryId: nextPrimary,
+                                  productSubCategoryIds: nextSubCategoryIds,
+                                }
+                              })
+                            }
+                          />
+                          <span>{item.name}</span>
+                        </label>
+                      )
+                    })
                   ) : (
-                    <option value='' disabled>
+                    <p className='text-xs text-slate-500'>
                       No categories found for selected main category
-                    </option>
+                    </p>
                   )}
-                </select>
+                </div>
                 <span className='mt-1 block text-xs text-slate-500'>
-                  Hold Ctrl/Cmd to select multiple categories.
+                  Multiple select with checkboxes.
                 </span>
               </label>
               <label className='text-sm lg:col-span-2'>
                 <span className='mb-1 block font-medium text-slate-700'>Subcategories</span>
-                <select
-                  multiple
-                  value={editingProduct.productSubCategoryIds}
-                  onChange={(e) =>
-                    setEditingProduct((prev) => {
-                      if (!prev) return prev
-                      const selected = Array.from(e.target.selectedOptions).map(
-                        (option) => option.value
-                      )
-                      return { ...prev, productSubCategoryIds: selected }
-                    })
-                  }
-                  className='min-h-[112px] w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm'
-                  disabled={!editorSelectedCategoryIds.length || loadingCategoryMeta || isCityScopedEditor}
+                <div
+                  className={`max-h-[132px] space-y-2 overflow-y-auto rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ${
+                    !editorSelectedCategoryIds.length || loadingCategoryMeta || isCityScopedEditor
+                      ? 'opacity-70'
+                      : ''
+                  }`}
                 >
                   {editorSubCategoryOptions.length ? (
-                    editorSubCategoryOptions.map((item) => (
-                      <option key={`subcategory-${item._id}`} value={item._id}>
-                        {item.name}
-                      </option>
-                    ))
+                    editorSubCategoryOptions.map((item) => {
+                      const checked = editingProduct.productSubCategoryIds.includes(item._id)
+                      return (
+                        <label
+                          key={`subcategory-${item._id}`}
+                          className='flex items-center gap-2 text-slate-700'
+                        >
+                          <input
+                            type='checkbox'
+                            checked={checked}
+                            disabled={
+                              !editorSelectedCategoryIds.length ||
+                              loadingCategoryMeta ||
+                              isCityScopedEditor
+                            }
+                            onChange={(e) =>
+                              setEditingProduct((prev) => {
+                                if (!prev) return prev
+
+                                const nextSubCategoryIds = e.target.checked
+                                  ? Array.from(
+                                      new Set([...prev.productSubCategoryIds, item._id])
+                                    )
+                                  : prev.productSubCategoryIds.filter(
+                                      (id) => id !== item._id
+                                    )
+
+                                return { ...prev, productSubCategoryIds: nextSubCategoryIds }
+                              })
+                            }
+                          />
+                          <span>{item.name}</span>
+                        </label>
+                      )
+                    })
                   ) : (
-                    <option value='' disabled>
+                    <p className='text-xs text-slate-500'>
                       No subcategories found for selected categories
-                    </option>
+                    </p>
                   )}
-                </select>
+                </div>
                 <span className='mt-1 block text-xs text-slate-500'>
                   {editorSelectedCategoryIds.length
                     ? 'Subcategories filtered by selected categories.'
@@ -2786,7 +3057,8 @@ export default function TemplateWorkspacePage() {
                 {cities
                   .filter((city) => city.isActive)
                   .map((city) => {
-                    const checked = editingProduct.availableCities.includes(city._id)
+                    const cityId = String(city._id || '').trim()
+                    const checked = editingProduct.availableCities.includes(cityId)
                     return (
                       <label key={city._id} className='flex items-center gap-2 text-sm text-slate-700'>
                         <input
@@ -2799,12 +3071,16 @@ export default function TemplateWorkspacePage() {
                               if (e.target.checked) {
                                 return {
                                   ...prev,
-                                  availableCities: [...prev.availableCities, city._id],
+                                  availableCities: Array.from(
+                                    new Set([...prev.availableCities, cityId])
+                                  ),
                                 }
                               }
                               return {
                                 ...prev,
-                                availableCities: prev.availableCities.filter((id) => id !== city._id),
+                                availableCities: prev.availableCities.filter(
+                                  (id) => id !== cityId
+                                ),
                               }
                             })
                           }

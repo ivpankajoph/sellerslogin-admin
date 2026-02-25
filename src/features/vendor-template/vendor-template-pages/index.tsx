@@ -22,7 +22,10 @@ import { BASE_URL } from '@/store/slices/vendor/productSlice'
 
 import { useSelector } from 'react-redux'
 import { initialData, type TemplateData } from '../data'
-import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import {
+  getVendorTemplatePreviewUrl,
+  resolvePreviewCityFromVendorProfile,
+} from '@/lib/storefront-url'
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
@@ -235,6 +238,9 @@ export default function VendorTemplatePages() {
   const [inlineEditVersion, setInlineEditVersion] = useState(0)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const vendor_id = useSelector((state: any) => state.auth?.user?.id)
+  const authDefaultCitySlug = useSelector(
+    (state: any) => state.auth?.user?.default_city_slug || ''
+  )
   const selectedTemplateKey = useMemo(
     () => getStoredEditingTemplateKey(vendor_id),
     [vendor_id]
@@ -293,7 +299,19 @@ export default function VendorTemplatePages() {
   const selectedPage =
     (pages.find((page) => page.id === selectedPageId) as any) || pages[0]
 
-  const previewBaseUrl = getVendorTemplatePreviewUrl(vendor_id, selectedTemplateKey)
+  const previewCity = useMemo(
+    () =>
+      resolvePreviewCityFromVendorProfile(
+        data?.components?.vendor_profile,
+        authDefaultCitySlug
+      ),
+    [data?.components?.vendor_profile, authDefaultCitySlug]
+  )
+  const previewBaseUrl = getVendorTemplatePreviewUrl(
+    vendor_id,
+    selectedTemplateKey,
+    previewCity.slug
+  )
   const previewPath = selectedPage?.slug ? `/page/${selectedPage.slug}` : ''
 
   const sectionOrder = useMemo(() => {
@@ -548,7 +566,7 @@ export default function VendorTemplatePages() {
         preview={
           <TemplatePreviewPanel
             title='Live Page Preview'
-            subtitle='Custom pages render in the storefront'
+            subtitle={`Custom pages render in the storefront. Default city: ${previewCity.label}`}
             baseSrc={previewBaseUrl}
             defaultPath={previewPath}
             pageOptions={[

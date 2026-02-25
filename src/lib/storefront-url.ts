@@ -10,6 +10,45 @@ const normalizeCitySlug = (value?: string) => {
   return slug || 'all'
 }
 
+const toCityLabel = (slug: string) => {
+  if (slug === 'all') return 'All Cities'
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+export type PreviewCitySelection = {
+  slug: string
+  label: string
+}
+
+export const resolvePreviewCityFromVendorProfile = (
+  vendorProfile?: Record<string, unknown> | null,
+  fallbackCitySlug?: string
+): PreviewCitySelection => {
+  const profile = vendorProfile && typeof vendorProfile === 'object' ? vendorProfile : {}
+  const rawName = String(
+    (profile as Record<string, unknown>)?.default_city_name ||
+      (profile as Record<string, unknown>)?.defaultCityName ||
+      ''
+  ).trim()
+  const rawSlug = String(
+    (profile as Record<string, unknown>)?.default_city_slug ||
+      (profile as Record<string, unknown>)?.defaultCitySlug ||
+      ''
+  ).trim()
+
+  const resolvedSlug = normalizeCitySlug(rawSlug || rawName || fallbackCitySlug || 'all')
+  const resolvedLabel = rawName || toCityLabel(resolvedSlug)
+
+  return {
+    slug: resolvedSlug,
+    label: resolvedLabel,
+  }
+}
+
 export const STOREFRONT_URL = trimTrailingSlash(
   import.meta.env.VITE_PUBLIC_STOREFRONT_URL ||
     import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND ||

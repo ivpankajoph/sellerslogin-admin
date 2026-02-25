@@ -24,7 +24,10 @@ import { ThemeSettingsSection } from '../components/form/ThemeSettingsSection'
 import { VendorProfileFieldsSection } from '../components/form/VendorProfileFieldsSection'
 import { updateFieldImmutable } from '../components/hooks/utils'
 import { initialData, type TemplateData } from '../data'
-import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import {
+  getVendorTemplatePreviewUrl,
+  resolvePreviewCityFromVendorProfile,
+} from '@/lib/storefront-url'
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
@@ -43,6 +46,9 @@ function VendorTemplateContact() {
   ])
   const vendor_id = useSelector((state: any) => state.auth?.user?.id)
   const token = useSelector((state: any) => state.auth?.token)
+  const authDefaultCitySlug = useSelector(
+    (state: any) => state.auth?.user?.default_city_slug || ''
+  )
   const selectedTemplateKey = useMemo(
     () => getStoredEditingTemplateKey(vendor_id),
     [vendor_id]
@@ -406,7 +412,19 @@ function VendorTemplateContact() {
     return () => window.clearTimeout(timeout)
   }, [inlineEditVersion, uploadingPaths, handleSave])
 
-  const previewBaseUrl = getVendorTemplatePreviewUrl(vendor_id, selectedTemplateKey)
+  const previewCity = useMemo(
+    () =>
+      resolvePreviewCityFromVendorProfile(
+        data?.components?.vendor_profile,
+        authDefaultCitySlug
+      ),
+    [data?.components?.vendor_profile, authDefaultCitySlug]
+  )
+  const previewBaseUrl = getVendorTemplatePreviewUrl(
+    vendor_id,
+    selectedTemplateKey,
+    previewCity.slug
+  )
 
   const sections = useMemo(
     () => [
@@ -706,7 +724,7 @@ function VendorTemplateContact() {
         preview={
           <TemplatePreviewPanel
             title='Live Contact Preview'
-            subtitle='Sync to refresh the right-side preview'
+            subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
             baseSrc={previewBaseUrl}
             defaultPath='/contact'
             pageOptions={[

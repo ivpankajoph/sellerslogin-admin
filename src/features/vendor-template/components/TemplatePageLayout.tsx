@@ -1,4 +1,13 @@
-import { type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+  type ReactNode,
+} from 'react'
 import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import {
@@ -12,6 +21,12 @@ const navItems = [
   { key: 'pages', label: 'Pages', to: '/vendor-template-pages' },
   { key: 'other', label: 'Social + FAQ', to: '/vendor-template-other' },
 ]
+
+const MIN_EDITOR_PANEL_WIDTH = 320
+const MIN_PREVIEW_PANEL_WIDTH = 440
+const DIVIDER_TRACK_WIDTH = 12
+const DEFAULT_EDITOR_PANEL_WIDTH = 420
+const PANEL_WIDTH_STORAGE_KEY = 'template_editor_panel_width_px'
 
 interface TemplatePageLayoutProps {
   title: string
@@ -36,7 +51,17 @@ export function TemplatePageLayout({
   preview,
   children,
 }: TemplatePageLayoutProps) {
+  const [editorPanelWidth, setEditorPanelWidth] = useState(DEFAULT_EDITOR_PANEL_WIDTH)
+  const [isResizing, setIsResizing] = useState(false)
+  const layoutRef = useRef<HTMLDivElement | null>(null)
+  const resizePointerIdRef = useRef<number | null>(null)
+  const resizeStartRef = useRef<{ x: number; width: number }>({
+    x: 0,
+    width: DEFAULT_EDITOR_PANEL_WIDTH,
+  })
+
   const hasMainContent = preview != null || children != null
+  const isSplitLayout = Boolean(preview && children)
   const templateName = getTemplateDisplayName(editingTemplateKey)
   const resolvedNavItems = navItems.map((item) =>
     item.key === 'home' && editingTemplateKey
@@ -46,6 +71,166 @@ export function TemplatePageLayout({
         }
       : item
   )
+  const gridStyle = useMemo<CSSProperties | undefined>(() => {
+    if (!isSplitLayout) return undefined
+    return {
+      ['--template-editor-panel-width' as string]: `${editorPanelWidth}px`,
+    }
+  }, [editorPanelWidth, isSplitLayout])
+
+  const resizeToClientX = useCallback(
+    (clientX: number) => {
+      if (!isSplitLayout) return
+      const layout = layoutRef.current
+      if (!layout) return
+
+      const rect = layout.getBoundingClientRect()
+      if (!rect.width) return
+
+      const deltaX = clientX - resizeStartRef.current.x
+      const targetWidth = resizeStartRef.current.width + deltaX
+      const maxEditorWidth = Math.max(
+        MIN_EDITOR_PANEL_WIDTH,
+        rect.width - MIN_PREVIEW_PANEL_WIDTH - DIVIDER_TRACK_WIDTH
+      )
+      const clampedWidth = Math.min(
+        maxEditorWidth,
+        Math.max(MIN_EDITOR_PANEL_WIDTH, targetWidth)
+      )
+      setEditorPanelWidth(clampedWidth)
+    },
+    [isSplitLayout]
+  )
+  const stopResizing = useCallback(() => {
+    setIsResizing(false)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = Number.parseInt(
+        window.localStorage.getItem(PANEL_WIDTH_STORAGE_KEY) || '',
+        10
+      )
+      if (Number.isFinite(stored) && stored >= MIN_EDITOR_PANEL_WIDTH) {
+        setEditorPanelWidth(stored)
+      }
+    } catch {
+      // ignore localStorage failures
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(PANEL_WIDTH_STORAGE_KEY, String(Math.round(editorPanelWidth)))
+    } catch {
+      // ignore localStorage failures
+    }
+  }, [editorPanelWidth])
+
+  useEffect(() => {
+    if (!isResizing) {
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        stopResizing()
+      }
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') {
+        stopResizing()
+      }
+    }
+
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+    window.addEventListener('mouseup', stopResizing)
+    window.addEventListener('pointerup', stopResizing)
+    window.addEventListener('pointercancel', stopResizing)
+    window.addEventListener('blur', stopResizing)
+    window.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('mouseup', stopResizing)
+      window.removeEventListener('pointerup', stopResizing)
+      window.removeEventListener('pointercancel', stopResizing)
+      window.removeEventListener('blur', stopResizing)
+      window.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+    }
+  }, [isResizing, stopResizing])
+
+  useEffect(() => {
+    if (!isSplitLayout) return
+    const clampToViewport = () => {
+      const layout = layoutRef.current
+      if (!layout) return
+      const rect = layout.getBoundingClientRect()
+      const maxEditorWidth = Math.max(
+        MIN_EDITOR_PANEL_WIDTH,
+        rect.width - MIN_PREVIEW_PANEL_WIDTH - DIVIDER_TRACK_WIDTH
+      )
+      setEditorPanelWidth((current) =>
+        Math.min(maxEditorWidth, Math.max(MIN_EDITOR_PANEL_WIDTH, current))
+      )
+    }
+    clampToViewport()
+    window.addEventListener('resize', clampToViewport)
+    return () => window.removeEventListener('resize', clampToViewport)
+  }, [isSplitLayout])
+
+  const handleResizeStart = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!isSplitLayout) return
+    if (event.button !== 0) return
+    event.preventDefault()
+    const layout = layoutRef.current
+    if (!layout) return
+    resizeStartRef.current = {
+      x: event.clientX,
+      width: editorPanelWidth,
+    }
+    resizePointerIdRef.current = event.pointerId
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setIsResizing(true)
+  }
+
+  const handleResizeMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!isResizing) return
+    if (
+      resizePointerIdRef.current !== null &&
+      event.pointerId !== resizePointerIdRef.current
+    ) {
+      return
+    }
+    // If mouseup gets lost (e.g. over iframe), stop resize as soon as button is not pressed.
+    if ((event.buttons & 1) !== 1) {
+      stopResizing()
+      return
+    }
+    resizeToClientX(event.clientX)
+  }
+
+  const handleResizeEnd = (event: PointerEvent<HTMLButtonElement>) => {
+    if (
+      resizePointerIdRef.current !== null &&
+      event.pointerId !== resizePointerIdRef.current
+    ) {
+      return
+    }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    resizePointerIdRef.current = null
+    stopResizing()
+  }
 
   return (
     <div className='relative min-h-screen overflow-hidden font-manrope'>
@@ -100,10 +285,12 @@ export function TemplatePageLayout({
 
         {hasMainContent ? (
           <div
+            ref={layoutRef}
+            style={gridStyle}
             className={cn(
               'grid gap-6',
-              preview && children
-                ? 'lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] xl:grid-cols-[minmax(360px,480px)_minmax(0,1fr)]'
+              isSplitLayout
+                ? 'lg:grid-cols-[var(--template-editor-panel-width)_12px_minmax(0,1fr)]'
                 : ''
             )}
           >
@@ -113,6 +300,33 @@ export function TemplatePageLayout({
                 data-editor-scroll-container='true'
               >
                 {children}
+              </div>
+            ) : null}
+            {isSplitLayout ? (
+              <div className='hidden lg:flex lg:items-stretch'>
+                <button
+                  type='button'
+                  onPointerDown={handleResizeStart}
+                  onPointerMove={handleResizeMove}
+                  onPointerUp={handleResizeEnd}
+                  onPointerCancel={handleResizeEnd}
+                  onLostPointerCapture={() => {
+                    resizePointerIdRef.current = null
+                    stopResizing()
+                  }}
+                  className='group h-full w-full cursor-col-resize select-none'
+                  aria-label='Resize editor and preview panels'
+                  title='Drag to resize panels'
+                >
+                  <span className='flex h-full w-full items-center justify-center'>
+                    <span
+                      className={cn(
+                        'h-24 w-[3px] rounded-full bg-slate-300 transition',
+                        isResizing ? 'bg-slate-500' : 'group-hover:bg-slate-500'
+                      )}
+                    />
+                  </span>
+                </button>
               </div>
             ) : null}
             {preview ? (

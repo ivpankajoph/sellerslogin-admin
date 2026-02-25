@@ -22,7 +22,10 @@ import { ArrayField } from '../components/form/ArrayField'
 import { ThemeSettingsSection } from '../components/form/ThemeSettingsSection'
 import { updateFieldImmutable } from '../components/hooks/utils'
 import { initialData as importedInitialData, type TemplateData } from '../data'
-import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import {
+  getVendorTemplatePreviewUrl,
+  resolvePreviewCityFromVendorProfile,
+} from '@/lib/storefront-url'
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
@@ -105,6 +108,11 @@ const safeInitialData: TemplateData = {
         heading: '',
         paragraphs: [],
         image: '',
+      },
+      vendorStories: {
+        heading: '',
+        subtitle: '',
+        items: [],
       },
       values: [],
       team: [],
@@ -196,6 +204,9 @@ const initialData: TemplateData = {
 function VendorTemplateOther() {
   const vendor_id = useSelector(selectVendorId)
   const token = useSelector((state: any) => state.auth?.token)
+  const authDefaultCitySlug = useSelector(
+    (state: any) => state.auth?.user?.default_city_slug || ''
+  )
   const [data, setData] = useState<TemplateData>(initialData)
   const [isSaving, setIsSaving] = useState(false)
   const [inlineEditVersion, setInlineEditVersion] = useState(0)
@@ -403,7 +414,19 @@ function VendorTemplateOther() {
     return () => window.clearTimeout(timeout)
   }, [inlineEditVersion, handleSave])
 
-  const previewBaseUrl = getVendorTemplatePreviewUrl(vendor_id, selectedTemplateKey)
+  const previewCity = useMemo(
+    () =>
+      resolvePreviewCityFromVendorProfile(
+        data?.components?.vendor_profile,
+        authDefaultCitySlug
+      ),
+    [data?.components?.vendor_profile, authDefaultCitySlug]
+  )
+  const previewBaseUrl = getVendorTemplatePreviewUrl(
+    vendor_id,
+    selectedTemplateKey,
+    previewCity.slug
+  )
   const footerConfig = (((data?.components?.social_page as any)?.footer ||
     {}) as Record<string, any>)
 
@@ -978,7 +1001,7 @@ function VendorTemplateOther() {
         preview={
           <TemplatePreviewPanel
             title='Live Template Preview'
-            subtitle='Sync to refresh the right-side preview'
+            subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
             baseSrc={previewBaseUrl}
             defaultPath=''
             pageOptions={[

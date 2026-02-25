@@ -397,11 +397,9 @@ function TemplateOrdersReport() {
   return (
     <div className='space-y-6'>
       <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-        <div className='relative overflow-hidden rounded-2xl border border-slate-200/60 bg-gradient-to-r from-slate-50 via-white to-slate-50 px-5 py-4 shadow-sm'>
-          <div className='pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br from-indigo-200/60 to-sky-200/60 blur-2xl' />
-          <div className='pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-gradient-to-br from-amber-200/50 to-rose-200/50 blur-2xl' />
+        <div>
           <h1 className='text-2xl font-semibold text-slate-900'>Order - Template Data</h1>
-          <p className='text-sm text-slate-600'>
+          <p className='text-sm text-muted-foreground'>
             {isVendor ? 'Your storefront order history' : 'All storefront orders across vendors'}
           </p>
         </div>
@@ -416,7 +414,7 @@ function TemplateOrdersReport() {
               }
             }}
             placeholder='Search order number or customer'
-            className='w-64 border-transparent bg-gradient-to-r from-indigo-50 via-sky-50 to-emerald-50 text-slate-700 shadow-sm ring-1 ring-indigo-200/70 focus-visible:ring-2 focus-visible:ring-indigo-400'
+            className='w-64'
           />
           {!isVendor && (
             <select
@@ -425,7 +423,7 @@ function TemplateOrdersReport() {
                 setVendorFilter(e.target.value)
                 setPage(1)
               }}
-              className='h-10 min-w-[180px] rounded-md border border-transparent bg-gradient-to-r from-amber-50 via-rose-50 to-orange-50 px-3 text-sm text-slate-700 shadow-sm ring-1 ring-amber-200/70 focus:ring-2 focus:ring-amber-400'
+              className='h-10 min-w-[180px] rounded-md border border-input bg-background px-3 text-sm'
             >
               <option value='all'>All vendors</option>
               {vendors.map((vendor) => (
@@ -442,7 +440,7 @@ function TemplateOrdersReport() {
                 setTemplateFilter(e.target.value)
                 setPage(1)
               }}
-              className='h-10 min-w-[190px] rounded-md border border-transparent bg-gradient-to-r from-fuchsia-50 via-pink-50 to-rose-50 px-3 text-sm text-slate-700 shadow-sm ring-1 ring-fuchsia-200/70 focus:ring-2 focus:ring-fuchsia-400'
+              className='h-10 min-w-[190px] rounded-md border border-input bg-background px-3 text-sm'
               disabled={vendorFilter === 'all' || templatesLoading}
             >
               <option value='all'>
@@ -461,7 +459,7 @@ function TemplateOrdersReport() {
               setStatus(e.target.value)
               setPage(1)
             }}
-            className='h-10 rounded-md border border-transparent bg-gradient-to-r from-sky-50 via-cyan-50 to-teal-50 px-3 text-sm text-slate-700 shadow-sm ring-1 ring-sky-200/70 focus:ring-2 focus:ring-sky-400'
+            className='h-10 rounded-md border border-input bg-background px-3 text-sm'
           >
             <option value='all'>All status</option>
             <option value='pending'>Pending</option>
@@ -471,61 +469,61 @@ function TemplateOrdersReport() {
             <option value='failed'>Failed</option>
             <option value='cancelled'>Cancelled</option>
           </select>
-          <Button onClick={() => fetchOrders()} disabled={loading} className='bg-slate-900 text-white shadow-sm hover:bg-slate-800'>
+          <Button onClick={() => fetchOrders()} disabled={loading}>
             {loading ? 'Refreshing...' : 'Refresh'}
           </Button>
         </div>
       </div>
 
       <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-        <Card className='border-0 bg-gradient-to-br from-indigo-500 to-sky-500 text-white shadow-lg shadow-indigo-100'>
+        <Card>
           <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-white/80'>Total Orders</CardTitle>
+            <CardTitle className='text-sm text-muted-foreground'>Total Orders</CardTitle>
           </CardHeader>
-          <CardContent className='text-3xl font-semibold'>{totalOrders}</CardContent>
+          <CardContent className='text-2xl font-semibold'>{totalOrders}</CardContent>
         </Card>
-        <Card className='border-0 bg-gradient-to-br from-emerald-500 to-lime-500 text-white shadow-lg shadow-emerald-100'>
+        <Card>
           <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-white/80'>Total Revenue</CardTitle>
+            <CardTitle className='text-sm text-muted-foreground'>Total Revenue</CardTitle>
           </CardHeader>
-          <CardContent className='text-3xl font-semibold'>{formatMoney(totalRevenue)}</CardContent>
+          <CardContent className='text-2xl font-semibold'>{formatMoney(totalRevenue)}</CardContent>
         </Card>
-        <Card className='border-0 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-100'>
+        <Card>
           <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-white/80'>Pending</CardTitle>
+            <CardTitle className='text-sm text-muted-foreground'>Pending</CardTitle>
           </CardHeader>
-          <CardContent className='text-3xl font-semibold'>
+          <CardContent className='text-2xl font-semibold'>
             {pendingCount}
           </CardContent>
         </Card>
-        <Card className='border-0 bg-gradient-to-br from-fuchsia-500 to-rose-500 text-white shadow-lg shadow-fuchsia-100'>
+        <Card>
           <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-white/80'>Delivered</CardTitle>
+            <CardTitle className='text-sm text-muted-foreground'>Delivered</CardTitle>
           </CardHeader>
-          <CardContent className='text-3xl font-semibold'>
+          <CardContent className='text-2xl font-semibold'>
             {deliveredCount}
           </CardContent>
         </Card>
       </div>
 
       <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-        <Card className='border-0 bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-100'>
+        <Card>
           <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-white/80'>Payments Paid</CardTitle>
+            <CardTitle className='text-sm text-muted-foreground'>Payments Paid</CardTitle>
           </CardHeader>
-          <CardContent className='text-3xl font-semibold'>{paidCount}</CardContent>
+          <CardContent className='text-2xl font-semibold'>{paidCount}</CardContent>
         </Card>
-        <Card className='border-0 bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-lg shadow-rose-100'>
+        <Card>
           <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-white/80'>Payments Failed</CardTitle>
+            <CardTitle className='text-sm text-muted-foreground'>Payments Failed</CardTitle>
           </CardHeader>
-          <CardContent className='text-3xl font-semibold'>{failedCount}</CardContent>
+          <CardContent className='text-2xl font-semibold'>{failedCount}</CardContent>
         </Card>
-        <Card className='border-0 bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-lg shadow-slate-200'>
+        <Card>
           <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-white/80'>Paid Revenue</CardTitle>
+            <CardTitle className='text-sm text-muted-foreground'>Paid Revenue</CardTitle>
           </CardHeader>
-          <CardContent className='text-3xl font-semibold'>{formatMoney(paidRevenue)}</CardContent>
+          <CardContent className='text-2xl font-semibold'>{formatMoney(paidRevenue)}</CardContent>
         </Card>
       </div>
 
@@ -547,7 +545,7 @@ function TemplateOrdersReport() {
                   onClick={() => setSelectedId(order._id)}
                   className={`w-full rounded-xl border p-3 text-left transition ${
                     selectedId === order._id
-                      ? 'border-indigo-500/70 bg-gradient-to-r from-indigo-50 to-white'
+                      ? 'border-slate-900 bg-slate-50'
                       : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
@@ -791,7 +789,7 @@ function TemplateOrdersReport() {
                   <>
                     <Separator />
 
-                    <div className='space-y-4 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 shadow-sm'>
+                    <div className='space-y-4 rounded-2xl border p-4'>
                       <div className='flex flex-wrap items-center justify-between gap-3'>
                         <div>
                           <p className='text-sm font-semibold text-slate-900'>Borzo delivery</p>
@@ -823,7 +821,7 @@ function TemplateOrdersReport() {
                       )}
 
                       <div className='grid gap-3 lg:grid-cols-2'>
-                        <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
+                        <div className='grid gap-2 rounded-xl border p-3'>
                           <p className='text-xs font-semibold text-slate-700'>Pickup address override (optional)</p>
                           <Input
                             placeholder='Pickup name'
@@ -854,7 +852,7 @@ function TemplateOrdersReport() {
                           </div>
                         </div>
 
-                        <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
+                        <div className='grid gap-2 rounded-xl border p-3'>
                           <p className='text-xs font-semibold text-slate-700'>Drop-off override (optional)</p>
                           <Input
                             placeholder='Drop-off name'
@@ -891,7 +889,6 @@ function TemplateOrdersReport() {
                           size='sm'
                           onClick={handleCreateBorzo}
                           disabled={borzoBusy || hasActiveBorzo}
-                          className='bg-gradient-to-r from-indigo-600 to-sky-600 text-white shadow-sm hover:from-indigo-500 hover:to-sky-500'
                         >
                           {borzoActionLoading ? 'Creating...' : hasActiveBorzo ? 'Already created' : 'Create Borzo delivery'}
                         </Button>
@@ -900,7 +897,6 @@ function TemplateOrdersReport() {
                           variant='outline'
                           onClick={handleCancelBorzo}
                           disabled={borzoBusy || !selectedOrder.borzo?.order_id}
-                          className='border-indigo-200 text-indigo-700 hover:bg-indigo-50'
                         >
                           {borzoActionLoading ? 'Canceling...' : 'Cancel Borzo delivery'}
                         </Button>

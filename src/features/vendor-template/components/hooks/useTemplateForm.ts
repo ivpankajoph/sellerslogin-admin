@@ -41,7 +41,7 @@ export function useTemplateForm() {
   const [isUpdatingTemplate, setIsUpdatingTemplate] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState('idle')
-  const [uploadingPaths, setUploadingPaths] = useState(new Set())
+  const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState(false)
   const [isDeploying, setIsDeploying] = useState(false)
   const [deployMessage, setDeployMessage] = useState('Deploying website...')
@@ -55,6 +55,12 @@ export function useTemplateForm() {
   const token = useSelector((s: any) => s.auth?.token)
   const vendor_weburl = useSelector(
     (s: any) => s.vendorprofile?.profile?.vendor?.bound_url
+  )
+  const vendor_default_city_slug = useSelector(
+    (s: any) =>
+      s.vendorprofile?.profile?.vendor?.default_city_slug ||
+      s.auth?.user?.default_city_slug ||
+      ''
   )
   const isAdmin = role === 'admin' || role === 'superadmin'
 
@@ -472,6 +478,7 @@ export function useTemplateForm() {
     isSubmitting,
     vendor_id,
     vendor_weburl,
+    vendor_default_city_slug,
     open,
     setOpen,
     isDeploying,

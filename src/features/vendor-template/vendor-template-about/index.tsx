@@ -23,7 +23,10 @@ import { VendorProfileFieldsSection } from '../components/form/VendorProfileFiel
 import { updateFieldImmutable } from '../components/hooks/utils'
 import { initialData, type TemplateData } from '../data'
 import { uploadImage } from '../helper/fileupload'
-import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import {
+  getVendorTemplatePreviewUrl,
+  resolvePreviewCityFromVendorProfile,
+} from '@/lib/storefront-url'
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
@@ -44,6 +47,9 @@ function VendorTemplateAbout() {
   ])
   const vendor_id = useSelector((state: any) => state.auth.user.id)
   const token = useSelector((state: any) => state.auth?.token)
+  const authDefaultCitySlug = useSelector(
+    (state: any) => state.auth?.user?.default_city_slug || ''
+  )
   const selectedTemplateKey = useMemo(
     () => getStoredEditingTemplateKey(vendor_id),
     [vendor_id]
@@ -302,7 +308,19 @@ function VendorTemplateAbout() {
     return () => window.clearTimeout(timeout)
   }, [inlineEditVersion, uploadingPaths, handleSave])
 
-  const previewBaseUrl = getVendorTemplatePreviewUrl(vendor_id, selectedTemplateKey)
+  const previewCity = useMemo(
+    () =>
+      resolvePreviewCityFromVendorProfile(
+        data?.components?.vendor_profile,
+        authDefaultCitySlug
+      ),
+    [data?.components?.vendor_profile, authDefaultCitySlug]
+  )
+  const previewBaseUrl = getVendorTemplatePreviewUrl(
+    vendor_id,
+    selectedTemplateKey,
+    previewCity.slug
+  )
 
   const sections = useMemo(
     () => [
@@ -836,7 +854,7 @@ function VendorTemplateAbout() {
         preview={
           <TemplatePreviewPanel
             title='Live About Preview'
-            subtitle='Sync to refresh the right-side preview'
+            subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
             baseSrc={previewBaseUrl}
             defaultPath='/about'
             pageOptions={[
