@@ -50,6 +50,7 @@ import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './rou
 import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedDeliveryChargesIndexRouteImport } from './routes/_authenticated/delivery-charges/index'
+import { Route as AuthenticatedCustomerQueriesIndexRouteImport } from './routes/_authenticated/customer-queries/index'
 import { Route as AuthenticatedCommissionIndexRouteImport } from './routes/_authenticated/commission/index'
 import { Route as AuthenticatedCitiesIndexRouteImport } from './routes/_authenticated/cities/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
@@ -301,6 +302,12 @@ const AuthenticatedDeliveryChargesIndexRoute =
     path: '/delivery-charges/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCustomerQueriesIndexRoute =
+  AuthenticatedCustomerQueriesIndexRouteImport.update({
+    id: '/customer-queries/',
+    path: '/customer-queries/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCommissionIndexRoute =
   AuthenticatedCommissionIndexRouteImport.update({
     id: '/commission/',
@@ -477,6 +484,7 @@ export interface FileRoutesByFullPath {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/cities': typeof AuthenticatedCitiesIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
+  '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
@@ -540,6 +548,7 @@ export interface FileRoutesByTo {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/cities': typeof AuthenticatedCitiesIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
+  '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
@@ -608,6 +617,7 @@ export interface FileRoutesById {
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/cities/': typeof AuthenticatedCitiesIndexRoute
   '/_authenticated/commission/': typeof AuthenticatedCommissionIndexRoute
+  '/_authenticated/customer-queries/': typeof AuthenticatedCustomerQueriesIndexRoute
   '/_authenticated/delivery-charges/': typeof AuthenticatedDeliveryChargesIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
@@ -674,6 +684,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/cities'
     | '/commission'
+    | '/customer-queries'
     | '/delivery-charges'
     | '/help-center'
     | '/integrations'
@@ -737,6 +748,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/cities'
     | '/commission'
+    | '/customer-queries'
     | '/delivery-charges'
     | '/help-center'
     | '/integrations'
@@ -804,6 +816,7 @@ export interface FileRouteTypes {
     | '/_authenticated/chats/'
     | '/_authenticated/cities/'
     | '/_authenticated/commission/'
+    | '/_authenticated/customer-queries/'
     | '/_authenticated/delivery-charges/'
     | '/_authenticated/help-center/'
     | '/_authenticated/integrations/'
@@ -1138,6 +1151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDeliveryChargesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/customer-queries/': {
+      id: '/_authenticated/customer-queries/'
+      path: '/customer-queries'
+      fullPath: '/customer-queries'
+      preLoaderRoute: typeof AuthenticatedCustomerQueriesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/commission/': {
       id: '/_authenticated/commission/'
       path: '/commission'
@@ -1348,6 +1368,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedCitiesIndexRoute: typeof AuthenticatedCitiesIndexRoute
   AuthenticatedCommissionIndexRoute: typeof AuthenticatedCommissionIndexRoute
+  AuthenticatedCustomerQueriesIndexRoute: typeof AuthenticatedCustomerQueriesIndexRoute
   AuthenticatedDeliveryChargesIndexRoute: typeof AuthenticatedDeliveryChargesIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
@@ -1397,6 +1418,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedCitiesIndexRoute: AuthenticatedCitiesIndexRoute,
   AuthenticatedCommissionIndexRoute: AuthenticatedCommissionIndexRoute,
+  AuthenticatedCustomerQueriesIndexRoute:
+    AuthenticatedCustomerQueriesIndexRoute,
   AuthenticatedDeliveryChargesIndexRoute:
     AuthenticatedDeliveryChargesIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,

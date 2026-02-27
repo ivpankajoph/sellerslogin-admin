@@ -10,7 +10,6 @@ import { UsersProvider } from './components/users-provider'
 import { UsersTable } from './components/users-table'
 import { useEffect, useState } from 'react'
 import api from '@/lib/axios'
-import axios from 'axios'
 
 import { useSelector } from 'react-redux'
 import { type User } from './data/schema'
@@ -32,18 +31,9 @@ export function Users() {
       setLoading(true)
       setError(null)
       try {
-        const res =
-          role === 'vendor'
-            ? await api.get('/customers')
-            : await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/users/getall`, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              })
+        const res = await api.get('/users/getall')
 
-        const users = role === 'vendor'
-          ? (res.data?.customers ?? [])
-          : (res.data?.users ?? [])
+        const users = res.data?.users ?? []
         const mapped: User[] = users.map((user: any) => {
           const name = String(user?.name || '').trim()
           const nameParts = name.split(/\s+/).filter(Boolean)

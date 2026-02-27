@@ -36,7 +36,13 @@ export const sidebarData: any = {
           title: 'Users',
           url: '/users',
           icon: Users,
-          roles: [ROLES.ADMIN,ROLES.VENDOR], // admin only
+          roles: [ROLES.ADMIN, ROLES.VENDOR], // admin only
+        },
+        {
+          title: 'User Queries',
+          url: '/customer-queries',
+          icon: HelpCircle,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
           title: 'Analytics',
@@ -173,17 +179,17 @@ export const sidebarData: any = {
 
     {
       title: 'Category',
-      roles: [ROLES.ADMIN,ROLES.VENDOR],
+      roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
           title: 'All Categories',
           icon: ShieldCheck,
-          roles: [ROLES.ADMIN,ROLES.VENDOR],
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
             {
               title: 'Show Categories',
               url: '/category',
-              roles: [ROLES.ADMIN,ROLES.VENDOR],
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
             {
               title: 'Specification Keys',
@@ -213,7 +219,7 @@ export const sidebarData: any = {
             {
               title: 'Show Products',
               url: '/products',
-              roles: [ ROLES.VENDOR],
+              roles: [ROLES.VENDOR],
             },
             {
               title: 'Create Products',
@@ -228,7 +234,7 @@ export const sidebarData: any = {
             {
               title: 'Inventory Management',
               url: '/inventory-management',
-              roles: [ROLES.ADMIN,ROLES.VENDOR], // admin only
+              roles: [ROLES.ADMIN, ROLES.VENDOR], // admin only
             },
           ],
         },
@@ -313,7 +319,7 @@ export const sidebarData: any = {
               url: '/vendor-template-pages',
               roles: [ROLES.VENDOR],
             },
-           
+
           ],
         },
       ],
