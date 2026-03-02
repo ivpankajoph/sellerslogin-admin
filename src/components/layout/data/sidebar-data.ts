@@ -13,6 +13,7 @@ import {
   Info,
   KeyRound,
   MapPinned,
+  Star,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -42,6 +43,12 @@ export const sidebarData: any = {
           title: 'User Queries',
           url: '/customer-queries',
           icon: HelpCircle,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+        },
+        {
+          title: 'Customer Reviews',
+          url: '/customer-reviews',
+          icon: Star,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {

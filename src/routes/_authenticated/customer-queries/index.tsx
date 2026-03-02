@@ -36,6 +36,7 @@ type CustomerQuery = {
   email: string
   phone?: string
   orderId?: string
+  productId?: { _id: string; productName?: string; slug?: string }
   issueType: string
   message: string
   userId: any
@@ -197,7 +198,14 @@ function CustomerQueriesPage() {
                     }`}
                 >
                   <div className='flex justify-between items-start mb-1'>
-                    <span className='font-medium text-sm truncate'>{query.fullName}</span>
+                    <div className='flex flex-col'>
+                      <span className='font-medium text-sm truncate'>{query.fullName}</span>
+                      {query.productId && (
+                        <span className='text-xs text-muted-foreground truncate max-w-[120px]'>
+                          Product: {query.productId.productName || 'N/A'}
+                        </span>
+                      )}
+                    </div>
                     <Badge variant='outline' className={getStatusBadge(query.status)}>
                       {query.status}
                     </Badge>
@@ -233,6 +241,12 @@ function CustomerQueriesPage() {
                       <Label className='text-xs text-muted-foreground'>Email Address</Label>
                       <p className='text-sm font-medium'>{selectedQuery.email}</p>
                     </div>
+                    {selectedQuery.productId && (
+                      <div>
+                        <Label className='text-xs text-muted-foreground'>Product</Label>
+                        <p className='text-sm font-medium'>{selectedQuery.productId.productName}</p>
+                      </div>
+                    )}
                     {selectedQuery.phone && (
                       <div>
                         <Label className='text-xs text-muted-foreground'>Phone Number</Label>
