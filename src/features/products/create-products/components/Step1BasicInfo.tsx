@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronsUpDown, Loader2, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import HyperlinkInsert from '@/components/product/HyperlinkInsert'
 import { cn } from '@/lib/utils'
 import {
   Command,
@@ -218,6 +219,8 @@ const Step1BasicInfo: React.FC<Props> = ({
   generateDescription,
 }) => {
   const [subCategorySearch, setSubCategorySearch] = useState('')
+  const shortDescriptionRef = useRef<HTMLTextAreaElement>(null)
+  const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     setSubCategorySearch('')
@@ -520,6 +523,7 @@ const Step1BasicInfo: React.FC<Props> = ({
           </button>
         </label>
         <textarea
+          ref={shortDescriptionRef}
           value={formData.shortDescription}
           onChange={(event) =>
             setFormData((prev: any) => ({
@@ -530,6 +534,17 @@ const Step1BasicInfo: React.FC<Props> = ({
           rows={3}
           className='w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
           required
+        />
+        <HyperlinkInsert
+          fieldLabel='Short Description'
+          value={formData.shortDescription}
+          textareaRef={shortDescriptionRef}
+          onValueChange={(nextValue) =>
+            setFormData((prev: any) => ({
+              ...prev,
+              shortDescription: nextValue,
+            }))
+          }
         />
       </div>
 
@@ -551,6 +566,7 @@ const Step1BasicInfo: React.FC<Props> = ({
           </button>
         </label>
         <textarea
+          ref={descriptionRef}
           value={formData.description}
           onChange={(event) =>
             setFormData((prev: any) => ({ ...prev, description: event.target.value }))
@@ -558,6 +574,17 @@ const Step1BasicInfo: React.FC<Props> = ({
           rows={5}
           className='w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
           required
+        />
+        <HyperlinkInsert
+          fieldLabel='Description'
+          value={formData.description}
+          textareaRef={descriptionRef}
+          onValueChange={(nextValue) =>
+            setFormData((prev: any) => ({
+              ...prev,
+              description: nextValue,
+            }))
+          }
         />
       </div>
     </section>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ExternalLink,
   FilePenLine,
@@ -17,6 +17,7 @@ import { ConfigDrawer } from '@/components/config-drawer'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import HyperlinkInsert from '@/components/product/HyperlinkInsert'
 import {
   getVendorTemplatePreviewUrl,
   setStoredTemplatePreviewCity,
@@ -461,6 +462,8 @@ export default function TemplateWorkspacePage() {
   const [vendorDefaultCitySlug, setVendorDefaultCitySlug] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [editingProduct, setEditingProduct] = useState<ProductEditor | null>(null)
+  const shortDescriptionRef = useRef<HTMLTextAreaElement>(null)
+  const descriptionRef = useRef<HTMLTextAreaElement>(null)
   const [savingDefaultCity, setSavingDefaultCity] = useState(false)
   const [loadingDefaultCity, setLoadingDefaultCity] = useState(false)
 
@@ -2186,6 +2189,7 @@ export default function TemplateWorkspacePage() {
             <label className='mt-3 block text-sm'>
               <span className='mb-1 block font-medium text-slate-700'>Short Description</span>
               <textarea
+                ref={shortDescriptionRef}
                 value={editingProduct.shortDescription}
                 onChange={(e) =>
                   setEditingProduct((prev) =>
@@ -2194,11 +2198,27 @@ export default function TemplateWorkspacePage() {
                 }
                 className='min-h-[88px] w-full rounded-md border border-slate-300 px-3 py-2'
               />
+              <HyperlinkInsert
+                fieldLabel='Short Description'
+                value={editingProduct.shortDescription}
+                textareaRef={shortDescriptionRef}
+                onValueChange={(nextValue) =>
+                  setEditingProduct((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          shortDescription: nextValue,
+                        }
+                      : prev
+                  )
+                }
+              />
             </label>
 
             <label className='mt-3 block text-sm'>
               <span className='mb-1 block font-medium text-slate-700'>Description</span>
               <textarea
+                ref={descriptionRef}
                 value={editingProduct.description}
                 onChange={(e) =>
                   setEditingProduct((prev) =>
@@ -2206,6 +2226,21 @@ export default function TemplateWorkspacePage() {
                   )
                 }
                 className='min-h-[110px] w-full rounded-md border border-slate-300 px-3 py-2'
+              />
+              <HyperlinkInsert
+                fieldLabel='Description'
+                value={editingProduct.description}
+                textareaRef={descriptionRef}
+                onValueChange={(nextValue) =>
+                  setEditingProduct((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          description: nextValue,
+                        }
+                      : prev
+                  )
+                }
               />
             </label>
 
