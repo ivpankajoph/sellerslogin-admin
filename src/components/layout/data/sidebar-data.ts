@@ -14,6 +14,7 @@ import {
   KeyRound,
   MapPinned,
   Star,
+  Globe,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -172,6 +173,12 @@ export const sidebarData: any = {
           title: 'About',
           url: '/vendor-about',
           icon: Info,
+          roles: [ROLES.VENDOR],
+        },
+        {
+          title: 'Get Domain',
+          url: '/get-domain',
+          icon: Globe,
           roles: [ROLES.VENDOR],
         },
         {
