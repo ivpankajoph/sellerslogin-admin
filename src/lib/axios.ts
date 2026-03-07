@@ -110,7 +110,7 @@ const handleExpiredSession = () => {
 
 
 const api: AxiosInstance = axios.create({
-  baseURL: `${BASE_URL}/v1`, 
+  baseURL: `${BASE_URL}/v1`,
   headers: {
     "Content-Type": "application/json",
   },
@@ -128,7 +128,7 @@ api.interceptors.request.use(
       return Promise.reject(new axios.Cancel("Session expired"));
     }
 
-    if (config.url && !config.url.startsWith("/auth") && !config.url.includes("/login")) {
+    if (config.url && !config.url.startsWith("/auth") && !config.url.includes("/login") && !config.url.includes("/support/queries") && !config.url.endsWith("/users/getall")) {
       const prefix = role === "vendor" ? "/vendor" : "/admin";
       if (!config.url.startsWith(prefix)) {
         config.url = `${prefix}${config.url}`;

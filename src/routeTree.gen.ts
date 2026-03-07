@@ -49,7 +49,10 @@ import { Route as AuthenticatedOrderIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './routes/_authenticated/inventory-management/index'
 import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
+import { Route as AuthenticatedGetDomainIndexRouteImport } from './routes/_authenticated/get-domain/index'
 import { Route as AuthenticatedDeliveryChargesIndexRouteImport } from './routes/_authenticated/delivery-charges/index'
+import { Route as AuthenticatedCustomerReviewsIndexRouteImport } from './routes/_authenticated/customer-reviews/index'
+import { Route as AuthenticatedCustomerQueriesIndexRouteImport } from './routes/_authenticated/customer-queries/index'
 import { Route as AuthenticatedCommissionIndexRouteImport } from './routes/_authenticated/commission/index'
 import { Route as AuthenticatedCitiesIndexRouteImport } from './routes/_authenticated/cities/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
@@ -295,10 +298,28 @@ const AuthenticatedHelpCenterIndexRoute =
     path: '/help-center/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedGetDomainIndexRoute =
+  AuthenticatedGetDomainIndexRouteImport.update({
+    id: '/get-domain/',
+    path: '/get-domain/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDeliveryChargesIndexRoute =
   AuthenticatedDeliveryChargesIndexRouteImport.update({
     id: '/delivery-charges/',
     path: '/delivery-charges/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCustomerReviewsIndexRoute =
+  AuthenticatedCustomerReviewsIndexRouteImport.update({
+    id: '/customer-reviews/',
+    path: '/customer-reviews/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCustomerQueriesIndexRoute =
+  AuthenticatedCustomerQueriesIndexRouteImport.update({
+    id: '/customer-queries/',
+    path: '/customer-queries/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedCommissionIndexRoute =
@@ -477,7 +498,10 @@ export interface FileRoutesByFullPath {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/cities': typeof AuthenticatedCitiesIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
+  '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
+  '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
+  '/get-domain': typeof AuthenticatedGetDomainIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
@@ -540,7 +564,10 @@ export interface FileRoutesByTo {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/cities': typeof AuthenticatedCitiesIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
+  '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
+  '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
+  '/get-domain': typeof AuthenticatedGetDomainIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
@@ -608,7 +635,10 @@ export interface FileRoutesById {
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/cities/': typeof AuthenticatedCitiesIndexRoute
   '/_authenticated/commission/': typeof AuthenticatedCommissionIndexRoute
+  '/_authenticated/customer-queries/': typeof AuthenticatedCustomerQueriesIndexRoute
+  '/_authenticated/customer-reviews/': typeof AuthenticatedCustomerReviewsIndexRoute
   '/_authenticated/delivery-charges/': typeof AuthenticatedDeliveryChargesIndexRoute
+  '/_authenticated/get-domain/': typeof AuthenticatedGetDomainIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/inventory-management/': typeof AuthenticatedInventoryManagementIndexRoute
@@ -674,7 +704,10 @@ export interface FileRouteTypes {
     | '/chats'
     | '/cities'
     | '/commission'
+    | '/customer-queries'
+    | '/customer-reviews'
     | '/delivery-charges'
+    | '/get-domain'
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
@@ -737,7 +770,10 @@ export interface FileRouteTypes {
     | '/chats'
     | '/cities'
     | '/commission'
+    | '/customer-queries'
+    | '/customer-reviews'
     | '/delivery-charges'
+    | '/get-domain'
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
@@ -804,7 +840,10 @@ export interface FileRouteTypes {
     | '/_authenticated/chats/'
     | '/_authenticated/cities/'
     | '/_authenticated/commission/'
+    | '/_authenticated/customer-queries/'
+    | '/_authenticated/customer-reviews/'
     | '/_authenticated/delivery-charges/'
+    | '/_authenticated/get-domain/'
     | '/_authenticated/help-center/'
     | '/_authenticated/integrations/'
     | '/_authenticated/inventory-management/'
@@ -1131,11 +1170,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHelpCenterIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/get-domain/': {
+      id: '/_authenticated/get-domain/'
+      path: '/get-domain'
+      fullPath: '/get-domain'
+      preLoaderRoute: typeof AuthenticatedGetDomainIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/delivery-charges/': {
       id: '/_authenticated/delivery-charges/'
       path: '/delivery-charges'
       fullPath: '/delivery-charges'
       preLoaderRoute: typeof AuthenticatedDeliveryChargesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/customer-reviews/': {
+      id: '/_authenticated/customer-reviews/'
+      path: '/customer-reviews'
+      fullPath: '/customer-reviews'
+      preLoaderRoute: typeof AuthenticatedCustomerReviewsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/customer-queries/': {
+      id: '/_authenticated/customer-queries/'
+      path: '/customer-queries'
+      fullPath: '/customer-queries'
+      preLoaderRoute: typeof AuthenticatedCustomerQueriesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/commission/': {
@@ -1348,7 +1408,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedCitiesIndexRoute: typeof AuthenticatedCitiesIndexRoute
   AuthenticatedCommissionIndexRoute: typeof AuthenticatedCommissionIndexRoute
+  AuthenticatedCustomerQueriesIndexRoute: typeof AuthenticatedCustomerQueriesIndexRoute
+  AuthenticatedCustomerReviewsIndexRoute: typeof AuthenticatedCustomerReviewsIndexRoute
   AuthenticatedDeliveryChargesIndexRoute: typeof AuthenticatedDeliveryChargesIndexRoute
+  AuthenticatedGetDomainIndexRoute: typeof AuthenticatedGetDomainIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
@@ -1397,8 +1460,13 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedCitiesIndexRoute: AuthenticatedCitiesIndexRoute,
   AuthenticatedCommissionIndexRoute: AuthenticatedCommissionIndexRoute,
+  AuthenticatedCustomerQueriesIndexRoute:
+    AuthenticatedCustomerQueriesIndexRoute,
+  AuthenticatedCustomerReviewsIndexRoute:
+    AuthenticatedCustomerReviewsIndexRoute,
   AuthenticatedDeliveryChargesIndexRoute:
     AuthenticatedDeliveryChargesIndexRoute,
+  AuthenticatedGetDomainIndexRoute: AuthenticatedGetDomainIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,
   AuthenticatedInventoryManagementIndexRoute:
