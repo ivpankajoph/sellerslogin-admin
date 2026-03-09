@@ -38,6 +38,7 @@ type CustomerQuery = {
   orderId?: string
   productId?: { _id: string; productName?: string; slug?: string }
   issueType: string
+  source?: 'support' | 'product_enquiry'
   message: string
   userId: any
   vendorId?: any
@@ -88,7 +89,10 @@ function CustomerQueriesPage() {
     const matchesSearch = !search ||
       q.fullName.toLowerCase().includes(search.toLowerCase()) ||
       q.email.toLowerCase().includes(search.toLowerCase()) ||
-      (q.orderId && q.orderId.toLowerCase().includes(search.toLowerCase()))
+      q.issueType.toLowerCase().includes(search.toLowerCase()) ||
+      q.message.toLowerCase().includes(search.toLowerCase()) ||
+      (q.orderId && q.orderId.toLowerCase().includes(search.toLowerCase())) ||
+      (q.productId?.productName && q.productId.productName.toLowerCase().includes(search.toLowerCase()))
     return matchesStatus && matchesSearch
   })
 
@@ -148,7 +152,7 @@ function CustomerQueriesPage() {
         <div>
           <h1 className='text-2xl font-semibold text-slate-900'>Customer Queries</h1>
           <p className='text-sm text-muted-foreground'>
-            Review and manage customer complaints and questions.
+            Review and manage customer complaints, questions, and product enquiries.
           </p>
         </div>
         <div className='flex flex-wrap items-center gap-2'>
@@ -210,7 +214,12 @@ function CustomerQueriesPage() {
                       {query.status}
                     </Badge>
                   </div>
-                  <div className='text-xs text-muted-foreground mb-2 truncate'>{query.issueType}</div>
+                  <div className='text-xs text-muted-foreground mb-2 truncate'>
+                    {query.issueType}
+                    {query.source === 'product_enquiry' && query.issueType !== 'Product enquiry'
+                      ? ' • Product enquiry'
+                      : ''}
+                  </div>
                   <div className='flex justify-between items-center text-[10px] text-muted-foreground'>
                     <span>{query.createdAt ? format(new Date(query.createdAt), 'MMM dd, yyyy') : ''}</span>
                     {query.orderId && <span>{query.orderId}</span>}

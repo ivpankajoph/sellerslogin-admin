@@ -41,7 +41,7 @@ export const sidebarData: any = {
           roles: [ROLES.ADMIN, ROLES.VENDOR], // admin only
         },
         {
-          title: 'User Queries',
+          title: 'Customer Queries',
           url: '/customer-queries',
           icon: HelpCircle,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
