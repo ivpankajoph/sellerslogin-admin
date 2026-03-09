@@ -21,6 +21,9 @@ export function Dashboard() {
   const dispatch = useDispatch()
   const user = useSelector((state: any) => state.auth.user)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'reports' | 'notifications'>(
+    'overview',
+  )
 
   useEffect(() => {
     if (!user?.id) return
@@ -79,7 +82,10 @@ export function Dashboard() {
         </div>
         <Tabs
           orientation='vertical'
-          defaultValue='overview'
+          value={activeTab}
+          onValueChange={(value) =>
+            setActiveTab(value as 'overview' | 'analytics' | 'reports' | 'notifications')
+          }
           className='space-y-4'
         >
           <div className='w-full overflow-x-auto pb-2'>
@@ -109,4 +115,3 @@ export function Dashboard() {
     </>
   )
 }
-

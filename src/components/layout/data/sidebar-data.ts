@@ -182,6 +182,12 @@ export const sidebarData: any = {
           roles: [ROLES.VENDOR],
         },
         {
+          title: 'Connect with Brevo',
+          url: '/connect-brevo',
+          icon: KeyRound,
+          roles: [ROLES.VENDOR],
+        },
+        {
           title: 'Delivery Tracking',
           url: '/borzo-report',
           icon: Truck,
