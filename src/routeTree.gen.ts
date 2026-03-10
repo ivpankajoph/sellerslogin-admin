@@ -24,6 +24,7 @@ import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-p
 import { Route as ClerkAuthenticatedRouteRouteImport } from './routes/clerk/_authenticated/route'
 import { Route as ClerkauthRouteRouteImport } from './routes/clerk/(auth)/route'
 import { Route as AuthenticatedAnalyticsRouteRouteImport } from './routes/_authenticated/analytics/route'
+import { Route as AuthenticatedWhatsappMarketingIndexRouteImport } from './routes/_authenticated/whatsapp-marketing/index'
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
 import { Route as AuthenticatedVendorIndexRouteImport } from './routes/_authenticated/vendor/index'
 import { Route as AuthenticatedVendorTemplateIndexRouteImport } from './routes/_authenticated/vendor-template/index'
@@ -149,6 +150,12 @@ const AuthenticatedAnalyticsRouteRoute =
   AuthenticatedAnalyticsRouteRouteImport.update({
     id: '/analytics',
     path: '/analytics',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWhatsappMarketingIndexRoute =
+  AuthenticatedWhatsappMarketingIndexRouteImport.update({
+    id: '/whatsapp-marketing/',
+    path: '/whatsapp-marketing/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedWalletIndexRoute =
@@ -527,6 +534,7 @@ export interface FileRoutesByFullPath {
   '/vendor-template': typeof AuthenticatedVendorTemplateIndexRoute
   '/vendor': typeof AuthenticatedVendorIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
+  '/whatsapp-marketing': typeof AuthenticatedWhatsappMarketingIndexRoute
   '/category/create-category': typeof AuthenticatedCategoryCreateCategoryIndexRoute
   '/products/admin-products': typeof AuthenticatedProductsAdminProductsIndexRoute
   '/products/create-products': typeof AuthenticatedProductsCreateProductsIndexRoute
@@ -593,6 +601,7 @@ export interface FileRoutesByTo {
   '/vendor-template': typeof AuthenticatedVendorTemplateIndexRoute
   '/vendor': typeof AuthenticatedVendorIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
+  '/whatsapp-marketing': typeof AuthenticatedWhatsappMarketingIndexRoute
   '/category/create-category': typeof AuthenticatedCategoryCreateCategoryIndexRoute
   '/products/admin-products': typeof AuthenticatedProductsAdminProductsIndexRoute
   '/products/create-products': typeof AuthenticatedProductsCreateProductsIndexRoute
@@ -664,6 +673,7 @@ export interface FileRoutesById {
   '/_authenticated/vendor-template/': typeof AuthenticatedVendorTemplateIndexRoute
   '/_authenticated/vendor/': typeof AuthenticatedVendorIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
+  '/_authenticated/whatsapp-marketing/': typeof AuthenticatedWhatsappMarketingIndexRoute
   '/_authenticated/category/create-category/': typeof AuthenticatedCategoryCreateCategoryIndexRoute
   '/_authenticated/products/admin-products/': typeof AuthenticatedProductsAdminProductsIndexRoute
   '/_authenticated/products/create-products/': typeof AuthenticatedProductsCreateProductsIndexRoute
@@ -733,6 +743,7 @@ export interface FileRouteTypes {
     | '/vendor-template'
     | '/vendor'
     | '/wallet'
+    | '/whatsapp-marketing'
     | '/category/create-category'
     | '/products/admin-products'
     | '/products/create-products'
@@ -799,6 +810,7 @@ export interface FileRouteTypes {
     | '/vendor-template'
     | '/vendor'
     | '/wallet'
+    | '/whatsapp-marketing'
     | '/category/create-category'
     | '/products/admin-products'
     | '/products/create-products'
@@ -869,6 +881,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vendor-template/'
     | '/_authenticated/vendor/'
     | '/_authenticated/wallet/'
+    | '/_authenticated/whatsapp-marketing/'
     | '/_authenticated/category/create-category/'
     | '/_authenticated/products/admin-products/'
     | '/_authenticated/products/create-products/'
@@ -993,6 +1006,13 @@ declare module '@tanstack/react-router' {
       path: '/analytics'
       fullPath: '/analytics'
       preLoaderRoute: typeof AuthenticatedAnalyticsRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/whatsapp-marketing/': {
+      id: '/_authenticated/whatsapp-marketing/'
+      path: '/whatsapp-marketing'
+      fullPath: '/whatsapp-marketing'
+      preLoaderRoute: typeof AuthenticatedWhatsappMarketingIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/wallet/': {
@@ -1437,6 +1457,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVendorTemplateIndexRoute: typeof AuthenticatedVendorTemplateIndexRoute
   AuthenticatedVendorIndexRoute: typeof AuthenticatedVendorIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
+  AuthenticatedWhatsappMarketingIndexRoute: typeof AuthenticatedWhatsappMarketingIndexRoute
   AuthenticatedCategoryCreateCategoryIndexRoute: typeof AuthenticatedCategoryCreateCategoryIndexRoute
   AuthenticatedProductsAdminProductsIndexRoute: typeof AuthenticatedProductsAdminProductsIndexRoute
   AuthenticatedProductsCreateProductsIndexRoute: typeof AuthenticatedProductsCreateProductsIndexRoute
@@ -1501,6 +1522,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVendorTemplateIndexRoute: AuthenticatedVendorTemplateIndexRoute,
   AuthenticatedVendorIndexRoute: AuthenticatedVendorIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,
+  AuthenticatedWhatsappMarketingIndexRoute:
+    AuthenticatedWhatsappMarketingIndexRoute,
   AuthenticatedCategoryCreateCategoryIndexRoute:
     AuthenticatedCategoryCreateCategoryIndexRoute,
   AuthenticatedProductsAdminProductsIndexRoute:

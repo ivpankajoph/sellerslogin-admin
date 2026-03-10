@@ -5,11 +5,15 @@
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Overview } from './overview'
 import { RecentSales } from './recent-sales'
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
+import api from '@/lib/axios'
+import { toast } from 'sonner'
 import {
+  ArrowUpRight,
   ShoppingBag,
   Boxes,
   PackageCheck,
@@ -18,6 +22,7 @@ import {
   Wallet,
   TrendingUp,
   Layers,
+  MessageSquareText,
 } from 'lucide-react'
 
 type Product = {
@@ -51,6 +56,7 @@ const VendorDashboard = () => {
   const [categoryMap, setCategoryMap] = useState<Record<string, Category>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [launchingMarketing, setLaunchingMarketing] = useState(false)
   const [globalCounts, setGlobalCounts] = useState({
     vendorsTotal: 0,
     verifiedVendors: 0,
@@ -440,8 +446,59 @@ const VendorDashboard = () => {
 
   const cardsToRender = isAdminRole ? adminCards : vendorCards
 
+  const handleMarketingLaunch = async () => {
+    if (launchingMarketing) return
+
+    try {
+      setLaunchingMarketing(true)
+      const response = await api.get('/marketing/launch')
+      const launchUrl = String(response?.data?.launchUrl || '').trim()
+
+      if (!launchUrl) {
+        throw new Error('Launch URL not returned by the server')
+      }
+
+      window.location.assign(launchUrl)
+    } catch (launchError: any) {
+      toast.error(
+        launchError?.response?.data?.message ||
+          launchError?.message ||
+          'Failed to open WhatsApp marketing dashboard'
+      )
+      setLaunchingMarketing(false)
+    }
+  }
+
   return (
     <>
+      {!isAdminRole && (
+        <Card className='mb-4 border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-teal-50 shadow-sm'>
+          <CardHeader className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+            <div className='space-y-1'>
+              <CardTitle className='flex items-center gap-2 text-slate-900'>
+                <MessageSquareText className='h-5 w-5 text-emerald-600' />
+                WhatsApp Marketing
+              </CardTitle>
+              <CardDescription className='max-w-2xl text-slate-600'>
+                Open your dedicated WhatsApp marketing workspace for campaigns,
+                automations, inbox, and templates.
+              </CardDescription>
+            </div>
+            <Button
+              type='button'
+              className='w-full bg-emerald-600 text-white hover:bg-emerald-700 md:w-auto'
+              disabled={launchingMarketing}
+              onClick={handleMarketingLaunch}
+            >
+              <MessageSquareText className='h-4 w-4' />
+              {launchingMarketing
+                ? 'Opening WhatsApp Marketing...'
+                : 'Open WhatsApp Marketing'}
+              <ArrowUpRight className='h-4 w-4' />
+            </Button>
+          </CardHeader>
+        </Card>
+      )}
       <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
         {cardsToRender.map((card) => {
           const Icon = card.icon

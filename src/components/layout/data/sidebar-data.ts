@@ -13,6 +13,7 @@ import {
   Info,
   KeyRound,
   MapPinned,
+  MessageSquareText,
   Star,
   Globe,
 } from 'lucide-react'
@@ -161,6 +162,12 @@ export const sidebarData: any = {
           title: 'Storefront Analytics',
           url: '/analytics',
           icon: LayoutDashboard,
+          roles: [ROLES.VENDOR],
+        },
+        {
+          title: 'WhatsApp Marketing',
+          url: '/whatsapp-marketing',
+          icon: MessageSquareText,
           roles: [ROLES.VENDOR],
         },
         {
