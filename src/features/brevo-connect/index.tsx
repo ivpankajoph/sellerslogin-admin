@@ -840,7 +840,7 @@ import {
   Plus,
   Send,
   Trash2,
-  ExternalLink,
+
 } from 'lucide-react'
 import { toast } from 'sonner'
 import api from '@/lib/axios'
@@ -935,7 +935,7 @@ export default function BrevoConnectPage() {
   const [contacts, setContacts] = useState<BrevoContact[]>([])
   const [loadingContacts, setLoadingContacts] = useState(false)
   const [stats, setStats] = useState<BrevoStat[]>([])
-  const [loadingStats, setLoadingStats] = useState(false)
+  const [, setLoadingStats] = useState(false)
   const [logs, setLogs] = useState<EmailLog[]>([])
   const [loadingLogs, setLoadingLogs] = useState(false)
 
