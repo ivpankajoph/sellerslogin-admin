@@ -51,7 +51,7 @@ export function UserAuthForm({
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     const resultAction = await dispatch(
       loginAdmin({
-        email: data.email,
+        email: data.email.trim().toLowerCase(),
         password: data.password,
       })
     );

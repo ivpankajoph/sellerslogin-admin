@@ -31,6 +31,13 @@ export const loginAdmin = createAsyncThunk(
   ) => {
     try {
       const response = await axios.post(`${BASE_URL}/v1/auth/login`, credentials);
+
+      if (!response.data?.success) {
+        return rejectWithValue(
+          response.data?.message || "Login failed."
+        );
+      }
+
       return response.data;
     } catch (err: any) {
       const message =
@@ -74,6 +81,9 @@ const authSlice = createSlice({
       )
       .addCase(loginAdmin.rejected, (state, action: PayloadAction<any>) => {
         state.loading = false;
+        state.token = null;
+        state.user = null;
+        state.isAuthenticated = false;
         state.error =
           typeof action.payload === "string"
             ? action.payload
