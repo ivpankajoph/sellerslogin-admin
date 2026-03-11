@@ -10,7 +10,7 @@ import { Overview } from './overview'
 import { RecentSales } from './recent-sales'
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
-import api from '@/lib/axios'
+import { launchWhatsAppMarketingWorkspace } from '@/features/whatsapp-marketing/launch-workspace'
 import { toast } from 'sonner'
 import {
   ArrowUpRight,
@@ -451,14 +451,8 @@ const VendorDashboard = () => {
 
     try {
       setLaunchingMarketing(true)
-      const response = await api.get('/marketing/launch')
-      const launchUrl = String(response?.data?.launchUrl || '').trim()
-
-      if (!launchUrl) {
-        throw new Error('Launch URL not returned by the server')
-      }
-
-      window.location.assign(launchUrl)
+      await launchWhatsAppMarketingWorkspace()
+      setLaunchingMarketing(false)
     } catch (launchError: any) {
       toast.error(
         launchError?.response?.data?.message ||

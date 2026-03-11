@@ -14,25 +14,24 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import api from '@/lib/axios'
+import { launchWhatsAppMarketingWorkspace } from './launch-workspace'
+
+const AUTO_LAUNCH_DEDUPE_MS = 1500
+const AUTO_LAUNCH_STORAGE_KEY = 'oph-whatsapp-marketing-auto-launch-at'
 
 export default function WhatsAppMarketingPage() {
   const [isLaunching, setIsLaunching] = useState(true)
+  const [isLaunched, setIsLaunched] = useState(false)
   const [error, setError] = useState('')
 
   const launchWorkspace = async () => {
     try {
       setIsLaunching(true)
+      setIsLaunched(false)
       setError('')
-
-      const response = await api.get('/marketing/launch')
-      const launchUrl = String(response?.data?.launchUrl || '').trim()
-
-      if (!launchUrl) {
-        throw new Error('Launch URL not returned by the server')
-      }
-
-      window.location.assign(launchUrl)
+      await launchWhatsAppMarketingWorkspace()
+      setIsLaunched(true)
+      setIsLaunching(false)
     } catch (launchError: any) {
       setError(
         launchError?.response?.data?.message ||
@@ -44,6 +43,16 @@ export default function WhatsAppMarketingPage() {
   }
 
   useEffect(() => {
+    const now = Date.now()
+    const previousLaunchAt = Number(
+      sessionStorage.getItem(AUTO_LAUNCH_STORAGE_KEY) || 0
+    )
+
+    if (now - previousLaunchAt < AUTO_LAUNCH_DEDUPE_MS) {
+      return
+    }
+
+    sessionStorage.setItem(AUTO_LAUNCH_STORAGE_KEY, String(now))
     launchWorkspace()
   }, [])
 
@@ -71,6 +80,26 @@ export default function WhatsAppMarketingPage() {
               <p className='text-sm text-slate-600'>
                 Launching your vendor marketing dashboard...
               </p>
+            </div>
+          ) : isLaunched ? (
+            <div className='space-y-5'>
+              <div className='rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700'>
+                WhatsApp Marketing opened in a new window.
+              </div>
+              <div className='flex flex-col gap-3 sm:flex-row sm:justify-center'>
+                <Button
+                  type='button'
+                  className='bg-emerald-600 text-white hover:bg-emerald-700'
+                  onClick={launchWorkspace}
+                >
+                  <MessageSquareText className='h-4 w-4' />
+                  Open Again
+                  <ArrowUpRight className='h-4 w-4' />
+                </Button>
+                <Button asChild variant='outline'>
+                  <Link to='/'>Back to Dashboard</Link>
+                </Button>
+              </div>
             </div>
           ) : (
             <div className='space-y-5'>
