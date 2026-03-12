@@ -1,4 +1,4 @@
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { type AppDispatch } from '@/store'
 import { logout } from '@/store/slices/authSlice'
 import { useDispatch } from 'react-redux'
@@ -54,25 +54,8 @@ export function ProfileDropdown() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem asChild>
-              <Link to='/profile'>
-                Profile
-                <DropdownMenuShortcut>Shift+Ctrl+P</DropdownMenuShortcut>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to='/'>
-                Billing
-                <DropdownMenuShortcut>Ctrl+B</DropdownMenuShortcut>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to='/'>
-                Settings
-                <DropdownMenuShortcut>Ctrl+S</DropdownMenuShortcut>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>New Team</DropdownMenuItem>
+           
+          
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>

@@ -17,8 +17,15 @@ import { ConfigDrawer } from '@/components/config-drawer'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import HyperlinkInsert from '@/components/product/HyperlinkInsert'
 import {
+  getVendorTemplatePageUrl,
   getVendorTemplatePreviewUrl,
   setStoredTemplatePreviewCity,
 } from '@/lib/storefront-url'
@@ -180,6 +187,12 @@ type ProductEditor = {
   availableCities: string[]
 }
 
+type MappedCity = {
+  _id: string
+  name: string
+  slug: string
+}
+
 const normalizeRole = (value: unknown) =>
   String(value || '')
     .trim()
@@ -320,6 +333,82 @@ const createEmptyVariantEditor = () => ({
 
 const getVendorLabel = (vendor: VendorRow) =>
   vendor.business_name || vendor.registrar_name || vendor.name || vendor.email || vendor._id
+
+const MAPPED_CITY_PREVIEW_COUNT = 3
+
+function MappedCitiesSummary({ cities = [] }: { cities?: MappedCity[] }) {
+  const normalizedCities = (Array.isArray(cities) ? cities : []).filter(
+    (city): city is MappedCity => Boolean(city?._id || city?.slug)
+  )
+
+  if (!normalizedCities.length) {
+    return (
+      <div className='max-w-[240px] space-y-1'>
+        <span className='inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600'>
+          All / not mapped
+        </span>
+        <p className='text-[11px] text-slate-500'>Visible across all cities</p>
+      </div>
+    )
+  }
+
+  const previewCities = normalizedCities.slice(0, MAPPED_CITY_PREVIEW_COUNT)
+  const remainingCount = normalizedCities.length - previewCities.length
+
+  return (
+    <div className='max-w-[240px] space-y-2'>
+      <div className='flex flex-wrap gap-1.5'>
+        {previewCities.map((city) => (
+          <span
+            key={city._id}
+            title={city.name}
+            className='max-w-[140px] truncate rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700'
+          >
+            {city.name}
+          </span>
+        ))}
+        {remainingCount > 0 ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type='button'
+                className='inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 transition hover:border-cyan-200 hover:text-cyan-700'
+              >
+                +{remainingCount} more
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align='start'
+              className='w-[300px] rounded-2xl border-slate-200 p-0 shadow-xl'
+            >
+              <div className='border-b border-slate-100 px-4 py-3'>
+                <p className='text-sm font-semibold text-slate-900'>Mapped Cities</p>
+                <p className='text-xs text-slate-500'>
+                  {normalizedCities.length} cities mapped to this page
+                </p>
+              </div>
+              <ScrollArea className='max-h-64'>
+                <div className='flex flex-wrap gap-2 p-4'>
+                  {normalizedCities.map((city) => (
+                    <span
+                      key={city._id}
+                      className='rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-700'
+                    >
+                      {city.name}
+                    </span>
+                  ))}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+        ) : null}
+      </div>
+      <p className='text-[11px] text-slate-500'>
+        {normalizedCities.length} mapped {normalizedCities.length === 1 ? 'city' : 'cities'}
+      </p>
+    </div>
+  )
+}
 
 const defaultEditor = (
   product: WorkspaceProduct,
@@ -895,7 +984,7 @@ export default function TemplateWorkspacePage() {
 
   const getProductPreviewUrl = useCallback(
     (row: WorkspaceProductPageRow) => {
-      if (!selectedVendorId || !selectedTemplateKey || !row?.product?._id) return ''
+      if (!selectedVendorId || !row?.product?._id) return ''
 
       const selectedSlug = normalizeCitySlug(selectedCitySlug)
       const citySlugForPreview =
@@ -906,10 +995,10 @@ export default function TemplateWorkspacePage() {
             : normalizeCitySlug(effectiveCitySlug)
 
       const baseUrl =
-        getVendorTemplatePreviewUrl(
+        getVendorTemplatePageUrl(
           selectedVendorId,
-          selectedTemplateKey,
-          citySlugForPreview
+          citySlugForPreview,
+          selectedTemplateKey
         ) || ''
       if (!baseUrl) return ''
       return `${baseUrl.replace(/\/$/, '')}/product/${row.product._id}`
@@ -1762,19 +1851,7 @@ export default function TemplateWorkspacePage() {
                         )}
                       </td>
                       <td className='py-3 pe-3 align-top'>
-                        <div className='flex flex-wrap gap-1'>
-                          {(product.availableCities || []).map((city) => (
-                            <span
-                              key={city._id}
-                              className='rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700'
-                            >
-                              {city.name}
-                            </span>
-                          ))}
-                          {!product.availableCities?.length ? (
-                            <span className='text-xs text-slate-400'>All / not mapped</span>
-                          ) : null}
-                        </div>
+                        <MappedCitiesSummary cities={product.availableCities || []} />
                       </td>
                       <td className='py-3 pe-3 align-top text-sm text-slate-600'>
                         <p className='truncate'>{product.status}</p>

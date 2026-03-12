@@ -291,7 +291,7 @@ export const sidebarData: any = {
           roles: [ROLES.ADMIN],
         },
         {
-          title: 'All Work Dashboard',
+          title: 'Template Workspace',
           url: '/template-workspace',
           icon: LayoutTemplate,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
