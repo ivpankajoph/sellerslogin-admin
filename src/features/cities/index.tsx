@@ -258,9 +258,10 @@ export default function CitiesPage() {
         const addedCount = Number(data?.addedCount || 0)
         const skippedCount = Number(data?.skippedCount || 0)
         toast.success(
-          createdCount > 0 || addedCount > 0
-            ? `${createdCount} cities created${addedCount ? `, ${addedCount} added to your list` : ''}${skippedCount ? `, ${skippedCount} skipped` : ''}`
-            : `No new city added${skippedCount ? ` (${skippedCount} already existed in your list)` : ''}`
+          data?.message ||
+            (createdCount > 0 || addedCount > 0
+              ? `${createdCount} cities created${addedCount ? `, ${addedCount} added to your list` : ''}${skippedCount ? `, ${skippedCount} skipped` : ''}`
+              : `No new city added${skippedCount ? ` (${skippedCount} already existed in your list)` : ''}`)
         )
 
         resetForm()

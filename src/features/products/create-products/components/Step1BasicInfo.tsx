@@ -593,10 +593,13 @@ const Step1BasicInfo: React.FC<Props> = ({
 
   const openCityCreator = (prefillName = '') => {
     const safeName = String(prefillName || '').trim()
+    setNewCityName(safeName ? toTitleCase(safeName.split(',')[0] || safeName) : '')
+    setNewCityState('')
+    setNewCityCountry('India')
+    setStateCityOptions([])
+    setSelectedStateCities([])
+    setStateCitySearch('')
     setShowCityCreator(true)
-    if (safeName) {
-      setNewCityName(toTitleCase(safeName.split(',')[0] || safeName))
-    }
   }
 
   useEffect(() => {
