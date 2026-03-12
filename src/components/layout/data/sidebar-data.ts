@@ -47,6 +47,12 @@ export const sidebarData: any = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
+          title: 'Vendor Queries',
+          url: '/vendor-queries',
+          icon: HelpCircle,
+          roles: [ROLES.ADMIN],
+        },
+        {
           title: 'Customer Reviews',
           url: '/customer-reviews',
           icon: Star,

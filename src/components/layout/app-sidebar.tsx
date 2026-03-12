@@ -20,8 +20,12 @@ export function AppSidebar() {
   const { collapsible, variant } = useLayout()
   const { isProviderVisible } = useVendorIntegrations()
   const user = useSelector((state: any) => state.auth.user)
-  const userType = user?.role
-  const effectiveRole = userType === 'superadmin' ? 'admin' : userType
+  const roleKey = String(user?.role || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]/g, '')
+  const isSuperAdmin = roleKey === 'superadmin'
+  const effectiveRole = isSuperAdmin ? 'admin' : roleKey
   const canShowByIntegration = (provider?: string) => {
     if (!provider) return true
     return isProviderVisible(provider as IntegrationProviderId)
@@ -30,7 +34,8 @@ export function AppSidebar() {
   const filteredNavGroups = sidebarData.navGroups
     .filter(
       (group: { roles: string | any[] }) =>
-        !group.roles || group.roles.includes(effectiveRole)
+        (!group.roles || group.roles.includes(effectiveRole)) &&
+        (!group.superAdminOnly || isSuperAdmin)
     )
     .map((group: { items: any[] }) => ({
       ...group,
@@ -38,6 +43,7 @@ export function AppSidebar() {
         ?.filter(
           (item) =>
             (!item.roles || item.roles.includes(effectiveRole)) &&
+            (!item.superAdminOnly || isSuperAdmin) &&
             canShowByIntegration(item.requiresIntegration),
         )
         .map((item) => ({
@@ -45,6 +51,7 @@ export function AppSidebar() {
           items: item.items?.filter(
             (subItem: { roles: string | any[] }) =>
               (!subItem.roles || subItem.roles.includes(effectiveRole)) &&
+              (!(subItem as any).superAdminOnly || isSuperAdmin) &&
               canShowByIntegration((subItem as any).requiresIntegration),
           ),
         }))

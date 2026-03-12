@@ -32,6 +32,7 @@ import { Route as AuthenticatedVendorTemplatePagesIndexRouteImport } from './rou
 import { Route as AuthenticatedVendorTemplateOtherIndexRouteImport } from './routes/_authenticated/vendor-template-other/index'
 import { Route as AuthenticatedVendorTemplateContactIndexRouteImport } from './routes/_authenticated/vendor-template-contact/index'
 import { Route as AuthenticatedVendorTemplateAboutIndexRouteImport } from './routes/_authenticated/vendor-template-about/index'
+import { Route as AuthenticatedVendorQueriesIndexRouteImport } from './routes/_authenticated/vendor-queries/index'
 import { Route as AuthenticatedVendorAnalyticsIndexRouteImport } from './routes/_authenticated/vendor-analytics/index'
 import { Route as AuthenticatedVendorAboutIndexRouteImport } from './routes/_authenticated/vendor-about/index'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
@@ -198,6 +199,12 @@ const AuthenticatedVendorTemplateAboutIndexRoute =
   AuthenticatedVendorTemplateAboutIndexRouteImport.update({
     id: '/vendor-template-about/',
     path: '/vendor-template-about/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVendorQueriesIndexRoute =
+  AuthenticatedVendorQueriesIndexRouteImport.update({
+    id: '/vendor-queries/',
+    path: '/vendor-queries/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedVendorAnalyticsIndexRoute =
@@ -528,6 +535,7 @@ export interface FileRoutesByFullPath {
   '/users': typeof AuthenticatedUsersIndexRoute
   '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
   '/vendor-analytics': typeof AuthenticatedVendorAnalyticsIndexRoute
+  '/vendor-queries': typeof AuthenticatedVendorQueriesIndexRoute
   '/vendor-template-about': typeof AuthenticatedVendorTemplateAboutIndexRoute
   '/vendor-template-contact': typeof AuthenticatedVendorTemplateContactIndexRoute
   '/vendor-template-other': typeof AuthenticatedVendorTemplateOtherIndexRoute
@@ -595,6 +603,7 @@ export interface FileRoutesByTo {
   '/users': typeof AuthenticatedUsersIndexRoute
   '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
   '/vendor-analytics': typeof AuthenticatedVendorAnalyticsIndexRoute
+  '/vendor-queries': typeof AuthenticatedVendorQueriesIndexRoute
   '/vendor-template-about': typeof AuthenticatedVendorTemplateAboutIndexRoute
   '/vendor-template-contact': typeof AuthenticatedVendorTemplateContactIndexRoute
   '/vendor-template-other': typeof AuthenticatedVendorTemplateOtherIndexRoute
@@ -667,6 +676,7 @@ export interface FileRoutesById {
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/vendor-about/': typeof AuthenticatedVendorAboutIndexRoute
   '/_authenticated/vendor-analytics/': typeof AuthenticatedVendorAnalyticsIndexRoute
+  '/_authenticated/vendor-queries/': typeof AuthenticatedVendorQueriesIndexRoute
   '/_authenticated/vendor-template-about/': typeof AuthenticatedVendorTemplateAboutIndexRoute
   '/_authenticated/vendor-template-contact/': typeof AuthenticatedVendorTemplateContactIndexRoute
   '/_authenticated/vendor-template-other/': typeof AuthenticatedVendorTemplateOtherIndexRoute
@@ -737,6 +747,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/vendor-about'
     | '/vendor-analytics'
+    | '/vendor-queries'
     | '/vendor-template-about'
     | '/vendor-template-contact'
     | '/vendor-template-other'
@@ -804,6 +815,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/vendor-about'
     | '/vendor-analytics'
+    | '/vendor-queries'
     | '/vendor-template-about'
     | '/vendor-template-contact'
     | '/vendor-template-other'
@@ -875,6 +887,7 @@ export interface FileRouteTypes {
     | '/_authenticated/users/'
     | '/_authenticated/vendor-about/'
     | '/_authenticated/vendor-analytics/'
+    | '/_authenticated/vendor-queries/'
     | '/_authenticated/vendor-template-about/'
     | '/_authenticated/vendor-template-contact/'
     | '/_authenticated/vendor-template-other/'
@@ -1062,6 +1075,13 @@ declare module '@tanstack/react-router' {
       path: '/vendor-template-about'
       fullPath: '/vendor-template-about'
       preLoaderRoute: typeof AuthenticatedVendorTemplateAboutIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vendor-queries/': {
+      id: '/_authenticated/vendor-queries/'
+      path: '/vendor-queries'
+      fullPath: '/vendor-queries'
+      preLoaderRoute: typeof AuthenticatedVendorQueriesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/vendor-analytics/': {
@@ -1451,6 +1471,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedVendorAboutIndexRoute: typeof AuthenticatedVendorAboutIndexRoute
   AuthenticatedVendorAnalyticsIndexRoute: typeof AuthenticatedVendorAnalyticsIndexRoute
+  AuthenticatedVendorQueriesIndexRoute: typeof AuthenticatedVendorQueriesIndexRoute
   AuthenticatedVendorTemplateAboutIndexRoute: typeof AuthenticatedVendorTemplateAboutIndexRoute
   AuthenticatedVendorTemplateContactIndexRoute: typeof AuthenticatedVendorTemplateContactIndexRoute
   AuthenticatedVendorTemplateOtherIndexRoute: typeof AuthenticatedVendorTemplateOtherIndexRoute
@@ -1512,6 +1533,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVendorAboutIndexRoute: AuthenticatedVendorAboutIndexRoute,
   AuthenticatedVendorAnalyticsIndexRoute:
     AuthenticatedVendorAnalyticsIndexRoute,
+  AuthenticatedVendorQueriesIndexRoute: AuthenticatedVendorQueriesIndexRoute,
   AuthenticatedVendorTemplateAboutIndexRoute:
     AuthenticatedVendorTemplateAboutIndexRoute,
   AuthenticatedVendorTemplateContactIndexRoute:
