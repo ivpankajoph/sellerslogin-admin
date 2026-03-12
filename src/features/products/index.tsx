@@ -31,6 +31,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { formatINR } from '@/lib/currency'
 import { cn } from '@/lib/utils'
@@ -163,6 +169,105 @@ function ProductImage({
       className={className}
       onError={() => setFailed(true)}
     />
+  )
+}
+
+function VariantSummaryCell({
+  variant,
+  variantIndex,
+}: {
+  variant?: ProductVariant
+  variantIndex: number
+}) {
+  const attributes = Object.entries(variant?.variantAttributes || {})
+    .filter(
+      ([key, value]) => Boolean(key) && value !== undefined && value !== null && String(value).trim()
+    )
+    .map(([key, value]) => ({
+      label: formatFieldLabel(key),
+      value: String(value).trim(),
+    }))
+
+  const previewAttributes = attributes.slice(0, 2)
+  const remainingCount = attributes.length - previewAttributes.length
+
+  return (
+    <div className='max-w-[280px] space-y-2'>
+      <div className='flex flex-wrap items-center gap-2'>
+        <Badge
+          variant='outline'
+          className='rounded-full border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700'
+        >
+          Variant {variantIndex + 1}
+        </Badge>
+        <span className='text-xs text-slate-500'>
+          {attributes.length || 0} {attributes.length === 1 ? 'detail' : 'details'}
+        </span>
+      </div>
+
+      {previewAttributes.length ? (
+        <div className='flex flex-wrap gap-1.5'>
+          {previewAttributes.map((attribute) => (
+            <span
+              key={`${attribute.label}-${attribute.value}`}
+              title={`${attribute.label}: ${attribute.value}`}
+              className='max-w-[220px] truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700'
+            >
+              {attribute.label}: {attribute.value}
+            </span>
+          ))}
+
+          {remainingCount > 0 ? (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type='button'
+                  className='inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:border-sky-200 hover:text-sky-700'
+                >
+                  +{remainingCount} more
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align='start'
+                className='w-[320px] rounded-2xl border-slate-200 p-0 shadow-xl'
+              >
+                <div className='border-b border-slate-100 px-4 py-3'>
+                  <p className='text-sm font-semibold text-slate-900'>
+                    {getVariantSummary(variant)}
+                  </p>
+                  <p className='text-xs text-slate-500'>
+                    SKU: {variant?.variantSku || `Variant ${variantIndex + 1}`}
+                  </p>
+                </div>
+                <ScrollArea className='max-h-64'>
+                  <div className='space-y-2 p-4'>
+                    {attributes.map((attribute) => (
+                      <div
+                        key={`${attribute.label}-${attribute.value}`}
+                        className='rounded-xl border border-slate-100 bg-slate-50 px-3 py-2'
+                      >
+                        <p className='text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500'>
+                          {attribute.label}
+                        </p>
+                        <p className='mt-1 text-sm font-medium text-slate-900'>
+                          {attribute.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          ) : null}
+        </div>
+      ) : (
+        <p className='text-sm font-medium text-slate-700'>{getVariantSummary(variant)}</p>
+      )}
+
+      <p className='text-xs text-slate-500'>
+        SKU: {variant?.variantSku || `Variant ${variantIndex + 1}`}
+      </p>
+    </div>
   )
 }
 
@@ -742,14 +847,10 @@ export default function VendorProductsTable() {
                         </div>
                       </td>
                       <td className='px-6 py-5'>
-                        <div className='max-w-xs space-y-1'>
-                          <p className='text-sm font-semibold text-slate-900'>
-                            {getVariantSummary(variant)}
-                          </p>
-                          <p className='text-xs text-slate-500'>
-                            SKU: {variant.variantSku || `Variant ${variantIndex + 1}`}
-                          </p>
-                        </div>
+                        <VariantSummaryCell
+                          variant={variant}
+                          variantIndex={variantIndex}
+                        />
                       </td>
                       <td className='px-6 py-5 text-base font-semibold text-slate-900'>
                         {Number(variant.stockQuantity || 0)} units
