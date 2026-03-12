@@ -146,7 +146,7 @@ const InventoryDashboard = () => {
       setLoading(true);
       setError(null);
       const response = await fetch(
-        `${API_BASE}/v1/products/category/${categoryId}?page=${page}&limit=${limit}`,
+        `${API_BASE}/v1/products/category/${categoryId}?page=${page}&limit=${limit}&includeUnavailable=true`,
         {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -193,7 +193,7 @@ const InventoryDashboard = () => {
       setLoading(true);
       setError(null);
       const response = await fetch(
-        `${API_BASE}/v1/products/sub-categories/${subCategoryId}?page=${page}&limit=${limit}`,
+        `${API_BASE}/v1/products/sub-categories/${subCategoryId}?page=${page}&limit=${limit}&includeUnavailable=true`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

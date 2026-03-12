@@ -1,5 +1,5 @@
 // src/components/ProductCreate/index.tsx
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   ArrowLeft,
@@ -10,8 +10,17 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { generateSpecifications, generateWithAI } from './aiHelpers'
 import { deleteFromCloudinary, uploadToCloudinary } from './cloudinary'
 import Step1BasicInfo from './components/Step1BasicInfo'
@@ -19,36 +28,225 @@ import Step3Specifications from './components/Step3Specifications'
 import Step4SEO from './components/Step4SEO'
 import Step5Variants from './components/Step5Variants'
 import Step6FAQs from './components/Step6FAQs'
-import { type ProductFormData, SPECIFICATION_TEMPLATES, type Variant } from './types/type'
+import {
+  type ImageUpload,
+  type ProductFormData,
+  SPECIFICATION_TEMPLATES,
+  type Variant,
+} from './types/type'
 
 // Interfaces
 
 // Specification templates by category
 
+const PRODUCT_CREATE_DRAFT_STORAGE_PREFIX = 'product_create_draft'
+const PRODUCT_CREATE_DRAFT_VERSION = 1
+const PRODUCT_CREATE_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const PRODUCT_CREATE_STEP_COUNT = 3
+
+const createInitialFormData = (): ProductFormData => ({
+  mainCategory: '',
+  productName: '',
+  productCategory: '',
+  productCategories: [],
+  productSubCategories: [],
+  availableCities: [],
+  brand: '',
+  shortDescription: '',
+  description: '',
+  defaultImages: [],
+  specifications: [{}],
+  isAvailable: true,
+  metaTitle: '',
+  metaDescription: '',
+  metaKeywords: [],
+  variants: [],
+  faqs: [],
+})
+
+type ProductCreateDraft = {
+  version: number
+  savedAt: number
+  formData: ProductFormData
+  selectedMainCategoryId: string
+  selectedCategoryIds: string[]
+  currentStep: number
+  specificationKeys: string[]
+  metaKeywordInput: string
+  tempAttributeKey: string
+  tempAttributeValue: string
+  variantMetaKeywordInput: string
+}
+
+const buildProductCreateDraftStorageKey = (vendorId: string) =>
+  `${PRODUCT_CREATE_DRAFT_STORAGE_PREFIX}_${vendorId}`
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const toText = (value: unknown) =>
+  typeof value === 'string' ? value : value == null ? '' : String(value)
+
+const toTrimmedText = (value: unknown) => toText(value).trim()
+
+const sanitizeStringList = (value: unknown) =>
+  Array.isArray(value)
+    ? Array.from(
+        new Set(value.map((item) => toTrimmedText(item)).filter(Boolean))
+      )
+    : []
+
+const sanitizeImageUploads = (value: unknown): ImageUpload[] => {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null
+
+      const url = toTrimmedText(item.url)
+      if (!url || url.startsWith('blob:') || item.uploading === true) {
+        return null
+      }
+
+      return {
+        url,
+        publicId: toTrimmedText(item.publicId),
+      }
+    })
+    .filter((item): item is ImageUpload => Boolean(item))
+}
+
+const sanitizeStringRecord = (value: unknown): Record<string, string> => {
+  if (!isRecord(value)) return {}
+
+  return Object.entries(value).reduce<Record<string, string>>((acc, [key, entryValue]) => {
+    const normalizedKey = toTrimmedText(key)
+    if (!normalizedKey) return acc
+    acc[normalizedKey] = toText(entryValue)
+    return acc
+  }, {})
+}
+
+const sanitizeFaqs = (value: unknown) => {
+  if (!Array.isArray(value)) return []
+
+  return value.map((item) => {
+    const raw = isRecord(item) ? item : {}
+    return {
+      question: toText(raw.question),
+      answer: toText(raw.answer),
+    }
+  })
+}
+
+const toNumberValue = (value: unknown) => {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : 0
+}
+
+const sanitizeVariant = (value: unknown): Variant => {
+  const raw = isRecord(value) ? value : {}
+
+  return {
+    variantAttributes: sanitizeStringRecord(raw.variantAttributes),
+    actualPrice: toNumberValue(raw.actualPrice),
+    finalPrice: toNumberValue(raw.finalPrice),
+    stockQuantity: toNumberValue(raw.stockQuantity),
+    variantsImageUrls: sanitizeImageUploads(raw.variantsImageUrls),
+    variantMetaTitle: toText(raw.variantMetaTitle),
+    variantMetaDescription: toText(raw.variantMetaDescription),
+    variantMetaKeywords: sanitizeStringList(raw.variantMetaKeywords),
+    isActive: raw.isActive !== false,
+  }
+}
+
+const sanitizeProductFormData = (value: unknown): ProductFormData => {
+  const raw = isRecord(value) ? value : {}
+  const specifications = Array.isArray(raw.specifications)
+    ? raw.specifications.map((item) => sanitizeStringRecord(item))
+    : []
+
+  return {
+    ...createInitialFormData(),
+    mainCategory: toTrimmedText(raw.mainCategory),
+    productName: toText(raw.productName),
+    productCategory: toTrimmedText(raw.productCategory),
+    productCategories: sanitizeStringList(raw.productCategories),
+    productSubCategories: sanitizeStringList(raw.productSubCategories),
+    availableCities: sanitizeStringList(raw.availableCities),
+    brand: toText(raw.brand),
+    shortDescription: toText(raw.shortDescription),
+    description: toText(raw.description),
+    defaultImages: sanitizeImageUploads(raw.defaultImages),
+    specifications: specifications.length ? specifications : [{}],
+    isAvailable: raw.isAvailable !== false,
+    metaTitle: toText(raw.metaTitle),
+    metaDescription: toText(raw.metaDescription),
+    metaKeywords: sanitizeStringList(raw.metaKeywords),
+    variants: Array.isArray(raw.variants) ? raw.variants.map(sanitizeVariant) : [],
+    faqs: sanitizeFaqs(raw.faqs),
+  }
+}
+
+const clampProductCreateStep = (value: unknown) => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) return 1
+  return Math.min(PRODUCT_CREATE_STEP_COUNT, Math.max(1, Math.trunc(numericValue)))
+}
+
+const sortEntitiesByName = <T extends { name?: string }>(items: T[]) =>
+  [...items].sort((a, b) =>
+    String(a?.name || '').localeCompare(String(b?.name || ''), undefined, {
+      sensitivity: 'base',
+    })
+  )
+
+const mergeEntityById = <T extends { _id?: string }>(items: T[], nextItem: T) => {
+  const entityMap = new Map<string, T>()
+  items.forEach((item) => {
+    const id = String(item?._id || '')
+    if (id) entityMap.set(id, item)
+  })
+
+  const nextId = String(nextItem?._id || '')
+  if (nextId) {
+    entityMap.set(nextId, nextItem)
+  }
+
+  return Array.from(entityMap.values())
+}
+
+const sanitizeProductCreateDraft = (value: unknown): ProductCreateDraft | null => {
+  if (!isRecord(value)) return null
+
+  return {
+    version: Number(value.version) || 0,
+    savedAt: Number(value.savedAt) || 0,
+    formData: sanitizeProductFormData(value.formData),
+    selectedMainCategoryId: toTrimmedText(value.selectedMainCategoryId),
+    selectedCategoryIds: sanitizeStringList(value.selectedCategoryIds),
+    currentStep: clampProductCreateStep(value.currentStep),
+    specificationKeys: sanitizeStringList(value.specificationKeys),
+    metaKeywordInput: toText(value.metaKeywordInput),
+    tempAttributeKey: toText(value.tempAttributeKey),
+    tempAttributeValue: toText(value.tempAttributeValue),
+    variantMetaKeywordInput: toText(value.variantMetaKeywordInput),
+  }
+}
+
 const ProductCreateForm: React.FC = () => {
   // Redux state (auth)
   const AUTH_TOKEN = useSelector((state: any) => state.auth?.token || '')
+  const authUser = useSelector((state: any) => state.auth?.user || null)
+  const vendorId = String(authUser?.id || authUser?._id || '')
+  const draftStorageKey = vendorId
+    ? buildProductCreateDraftStorageKey(vendorId)
+    : ''
+  const restoredSpecificationKeysRef = useRef<string[] | null>(null)
+  const formTopRef = useRef<HTMLDivElement | null>(null)
 
   // Form state
-  const [formData, setFormData] = useState<ProductFormData>({
-    mainCategory: '',
-    productName: '',
-    productCategory: '',
-    productCategories: [],
-    productSubCategories: [],
-    availableCities: [],
-    brand: '',
-    shortDescription: '',
-    description: '',
-    defaultImages: [],
-    specifications: [{}],
-    isAvailable: true,
-    metaTitle: '',
-    metaDescription: '',
-    metaKeywords: [],
-    variants: [],
-    faqs: [],
-  })
+  const [formData, setFormData] = useState<ProductFormData>(() => createInitialFormData())
 
   const [mainCategories, setMainCategories] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
@@ -75,6 +273,179 @@ const ProductCreateForm: React.FC = () => {
   const [tempAttributeKey, setTempAttributeKey] = useState('')
   const [tempAttributeValue, setTempAttributeValue] = useState('')
   const [variantMetaKeywordInput, setVariantMetaKeywordInput] = useState('')
+  const [isDraftHydrated, setIsDraftHydrated] = useState(false)
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false)
+  const [successDialogMessage, setSuccessDialogMessage] = useState('')
+
+  const resetDraftState = () => {
+    restoredSpecificationKeysRef.current = null
+    setFormData(createInitialFormData())
+    setSelectedMainCategoryId('')
+    setSelectedCategoryIds([])
+    setCategories([])
+    setFilteredSubcategories([])
+    setSpecificationKeys(SPECIFICATION_TEMPLATES.default)
+    setCurrentStep(1)
+    setMetaKeywordInput('')
+    setTempAttributeKey('')
+    setTempAttributeValue('')
+    setVariantMetaKeywordInput('')
+  }
+
+  const clearDraftStorage = () => {
+    if (!draftStorageKey || typeof window === 'undefined') return
+    try {
+      window.localStorage.removeItem(draftStorageKey)
+    } catch {
+      return
+    } finally {
+      setDraftSavedAt(null)
+    }
+  }
+
+  useEffect(() => {
+    if (!vendorId || !draftStorageKey || typeof window === 'undefined') return
+
+    setIsDraftHydrated(false)
+
+    try {
+      const storedDraft = window.localStorage.getItem(draftStorageKey)
+      if (!storedDraft) {
+        resetDraftState()
+        setDraftSavedAt(null)
+        return
+      }
+
+      const parsedDraft = sanitizeProductCreateDraft(JSON.parse(storedDraft))
+      const isInvalidDraft =
+        !parsedDraft ||
+        parsedDraft.version !== PRODUCT_CREATE_DRAFT_VERSION ||
+        !parsedDraft.savedAt ||
+        Date.now() - parsedDraft.savedAt > PRODUCT_CREATE_DRAFT_TTL_MS
+
+      if (isInvalidDraft) {
+        window.localStorage.removeItem(draftStorageKey)
+        resetDraftState()
+        setDraftSavedAt(null)
+        return
+      }
+
+      restoredSpecificationKeysRef.current = parsedDraft.specificationKeys.length
+        ? parsedDraft.specificationKeys
+        : null
+
+      setFormData(parsedDraft.formData)
+      setSelectedMainCategoryId(
+        parsedDraft.selectedMainCategoryId || parsedDraft.formData.mainCategory
+      )
+      setSelectedCategoryIds(
+        parsedDraft.selectedCategoryIds.length
+          ? parsedDraft.selectedCategoryIds
+          : parsedDraft.formData.productCategories
+      )
+      setCurrentStep(parsedDraft.currentStep)
+      setSpecificationKeys(
+        parsedDraft.specificationKeys.length
+          ? parsedDraft.specificationKeys
+          : Object.keys(parsedDraft.formData.specifications?.[0] || {}).length
+            ? Object.keys(parsedDraft.formData.specifications[0])
+            : SPECIFICATION_TEMPLATES.default
+      )
+      setMetaKeywordInput(parsedDraft.metaKeywordInput)
+      setTempAttributeKey(parsedDraft.tempAttributeKey)
+      setTempAttributeValue(parsedDraft.tempAttributeValue)
+      setVariantMetaKeywordInput(parsedDraft.variantMetaKeywordInput)
+      setDraftSavedAt(parsedDraft.savedAt)
+    } catch {
+      clearDraftStorage()
+      resetDraftState()
+    } finally {
+      setIsDraftHydrated(true)
+    }
+  }, [draftStorageKey, vendorId])
+
+  useEffect(() => {
+    if (!isDraftHydrated || !vendorId || !draftStorageKey || typeof window === 'undefined') {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const specificationKeysToPersist = Array.from(
+        new Set([
+          ...sanitizeStringList(specificationKeys),
+          ...Object.keys(formData.specifications?.[0] || {})
+            .map((key) => toTrimmedText(key))
+            .filter(Boolean),
+        ])
+      )
+
+      const draftToPersist: ProductCreateDraft = {
+        version: PRODUCT_CREATE_DRAFT_VERSION,
+        savedAt: Date.now(),
+        formData: sanitizeProductFormData(formData),
+        selectedMainCategoryId: selectedMainCategoryId || formData.mainCategory,
+        selectedCategoryIds: selectedCategoryIds.length
+          ? selectedCategoryIds
+          : sanitizeStringList(formData.productCategories),
+        currentStep: clampProductCreateStep(currentStep),
+        specificationKeys: specificationKeysToPersist,
+        metaKeywordInput,
+        tempAttributeKey,
+        tempAttributeValue,
+        variantMetaKeywordInput,
+      }
+
+      try {
+        window.localStorage.setItem(draftStorageKey, JSON.stringify(draftToPersist))
+        setDraftSavedAt(draftToPersist.savedAt)
+      } catch {
+        return
+      }
+    }, 300)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [
+    currentStep,
+    draftStorageKey,
+    formData,
+    isDraftHydrated,
+    metaKeywordInput,
+    selectedCategoryIds,
+    selectedMainCategoryId,
+    specificationKeys,
+    tempAttributeKey,
+    tempAttributeValue,
+    variantMetaKeywordInput,
+    vendorId,
+  ])
+
+  const lastSavedLabel = useMemo(() => {
+    if (!draftSavedAt) return ''
+
+    try {
+      return new Intl.DateTimeFormat('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(new Date(draftSavedAt))
+    } catch {
+      return new Date(draftSavedAt).toLocaleString()
+    }
+  }, [draftSavedAt])
+
+  const goToStep = (stepIndex: number) => {
+    setCurrentStep(clampProductCreateStep(stepIndex))
+
+    if (typeof window === 'undefined') return
+    window.requestAnimationFrame(() => {
+      formTopRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+  }
 
   useEffect(() => {
     const fetchMainCategories = async () => {
@@ -96,27 +467,63 @@ const ProductCreateForm: React.FC = () => {
     fetchMainCategories()
   }, [])
 
-  useEffect(() => {
-    const fetchCities = async () => {
-      setIsCityLoading(true)
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities?includeInactive=false`
-        )
-        if (!res.ok) throw new Error('Failed to fetch cities')
-        const json = await res.json()
-        setCities(Array.isArray(json?.data) ? json.data : [])
-      } catch {
-        setCities([])
-      } finally {
-        setIsCityLoading(false)
-      }
+  const loadCities = useCallback(async () => {
+    setIsCityLoading(true)
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities?includeInactive=false`,
+        {
+          headers: AUTH_TOKEN
+            ? {
+                Authorization: `Bearer ${AUTH_TOKEN}`,
+              }
+            : undefined,
+        }
+      )
+      if (!res.ok) throw new Error('Failed to fetch cities')
+      const json = await res.json()
+      const nextCities = Array.isArray(json?.data) ? json.data : []
+      setCities(nextCities)
+      return nextCities
+    } catch {
+      setCities([])
+      return []
+    } finally {
+      setIsCityLoading(false)
     }
-
-    fetchCities()
-  }, [])
+  }, [AUTH_TOKEN])
 
   useEffect(() => {
+    loadCities()
+  }, [loadCities])
+
+  useEffect(() => {
+    if (!isDraftHydrated) return
+
+    const validCityIds = new Set(
+      cities
+        .map((city: any) => String(city?._id || '').trim())
+        .filter(Boolean)
+    )
+
+    setFormData((prev: ProductFormData) => {
+      const filteredCities = (prev.availableCities || []).filter((cityId) =>
+        validCityIds.has(String(cityId || '').trim())
+      )
+
+      if (filteredCities.length === (prev.availableCities || []).length) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        availableCities: filteredCities,
+      }
+    })
+  }, [cities, isDraftHydrated])
+
+  useEffect(() => {
+    if (!isDraftHydrated) return
     if (!selectedMainCategoryId) {
       setCategories([])
       setSelectedCategoryIds([])
@@ -148,9 +555,10 @@ const ProductCreateForm: React.FC = () => {
     }
 
     fetchCategories()
-  }, [selectedMainCategoryId])
+  }, [isDraftHydrated, selectedMainCategoryId])
 
   useEffect(() => {
+    if (!isDraftHydrated) return
     if (!selectedCategoryIds.length) {
       setFilteredSubcategories([])
       return
@@ -203,7 +611,308 @@ const ProductCreateForm: React.FC = () => {
     }
 
     fetchSubcategories()
-  }, [selectedCategoryIds, categories])
+  }, [categories, isDraftHydrated, selectedCategoryIds])
+
+  const handleCreateMainCategory = async (name: string) => {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      throw new Error('Main category name is required.')
+    }
+    if (!AUTH_TOKEN) {
+      throw new Error('Your session has expired. Please login again.')
+    }
+
+    const response = await fetch(
+      `${import.meta.env.VITE_PUBLIC_API_URL}/v1/maincategories/create`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${AUTH_TOKEN}`,
+        },
+        body: JSON.stringify({ name: trimmedName }),
+      }
+    )
+
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || payload?.success === false || !payload?.data?._id) {
+      throw new Error(payload?.message || 'Failed to create main category.')
+    }
+
+    const created = payload.data
+    setMainCategories((prev) => sortEntitiesByName(mergeEntityById(prev, created)))
+    setSelectedMainCategoryId(created._id)
+    setSelectedCategoryIds([])
+    setCategories([])
+    setFilteredSubcategories([])
+    setFormData((prev: ProductFormData) => ({
+      ...prev,
+      mainCategory: created._id,
+      productCategory: '',
+      productCategories: [],
+      productSubCategories: [],
+    }))
+  }
+
+  const handleCreateCategory = async (name: string) => {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      throw new Error('Category name is required.')
+    }
+    if (!selectedMainCategoryId) {
+      throw new Error('Select a main category first.')
+    }
+    if (!AUTH_TOKEN) {
+      throw new Error('Your session has expired. Please login again.')
+    }
+
+    const selectedMainCategory = mainCategories.find(
+      (category: any) => String(category?._id) === String(selectedMainCategoryId)
+    )
+
+    const response = await fetch(
+      `${import.meta.env.VITE_PUBLIC_API_URL}/v1/categories/create`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${AUTH_TOKEN}`,
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          main_category_id: selectedMainCategoryId,
+          main_category_name: selectedMainCategory?.name || '',
+        }),
+      }
+    )
+
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || payload?.success === false || !payload?.data?._id) {
+      throw new Error(payload?.message || 'Failed to create category.')
+    }
+
+    const created = payload.data
+    setCategories((prev) => sortEntitiesByName(mergeEntityById(prev, created)))
+    setSelectedCategoryIds((prev) =>
+      prev.includes(created._id) ? prev : [...prev, created._id]
+    )
+    setFormData((prev: ProductFormData) => {
+      const nextCategoryIds = prev.productCategories.includes(created._id)
+        ? prev.productCategories
+        : [...prev.productCategories, created._id]
+
+      return {
+        ...prev,
+        productCategory: nextCategoryIds[0] || '',
+        productCategories: nextCategoryIds,
+      }
+    })
+  }
+
+  const handleCreateSubcategory = async ({
+    name,
+    categoryId,
+  }: {
+    name: string
+    categoryId: string
+  }) => {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      throw new Error('Subcategory name is required.')
+    }
+    if (!categoryId) {
+      throw new Error('Choose a category first.')
+    }
+    if (!AUTH_TOKEN) {
+      throw new Error('Your session has expired. Please login again.')
+    }
+
+    const parentCategory = categories.find(
+      (category: any) => String(category?._id) === String(categoryId)
+    )
+    if (!parentCategory?._id) {
+      throw new Error('Selected category was not found.')
+    }
+
+    const selectedMainCategory = mainCategories.find(
+      (category: any) => String(category?._id) === String(selectedMainCategoryId)
+    )
+
+    const response = await fetch(
+      `${import.meta.env.VITE_PUBLIC_API_URL}/v1/subcategories/create`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${AUTH_TOKEN}`,
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          category_id: parentCategory._id,
+          category_name: parentCategory.name,
+          main_category_id: selectedMainCategoryId,
+          main_category_name: selectedMainCategory?.name || '',
+        }),
+      }
+    )
+
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || payload?.success === false || !payload?.data?._id) {
+      throw new Error(payload?.message || 'Failed to create subcategory.')
+    }
+
+    const created = {
+      ...payload.data,
+      categoryName: parentCategory.name,
+    }
+
+    setFilteredSubcategories((prev) =>
+      sortEntitiesByName(mergeEntityById(prev, created))
+    )
+    setFormData((prev: ProductFormData) => ({
+      ...prev,
+      productSubCategories: prev.productSubCategories.includes(created._id)
+        ? prev.productSubCategories
+        : [...prev.productSubCategories, created._id],
+    }))
+  }
+
+  const discoverStateCities = useCallback(
+    async (state: string, country: string) => {
+      const safeState = String(state || '').trim()
+      const safeCountry = String(country || '').trim() || 'India'
+
+      if (!safeState) return []
+      if (!AUTH_TOKEN) {
+        throw new Error('Your session has expired. Please login again.')
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities/discover?state=${encodeURIComponent(
+          safeState
+        )}&country=${encodeURIComponent(safeCountry)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${AUTH_TOKEN}`,
+          },
+        }
+      )
+
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || payload?.success === false) {
+        throw new Error(payload?.message || 'Failed to fetch cities for selected state.')
+      }
+
+      return Array.isArray(payload?.cities)
+        ? payload.cities
+            .map((city: unknown) => String(city || '').trim())
+            .filter(Boolean)
+        : []
+    },
+    [AUTH_TOKEN]
+  )
+
+  const handleCreateCities = useCallback(
+    async ({
+      name,
+      state,
+      country,
+      cities: cityNames,
+    }: {
+      name: string
+      state: string
+      country: string
+      cities: string[]
+    }) => {
+      const trimmedName = String(name || '').trim()
+      const safeState = String(state || '').trim()
+      const safeCountry = String(country || '').trim() || 'India'
+      const normalizedCityNames = Array.from(
+        new Set(
+          (Array.isArray(cityNames) ? cityNames : [])
+            .map((cityName) => String(cityName || '').trim())
+            .filter(Boolean)
+        )
+      )
+
+      if (!AUTH_TOKEN) {
+        throw new Error('Your session has expired. Please login again.')
+      }
+      if (!trimmedName && !normalizedCityNames.length) {
+        throw new Error('City name is required.')
+      }
+
+      const endpoint = normalizedCityNames.length
+        ? `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities/bulk`
+        : `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities`
+      const requestBody = normalizedCityNames.length
+        ? {
+            state: safeState,
+            country: safeCountry,
+            isActive: true,
+            cities: normalizedCityNames,
+          }
+        : {
+            name: trimmedName,
+            state: safeState,
+            country: safeCountry,
+            isActive: true,
+          }
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${AUTH_TOKEN}`,
+        },
+        body: JSON.stringify(requestBody),
+      })
+
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || payload?.success === false) {
+        throw new Error(payload?.message || 'Failed to create city.')
+      }
+
+      const latestCities = await loadCities()
+      const explicitCityIds = new Set<string>()
+
+      const collectEntityId = (entity: any) => {
+        const id = String(entity?._id || '').trim()
+        if (id) explicitCityIds.add(id)
+      }
+
+      collectEntityId(payload?.data)
+      ;(Array.isArray(payload?.created) ? payload.created : []).forEach(collectEntityId)
+      ;(Array.isArray(payload?.added) ? payload.added : []).forEach(collectEntityId)
+
+      const targetNames = new Set(
+        (normalizedCityNames.length ? normalizedCityNames : [trimmedName])
+          .map((cityName) => String(cityName || '').trim().toLowerCase())
+          .filter(Boolean)
+      )
+      const normalizedState = safeState.toLowerCase()
+      const normalizedCountry = safeCountry.toLowerCase()
+
+      latestCities.forEach((city: any) => {
+        const cityId = String(city?._id || '').trim()
+        const cityName = String(city?.name || '').trim().toLowerCase()
+        const cityState = String(city?.state || '').trim().toLowerCase()
+        const cityCountry = String(city?.country || '').trim().toLowerCase()
+
+        if (!cityId || !targetNames.has(cityName)) return
+        if (normalizedState && cityState && cityState !== normalizedState) return
+        if (normalizedCountry && cityCountry && cityCountry !== normalizedCountry) return
+
+        explicitCityIds.add(cityId)
+      })
+
+      return {
+        message: String(payload?.message || '').trim(),
+        cityIds: Array.from(explicitCityIds),
+      }
+    },
+    [AUTH_TOKEN, loadCities]
+  )
 
   useEffect(() => {
     const applySpecificationKeys = (keys: string[]) => {
@@ -218,7 +927,10 @@ const ProductCreateForm: React.FC = () => {
       })
     }
 
+    if (!isDraftHydrated) return
+
     if (!selectedMainCategoryId) {
+      restoredSpecificationKeysRef.current = null
       applySpecificationKeys(SPECIFICATION_TEMPLATES.default)
       return
     }
@@ -233,15 +945,31 @@ const ProductCreateForm: React.FC = () => {
         const json = await res.json()
         const apiKeys = Array.isArray(json?.data?.keys) ? json.data.keys : []
         const nextKeys = apiKeys.length ? apiKeys : SPECIFICATION_TEMPLATES.default
+        const restoredSpecificationKeys = restoredSpecificationKeysRef.current
+        const mergedKeys = restoredSpecificationKeys?.length
+          ? Array.from(new Set([...nextKeys, ...restoredSpecificationKeys]))
+          : nextKeys
 
-        applySpecificationKeys(nextKeys)
+        applySpecificationKeys(mergedKeys)
       } catch (err) {
-        applySpecificationKeys(SPECIFICATION_TEMPLATES.default)
+        const restoredSpecificationKeys = restoredSpecificationKeysRef.current
+        const fallbackKeys = restoredSpecificationKeys?.length
+          ? Array.from(
+              new Set([
+                ...SPECIFICATION_TEMPLATES.default,
+                ...restoredSpecificationKeys,
+              ])
+            )
+          : SPECIFICATION_TEMPLATES.default
+
+        applySpecificationKeys(fallbackKeys)
+      } finally {
+        restoredSpecificationKeysRef.current = null
       }
     }
 
     fetchSpecificationKeys()
-  }, [selectedMainCategoryId])
+  }, [isDraftHydrated, selectedMainCategoryId])
 
   // --- AI Handlers for Variants ---
   const handleGenerateVariantMetaTitle = async (vIndex: number) => {
@@ -271,7 +999,7 @@ const ProductCreateForm: React.FC = () => {
         })
       }
     } catch (err) {
-      alert('AI generation failed')
+      toast.error('AI generation failed')
     } finally {
       setAiLoading((prev: any) => ({
         ...prev,
@@ -310,7 +1038,7 @@ const ProductCreateForm: React.FC = () => {
         })
       }
     } catch (err) {
-      alert('AI generation failed')
+      toast.error('AI generation failed')
     } finally {
       setAiLoading((prev: any) => ({
         ...prev,
@@ -353,7 +1081,7 @@ const ProductCreateForm: React.FC = () => {
         })
       }
     } catch (err) {
-      alert('AI generation failed')
+      toast.error('AI generation failed')
     } finally {
       setAiLoading((prev: any) => ({
         ...prev,
@@ -591,16 +1319,16 @@ const ProductCreateForm: React.FC = () => {
         typeof formData.specifications[0] !== 'object' ||
         Array.isArray(formData.specifications[0])
       ) {
-        alert(
-          'Invalid specifications format detected. Please click "Generate with AI" in the Specifications step to fix this.'
+        toast.error(
+          'Invalid specifications format detected. Open the Specifications step and generate or fix the fields first.'
         )
-        setLoading(false)
+        goToStep(2)
         return
       }
 
       if (!Array.isArray(formData.availableCities) || formData.availableCities.length === 0) {
-        alert('Please select at least one city in Basic Information.')
-        setLoading(false)
+        toast.error('Please select at least one city in Basic Information.')
+        goToStep(1)
         return
       }
 
@@ -647,9 +1375,15 @@ const ProductCreateForm: React.FC = () => {
         throw new Error(String(backendMessage))
       }
 
-      alert(responseBody?.message || 'Product created successfully!')
+      const nextSuccessMessage =
+        responseBody?.message || 'Product created successfully!'
+      clearDraftStorage()
+      resetDraftState()
+      goToStep(1)
+      setSuccessDialogMessage(nextSuccessMessage)
+      setSuccessDialogOpen(true)
     } catch (err: any) {
-      alert(err?.message || 'Failed to create product')
+      toast.error(err?.message || 'Failed to create product')
     } finally {
       setLoading(false)
     }
@@ -677,6 +1411,11 @@ const ProductCreateForm: React.FC = () => {
             aiLoading={aiLoading}
             generateWithAI={generateShortDesc}
             generateDescription={generateDescription}
+            onCreateMainCategory={handleCreateMainCategory}
+            onCreateCategory={handleCreateCategory}
+            onCreateSubcategory={handleCreateSubcategory}
+            onDiscoverStateCities={discoverStateCities}
+            onCreateCities={handleCreateCities}
           />
         )
       case 2:
@@ -831,7 +1570,7 @@ const ProductCreateForm: React.FC = () => {
                     }))
                   }
                 } catch (err) {
-                  alert('AI generation failed')
+                  toast.error('AI generation failed')
                 } finally {
                   setAiLoading((prev: any) => ({ ...prev, metaKeywords: false }))
                 }
@@ -872,7 +1611,7 @@ const ProductCreateForm: React.FC = () => {
                       }
                     }
                   } catch (err) {
-                    alert('AI generation failed')
+                    toast.error('AI generation failed')
                   } finally {
                     setAiLoading((prev: any) => ({ ...prev, faqs: false }))
                   }
@@ -932,11 +1671,39 @@ const ProductCreateForm: React.FC = () => {
               <Badge className='border border-slate-200 bg-white text-slate-700'>
                 Draft Mode
               </Badge>
+              <Badge className='border border-emerald-200 bg-emerald-100/70 text-emerald-800'>
+                Autosaved Locally
+              </Badge>
+              {lastSavedLabel ? (
+                <span className='text-xs font-medium text-slate-500'>
+                  Saved {lastSavedLabel}
+                </span>
+              ) : null}
+              <Button
+                type='button'
+                variant='outline'
+                onClick={() => {
+                  if (
+                    typeof window !== 'undefined' &&
+                    !window.confirm('Clear the saved product draft for this vendor?')
+                  ) {
+                    return
+                  }
+                  clearDraftStorage()
+                  resetDraftState()
+                }}
+                className='h-9 rounded-full border-slate-300 bg-white px-4 text-slate-700 hover:bg-slate-50'
+              >
+                Reset Draft
+              </Button>
             </div>
           </div>
         </section>
 
-        <div className='rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur-sm sm:p-8'>
+        <div
+          ref={formTopRef}
+          className='rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur-sm sm:p-8'
+        >
           <Link to='/upload-products'>
             <Button
               variant='outline'
@@ -954,15 +1721,18 @@ const ProductCreateForm: React.FC = () => {
               const isCompleted = currentStep > stepIndex
 
               return (
-                <div
+                <button
                   key={step.title}
+                  type='button'
+                  onClick={() => goToStep(stepIndex)}
+                  aria-current={isActive ? 'step' : undefined}
                   className={`rounded-2xl border p-4 transition ${
                     isActive
                       ? 'border-cyan-300 bg-cyan-50/70 shadow-sm'
                       : isCompleted
                         ? 'border-emerald-300 bg-emerald-50/70'
                         : 'border-slate-200 bg-slate-50/70'
-                  }`}
+                  } cursor-pointer text-left hover:border-cyan-300 hover:bg-cyan-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400`}
                 >
                   <div className='flex items-start gap-3'>
                     <div
@@ -985,7 +1755,7 @@ const ProductCreateForm: React.FC = () => {
                       <p className='text-xs text-slate-600'>{step.description}</p>
                     </div>
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>
@@ -996,7 +1766,7 @@ const ProductCreateForm: React.FC = () => {
             <div className='flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4'>
               <button
                 type='button'
-                onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
+                onClick={() => goToStep(currentStep - 1)}
                 disabled={currentStep === 1}
                 className='inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
               >
@@ -1007,9 +1777,7 @@ const ProductCreateForm: React.FC = () => {
               {currentStep < steps.length ? (
                 <button
                   type='button'
-                  onClick={() =>
-                    setCurrentStep((prev) => Math.min(steps.length, prev + 1))
-                  }
+                  onClick={() => goToStep(currentStep + 1)}
                   className='inline-flex h-11 items-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-semibold text-white transition hover:bg-cyan-700'
                 >
                   Next
@@ -1030,6 +1798,39 @@ const ProductCreateForm: React.FC = () => {
           </form>
         </div>
       </div>
+
+      <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
+        <DialogContent className='max-w-md rounded-[28px] border-slate-200 p-0 shadow-2xl'>
+          <div className='rounded-t-[28px] border-b border-emerald-100 bg-emerald-50 px-6 py-5'>
+            <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white'>
+              <CheckCircle2 className='h-6 w-6' />
+            </div>
+            <DialogHeader className='text-left'>
+              <DialogTitle className='text-2xl font-semibold text-slate-950'>
+                Product Created
+              </DialogTitle>
+              <DialogDescription className='text-sm leading-6 text-slate-600'>
+                {successDialogMessage}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className='space-y-4 px-6 py-5'>
+            <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600'>
+              The form has been cleared, draft data has been removed, and you have been returned to the Basic Information step so you can create the next product immediately.
+            </div>
+            <DialogFooter className='sm:justify-start'>
+              <Button
+                type='button'
+                onClick={() => setSuccessDialogOpen(false)}
+                className='h-10 rounded-xl bg-emerald-600 px-5 text-white hover:bg-emerald-700'
+              >
+                Create Another Product
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

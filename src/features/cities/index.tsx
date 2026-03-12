@@ -255,11 +255,12 @@ export default function CitiesPage() {
         }
 
         const createdCount = Number(data?.createdCount || 0)
+        const addedCount = Number(data?.addedCount || 0)
         const skippedCount = Number(data?.skippedCount || 0)
         toast.success(
-          createdCount > 0
-            ? `${createdCount} cities created${skippedCount ? `, ${skippedCount} skipped` : ''}`
-            : `No new city created${skippedCount ? ` (${skippedCount} already existed)` : ''}`
+          createdCount > 0 || addedCount > 0
+            ? `${createdCount} cities created${addedCount ? `, ${addedCount} added to your list` : ''}${skippedCount ? `, ${skippedCount} skipped` : ''}`
+            : `No new city added${skippedCount ? ` (${skippedCount} already existed in your list)` : ''}`
         )
 
         resetForm()
@@ -291,11 +292,11 @@ export default function CitiesPage() {
         },
         body: JSON.stringify(form),
       })
-      const data = await res.json()
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.message || `Failed to save city (HTTP ${res.status})`)
-      }
-      toast.success(editingId ? 'City updated' : 'City created')
+        const data = await res.json()
+        if (!res.ok || data?.success === false) {
+          throw new Error(data?.message || `Failed to save city (HTTP ${res.status})`)
+        }
+      toast.success(data?.message || (editingId ? 'City updated' : 'City created'))
       resetForm()
       loadCities()
     } catch (error: any) {
@@ -337,7 +338,13 @@ export default function CitiesPage() {
       return
     }
 
-    if (!window.confirm(`Delete city "${city.name}"?`)) return
+    const isOwnedByCurrentVendor =
+      isVendor && String(city.createdBy || '') === currentUserId
+    const confirmMessage = isVendor && !isOwnedByCurrentVendor
+      ? `Remove city "${city.name}" from your list?`
+      : `Delete city "${city.name}"?`
+
+    if (!window.confirm(confirmMessage)) return
     setDeletingId(city._id)
     try {
       const res = await fetch(
@@ -353,7 +360,7 @@ export default function CitiesPage() {
       if (!res.ok || data?.success === false) {
         throw new Error(data?.message || `Failed to delete city (HTTP ${res.status})`)
       }
-      toast.success('City deleted')
+      toast.success(data?.message || 'City deleted')
       loadCities()
     } catch (error: any) {
       toast.error(error?.message || 'Failed to delete city')
@@ -424,7 +431,9 @@ export default function CitiesPage() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>Manage Cities</h2>
             <p className='text-muted-foreground'>
-              Create city list for city-wise product visibility in templates.
+              {isVendor
+                ? 'Create and manage your private city list for product visibility.'
+                : 'Create city list for city-wise product visibility in templates.'}
             </p>
           </div>
           <Button variant='outline' onClick={loadCities} disabled={loading}>

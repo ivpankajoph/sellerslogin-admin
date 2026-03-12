@@ -706,7 +706,10 @@ export default function TemplateWorkspacePage() {
     try {
       const productListCityScope = normalizeCitySlug(selectedCitySlug)
       const productsRes = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/all?ownerId=${selectedVendorId}&city=${encodeURIComponent(productListCityScope)}`
+        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/all?includeUnavailable=true&ownerId=${selectedVendorId}&city=${encodeURIComponent(productListCityScope)}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
       )
       const productsBody = await productsRes.json()
 
@@ -717,7 +720,7 @@ export default function TemplateWorkspacePage() {
     } finally {
       setLoadingWorkspace(false)
     }
-  }, [selectedVendorId, selectedCitySlug])
+  }, [selectedVendorId, selectedCitySlug, token])
 
   useEffect(() => {
     if (!selectedVendorId) return
@@ -1073,9 +1076,14 @@ export default function TemplateWorkspacePage() {
             : `city=${encodeURIComponent(pageCity.citySlug)}`
           : ''
 
-      const endpoint = `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/${productId}${
-        cityQuery ? `?${cityQuery}` : ''
-      }`
+      const queryParams = new URLSearchParams()
+      queryParams.set('includeUnavailable', 'true')
+      if (cityQuery) {
+        const scopedParams = new URLSearchParams(cityQuery)
+        scopedParams.forEach((value, key) => queryParams.set(key, value))
+      }
+
+      const endpoint = `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/${productId}?${queryParams.toString()}`
       const response = await fetch(endpoint, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       })

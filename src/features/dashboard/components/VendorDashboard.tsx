@@ -70,10 +70,10 @@ const VendorDashboard = () => {
       try {
         const baseUrl = import.meta.env.VITE_PUBLIC_API_URL
         const baseEndpoint = isAdminRole
-          ? `${baseUrl}/v1/products/all`
+          ? `${baseUrl}/v1/products/all?includeUnavailable=true`
           : `${baseUrl}/v1/products/vendor/${vendorId}`
         const firstRes = await fetch(
-          `${baseEndpoint}?page=1&limit=50`,
+          `${baseEndpoint}${isAdminRole ? '&' : '?'}page=1&limit=50`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -93,7 +93,7 @@ const VendorDashboard = () => {
           const pagePromises = []
           for (let p = 2; p <= totalPages; p += 1) {
             pagePromises.push(
-              fetch(`${baseEndpoint}?page=${p}&limit=50`, {
+              fetch(`${baseEndpoint}${isAdminRole ? '&' : '?'}page=${p}&limit=50`, {
                 headers: { Authorization: `Bearer ${token}` },
               }).then((res) => res.json())
             )

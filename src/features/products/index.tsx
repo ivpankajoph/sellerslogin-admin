@@ -1,515 +1,821 @@
-import { useState, useEffect } from 'react';
-import { Eye, Package, X, Box, Tag, TrendingUp } from 'lucide-react';
-import { useSelector } from 'react-redux';
-import { Pagination } from '@/components/pagination';
+import { Link } from '@tanstack/react-router'
+import {
+  Boxes,
+  CalendarDays,
+  Eye,
+  FileText,
+  HelpCircle,
+  ImageIcon,
+  Loader2,
+  Package,
+  Tag,
+  TrendingUp,
+  type LucideIcon,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
+import { ConfigDrawer } from '@/components/config-drawer'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { Pagination } from '@/components/pagination'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { Search } from '@/components/search'
+import { ThemeSwitch } from '@/components/theme-switch'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
+import { formatINR } from '@/lib/currency'
+import { cn } from '@/lib/utils'
+import { LinkedText } from './components/linked-text'
 
-interface Product {
-  _id: string;
-  productName: string;
-  brand: string;
-  shortDescription: string;
-  description: string;
-  defaultImages: Array<{ url: string }>;
-  variants: Array<{
-    variantSku: string;
-    variantAttributes: Record<string, string>;
-    actualPrice: number;
-    discountPercent: number;
-    finalPrice: number;
-    stockQuantity: number;
-    variantsImageUrls: Array<{ url: string }>;
-  }>;
-  status: string;
-  createdAt: string;
-  specifications: Array<Record<string, any>>;
-  faqs: Array<{ question: string; answer: string }>;
+type ProductVariant = {
+  _id?: string
+  variantSku?: string
+  variantAttributes?: Record<string, unknown>
+  actualPrice?: number
+  finalPrice?: number
+  discountPercent?: number
+  stockQuantity?: number
+  variantsImageUrls?: Array<{ url?: string }>
+  isActive?: boolean
 }
 
-const VendorProductsTable = () => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [error, setError] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalProducts, setTotalProducts] = useState(0);
-  const limit = 10;
+type Product = {
+  _id: string
+  productName?: string
+  brand?: string
+  shortDescription?: string
+  description?: string
+  defaultImages?: Array<{ url?: string }>
+  variants?: ProductVariant[]
+  status?: string
+  isAvailable?: boolean
+  createdAt?: string
+  specifications?: Array<Record<string, unknown>>
+  faqs?: Array<{ question?: string; answer?: string }>
+}
 
-  useEffect(() => {
-    fetchProducts();
-  }, [page]);
+type VariantRow = {
+  rowKey: string
+  product: Product
+  variant: ProductVariant
+  variantIndex: number
+}
 
-  const vendorId = useSelector((state: any) => state.auth.user?.id);
-  const token = useSelector((state: any) => state.auth.token);
+type SummaryCard = {
+  label: string
+  value: number
+  Icon: LucideIcon
+  iconClass: string
+}
 
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/vendor/${vendorId}?page=${page}&limit=${limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+const limit = 10
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+const formatFieldLabel = (value: string) =>
+  value
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
 
-      const data = await response.json();
-      // Ensure products is always an array
-      setProducts(Array.isArray(data.products) ? data.products : []);
-      setTotalPages(data?.pagination?.totalPages || 1);
-      setTotalProducts(data?.pagination?.total || 0);
-      setLoading(false);
-    } catch (err) {
-      setError('Failed to fetch products');
-      setLoading(false);
-    }
-  };
+const formatDate = (value?: string) => {
+  if (!value) return 'Unavailable'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'Unavailable'
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(parsed)
+}
 
-  const handlePageChange = (nextPage: number) => {
-    setPage(nextPage);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+const getTotalStock = (variants?: ProductVariant[]) =>
+  Array.isArray(variants)
+    ? variants.reduce((sum, item) => sum + Number(item?.stockQuantity || 0), 0)
+    : 0
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'approved':
-        return 'bg-green-100 text-green-700 border-green-200';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'rejected':
-        return 'bg-red-100 text-red-700 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
+const getVariantPrice = (variant?: ProductVariant) =>
+  formatINR(Number(variant?.finalPrice ?? variant?.actualPrice ?? 0))
 
-  const getTotalStock = (variants: any[] = []) => {
-    return variants.reduce((sum, v) => sum + (v?.stockQuantity || 0), 0);
-  };
+const getVariantImageUrl = (variant?: ProductVariant) =>
+  String(variant?.variantsImageUrls?.[0]?.url || '').trim()
 
-  const safeMin = (arr: number[]) => {
-    if (!arr.length) return 0;
-    return Math.min(...arr);
-  };
+const getPrimaryVariantImageUrl = (product?: Product) =>
+  Array.isArray(product?.variants)
+    ? product.variants
+        .map((variant) => getVariantImageUrl(variant))
+        .find((imageUrl) => Boolean(imageUrl)) || ''
+    : ''
 
-  const safeMax = (arr: number[]) => {
-    if (!arr.length) return 0;
-    return Math.max(...arr);
-  };
+const getVariantSummary = (variant?: ProductVariant) => {
+  const attributes = Object.entries(variant?.variantAttributes || {}).filter(
+    ([key, value]) => Boolean(key) && value !== undefined && value !== null && String(value).trim()
+  )
 
-  if (loading) {
-    return (
-      <div className='flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100'>
-        <div className='text-center'>
-          <div className='mx-auto h-16 w-16 animate-spin rounded-full border-b-4 border-indigo-600'></div>
-          <p className='mt-4 font-medium text-slate-600'>Loading products...</p>
-        </div>
-      </div>
-    );
+  if (attributes.length) {
+    return attributes
+      .map(([key, value]) => `${formatFieldLabel(key)}: ${String(value)}`)
+      .join(' • ')
   }
 
-  if (error) {
+  if (variant?.variantSku) {
+    return variant.variantSku
+  }
+
+  return 'Default variant'
+}
+
+function ProductImage({
+  src,
+  alt,
+  className,
+}: {
+  src?: string
+  alt: string
+  className?: string
+}) {
+  const [failed, setFailed] = useState(false)
+
+  if (!src || failed) {
     return (
-      <div className='flex min-h-screen items-center justify-center'>
-        <div className='max-w-md rounded-2xl border-2 border-red-200 bg-red-50 p-8'>
-          <p className='text-lg font-semibold text-red-700'>{error}</p>
-        </div>
+      <div
+        className={cn(
+          'flex items-center justify-center rounded-2xl bg-slate-100 text-slate-400',
+          className
+        )}
+      >
+        <ImageIcon className='h-8 w-8' />
       </div>
-    );
+    )
   }
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 p-8'>
-      <div className='mx-auto max-w-7xl'>
-        {/* Header */}
-        <div className='mb-8'>
-          <div className='mb-2 flex items-center gap-3'>
-            <Package className='h-10 w-10 text-indigo-600' />
-            <h1 className='text-4xl font-bold text-slate-800'>
-              Product Inventory
-            </h1>
-          </div>
-          <p className='ml-13 text-lg text-slate-600'>
-            Manage and monitor your product catalog
-          </p>
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+function ProductDetailsDialog({
+  product,
+  open,
+  onOpenChange,
+}: {
+  product: Product | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  if (!product) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className='max-h-[90vh] overflow-hidden rounded-[30px] border-slate-200 p-0 shadow-2xl sm:max-w-5xl'>
+        <div className='border-b border-sky-100 bg-sky-50/70 px-6 py-5'>
+          <Badge
+            variant='outline'
+            className='mb-3 rounded-full border-sky-200 bg-white/80 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-sky-700'
+          >
+            Product Details
+          </Badge>
+          <DialogHeader className='text-left'>
+            <DialogTitle className='text-2xl font-semibold text-slate-950'>
+              {product.productName || 'Unnamed Product'}
+            </DialogTitle>
+            <DialogDescription className='text-sm text-slate-600'>
+              Review your listing content, stock position, variants, and FAQ data.
+            </DialogDescription>
+          </DialogHeader>
         </div>
 
-        {/* Stats Cards */}
-        <div className='mb-8 grid grid-cols-1 gap-6 md:grid-cols-3'>
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-lg'>
-            <div className='flex items-center justify-between'>
-              <div>
-                <p className='text-sm font-medium text-slate-500'>
-                  Total Products
-                </p>
-                <p className='mt-1 text-3xl font-bold text-slate-800'>
-                  {totalProducts || products.length}
-                </p>
-              </div>
-              <div className='rounded-xl bg-indigo-100 p-4'>
-                <Box className='h-8 w-8 text-indigo-600' />
-              </div>
-            </div>
-          </div>
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-lg'>
-            <div className='flex items-center justify-between'>
-              <div>
-                <p className='text-sm font-medium text-slate-500'>
-                  Total Variants
-                </p>
-                <p className='mt-1 text-3xl font-bold text-slate-800'>
-                  {products.reduce((sum, p) => sum + (Array.isArray(p.variants) ? p.variants.length : 0), 0)}
-                </p>
-              </div>
-              <div className='rounded-xl bg-purple-100 p-4'>
-                <Tag className='h-8 w-8 text-purple-600' />
-              </div>
-            </div>
-          </div>
-          <div className='rounded-2xl border border-slate-200 bg-white p-6 shadow-lg'>
-            <div className='flex items-center justify-between'>
-              <div>
-                <p className='text-sm font-medium text-slate-500'>
-                  Total Stock
-                </p>
-                <p className='mt-1 text-3xl font-bold text-slate-800'>
-                  {products.reduce(
-                    (sum, p) => sum + getTotalStock(Array.isArray(p.variants) ? p.variants : []),
-                    0
+        <div className='max-h-[calc(90vh-112px)] space-y-6 overflow-y-auto px-6 py-6'>
+          <div className='grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]'>
+            <ProductImage
+              src={getPrimaryVariantImageUrl(product)}
+              alt={product.productName || 'Product variant image'}
+              className='aspect-square w-full rounded-[28px] border border-slate-200 object-cover'
+            />
+            <div className='space-y-5'>
+              <div className='flex flex-wrap items-center gap-3'>
+                <Badge
+                  variant='outline'
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-semibold',
+                    product.isAvailable !== false
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 bg-slate-100 text-slate-600'
                   )}
-                </p>
+                >
+                  {product.isAvailable !== false ? 'Visible Everywhere' : 'Hidden Everywhere'}
+                </Badge>
+                <Badge
+                  variant='outline'
+                  className='rounded-full border-slate-200 px-3 py-1 text-slate-600'
+                >
+                  <CalendarDays className='h-3.5 w-3.5' />
+                  {formatDate(product.createdAt)}
+                </Badge>
               </div>
-              <div className='rounded-xl bg-green-100 p-4'>
-                <TrendingUp className='h-8 w-8 text-green-600' />
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Table */}
-        <div className='overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl'>
-          <div className='overflow-x-auto'>
-            <table className='w-full'>
-              <thead>
-                <tr className='bg-black text-white'>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>
-                    Product
-                  </th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>
+              <div className='grid gap-4 sm:grid-cols-3'>
+                <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+                  <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
                     Brand
-                  </th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>
+                  </p>
+                  <p className='mt-2 text-base font-semibold text-slate-900'>
+                    {product.brand || 'Unavailable'}
+                  </p>
+                </div>
+                <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+                  <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
                     Variants
-                  </th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>
+                  </p>
+                  <p className='mt-2 text-base font-semibold text-slate-900'>
+                    {product.variants?.length || 0}
+                  </p>
+                </div>
+                <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+                  <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
                     Stock
-                  </th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>
-                    Price Range
-                  </th>
-                  <th className='px-6 py-4 text-left text-sm font-semibold'>
-                    Status
-                  </th>
-                  <th className='px-6 py-4 text-center text-sm font-semibold'>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-slate-200'>
-                {products.map((product) => {
-                  const variants = Array.isArray(product.variants) ? product.variants : [];
-                  const prices = variants.map(v => v?.finalPrice || 0).filter(p => typeof p === 'number' && !isNaN(p));
-                  const minPrice = prices.length ? safeMin(prices) : 0;
-                  const maxPrice = prices.length ? safeMax(prices) : 0;
-
-                  return (
-                    <tr
-                      key={product._id || Math.random().toString()}
-                      className='transition-colors duration-150 hover:bg-indigo-50'
-                    >
-                      <td className='px-6 py-4'>
-                        <div className='flex items-center gap-4'>
-                          <img
-                            src={product.defaultImages?.[0]?.url || ''}
-                            alt={product.productName || 'Product'}
-                            className='h-16 w-16 rounded-xl border-2 border-slate-200 object-cover shadow-sm'
-                            onError={(e) => (e.currentTarget.src = '/fallback-image.png')}
-                          />
-                          <div className='max-w-xs'>
-                            <p className='truncate font-semibold text-slate-800'>
-                              {product.productName || 'Unnamed Product'}
-                            </p>
-                            <p className='truncate text-sm text-slate-500'>
-                              {product.shortDescription || 'No description'}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className='px-6 py-4'>
-                        <span className='font-medium text-slate-700'>
-                          {product.brand || '—'}
-                        </span>
-                      </td>
-                      <td className='px-6 py-4'>
-                        <span className='inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700'>
-                          {variants.length} variant{variants.length !== 1 ? 's' : ''}
-                        </span>
-                      </td>
-                      <td className='px-6 py-4'>
-                        <span className='font-semibold text-slate-800'>
-                          {getTotalStock(variants)} units
-                        </span>
-                      </td>
-                      <td className='px-6 py-4'>
-                        <div className='flex flex-col gap-1'>
-                          <span className='text-sm font-semibold text-slate-800'>
-                            ₹{minPrice.toLocaleString()}
-                          </span>
-                          {minPrice !== maxPrice && (
-                            <span className='text-xs text-slate-500'>
-                              to ₹{maxPrice.toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className='px-6 py-4'>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getStatusColor(
-                            product.status || 'unknown'
-                          )}`}
-                        >
-                          {(product.status || 'Unknown')
-                            .charAt(0)
-                            .toUpperCase() +
-                            (product.status || 'Unknown').slice(1).toLowerCase()}
-                        </span>
-                      </td>
-                      <td className='px-6 py-4 text-center'>
-                        <button
-                          onClick={() => setSelectedProduct(product)}
-                          className='inline-flex transform items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 font-medium text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-lg'
-                        >
-                          <Eye className='h-4 w-4' />
-                          View Details
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          isLoading={loading}
-        />
-      </div>
-
-      {/* Modal */}
-      {selectedProduct && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm'>
-          <div className='max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white shadow-2xl'>
-            {/* Modal Header */}
-            <div className='sticky top-0 z-10 flex items-center justify-between rounded-t-3xl bg-white p-6'>
-              <h2 className='text-2xl font-bold'>Product Details</h2>
-              <button
-                onClick={() => setSelectedProduct(null)}
-                className='rounded-lg p-2 transition-colors hover:bg-white/20'
-              >
-                <X className='h-6 w-6' />
-              </button>
-            </div>
-
-            <div className='p-8'>
-              {/* Product Images */}
-              <div className='mb-8'>
-                <img
-                  src={selectedProduct.defaultImages?.[0]?.url || '/fallback-image.png'}
-                  alt={selectedProduct.productName || 'Product'}
-                  className='h-96 w-full rounded-2xl object-cover shadow-lg'
-                  onError={(e) => (e.currentTarget.src = '/fallback-image.png')}
-                />
-              </div>
-
-              {/* Basic Info */}
-              <div className='mb-8'>
-                <h3 className='mb-2 text-3xl font-bold text-slate-800'>
-                  {selectedProduct.productName || 'Unnamed Product'}
-                </h3>
-                <p className='mb-4 text-slate-600'>
-                  {selectedProduct.description || 'No description available.'}
-                </p>
-                <div className='flex items-center gap-4'>
-                  <span className='rounded-lg bg-indigo-100 px-4 py-2 font-semibold text-indigo-700'>
-                    {selectedProduct.brand || '—'}
-                  </span>
-                  <span
-                    className={`rounded-lg border px-4 py-2 font-semibold ${getStatusColor(
-                      selectedProduct.status || 'unknown'
-                    )}`}
-                  >
-                    {(selectedProduct.status || 'Unknown')
-                      .charAt(0)
-                      .toUpperCase() +
-                      (selectedProduct.status || 'Unknown').slice(1).toLowerCase()}
-                  </span>
+                  </p>
+                  <p className='mt-2 text-base font-semibold text-slate-900'>
+                    {getTotalStock(product.variants)} units
+                  </p>
                 </div>
               </div>
 
-              {/* Specifications */}
-              {Array.isArray(selectedProduct.specifications) &&
-                selectedProduct.specifications.length > 0 &&
-                selectedProduct.specifications[0] &&
-                Object.keys(selectedProduct.specifications[0]).length > 0 && (
-                  <div className='mb-8'>
-                    <h4 className='mb-4 flex items-center gap-2 text-xl font-bold text-slate-800'>
-                      <Box className='h-5 w-5 text-indigo-600' />
-                      Specifications
-                    </h4>
-                    <div className='rounded-2xl border border-slate-200 bg-slate-50 p-6'>
-                      <div className='grid grid-cols-2 gap-4'>
-                        {Object.entries(selectedProduct.specifications[0]).map(
+              <div className='rounded-[24px] border border-slate-200 bg-white p-5'>
+                <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+                  Description
+                </p>
+                <LinkedText
+                  as='p'
+                  text={
+                    product.description ||
+                    product.shortDescription ||
+                    'No description available.'
+                  }
+                  className='mt-3 text-sm leading-7 text-slate-700'
+                />
+              </div>
+            </div>
+          </div>
+
+          {Array.isArray(product.specifications) &&
+            product.specifications[0] &&
+            Object.keys(product.specifications[0]).length > 0 && (
+              <section className='rounded-[24px] border border-slate-200 bg-white p-5'>
+                <div className='mb-4 flex items-center gap-2 text-slate-900'>
+                  <FileText className='h-4 w-4 text-sky-700' />
+                  <h3 className='text-lg font-semibold'>Specifications</h3>
+                </div>
+                <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-3'>
+                  {Object.entries(product.specifications[0]).map(([key, value]) => (
+                    <div
+                      key={key}
+                      className='rounded-2xl border border-slate-200 bg-slate-50 p-4'
+                    >
+                      <p className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
+                        {formatFieldLabel(key)}
+                      </p>
+                      <p className='mt-2 text-sm font-medium text-slate-900'>
+                        {typeof value === 'boolean'
+                          ? value
+                            ? 'Yes'
+                            : 'No'
+                          : String(value ?? 'Unavailable')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+          <section className='rounded-[24px] border border-slate-200 bg-white p-5'>
+            <div className='mb-4 flex items-center gap-2 text-slate-900'>
+              <Boxes className='h-4 w-4 text-sky-700' />
+              <h3 className='text-lg font-semibold'>Variants</h3>
+            </div>
+            <div className='space-y-4'>
+              {(product.variants || []).map((variant, index) => (
+                <div
+                  key={variant.variantSku || index}
+                  className='rounded-[22px] border border-slate-200 bg-slate-50 p-4'
+                >
+                  <div className='flex flex-col gap-4 lg:flex-row'>
+                    <ProductImage
+                      src={variant.variantsImageUrls?.[0]?.url}
+                      alt={`${product.productName || 'Product'} variant`}
+                      className='h-28 w-28 rounded-2xl border border-slate-200 object-cover'
+                    />
+                    <div className='min-w-0 flex-1 space-y-3'>
+                      <div className='flex flex-wrap gap-2'>
+                        {Object.entries(variant.variantAttributes || {}).map(
                           ([key, value]) => (
-                            <div key={key} className='flex flex-col'>
-                              <span className='text-sm font-medium text-slate-500 capitalize'>
-                                {key.replace(/([A-Z])/g, ' $1').trim()}
-                              </span>
-                              <span className='font-semibold text-slate-800'>
-                                {typeof value === 'boolean'
-                                  ? value
-                                    ? 'Yes'
-                                    : 'No'
-                                  : String(value ?? '—')}
-                              </span>
-                            </div>
+                            <Badge
+                              key={key}
+                              variant='outline'
+                              className='rounded-full border-sky-200 bg-white px-3 py-1 text-sky-700'
+                            >
+                              {formatFieldLabel(key)}: {String(value || 'N/A')}
+                            </Badge>
                           )
                         )}
                       </div>
-                    </div>
-                  </div>
-                )}
-
-              {/* Variants */}
-              <div className='mb-8'>
-                <h4 className='mb-4 flex items-center gap-2 text-xl font-bold text-slate-800'>
-                  <Tag className='h-5 w-5 text-indigo-600' />
-                  Available Variants (
-                  {Array.isArray(selectedProduct.variants)
-                    ? selectedProduct.variants.length
-                    : 0}
-                  )
-                </h4>
-                <div className='space-y-4'>
-                  {(Array.isArray(selectedProduct.variants)
-                    ? selectedProduct.variants
-                    : []
-                  ).map((variant, idx) => {
-                    const attrs = variant.variantAttributes || {};
-                    return (
-                      <div
-                        key={variant.variantSku || idx}
-                        className='rounded-2xl border-2 border-slate-200 bg-gradient-to-r from-slate-50 to-indigo-50 p-6 transition-colors hover:border-indigo-300'
-                      >
-                        <div className='flex items-start gap-6'>
-                          {variant.variantsImageUrls?.[0]?.url && (
-                            <img
-                              src={variant.variantsImageUrls[0].url}
-                              alt={variant.variantSku || 'Variant'}
-                              className='h-24 w-24 rounded-xl border-2 border-white object-cover shadow-md'
-                              onError={(e) => (e.currentTarget.src = '/fallback-image.png')}
-                            />
-                          )}
-                          <div className='flex-1'>
-                            <div className='mb-3 flex flex-wrap items-center gap-2'>
-                              {Object.entries(attrs).map(([key, value]) => (
-                                <span
-                                  key={key}
-                                  className='rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 capitalize'
-                                >
-                                  {String(value || '—')}
-                                </span>
-                              ))}
-                            </div>
-                            <div className='grid grid-cols-2 gap-4 md:grid-cols-4'>
-                              <div>
-                                <p className='text-xs font-medium text-slate-500'>
-                                  Original Price
-                                </p>
-                                <p className='text-lg font-bold text-slate-400 line-through'>
-                                  ₹{(variant.actualPrice || 0).toLocaleString()}
-                                </p>
-                              </div>
-                              <div>
-                                <p className='text-xs font-medium text-slate-500'>
-                                  Final Price
-                                </p>
-                                <p className='text-lg font-bold text-green-600'>
-                                  ₹{(variant.finalPrice || 0).toLocaleString()}
-                                </p>
-                              </div>
-                              <div>
-                                <p className='text-xs font-medium text-slate-500'>
-                                  Discount
-                                </p>
-                                <p className='text-lg font-bold text-orange-600'>
-                                  {(variant.discountPercent || 0)}% OFF
-                                </p>
-                              </div>
-                              <div>
-                                <p className='text-xs font-medium text-slate-500'>
-                                  Stock
-                                </p>
-                                <p className='text-lg font-bold text-indigo-600'>
-                                  {(variant.stockQuantity || 0)} units
-                                </p>
-                              </div>
-                            </div>
-                            <p className='mt-3 font-mono text-xs text-slate-400'>
-                              SKU: {variant.variantSku || '—'}
-                            </p>
-                          </div>
+                      <div className='grid gap-3 sm:grid-cols-3 xl:grid-cols-4'>
+                        <div>
+                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-slate-500'>
+                            SKU
+                          </p>
+                          <p className='mt-1 text-sm font-medium text-slate-900'>
+                            {variant.variantSku || 'Unavailable'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-slate-500'>
+                            Actual Price
+                          </p>
+                          <p className='mt-1 text-sm font-medium text-slate-900'>
+                            {formatINR(variant.actualPrice || 0)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-slate-500'>
+                            Final Price
+                          </p>
+                          <p className='mt-1 text-sm font-medium text-slate-900'>
+                            {formatINR(variant.finalPrice || 0)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-slate-500'>
+                            Stock
+                          </p>
+                          <p className='mt-1 text-sm font-medium text-slate-900'>
+                            {Number(variant.stockQuantity || 0)} units
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* FAQs */}
-              {Array.isArray(selectedProduct.faqs) && selectedProduct.faqs.length > 0 && (
-                <div>
-                  <h4 className='mb-4 text-xl font-bold text-slate-800'>
-                    Frequently Asked Questions
-                  </h4>
-                  <div className='space-y-3'>
-                    {selectedProduct.faqs.map((faq, idx) => (
-                      <div
-                        key={idx}
-                        className='rounded-xl border border-slate-200 bg-slate-50 p-5'
-                      >
-                        <p className='mb-2 font-semibold text-slate-800'>
-                          Q: {faq.question || '—'}
-                        </p>
-                        <p className='text-slate-600'>A: {faq.answer || '—'}</p>
-                      </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
-              )}
+              ))}
+            </div>
+          </section>
+
+          {Array.isArray(product.faqs) && product.faqs.length > 0 && (
+            <section className='rounded-[24px] border border-slate-200 bg-white p-5'>
+              <div className='mb-4 flex items-center gap-2 text-slate-900'>
+                <HelpCircle className='h-4 w-4 text-sky-700' />
+                <h3 className='text-lg font-semibold'>FAQs</h3>
+              </div>
+              <div className='space-y-3'>
+                {product.faqs.map((faq, index) => (
+                  <div
+                    key={`${faq.question || 'faq'}-${index}`}
+                    className='rounded-2xl border border-slate-200 bg-slate-50 p-4'
+                  >
+                    <LinkedText
+                      as='p'
+                      text={faq.question || 'No question provided'}
+                      className='text-sm font-semibold text-slate-900'
+                    />
+                    <LinkedText
+                      as='p'
+                      text={faq.answer || 'No answer provided'}
+                      className='mt-2 text-sm leading-6 text-slate-700'
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export default function VendorProductsTable() {
+  const vendorId = useSelector((state: any) => state.auth?.user?.id || state.auth?.user?._id || '')
+  const token = useSelector((state: any) => state.auth?.token || '')
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalProducts, setTotalProducts] = useState(0)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [visibilityUpdatingId, setVisibilityUpdatingId] = useState('')
+
+  const loadProducts = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!vendorId || !token) {
+        setProducts([])
+        setLoading(false)
+        return
+      }
+
+      try {
+        setLoading(true)
+        setError('')
+
+        const response = await fetch(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/vendor/${vendorId}?page=${page}&limit=${limit}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            signal,
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+
+        const data = await response.json()
+        setProducts(Array.isArray(data?.products) ? data.products : [])
+        setTotalPages(Number(data?.pagination?.totalPages || 1))
+        setTotalProducts(Number(data?.pagination?.total || 0))
+      } catch (fetchError: any) {
+        if (fetchError?.name === 'AbortError') return
+        setProducts([])
+        setError('Failed to fetch products.')
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false)
+        }
+      }
+    },
+    [page, token, vendorId]
+  )
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    if (!vendorId || !token) {
+      setProducts([])
+      setLoading(false)
+      return
+    }
+
+    loadProducts(controller.signal)
+    return () => controller.abort()
+  }, [loadProducts, token, vendorId])
+
+  const totalVariants = useMemo(
+    () => products.reduce((sum, product) => sum + (product.variants?.length || 0), 0),
+    [products]
+  )
+  const totalStock = useMemo(
+    () => products.reduce((sum, product) => sum + getTotalStock(product.variants), 0),
+    [products]
+  )
+  const summaryCards = useMemo(
+    () =>
+      [
+        {
+          label: 'Total Products',
+          value: totalProducts || products.length,
+          Icon: Package,
+          iconClass: 'bg-sky-100 text-sky-700',
+        },
+        {
+          label: 'Total Variants',
+          value: totalVariants,
+          Icon: Boxes,
+          iconClass: 'bg-emerald-100 text-emerald-700',
+        },
+        {
+          label: 'Total Stock',
+          value: totalStock,
+          Icon: TrendingUp,
+          iconClass: 'bg-amber-100 text-amber-700',
+        },
+      ] satisfies SummaryCard[],
+    [products.length, totalProducts, totalStock, totalVariants]
+  )
+
+  const variantRows = useMemo<VariantRow[]>(
+    () =>
+      products.flatMap((product) => {
+        const variants = Array.isArray(product.variants) && product.variants.length
+          ? product.variants
+          : [{}]
+
+        return variants.map((variant, index) => ({
+          rowKey: `${product._id}-${variant?._id || variant?.variantSku || index}`,
+          product,
+          variant,
+          variantIndex: index,
+        }))
+      }),
+    [products]
+  )
+
+  const handleVisibilityToggle = useCallback(
+    async (productId: string, nextValue: boolean) => {
+      if (!token) {
+        toast.error('Your session has expired. Please login again.')
+        return
+      }
+
+      setVisibilityUpdatingId(productId)
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/admin/products/${productId}/content`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ isAvailable: nextValue }),
+          }
+        )
+
+        const body = await response.json().catch(() => null)
+        if (!response.ok || body?.success === false || !body?.data?._id) {
+          throw new Error(body?.message || 'Failed to update product visibility.')
+        }
+
+        setProducts((prev) =>
+          prev.map((product) =>
+            product._id === productId
+              ? {
+                  ...product,
+                  isAvailable: nextValue,
+                }
+              : product
+          )
+        )
+        setSelectedProduct((current) =>
+          current && current._id === productId
+            ? {
+                ...current,
+                isAvailable: nextValue,
+              }
+            : current
+        )
+        toast.success(nextValue ? 'Product is now visible everywhere.' : 'Product has been hidden everywhere.')
+      } catch (updateError: any) {
+        toast.error(updateError?.message || 'Failed to update product visibility.')
+      } finally {
+        setVisibilityUpdatingId('')
+      }
+    },
+    [token]
+  )
+
+  return (
+    <div className='flex min-h-screen flex-col'>
+      <Header fixed>
+        <Search />
+        <div className='ml-auto flex items-center gap-2'>
+          <ThemeSwitch />
+          <ConfigDrawer />
+          <ProfileDropdown />
+        </div>
+      </Header>
+
+      <Main className='space-y-6'>
+        <section className='rounded-[32px] border border-sky-100 bg-sky-50/50 px-6 py-8 shadow-sm'>
+          <div className='flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between'>
+            <div className='space-y-4'>
+              <Badge
+                variant='outline'
+                className='rounded-full border-sky-200 bg-white/80 px-4 py-1 text-[11px] uppercase tracking-[0.3em] text-sky-700'
+              >
+                Product Inventory
+              </Badge>
+              <div className='space-y-2'>
+                <h1 className='text-4xl font-semibold tracking-tight text-slate-950'>
+                  Your Product Catalog
+                </h1>
+                <p className='max-w-3xl text-lg leading-8 text-slate-600'>
+                  Track live catalog entries, stock movement, and listing quality from the same product workspace style as the rest of the platform.
+                </p>
+              </div>
+              <div className='flex flex-wrap gap-2'>
+                <Badge
+                  variant='outline'
+                  className='rounded-full border-slate-200 bg-white px-3 py-1 text-slate-700'
+                >
+                  {totalProducts || products.length} products
+                </Badge>
+                <Badge
+                  variant='outline'
+                  className='rounded-full border-slate-200 bg-white px-3 py-1 text-slate-700'
+                >
+                  {totalVariants} variants
+                </Badge>
+                <Badge
+                  variant='outline'
+                  className='rounded-full border-slate-200 bg-white px-3 py-1 text-slate-700'
+                >
+                  {totalStock} stock units
+                </Badge>
+              </div>
+            </div>
+
+            <div className='flex flex-wrap gap-3'>
+              <Button
+                asChild
+                variant='outline'
+                className='h-11 rounded-xl border-slate-200 px-5'
+              >
+                <Link to='/upload-products'>Bulk Upload</Link>
+              </Button>
+              <Button
+                asChild
+                className='h-11 rounded-xl bg-slate-950 px-5 text-white hover:bg-slate-800'
+              >
+                <Link to='/products/create-products'>Create Product</Link>
+              </Button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+        </section>
 
-export default VendorProductsTable;
+        <section className='grid gap-4 md:grid-cols-3'>
+          {summaryCards.map(({ label, value, Icon, iconClass }) => (
+            <div
+              key={label}
+              className='rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm'
+            >
+              <div className='flex items-start justify-between gap-4'>
+                <div>
+                  <p className='text-sm font-medium text-slate-500'>{label}</p>
+                  <p className='mt-3 text-4xl font-semibold tracking-tight text-slate-950'>
+                    {value}
+                  </p>
+                </div>
+                <div className={cn('rounded-2xl p-3', iconClass)}>
+                  <Icon className='h-6 w-6' />
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <section className='overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm'>
+          {error && (
+            <div className='border-b border-rose-200 bg-rose-50 px-6 py-3 text-sm font-medium text-rose-700'>
+              {error}
+            </div>
+          )}
+          <div className='relative overflow-x-auto'>
+            {loading && (
+              <div className='absolute inset-0 z-10 flex items-center justify-center bg-white/75 backdrop-blur-sm'>
+                <div className='flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm'>
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                  Loading products
+                </div>
+              </div>
+            )}
+
+            <table className='min-w-full text-left'>
+              <thead className='bg-slate-50 text-xs uppercase tracking-[0.2em] text-slate-500'>
+                <tr>
+                  <th className='px-6 py-4 font-semibold'>Product</th>
+                  <th className='px-6 py-4 font-semibold'>Brand</th>
+                  <th className='px-6 py-4 font-semibold'>Variant</th>
+                  <th className='px-6 py-4 font-semibold'>Stock</th>
+                  <th className='px-6 py-4 font-semibold'>Price</th>
+                  <th className='px-6 py-4 font-semibold'>Visible</th>
+                  <th className='px-6 py-4 font-semibold'>Actions</th>
+                </tr>
+              </thead>
+              <tbody className='divide-y divide-slate-200'>
+                {!loading && variantRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className='px-6 py-16 text-center'>
+                      <div className='flex flex-col items-center gap-3'>
+                        <div className='rounded-full bg-slate-100 p-4 text-slate-500'>
+                          <Package className='h-6 w-6' />
+                        </div>
+                        <h3 className='text-lg font-semibold text-slate-900'>
+                          No products found
+                        </h3>
+                        <p className='max-w-md text-sm text-slate-500'>
+                          Start by creating a product or bulk uploading your catalog.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  variantRows.map(({ rowKey, product, variant, variantIndex }) => (
+                    <tr key={rowKey} className='transition-colors hover:bg-slate-50/80'>
+                      <td className='px-6 py-5'>
+                        <div className='flex items-center gap-4'>
+                          <ProductImage
+                            src={getVariantImageUrl(variant)}
+                            alt={`${product.productName || 'Product'} variant ${variantIndex + 1}`}
+                            className='h-16 w-16 rounded-2xl border border-slate-200 object-cover'
+                          />
+                          <div className='min-w-0'>
+                            <p className='text-lg font-semibold text-slate-950'>
+                              {product.productName || 'Unnamed Product'}
+                            </p>
+                            <LinkedText
+                              as='p'
+                              text={product.shortDescription || 'No short description available.'}
+                              preserveWhitespace={false}
+                              className='max-w-md overflow-hidden text-ellipsis whitespace-nowrap text-sm text-slate-500'
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className='px-6 py-5'>
+                        <div className='flex items-center gap-2 text-slate-700'>
+                          <Tag className='h-4 w-4 text-slate-400' />
+                          <span className='font-medium'>{product.brand || 'Unavailable'}</span>
+                        </div>
+                      </td>
+                      <td className='px-6 py-5'>
+                        <div className='max-w-xs space-y-1'>
+                          <p className='text-sm font-semibold text-slate-900'>
+                            {getVariantSummary(variant)}
+                          </p>
+                          <p className='text-xs text-slate-500'>
+                            SKU: {variant.variantSku || `Variant ${variantIndex + 1}`}
+                          </p>
+                        </div>
+                      </td>
+                      <td className='px-6 py-5 text-base font-semibold text-slate-900'>
+                        {Number(variant.stockQuantity || 0)} units
+                      </td>
+                      <td className='px-6 py-5 text-base font-semibold text-slate-900'>
+                        {getVariantPrice(variant)}
+                      </td>
+                      <td className='px-6 py-5'>
+                        <div className='flex min-w-[148px] items-center gap-3'>
+                          <Switch
+                            checked={product.isAvailable !== false}
+                            onCheckedChange={(checked) =>
+                              handleVisibilityToggle(product._id, checked)
+                            }
+                            disabled={visibilityUpdatingId === product._id}
+                          />
+                          <span
+                            className={cn(
+                              'text-sm font-medium',
+                              product.isAvailable !== false
+                                ? 'text-emerald-700'
+                                : 'text-slate-500'
+                            )}
+                          >
+                            {visibilityUpdatingId === product._id
+                              ? 'Saving...'
+                              : product.isAvailable !== false
+                                ? 'Visible'
+                                : 'Hidden'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className='px-6 py-5'>
+                        <Button
+                          variant='outline'
+                          className='h-10 rounded-xl border-slate-200 px-4'
+                          onClick={() => setSelectedProduct(product)}
+                        >
+                          <Eye className='h-4 w-4' />
+                          View Details
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPageChange={(nextPage) => {
+            setPage(nextPage)
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
+          isLoading={loading}
+        />
+      </Main>
+
+      <ProductDetailsDialog
+        product={selectedProduct}
+        open={Boolean(selectedProduct)}
+        onOpenChange={(open) => !open && setSelectedProduct(null)}
+      />
+    </div>
+  )
+}

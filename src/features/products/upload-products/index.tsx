@@ -1,41 +1,54 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import {
-  Upload,
-  Download,
-  CheckCircle,
-  XCircle,
   AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Download,
   FileSpreadsheet,
   Loader2,
-  ArrowLeft,
   Sparkles,
-} from 'lucide-react';
-import { useSelector } from 'react-redux';
+  Upload,
+  XCircle,
+} from 'lucide-react'
+import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
+import { ConfigDrawer } from '@/components/config-drawer'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { Search } from '@/components/search'
+import { ThemeSwitch } from '@/components/theme-switch'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 interface UploadError {
-  rows: number[];
-  productName: string;
-  errors: string[];
+  rows: number[]
+  productName: string
+  errors: string[]
 }
 
 interface UploadResult {
-  success: boolean;
-  successCount: number;
-  failureCount: number;
-  errors: UploadError[];
+  success: boolean
+  successCount: number
+  failureCount: number
+  errors: UploadError[]
   successfulProducts: Array<{
-    productId: string;
-    productName: string;
-    slug: string;
-  }>;
+    productId: string
+    productName: string
+    slug: string
+  }>
 }
+
+const MAX_FILE_SIZE_MB = 10
 
 const normalizeRows = (value: unknown): number[] => {
   if (Array.isArray(value)) {
-    return value.filter((row) => typeof row === 'number') as number[];
+    return value.filter((row) => typeof row === 'number') as number[]
   }
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return [value];
+    return [value]
   }
   if (typeof value === 'string') {
     return value
@@ -43,10 +56,10 @@ const normalizeRows = (value: unknown): number[] => {
       .map((chunk) => chunk.trim())
       .filter(Boolean)
       .map((chunk) => Number(chunk))
-      .filter((row) => Number.isFinite(row) && row > 0);
+      .filter((row) => Number.isFinite(row) && row > 0)
   }
-  return [];
-};
+  return []
+}
 
 const safeResult = (raw: any): UploadResult => {
   if (!raw || typeof raw !== 'object') {
@@ -56,7 +69,7 @@ const safeResult = (raw: any): UploadResult => {
       failureCount: 0,
       errors: [],
       successfulProducts: [],
-    };
+    }
   }
 
   const errors = Array.isArray(raw.errors)
@@ -64,30 +77,33 @@ const safeResult = (raw: any): UploadResult => {
         const productName =
           typeof entry.productName === 'string'
             ? entry.productName
-            : 'Unknown Product';
+            : 'Unknown Product'
 
         const messages =
           Array.isArray(entry.errors) && entry.errors.length > 0
             ? entry.errors.filter((err: any) => typeof err === 'string')
             : typeof entry.error === 'string'
-            ? [entry.error]
-            : ['Unknown validation error'];
+              ? [entry.error]
+              : ['Unknown validation error']
 
         return {
           rows: normalizeRows(entry.rows ?? entry.row ?? []),
           productName,
           errors: messages.length ? messages : ['Unknown validation error'],
-        };
+        }
       })
-    : [];
+    : []
 
   const successfulProducts = Array.isArray(raw.successfulProducts)
-    ? raw.successfulProducts.map((p: any) => ({
-        productId: typeof p.productId === 'string' ? p.productId : '',
-        productName: typeof p.productName === 'string' ? p.productName : 'Unknown',
-        slug: typeof p.slug === 'string' ? p.slug : '',
+    ? raw.successfulProducts.map((product: any) => ({
+        productId: typeof product.productId === 'string' ? product.productId : '',
+        productName:
+          typeof product.productName === 'string'
+            ? product.productName
+            : 'Unknown',
+        slug: typeof product.slug === 'string' ? product.slug : '',
       }))
-    : [];
+    : []
 
   return {
     success: Boolean(raw.success),
@@ -95,40 +111,90 @@ const safeResult = (raw: any): UploadResult => {
     failureCount: typeof raw.failureCount === 'number' ? raw.failureCount : 0,
     errors,
     successfulProducts,
-  };
-};
+  }
+}
+
+const formatFileSize = (file: File) => {
+  if (file.size < 1024 * 1024) {
+    return `${(file.size / 1024).toFixed(1)} KB`
+  }
+  return `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+}
 
 const ExcelProductUpload: React.FC = () => {
-  const token = useSelector((state: any) => state.auth.token);
+  const token = useSelector((state: any) => state.auth?.token || '')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<UploadResult | null>(null);
-  const [dragActive, setDragActive] = useState(false);
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [result, setResult] = useState<UploadResult | null>(null)
+  const [dragActive, setDragActive] = useState(false)
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
+  const openFilePicker = () => {
+    fileInputRef.current?.click()
+  }
+
+  const validateFile = (nextFile: File): boolean => {
+    const fileExtension = nextFile.name.split('.').pop()?.toLowerCase()
+    const isValid =
+      fileExtension === 'xlsx' ||
+      fileExtension === 'csv' ||
+      nextFile.type ===
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      nextFile.type === 'application/vnd.ms-excel' ||
+      nextFile.type === 'text/csv'
+
+    if (!isValid) {
+      toast.error('Upload a valid Excel or CSV file (.xlsx or .csv).')
+      return false
     }
-  };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0];
-      if (validateFile(droppedFile)) {
-        setFile(droppedFile);
-        setResult(null);
-      }
+    if (nextFile.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      toast.error(`File size must be less than ${MAX_FILE_SIZE_MB}MB.`)
+      return false
     }
-  };
+
+    return true
+  }
+
+  const setSelectedFile = (nextFile: File | null) => {
+    setFile(nextFile)
+    setResult(null)
+  }
+
+  const handleDrag = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.type === 'dragenter' || event.type === 'dragover') {
+      setDragActive(true)
+    } else if (event.type === 'dragleave') {
+      setDragActive(false)
+    }
+  }
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setDragActive(false)
+
+    const droppedFile = event.dataTransfer.files?.[0]
+    if (!droppedFile) return
+
+    if (validateFile(droppedFile)) {
+      setSelectedFile(droppedFile)
+    }
+  }
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0]
+    if (!selectedFile) return
+
+    if (validateFile(selectedFile)) {
+      setSelectedFile(selectedFile)
+    }
+
+    event.target.value = ''
+  }
 
   const downloadTemplate = async () => {
     try {
@@ -140,388 +206,470 @@ const ExcelProductUpload: React.FC = () => {
             Authorization: `Bearer ${token}`,
           },
         }
-      );
+      )
 
       if (!response.ok) {
-        throw new Error('Failed to download template');
+        throw new Error('Failed to download template')
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'product_upload_template.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'product_upload_template.xlsx'
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+      window.URL.revokeObjectURL(url)
     } catch {
-      alert('Unable to download template. Please try again.');
+      toast.error('Unable to download template. Try again.')
     }
-  };
-
-  const validateFile = (file: File): boolean => {
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
-    const isValid =
-      fileExtension === 'xlsx' ||
-      fileExtension === 'csv' ||
-      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      file.type === 'application/vnd.ms-excel' ||
-      file.type === 'text/csv';
-
-    if (!isValid) {
-      alert('Please upload a valid Excel or CSV file (.xlsx or .csv)');
-      return false;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB');
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      if (validateFile(selectedFile)) {
-        setFile(selectedFile);
-        setResult(null);
-      }
-    }
-  };
+  }
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file) return
 
-    setUploading(true);
+    setUploading(true)
 
-    const formData = new FormData();
-    formData.append('file', file);
+    const formData = new FormData()
+    formData.append('file', file)
 
     try {
-      const url = `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/bulk-upload`;
-      const response = await fetch(url, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/bulk-upload`,
+        {
+          method: 'POST',
+          body: formData,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
 
-      const data = await response.json();
+      const data = await response.json()
 
-      if (response.ok) {
-        const parsedResult = safeResult(data.data || data);
-        setResult(parsedResult);
-      } else {
-        const message = data?.message || 'Upload failed due to server error.';
+      if (!response.ok) {
+        const message = data?.message || 'Upload failed due to server error.'
         setResult({
           success: false,
           successCount: 0,
           failureCount: 0,
           errors: [{ rows: [0], productName: 'System', errors: [message] }],
           successfulProducts: [],
-        });
+        })
+        toast.error(message)
+        return
+      }
+
+      const parsedResult = safeResult(data.data || data)
+      setResult(parsedResult)
+
+      if (parsedResult.failureCount > 0) {
+        toast.warning(
+          `${parsedResult.successCount} products created, ${parsedResult.failureCount} failed.`
+        )
+      } else {
+        toast.success(`${parsedResult.successCount} products created successfully.`)
       }
     } catch {
-      const errorMsg = 'Network error. Please check your connection and try again.';
+      const errorMessage = 'Network error. Check your connection and try again.'
       setResult({
         success: false,
         successCount: 0,
         failureCount: 0,
-        errors: [{ rows: [0], productName: 'System', errors: [errorMsg] }],
+        errors: [{ rows: [0], productName: 'System', errors: [errorMessage] }],
         successfulProducts: [],
-      });
+      })
+      toast.error(errorMessage)
     } finally {
-      setUploading(false);
+      setUploading(false)
     }
-  };
+  }
 
   const resetUpload = () => {
-    setFile(null);
-    setResult(null);
-  };
+    setSelectedFile(null)
+  }
 
-  const goBack = () => {
-    window.history.back();
-  };
+  const totalProcessed =
+    (result?.successCount || 0) + (result?.failureCount || 0)
 
   return (
-  <div className="min-h-screen bg-white px-4 py-8 text-gray-900">
-  <div className="mx-auto max-w-5xl space-y-6">
-    <div className="flex items-center gap-4">
-      <button
-        onClick={goBack}
-        className="group flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-800 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md"
-      >
-        <ArrowLeft size={18} className="transition-transform group-hover:-translate-x-1" />
-        <span className="font-medium">Back</span>
-      </button>
-
-      <div className="flex-1 rounded-lg border border-gray-300 bg-white px-6 py-3 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="rounded-md bg-black p-2">
-            <Sparkles className="text-white" size={24} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-black">Bulk Product Upload</h1>
-            <p className="text-sm text-gray-600">Upload multiple products at once using Excel</p>
-          </div>
+    <>
+      <Header fixed>
+        <Search />
+        <div className='ms-auto flex items-center space-x-4'>
+          <ThemeSwitch />
+          <ConfigDrawer />
+          <ProfileDropdown />
         </div>
-      </div>
-    </div>
+      </Header>
 
-    {/* Main Content Card */}
-    <div className="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-lg">
-      <div className="bg-black px-6 py-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Upload Your File</h2>
-          <button
-            onClick={downloadTemplate}
-            className="flex items-center gap-2 rounded-md bg-white px-4 py-2 font-medium text-black shadow transition-all hover:bg-gray-100"
-          >
-            <Download size={18} />
-            Download Template
-          </button>
-        </div>
-      </div>
+      <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
+        <section className='rounded-3xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50/80 via-white to-indigo-50/70 p-6 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.6)]'>
+          <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
+            <div>
+              <div className='mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700'>
+                <Sparkles className='h-3.5 w-3.5' />
+                Bulk Product Upload
+              </div>
+              <h1 className='text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl'>
+                Upload Products by Sheet
+              </h1>
+              <p className='mt-1 max-w-3xl text-sm text-slate-600 sm:text-base'>
+                Import multiple products in one pass using the approved Excel or CSV
+                template.
+              </p>
+            </div>
 
-      <div className="p-8">
-        {!result && (
-          <>
+            <div className='flex flex-wrap items-center gap-2'>
+              <Badge className='border border-cyan-200 bg-cyan-100/70 text-cyan-800'>
+                Excel or CSV
+              </Badge>
+              <Badge className='border border-slate-200 bg-white text-slate-700'>
+                Max {MAX_FILE_SIZE_MB}MB
+              </Badge>
+              <Button asChild variant='outline' className='rounded-xl border-slate-300'>
+                <Link to='/products/create-products'>
+                  <ArrowLeft className='h-4 w-4' />
+                  Back to Product Studio
+                </Link>
+              </Button>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={downloadTemplate}
+                className='rounded-xl border-slate-300'
+              >
+                <Download className='h-4 w-4' />
+                Download Template
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <div className='grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_340px]'>
+          <section className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
+            <div className='flex flex-wrap items-center justify-between gap-3'>
+              <div>
+                <h2 className='text-lg font-semibold text-slate-900'>Upload File</h2>
+                <p className='text-sm text-slate-500'>
+                  Drop the sheet here or browse from your computer.
+                </p>
+              </div>
+              <Badge
+                className={cn(
+                  'border',
+                  file
+                    ? 'border-emerald-200 bg-emerald-100/70 text-emerald-800'
+                    : 'border-slate-200 bg-slate-100 text-slate-700'
+                )}
+              >
+                {file ? 'Ready to upload' : 'Awaiting file'}
+              </Badge>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type='file'
+              accept='.xlsx,.csv'
+              onChange={handleFileChange}
+              className='hidden'
+            />
+
             <div
-              className={`relative rounded-xl border-2 border-dashed p-12 text-center transition-all duration-300 ${
-                dragActive
-                  ? 'scale-[1.02] border-black bg-gray-50'
-                  : 'border-gray-400 hover:border-gray-600 hover:bg-gray-50'
-              }`}
+              role='button'
+              tabIndex={0}
+              onClick={openFilePicker}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  openFilePicker()
+                }
+              }}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
               onDrop={handleDrop}
+              className={cn(
+                'mt-5 rounded-2xl border-2 border-dashed p-8 text-center transition',
+                dragActive
+                  ? 'border-cyan-500 bg-cyan-50/80'
+                  : 'border-slate-300 bg-slate-50/70 hover:border-cyan-300 hover:bg-cyan-50/50'
+              )}
             >
               {file ? (
-                <div className="animate-in fade-in space-y-4 duration-300">
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-xl bg-black shadow">
-                    <FileSpreadsheet size={40} className="text-white" />
+                <div className='mx-auto max-w-xl rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5 text-left shadow-sm'>
+                  <div className='flex flex-wrap items-start gap-4'>
+                    <div className='flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700'>
+                      <FileSpreadsheet className='h-7 w-7' />
+                    </div>
+                    <div className='min-w-0 flex-1'>
+                      <p className='truncate text-base font-semibold text-slate-900'>
+                        {file.name}
+                      </p>
+                      <p className='mt-1 text-sm text-slate-500'>
+                        {formatFileSize(file)} and ready for import.
+                      </p>
+                      <div className='mt-3 flex flex-wrap gap-2'>
+                        <Button
+                          type='button'
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleUpload()
+                          }}
+                          disabled={uploading}
+                          className='rounded-xl bg-cyan-600 text-white hover:bg-cyan-700'
+                        >
+                          {uploading ? (
+                            <>
+                              <Loader2 className='h-4 w-4 animate-spin' />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className='h-4 w-4' />
+                              Upload Products
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openFilePicker()
+                          }}
+                          className='rounded-xl border-slate-300'
+                        >
+                          Replace File
+                        </Button>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            resetUpload()
+                          }}
+                          className='rounded-xl text-slate-600 hover:text-slate-900'
+                        >
+                          Remove File
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xl font-bold text-gray-900">{file.name}</p>
-                    <p className="mt-1 text-sm text-gray-600">{(file.size / 1024).toFixed(2)} KB</p>
-                  </div>
-                  <button
-                    onClick={resetUpload}
-                    className="text-sm font-medium text-red-600 transition hover:text-red-700 hover:underline"
-                  >
-                    Remove file
-                  </button>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-xl bg-gray-100">
-                    <Upload size={40} className="text-black" />
+                <div className='space-y-5'>
+                  <div className='mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-cyan-100/80 text-cyan-700'>
+                    <Upload className='h-9 w-9' />
                   </div>
                   <div>
-                    <p className="mb-1 text-xl font-bold text-gray-900">Drop your Excel file here</p>
-                    <p className="text-gray-600">or click to browse</p>
+                    <p className='text-2xl font-bold text-slate-900'>
+                      Drop your Excel file here
+                    </p>
+                    <p className='mt-1 text-sm text-slate-500'>
+                      Click anywhere in this area to browse or drag the file in.
+                    </p>
                   </div>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-black px-8 py-3 font-semibold text-white shadow transition-all hover:bg-gray-900">
-                    <Upload size={18} />
-                    Browse Files
-                    <input
-                      type="file"
-                      accept=".xlsx,.csv"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </label>
-                  <p className="text-sm text-gray-600">
-                    Supported: <span className="font-medium">.xlsx, .csv</span> • Max size:{' '}
-                    <span className="font-medium">10MB</span>
-                  </p>
+                  <div className='flex flex-wrap items-center justify-center gap-2 text-sm text-slate-500'>
+                    <span>Accepted formats: .xlsx, .csv</span>
+                    <span>Max size: {MAX_FILE_SIZE_MB}MB</span>
+                  </div>
                 </div>
               )}
             </div>
+          </section>
 
-            {file && (
-              <button
-                onClick={handleUpload}
-                disabled={uploading}
-                className="mt-8 flex w-full items-center justify-center gap-3 rounded-xl bg-black px-8 py-4 text-lg font-bold text-white shadow transition-all hover:bg-gray-900 disabled:cursor-not-allowed disabled:bg-gray-400"
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 size={24} className="animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload size={24} />
-                    Upload Products
-                  </>
-                )}
-              </button>
-            )}
-          </>
-        )}
-
-        {result && (
-          <div className="animate-in fade-in space-y-6 duration-500">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="rounded-xl border-2 border-green-600 bg-green-50 p-6 shadow">
-                <div className="mb-3 flex items-center gap-3">
-                  <div className="rounded-md bg-green-600 p-2">
-                    <CheckCircle className="text-white" size={24} />
+          <div className='space-y-4'>
+            <section className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
+              <h2 className='text-lg font-semibold text-slate-900'>Import Checklist</h2>
+              <div className='mt-4 space-y-3'>
+                {[
+                  'Download the template first to keep column names correct.',
+                  'Fill every required field before uploading the sheet.',
+                  'Keep variant payloads in valid JSON format.',
+                  'Use valid image URLs if you want images attached on import.',
+                  'Uploaded products go through the current approval flow.',
+                ].map((item) => (
+                  <div key={item} className='flex items-start gap-3 rounded-xl bg-slate-50 p-3'>
+                    <div className='mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-100 text-cyan-700'>
+                      <CheckCircle2 className='h-4 w-4' />
+                    </div>
+                    <p className='text-sm text-slate-600'>{item}</p>
                   </div>
-                  <span className="text-lg font-bold text-green-800">Successful</span>
-                </div>
-                <p className="text-5xl font-black text-green-700">{result.successCount}</p>
+                ))}
               </div>
+            </section>
 
-              <div className="rounded-xl border-2 border-red-600 bg-red-50 p-6 shadow">
-                <div className="mb-3 flex items-center gap-3">
-                  <div className="rounded-md bg-red-600 p-2">
-                    <XCircle className="text-white" size={24} />
-                  </div>
-                  <span className="text-lg font-bold text-red-800">Failed</span>
+            <section className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
+              <h2 className='text-lg font-semibold text-slate-900'>Status</h2>
+              <div className='mt-4 grid gap-3'>
+                <div className='rounded-xl border border-slate-200 bg-slate-50 p-4'>
+                  <p className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
+                    Current File
+                  </p>
+                  <p className='mt-2 text-sm font-medium text-slate-900'>
+                    {file ? file.name : 'No file selected'}
+                  </p>
                 </div>
-                <p className="text-5xl font-black text-red-700">{result.failureCount}</p>
+                <div className='rounded-xl border border-slate-200 bg-slate-50 p-4'>
+                  <p className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
+                    Last Upload
+                  </p>
+                  <p className='mt-2 text-sm font-medium text-slate-900'>
+                    {result
+                      ? `${result.successCount} success, ${result.failureCount} failed`
+                      : 'No upload processed yet'}
+                  </p>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        {result ? (
+          <section className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
+            <div className='flex flex-wrap items-center justify-between gap-3'>
+              <div>
+                <h2 className='text-lg font-semibold text-slate-900'>Upload Results</h2>
+                <p className='text-sm text-slate-500'>
+                  Review created products and row-level validation issues.
+                </p>
+              </div>
+              <div className='flex flex-wrap items-center gap-2'>
+                <Badge
+                  className={cn(
+                    'border',
+                    result.failureCount > 0
+                      ? 'border-amber-200 bg-amber-100/80 text-amber-800'
+                      : 'border-emerald-200 bg-emerald-100/80 text-emerald-800'
+                  )}
+                >
+                  {result.failureCount > 0 ? 'Completed with issues' : 'Completed'}
+                </Badge>
+                <Button
+                  type='button'
+                  variant='outline'
+                  onClick={downloadTemplate}
+                  className='rounded-xl border-slate-300'
+                >
+                  <Download className='h-4 w-4' />
+                  Download Template
+                </Button>
+                <Button
+                  type='button'
+                  onClick={resetUpload}
+                  className='rounded-xl bg-cyan-600 text-white hover:bg-cyan-700'
+                >
+                  Upload Another File
+                </Button>
               </div>
             </div>
 
-            {/* Successfully Created Products */}
-            {(result?.successfulProducts ?? []).length > 0 && (
-              <div className="rounded-xl border-2 border-green-600 bg-green-50 p-6 shadow">
-                <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-green-800">
-                  <CheckCircle size={20} />
-                  Successfully Created Products
-                </h3>
-                <div className="custom-scrollbar max-h-80 space-y-3 overflow-y-auto pr-2">
-                  {(result?.successfulProducts ?? []).map((product, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-lg border border-green-200 bg-white p-4 shadow-sm"
-                    >
-                      <p className="text-base font-semibold text-gray-900">{product.productName}</p>
-                      <p className="mt-1 text-sm text-gray-600">
-                        <span className="font-medium">Slug:</span> {product.slug}
-                      </p>
-                    </div>
-                  ))}
+            <div className='mt-5 grid gap-4 md:grid-cols-3'>
+              <div className='rounded-2xl border border-slate-200 bg-slate-50/80 p-5'>
+                <div className='flex items-center justify-between'>
+                  <div>
+                    <p className='text-sm font-medium text-slate-500'>Processed Rows</p>
+                    <p className='mt-1 text-3xl font-bold text-slate-900'>
+                      {totalProcessed}
+                    </p>
+                  </div>
+                  <div className='rounded-xl bg-cyan-100 p-3 text-cyan-700'>
+                    <FileSpreadsheet className='h-6 w-6' />
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Errors */}
-            {(result?.errors ?? []).length > 0 && (
-              <div className="rounded-xl border-2 border-red-600 bg-red-50 p-6 shadow">
-                <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-red-800">
-                  <AlertCircle size={20} />
-                  Errors ({(result?.errors ?? []).length})
-                </h3>
-                <div className="custom-scrollbar max-h-96 space-y-3 overflow-y-auto pr-2">
-                  {(result?.errors ?? []).map((error, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-lg border border-red-200 bg-white p-4 shadow-sm"
-                    >
-                      <p className="mb-2 text-base font-semibold text-gray-900">
-                        {(error.rows.length
-                          ? error.rows.length > 1
-                            ? `Rows ${error.rows.join(', ')}`
-                            : `Row ${error.rows[0]}`
-                          : 'Row unknown')}
-                        : {error.productName || 'Unknown Product'}
-                      </p>
-                      <ul className="ml-2 space-y-1 text-sm text-red-700">
-                        {(error.errors ?? []).map((err, errIdx) => (
-                          <li key={errIdx} className="flex items-start gap-2">
-                            <span className="mt-0.5 text-red-500">•</span>
-                            <span>{err}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+              <div className='rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5'>
+                <div className='flex items-center justify-between'>
+                  <div>
+                    <p className='text-sm font-medium text-emerald-700'>Successful</p>
+                    <p className='mt-1 text-3xl font-bold text-emerald-800'>
+                      {result.successCount}
+                    </p>
+                  </div>
+                  <div className='rounded-xl bg-emerald-100 p-3 text-emerald-700'>
+                    <CheckCircle2 className='h-6 w-6' />
+                  </div>
                 </div>
               </div>
-            )}
 
-            <button
-              onClick={resetUpload}
-              className="w-full rounded-xl bg-black px-8 py-4 text-lg font-bold text-white shadow transition-all hover:bg-gray-900"
-            >
-              Upload Another File
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+              <div className='rounded-2xl border border-rose-200 bg-rose-50/80 p-5'>
+                <div className='flex items-center justify-between'>
+                  <div>
+                    <p className='text-sm font-medium text-rose-700'>Failed</p>
+                    <p className='mt-1 text-3xl font-bold text-rose-800'>
+                      {result.failureCount}
+                    </p>
+                  </div>
+                  <div className='rounded-xl bg-rose-100 p-3 text-rose-700'>
+                    <XCircle className='h-6 w-6' />
+                  </div>
+                </div>
+              </div>
+            </div>
 
-    {/* Info Card */}
-    <div className="rounded-xl border-2 border-gray-300 bg-gray-50 p-6 shadow">
-      <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
-        <AlertCircle size={20} />
-        Important Guidelines
-      </h3>
-      <ul className="space-y-2 text-sm text-gray-700">
-        <li className="flex items-start gap-2">
-          <span className="mt-0.5 text-gray-500">✓</span>
-          <span>Download the template to ensure correct format</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="mt-0.5 text-gray-500">✓</span>
-          <span>All required fields must be filled</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="mt-0.5 text-gray-500">✓</span>
-          <span>Variants should be in JSON format</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="mt-0.5 text-gray-500">✓</span>
-          <span>Images should be valid URLs or will be uploaded separately</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="mt-0.5 text-gray-500">✓</span>
-          <span>Products will be created with 'pending' status for approval</span>
-        </li>
-      </ul>
-    </div>
-  </div>
+            <div className='mt-5 grid gap-4 xl:grid-cols-2'>
+              {(result.successfulProducts ?? []).length > 0 ? (
+                <section className='rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5'>
+                  <h3 className='flex items-center gap-2 text-base font-semibold text-emerald-800'>
+                    <CheckCircle2 className='h-5 w-5' />
+                    Successfully Created Products
+                  </h3>
+                  <div className='mt-4 max-h-96 space-y-3 overflow-y-auto pr-1'>
+                    {(result.successfulProducts ?? []).map((product) => (
+                      <article
+                        key={product.productId || `${product.slug}-${product.productName}`}
+                        className='rounded-xl border border-emerald-200 bg-white p-4 shadow-sm'
+                      >
+                        <p className='font-semibold text-slate-900'>{product.productName}</p>
+                        <p className='mt-1 text-sm text-slate-500'>
+                          Slug: {product.slug || '-'}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
-  <style>{`
-    .custom-scrollbar::-webkit-scrollbar {
-      width: 8px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-      background: #f9fafb;
-      border-radius: 10px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #d1d5db;
-      border-radius: 10px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: #9ca3af;
-    }
-    @keyframes fade-in {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    .animate-in {
-      animation: fade-in 0.3s ease-out;
-    }
-  `}</style>
-</div>
-  );
-};
+              {(result.errors ?? []).length > 0 ? (
+                <section className='rounded-2xl border border-rose-200 bg-rose-50/70 p-5'>
+                  <h3 className='flex items-center gap-2 text-base font-semibold text-rose-800'>
+                    <AlertCircle className='h-5 w-5' />
+                    Errors ({result.errors.length})
+                  </h3>
+                  <div className='mt-4 max-h-96 space-y-3 overflow-y-auto pr-1'>
+                    {(result.errors ?? []).map((error, index) => (
+                      <article
+                        key={`${error.productName}-${index}`}
+                        className='rounded-xl border border-rose-200 bg-white p-4 shadow-sm'
+                      >
+                        <p className='font-semibold text-slate-900'>
+                          {error.rows.length
+                            ? error.rows.length > 1
+                              ? `Rows ${error.rows.join(', ')}`
+                              : `Row ${error.rows[0]}`
+                            : 'Row unknown'}
+                          {' : '}
+                          {error.productName || 'Unknown Product'}
+                        </p>
+                        <ul className='mt-2 space-y-1 text-sm text-rose-700'>
+                          {(error.errors ?? []).map((message, errorIndex) => (
+                            <li key={`${message}-${errorIndex}`}>{message}</li>
+                          ))}
+                        </ul>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+      </Main>
+    </>
+  )
+}
 
-export default ExcelProductUpload;
+export default ExcelProductUpload
