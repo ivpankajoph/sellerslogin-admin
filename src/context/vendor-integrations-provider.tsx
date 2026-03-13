@@ -10,6 +10,7 @@ import {
 import { useSelector } from 'react-redux'
 import api from '@/lib/axios'
 import {
+  applyBrevoStatus,
   isProviderUsableFromData,
   parseVendorIntegrations,
   type IntegrationProviderId,
@@ -51,9 +52,13 @@ export function VendorIntegrationsProvider({ children }: { children: ReactNode }
 
     try {
       setLoading(true)
-      const response = await api.get('/integrations')
+      const [response, brevoResponse] = await Promise.all([
+        api.get('/integrations'),
+        api.get('/vendor/brevo/status').catch(() => null),
+      ])
       const parsed = parseVendorIntegrations(response?.data?.data)
-      setData(parsed)
+      const hydrated = applyBrevoStatus(parsed, brevoResponse?.data?.data)
+      setData(hydrated)
     } catch {
       setData(null)
     } finally {

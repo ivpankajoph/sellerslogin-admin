@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 
-const CORE_TEMPLATE_KEYS = new Set(['classic', 'studio', 'minimal', 'trend'])
+const CORE_TEMPLATE_KEYS = new Set(['mquiq', 'poupqz', 'oragze', 'whiterose'])
 
 type TemplateCatalogItem = {
   key: string

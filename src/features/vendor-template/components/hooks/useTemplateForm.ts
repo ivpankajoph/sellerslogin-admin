@@ -18,7 +18,7 @@ type TemplateCatalogItem = {
   deletable?: boolean
 }
 
-const CORE_TEMPLATE_KEYS = new Set(['classic', 'studio', 'minimal', 'trend'])
+const CORE_TEMPLATE_KEYS = new Set(['mquiq', 'poupqz', 'oragze', 'whiterose'])
 
 const normalizeTemplateKey = (value: unknown) =>
   String(value || '')
@@ -36,8 +36,8 @@ export function useTemplateForm() {
   const [templateCatalog, setTemplateCatalog] = useState<TemplateCatalogItem[]>(
     []
   )
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState('classic')
-  const [activeTemplateKey, setActiveTemplateKey] = useState('classic')
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState('mquiq')
+  const [activeTemplateKey, setActiveTemplateKey] = useState('mquiq')
   const [isUpdatingTemplate, setIsUpdatingTemplate] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState('idle')
@@ -203,9 +203,9 @@ export function useTemplateForm() {
     if (!templateCatalog.length) return
 
     const fallbackKey =
-      templateCatalog.find((item) => item.key === 'classic')?.key ||
+      templateCatalog.find((item) => item.key === 'mquiq')?.key ||
       templateCatalog[0]?.key ||
-      'classic'
+      'mquiq'
 
     if (!templateCatalog.some((item) => item.key === selectedTemplateKey)) {
       setSelectedTemplateKey(fallbackKey)
@@ -376,9 +376,9 @@ export function useTemplateForm() {
 
       setTemplateCatalog(items)
 
-      const fallbackKey = items.find((item) => item.key === 'classic')?.key ||
+      const fallbackKey = items.find((item) => item.key === 'mquiq')?.key ||
         items[0]?.key ||
-        'classic'
+        'mquiq'
 
       if (selectedTemplateKey === templateKey) {
         setSelectedTemplateKey(fallbackKey)

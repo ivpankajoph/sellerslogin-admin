@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none">
+  <rect width="160" height="160" rx="36" fill="#FFF7E6"/>
+  <rect x="34" y="42" width="92" height="68" rx="16" fill="#FFFFFF" stroke="#F59E0B" stroke-width="6"/>
+  <path d="M50 66H110" stroke="#F59E0B" stroke-width="6" stroke-linecap="round"/>
+  <path d="M60 92H100" stroke="#F59E0B" stroke-width="6" stroke-linecap="round"/>
+  <rect x="42" y="114" width="76" height="20" rx="10" fill="#F59E0B"/>
+  <text x="80" y="128" text-anchor="middle" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">COD</text>
+</svg>

@@ -1,15 +1,38 @@
+import borzoLogo from '@/assets/toolkit-apps/borzo.svg'
+import brevoLogo from '@/assets/toolkit-apps/brevo.svg'
+import cashfreeLogo from '@/assets/toolkit-apps/cashfree.png'
+import codLogo from '@/assets/toolkit-apps/cod.svg'
+import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
+import razorpayLogo from '@/assets/toolkit-apps/razorpay.png'
+
 export const INTEGRATION_PROVIDER_IDS = [
   'razorpay',
   'cashfree',
   'cod',
   'borzo',
   'delhivery',
+  'brevo',
 ] as const
 
 export type IntegrationProviderId = (typeof INTEGRATION_PROVIDER_IDS)[number]
 export type PaymentProviderId = 'cod' | 'razorpay' | 'cashfree'
 export type DeliveryProviderId = 'none' | 'borzo' | 'delhivery'
-export type IntegrationCategory = 'payment' | 'delivery'
+export type IntegrationCategory = 'payment' | 'delivery' | 'marketing'
+export type IntegrationProviderField = {
+  key: string
+  label: string
+  placeholder?: string
+  type?: 'text' | 'password'
+}
+export type IntegrationCatalogItem = {
+  title: string
+  shortLabel: string
+  category: IntegrationCategory
+  description: string
+  imageSrc: string
+  docs?: string
+  fields: IntegrationProviderField[]
+}
 
 export type IntegrationProviderState = {
   provider: IntegrationProviderId
@@ -19,6 +42,7 @@ export type IntegrationProviderState = {
   connected_at?: string | null
   last_checked_at?: string | null
   last_error?: string
+  config?: Record<string, string>
 }
 
 export type VendorIntegrationsResponse = {
@@ -29,11 +53,93 @@ export type VendorIntegrationsResponse = {
   providers: Record<IntegrationProviderId, IntegrationProviderState>
 }
 
+export const INTEGRATION_PROVIDER_META: Record<
+  IntegrationProviderId,
+  IntegrationCatalogItem
+> = {
+  razorpay: {
+    title: 'Razorpay',
+    shortLabel: 'Razorpay',
+    category: 'payment',
+    description: 'Accept UPI, cards and netbanking payments.',
+    imageSrc: razorpayLogo,
+    docs: 'https://razorpay.com/docs',
+    fields: [
+      { key: 'key_id', label: 'Key ID', placeholder: 'rzp_live_xxxx' },
+      { key: 'key_secret', label: 'Key Secret', type: 'password' },
+      { key: 'webhook_secret', label: 'Webhook Secret', type: 'password' },
+    ],
+  },
+  cashfree: {
+    title: 'Cashfree',
+    shortLabel: 'Cashfree',
+    category: 'payment',
+    description: 'Alternative payment gateway for checkout.',
+    imageSrc: cashfreeLogo,
+    docs: 'https://docs.cashfree.com',
+    fields: [
+      { key: 'app_id', label: 'App ID' },
+      { key: 'secret_key', label: 'Secret Key', type: 'password' },
+      { key: 'environment', label: 'Environment', placeholder: 'sandbox / production' },
+    ],
+  },
+  cod: {
+    title: 'Cash on Delivery',
+    shortLabel: 'COD',
+    category: 'payment',
+    description: 'Allow customers to pay at delivery time.',
+    imageSrc: codLogo,
+    fields: [],
+  },
+  borzo: {
+    title: 'Borzo',
+    shortLabel: 'Borzo',
+    category: 'delivery',
+    description: 'On-demand local delivery provider.',
+    imageSrc: borzoLogo,
+    docs: 'https://borzodelivery.com/in/business-api/doc',
+    fields: [
+      { key: 'auth_token', label: 'Auth Token', type: 'password' },
+      { key: 'base_url', label: 'Base URL', placeholder: 'https://robotapitest-in.borzodelivery.com' },
+      { key: 'api_version', label: 'API Version', placeholder: '1.6' },
+    ],
+  },
+  delhivery: {
+    title: 'Delhivery',
+    shortLabel: 'Delhivery',
+    category: 'delivery',
+    description: 'Delhivery shipping API integration.',
+    imageSrc: delhiveryLogo,
+    docs: 'https://delhivery-express-api-doc.readme.io',
+    fields: [
+      { key: 'token', label: 'API Token', type: 'password' },
+      {
+        key: 'base_url',
+        label: 'Base URL (domain only)',
+        placeholder: 'https://track.delhivery.com',
+      },
+    ],
+  },
+  brevo: {
+    title: 'Brevo',
+    shortLabel: 'Brevo',
+    category: 'marketing',
+    description: 'Email marketing, campaigns, templates, and contact tools.',
+    imageSrc: brevoLogo,
+    docs: 'https://developers.brevo.com/docs',
+    fields: [],
+  },
+}
+
 const PAYMENT_PROVIDERS = new Set<PaymentProviderId>(['cod', 'razorpay', 'cashfree'])
 const DELIVERY_PROVIDERS = new Set<DeliveryProviderId>(['none', 'borzo', 'delhivery'])
 
 const getProviderCategory = (provider: IntegrationProviderId): IntegrationCategory =>
-  provider === 'borzo' || provider === 'delhivery' ? 'delivery' : 'payment'
+  provider === 'borzo' || provider === 'delhivery'
+    ? 'delivery'
+    : provider === 'brevo'
+      ? 'marketing'
+      : 'payment'
 
 export const isProviderUsable = (
   provider: IntegrationProviderId,
@@ -52,6 +158,21 @@ export const isProviderUsableFromData = (
   if (!data?.providers) return false
   return isProviderUsable(provider, data.providers[provider])
 }
+
+export const getConnectedProviderIds = (data: VendorIntegrationsResponse | null) =>
+  INTEGRATION_PROVIDER_IDS.filter((provider) => isProviderUsableFromData(data, provider))
+
+export const isProviderInstalledFromData = (
+  data: VendorIntegrationsResponse | null,
+  provider: IntegrationProviderId,
+) => {
+  const state = data?.providers?.[provider]
+  if (!state) return false
+  return Boolean(state.enabled || state.connected)
+}
+
+export const getInstalledProviderIds = (data: VendorIntegrationsResponse | null) =>
+  INTEGRATION_PROVIDER_IDS.filter((provider) => isProviderInstalledFromData(data, provider))
 
 export const parseVendorIntegrations = (
   payload: unknown,
@@ -75,6 +196,10 @@ export const parseVendorIntegrations = (
         connected_at: input?.connected_at ?? null,
         last_checked_at: input?.last_checked_at ?? null,
         last_error: input?.last_error || '',
+        config:
+          input?.config && typeof input.config === 'object'
+            ? (input.config as Record<string, string>)
+            : {},
       }
       return acc
     },
@@ -94,5 +219,34 @@ export const parseVendorIntegrations = (
         : 'none',
     },
     providers,
+  }
+}
+
+export const applyBrevoStatus = (
+  data: VendorIntegrationsResponse | null,
+  payload: unknown,
+): VendorIntegrationsResponse | null => {
+  if (!data) return null
+
+  const source =
+    payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+  const connected = Boolean(source.connected)
+
+  return {
+    ...data,
+    providers: {
+      ...data.providers,
+      brevo: {
+        ...data.providers.brevo,
+        provider: 'brevo',
+        category: 'marketing',
+        enabled: connected,
+        connected,
+        connected_at: data.providers.brevo.connected_at ?? null,
+        last_checked_at: data.providers.brevo.last_checked_at ?? null,
+        last_error: '',
+        config: data.providers.brevo.config ?? {},
+      },
+    },
   }
 }

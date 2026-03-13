@@ -5,7 +5,10 @@ import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { useLayout } from '@/context/layout-provider'
 import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
-import type { IntegrationProviderId } from '@/lib/vendor-integrations'
+import {
+  getInstalledProviderIds,
+  type IntegrationProviderId,
+} from '@/lib/vendor-integrations'
 import { Button } from '@/components/ui/button'
 import {
   Sidebar,
@@ -21,40 +24,52 @@ import { NavUser } from './nav-user'
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
-  const { isProviderVisible } = useVendorIntegrations()
+  const { data, isProviderVisible } = useVendorIntegrations()
   const { state, toggleSidebar } = useSidebar()
   const user = useSelector((state: any) => state.auth.user)
   const userType = user?.role
   const effectiveRole = userType === 'superadmin' ? 'admin' : userType
+  const installedToolkitProviders = getInstalledProviderIds(data)
+  const installedToolkitCount = installedToolkitProviders.length
   const canShowByIntegration = (provider?: string) => {
     if (!provider) return true
     return isProviderVisible(provider as IntegrationProviderId)
   }
+  const canShowByToolkitInstall = (provider?: string) => {
+    if (!provider) return true
+    if (effectiveRole !== 'vendor') return true
+    return installedToolkitProviders.includes(provider as IntegrationProviderId)
+  }
 
   const filteredNavGroups = sidebarData.navGroups
-    .filter(
-      (group: { roles: string | any[] }) =>
-        !group.roles || group.roles.includes(effectiveRole)
-    )
-    .map((group: { items: any[] }) => ({
+    .filter((group: any) => !group.roles || group.roles.includes(effectiveRole))
+    .map((group: any) => ({
       ...group,
       items: group.items
         ?.filter(
-          (item) =>
+          (item: any) =>
             (!item.roles || item.roles.includes(effectiveRole)) &&
-            canShowByIntegration(item.requiresIntegration),
+            (group.title === 'Sellerslogin Toolkit'
+              ? canShowByToolkitInstall(item.requiresIntegration)
+              : canShowByIntegration(item.requiresIntegration)),
         )
-        .map((item) => ({
+        .map((item: any) => ({
           ...item,
+          badge:
+            item.title === 'My Apps' && effectiveRole === 'vendor' && installedToolkitCount
+              ? String(installedToolkitCount)
+              : item.badge,
           items: item.items?.filter(
-            (subItem: { roles: string | any[] }) =>
+            (subItem: any) =>
               (!subItem.roles || subItem.roles.includes(effectiveRole)) &&
-              canShowByIntegration((subItem as any).requiresIntegration),
+              (group.title === 'Sellerslogin Toolkit'
+                ? canShowByToolkitInstall(subItem.requiresIntegration)
+                : canShowByIntegration(subItem.requiresIntegration)),
           ),
         }))
-        .filter((item) => !item.items || item.items.length > 0),
+        .filter((item: any) => !item.items || item.items.length > 0),
     }))
-    .filter((group: { items: string | any[] }) => group.items.length > 0)
+    .filter((group: any) => group.items.length > 0)
 
   return (
     <Sidebar

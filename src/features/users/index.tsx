@@ -31,9 +31,11 @@ export function Users() {
       setLoading(true)
       setError(null)
       try {
-        const res = await api.get('/users/getall')
+        const isVendor = role === 'vendor'
+        const endpoint = isVendor ? '/vendor/customers' : '/users/getall'
+        const res = await api.get(endpoint)
 
-        const users = res.data?.users ?? []
+        const users = isVendor ? res.data?.customers ?? [] : res.data?.users ?? []
         const mapped: User[] = users.map((user: any) => {
           const name = String(user?.name || '').trim()
           const nameParts = name.split(/\s+/).filter(Boolean)

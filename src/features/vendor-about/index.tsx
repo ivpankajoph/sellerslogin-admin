@@ -128,8 +128,8 @@ const SECTION_META: Record<string, SectionMeta> = {
     surface: 'from-lime-50/70 via-white to-green-50/40',
   },
   integrations: {
-    title: 'Integrations',
-    description: 'Connected services and integration-specific settings.',
+    title: 'Sellerslogin Toolkit',
+    description: 'Connected apps, automation tools, and toolkit-specific settings.',
     icon: Layers3,
     order: 8,
     bar: 'from-indigo-500 to-blue-500',

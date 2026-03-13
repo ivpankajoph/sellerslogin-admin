@@ -1,124 +1,65 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  ArrowUpRight,
   CheckCircle2,
   CircleOff,
   CreditCard,
   ExternalLink,
+  LayoutGrid,
   Loader2,
-  PlugZap,
+  Mail,
   RefreshCcw,
+  Settings2,
   ShieldCheck,
   Sparkles,
+  Store,
   Truck,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import api from '@/lib/axios'
+import {
+  applyBrevoStatus,
+  getInstalledProviderIds,
+  INTEGRATION_PROVIDER_IDS,
+  INTEGRATION_PROVIDER_META,
+  parseVendorIntegrations,
+  type IntegrationCategory,
+  type IntegrationProviderId,
+  type VendorIntegrationsResponse,
+} from '@/lib/vendor-integrations'
 import { cn } from '@/lib/utils'
 import type { RootState } from '@/store'
 
-type ProviderId = 'razorpay' | 'cashfree' | 'cod' | 'borzo' | 'delhivery'
-type ProviderCategory = 'payment' | 'delivery'
+type ProviderId = IntegrationProviderId
+type ProviderCategory = IntegrationCategory
+type IntegrationsResponse = VendorIntegrationsResponse
 
-type ProviderState = {
-  provider: ProviderId
-  category: ProviderCategory
-  enabled: boolean
-  connected: boolean
-  connected_at: string | null
-  last_checked_at: string | null
-  last_error: string
-  config: Record<string, string>
+const providerMeta = INTEGRATION_PROVIDER_META
+const providerOrder = INTEGRATION_PROVIDER_IDS
+
+const providerAccentClass: Record<ProviderId, string> = {
+  razorpay: 'border-violet-200 bg-violet-50',
+  cashfree: 'border-indigo-200 bg-indigo-50',
+  cod: 'border-amber-200 bg-amber-50',
+  borzo: 'border-emerald-200 bg-emerald-50',
+  delhivery: 'border-cyan-200 bg-cyan-50',
+  brevo: 'border-emerald-200 bg-emerald-50',
 }
-
-type IntegrationsResponse = {
-  defaults: {
-    payment: 'cod' | 'razorpay' | 'cashfree'
-    delivery: 'none' | 'borzo' | 'delhivery'
-  }
-  providers: Record<ProviderId, ProviderState>
-}
-
-type FieldConfig = {
-  key: string
-  label: string
-  placeholder?: string
-  type?: 'text' | 'password'
-}
-
-const providerMeta: Record<
-  ProviderId,
-  {
-    title: string
-    category: ProviderCategory
-    description: string
-    docs?: string
-    fields: FieldConfig[]
-  }
-> = {
-  razorpay: {
-    title: 'Razorpay',
-    category: 'payment',
-    description: 'Accept UPI, cards and netbanking payments.',
-    docs: 'https://razorpay.com/docs',
-    fields: [
-      { key: 'key_id', label: 'Key ID', placeholder: 'rzp_live_xxxx' },
-      { key: 'key_secret', label: 'Key Secret', type: 'password' },
-      { key: 'webhook_secret', label: 'Webhook Secret', type: 'password' },
-    ],
-  },
-  cashfree: {
-    title: 'Cashfree',
-    category: 'payment',
-    description: 'Alternative payment gateway for checkout.',
-    docs: 'https://docs.cashfree.com',
-    fields: [
-      { key: 'app_id', label: 'App ID' },
-      { key: 'secret_key', label: 'Secret Key', type: 'password' },
-      { key: 'environment', label: 'Environment', placeholder: 'sandbox / production' },
-    ],
-  },
-  cod: {
-    title: 'Cash on Delivery',
-    category: 'payment',
-    description: 'Allow customers to pay at delivery time.',
-    fields: [],
-  },
-  borzo: {
-    title: 'Borzo',
-    category: 'delivery',
-    description: 'On-demand local delivery provider.',
-    docs: 'https://borzodelivery.com/in/business-api/doc',
-    fields: [
-      { key: 'auth_token', label: 'Auth Token', type: 'password' },
-      { key: 'base_url', label: 'Base URL', placeholder: 'https://robotapitest-in.borzodelivery.com' },
-      { key: 'api_version', label: 'API Version', placeholder: '1.6' },
-    ],
-  },
-  delhivery: {
-    title: 'Delhivery',
-    category: 'delivery',
-    description: 'Delhivery shipping API integration.',
-    docs: 'https://delhivery-express-api-doc.readme.io',
-    fields: [
-      { key: 'token', label: 'API Token', type: 'password' },
-      {
-        key: 'base_url',
-        label: 'Base URL (domain only)',
-        placeholder: 'https://track.delhivery.com',
-      },
-    ],
-  },
-}
-
-const providerOrder: ProviderId[] = ['razorpay', 'cashfree', 'cod', 'borzo', 'delhivery']
 
 const toReadableTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : 'Never'
@@ -126,15 +67,46 @@ const toReadableTime = (value?: string | null) =>
 const isSecretField = (key: string) =>
   key.includes('secret') || key.includes('token') || key.includes('auth')
 
-const providerCardTheme = (category: ProviderCategory) =>
-  category === 'payment'
-    ? 'from-amber-50/70 via-rose-50/50 to-white'
-    : 'from-cyan-50/70 via-emerald-50/40 to-white'
-
 const statusBadgeClass = (connected?: boolean) =>
   connected
     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
     : 'border-slate-200 bg-slate-100 text-slate-700'
+
+const categoryBadgeClass = (category: ProviderCategory) =>
+  category === 'payment'
+    ? 'border-amber-200 bg-amber-50 text-amber-700'
+    : category === 'delivery'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      : 'border-sky-200 bg-sky-50 text-sky-700'
+
+function ProviderArtwork({
+  providerId,
+  className,
+  imageClassName,
+}: {
+  providerId: ProviderId
+  className?: string
+  imageClassName?: string
+}) {
+  const meta = providerMeta[providerId]
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center justify-center overflow-hidden border shadow-sm',
+        providerAccentClass[providerId],
+        className,
+      )}
+    >
+      <img
+        src={meta.imageSrc}
+        alt={`${meta.title} logo`}
+        className={cn('h-full w-full object-contain', imageClassName)}
+        loading='lazy'
+      />
+    </span>
+  )
+}
 
 function getConnectPath(role: string | undefined, vendorId: string | null) {
   if (role === 'admin') {
@@ -156,7 +128,9 @@ export default function IntegrationsPage({
 }: {
   focusProvider?: ProviderId
 }) {
+  const { refresh: refreshVendorIntegrations } = useVendorIntegrations()
   const role = useSelector((state: RootState) => state.auth?.user?.role)
+  const effectiveRole = role === 'superadmin' ? 'admin' : role
   const [loading, setLoading] = useState(true)
   const [savingDefaults, setSavingDefaults] = useState(false)
   const [selectedVendorId, setSelectedVendorId] = useState('')
@@ -168,6 +142,7 @@ export default function IntegrationsPage({
     cod: {},
     borzo: {},
     delhivery: {},
+    brevo: {},
   })
   const [providerEnabled, setProviderEnabled] = useState<Record<ProviderId, boolean>>({
     razorpay: false,
@@ -175,6 +150,7 @@ export default function IntegrationsPage({
     cod: true,
     borzo: false,
     delhivery: false,
+    brevo: false,
   })
   const [busyMap, setBusyMap] = useState<Record<string, boolean>>({})
   const [defaultPayment, setDefaultPayment] = useState<'cod' | 'razorpay' | 'cashfree'>('cod')
@@ -183,35 +159,45 @@ export default function IntegrationsPage({
     focusProvider ? providerMeta[focusProvider].category : 'all',
   )
 
+  const installedProviderIds = useMemo(() => getInstalledProviderIds(data), [data])
+  const visibleProviderOrder = useMemo(
+    () =>
+      effectiveRole === 'vendor'
+        ? providerOrder
+        : providerOrder.filter((providerId) => providerId !== 'brevo'),
+    [effectiveRole],
+  )
+
   const targetProviderIds = useMemo(() => {
     if (focusProvider) {
       return providerMeta[focusProvider] ? [focusProvider] : []
     }
-    return providerOrder.filter((providerId) =>
-      filter === 'all' ? true : providerMeta[providerId].category === filter,
-    )
-  }, [filter, focusProvider])
+
+    return visibleProviderOrder.filter((providerId) => {
+      if (filter === 'all') return true
+      return providerMeta[providerId].category === filter
+    })
+  }, [filter, focusProvider, visibleProviderOrder])
 
   useEffect(() => {
     setFilter(focusProvider ? providerMeta[focusProvider].category : 'all')
   }, [focusProvider])
 
-  const connectedCount = useMemo(() => {
-    if (!data) return 0
-    return providerOrder.filter((providerId) => Boolean(data.providers?.[providerId]?.connected)).length
-  }, [data])
-
   const loadIntegrations = async (vendorIdOverride?: string | null) => {
     const vendorId = vendorIdOverride ?? resolvedVendorId
-    const path = getConnectPath(role, vendorId)
+    const path = getConnectPath(effectiveRole, vendorId)
     if (!path) {
       setLoading(false)
       return null
     }
     try {
       setLoading(true)
-      const response = await api.get(path)
-      const payload: IntegrationsResponse | undefined = response?.data?.data
+      const [response, brevoResponse] = await Promise.all([
+        api.get(path),
+        effectiveRole === 'vendor' ? api.get('/vendor/brevo/status').catch(() => null) : Promise.resolve(null),
+      ])
+      const parsed = parseVendorIntegrations(response?.data?.data)
+      const payload = applyBrevoStatus(parsed, brevoResponse?.data?.data)
       if (!payload) {
         throw new Error('No integration data received')
       }
@@ -224,6 +210,7 @@ export default function IntegrationsPage({
         cod: payload.providers.cod.enabled,
         borzo: payload.providers.borzo.enabled,
         delhivery: payload.providers.delhivery.enabled,
+        brevo: payload.providers.brevo.enabled,
       })
 
       const nextDrafts: Record<ProviderId, Record<string, string>> = {
@@ -232,6 +219,7 @@ export default function IntegrationsPage({
         cod: {},
         borzo: {},
         delhivery: {},
+        brevo: {},
       }
 
       providerOrder.forEach((providerId) => {
@@ -248,7 +236,7 @@ export default function IntegrationsPage({
       setDrafts(nextDrafts)
       return payload
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to load integrations')
+      toast.error(error?.response?.data?.message || 'Failed to load toolkit apps')
       return null
     } finally {
       setLoading(false)
@@ -256,22 +244,27 @@ export default function IntegrationsPage({
   }
 
   useEffect(() => {
-    if (role === 'admin') {
+    if (effectiveRole === 'admin') {
       setLoading(false)
       return
     }
-    loadIntegrations(null)
+    void loadIntegrations(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role])
+  }, [effectiveRole])
 
   const setBusy = (key: string, value: boolean) =>
     setBusyMap((prev) => ({ ...prev, [key]: value }))
+
+  const syncVendorToolkitContext = async () => {
+    if (effectiveRole !== 'vendor') return
+    await refreshVendorIntegrations()
+  }
 
   const saveDefaults = async (overrides?: {
     payment?: 'cod' | 'razorpay' | 'cashfree'
     delivery?: 'none' | 'borzo' | 'delhivery'
   }) => {
-    const path = getActionPath(role, resolvedVendorId, '/defaults')
+    const path = getActionPath(effectiveRole, resolvedVendorId, '/defaults')
     if (!path) {
       toast.error('Select a vendor first')
       return
@@ -284,12 +277,13 @@ export default function IntegrationsPage({
         payment_default_provider: paymentProvider,
         delivery_default_provider: deliveryProvider,
       })
-      toast.success('Default apps updated')
+      toast.success('Toolkit defaults updated')
       await loadIntegrations()
+      await syncVendorToolkitContext()
     } catch (error: any) {
       toast.error(
         error?.response?.data?.message ||
-          'Failed to save defaults. Connect and enable the selected provider first.',
+          'Failed to save defaults. Connect and enable the selected app first.',
       )
     } finally {
       setSavingDefaults(false)
@@ -307,7 +301,7 @@ export default function IntegrationsPage({
   }
 
   const saveProvider = async (provider: ProviderId) => {
-    const path = getActionPath(role, resolvedVendorId, `/${provider}`)
+    const path = getActionPath(effectiveRole, resolvedVendorId, `/${provider}`)
     if (!path) {
       toast.error('Select a vendor first')
       return
@@ -324,7 +318,6 @@ export default function IntegrationsPage({
         }
       })
 
-      // If credentials are provided, treat save as intent to connect the provider.
       const hasCredentialInput = Object.keys(config).length > 0
       const shouldEnable =
         provider === 'cod'
@@ -336,6 +329,7 @@ export default function IntegrationsPage({
         config,
       })
       const refreshed = await loadIntegrations()
+      await syncVendorToolkitContext()
       const latest = refreshed?.providers?.[provider]
       if (latest?.connected) {
         toast.success(`${providerMeta[provider].title} connected and saved`)
@@ -350,7 +344,7 @@ export default function IntegrationsPage({
   }
 
   const testProvider = async (provider: ProviderId) => {
-    const path = getActionPath(role, resolvedVendorId, `/${provider}/test`)
+    const path = getActionPath(effectiveRole, resolvedVendorId, `/${provider}/test`)
     if (!path) {
       toast.error('Select a vendor first')
       return
@@ -368,7 +362,7 @@ export default function IntegrationsPage({
       })
       const response = await api.post(path, { config })
       toast.success(
-        `${response?.data?.message || `${providerMeta[provider].title} connection test passed`}. Click Save to persist.`,
+        `${response?.data?.message || `${providerMeta[provider].title} connection test passed`}. Click save to persist.`,
       )
     } catch (error: any) {
       toast.error(error?.response?.data?.message || `Connection test failed for ${provider}`)
@@ -378,7 +372,7 @@ export default function IntegrationsPage({
   }
 
   const disconnectProvider = async (provider: ProviderId) => {
-    const path = getActionPath(role, resolvedVendorId, `/${provider}`)
+    const path = getActionPath(effectiveRole, resolvedVendorId, `/${provider}`)
     if (!path) {
       toast.error('Select a vendor first')
       return
@@ -387,8 +381,9 @@ export default function IntegrationsPage({
     try {
       setBusy(busyKey, true)
       await api.delete(path)
-      toast.success(`${providerMeta[provider].title} disconnected`)
+      toast.success(`${providerMeta[provider].title} removed from your toolkit`)
       await loadIntegrations()
+      await syncVendorToolkitContext()
     } catch (error: any) {
       toast.error(error?.response?.data?.message || `Failed to disconnect ${provider}`)
     } finally {
@@ -420,61 +415,267 @@ export default function IntegrationsPage({
     })
   }
 
-  return (
-    <div className='space-y-6 rounded-2xl bg-gradient-to-b from-sky-50/45 via-white to-violet-50/35 p-4 md:p-6'>
-      <div className='rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-100/70 via-indigo-50 to-pink-100/50 p-5 shadow-sm'>
-        <div className='flex flex-wrap items-start justify-between gap-4'>
-          <div className='space-y-2'>
-            <h1 className='flex items-center gap-2 text-2xl font-semibold text-slate-900'>
-              <Sparkles className='h-5 w-5 text-indigo-600' />
-              App Integrations
-            </h1>
-            <p className='text-sm text-slate-600'>
-              Connect payment and delivery apps, then set your default providers for template checkout.
-            </p>
-            <div className='flex flex-wrap gap-2'>
-              <Badge className='border-sky-200 bg-white/80 text-slate-700'>
-                {connectedCount}/{providerOrder.length} Connected
-              </Badge>
-              <Badge className='border-indigo-200 bg-indigo-50 text-indigo-700'>
-                Default Payment: {defaultPayment.toUpperCase()}
-              </Badge>
-              <Badge className='border-emerald-200 bg-emerald-50 text-emerald-700'>
-                Default Delivery: {defaultDelivery.toUpperCase()}
-              </Badge>
+  if (!focusProvider) {
+    return (
+      <div className='space-y-6 rounded-3xl bg-gradient-to-b from-slate-50 via-white to-slate-100/80 p-4 md:p-6'>
+        <div className='overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm'>
+          <div className='border-b border-slate-200 bg-[linear-gradient(125deg,rgba(237,246,255,0.95)_0%,rgba(248,250,252,0.96)_44%,rgba(245,243,255,0.95)_100%)] p-6 md:p-7'>
+            <div className='flex flex-wrap items-start justify-between gap-6'>
+              <div className='max-w-3xl space-y-3'>
+                <Badge className='rounded-full border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700'>
+                  Sellerslogin Toolkit
+                </Badge>
+                <div className='space-y-2'>
+                  <h1 className='flex items-center gap-3 text-3xl font-semibold tracking-tight text-slate-950'>
+                    <Sparkles className='h-7 w-7 text-indigo-600' />
+                    Toolkit Store
+                  </h1>
+                  <p className='max-w-2xl text-sm leading-6 text-slate-600 sm:text-base'>
+                    Browse apps, pick one, and open its dedicated setup page when you want to connect it.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant='outline'
+                size='sm'
+                className='border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'
+                onClick={() => loadIntegrations()}
+              >
+                <RefreshCcw className='h-4 w-4' />
+                Refresh
+              </Button>
             </div>
           </div>
-          <div className='flex items-center gap-2'>
+        </div>
+
+        {effectiveRole === 'admin' && (
+          <Card className='border-slate-200 bg-white shadow-sm'>
+            <CardHeader>
+              <CardTitle className='text-base'>Toolkit vendor scope</CardTitle>
+              <CardDescription>Enter a vendor ID to manage that vendor&apos;s toolkit apps.</CardDescription>
+            </CardHeader>
+            <CardContent className='flex flex-wrap items-end gap-3'>
+              <div className='w-full max-w-xl space-y-2'>
+                <Label>Vendor ID</Label>
+                <Input
+                  value={selectedVendorId}
+                  onChange={(event) => setSelectedVendorId(event.target.value)}
+                  placeholder='MongoDB vendor id'
+                />
+              </div>
+              <Button
+                className='bg-slate-950 text-white hover:bg-slate-800'
+                onClick={async () => {
+                  const id = selectedVendorId.trim()
+                  if (!id) {
+                    toast.error('Vendor ID is required')
+                    return
+                  }
+                  setResolvedVendorId(id)
+                  await loadIntegrations(id)
+                }}
+              >
+                Load Vendor Toolkit
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className='flex flex-wrap items-center gap-2'>
+          <Button
+            variant='outline'
+            size='sm'
+            className={cn(
+              'rounded-full border-slate-200',
+              filter === 'all'
+                ? 'bg-slate-950 text-white hover:bg-slate-900'
+                : 'bg-white text-slate-700 hover:bg-slate-50',
+            )}
+            onClick={() => setFilter('all')}
+          >
+            <LayoutGrid className='h-4 w-4' />
+            All Apps
+          </Button>
+          <Button
+            variant='outline'
+            size='sm'
+            className={cn(
+              'rounded-full border-amber-200',
+              filter === 'payment'
+                ? 'bg-amber-500 text-white hover:bg-amber-600'
+                : 'bg-white text-amber-700 hover:bg-amber-50',
+            )}
+            onClick={() => setFilter('payment')}
+          >
+            <CreditCard className='h-4 w-4' />
+            Payment Apps
+          </Button>
+          <Button
+            variant='outline'
+            size='sm'
+            className={cn(
+              'rounded-full border-emerald-200',
+              filter === 'delivery'
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                : 'bg-white text-emerald-700 hover:bg-emerald-50',
+            )}
+            onClick={() => setFilter('delivery')}
+          >
+            <Truck className='h-4 w-4' />
+            Delivery Apps
+          </Button>
+          {effectiveRole === 'vendor' && (
             <Button
               variant='outline'
               size='sm'
-              className='border-indigo-200 bg-white/80 text-indigo-700 hover:bg-indigo-50'
-              onClick={() => loadIntegrations()}
+              className={cn(
+                'rounded-full border-sky-200',
+                filter === 'marketing'
+                  ? 'bg-sky-600 text-white hover:bg-sky-700'
+                  : 'bg-white text-sky-700 hover:bg-sky-50',
+              )}
+              onClick={() => setFilter('marketing')}
             >
-              <RefreshCcw className='h-4 w-4' />
-              Refresh
+              <Mail className='h-4 w-4' />
+              Marketing Apps
             </Button>
+          )}
+        </div>
+
+        {loading ? (
+          <Card className='border-slate-200 bg-white shadow-sm'>
+            <CardContent className='flex items-center gap-2 py-10 text-sm text-muted-foreground'>
+              <Loader2 className='h-4 w-4 animate-spin' />
+              Loading toolkit apps...
+            </CardContent>
+          </Card>
+        ) : targetProviderIds.length === 0 ? (
+          <Card className='border-slate-200 bg-white shadow-sm'>
+            <CardContent className='py-10 text-sm text-slate-600'>
+              No apps match this view yet. Try a different filter.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className='grid gap-4 lg:grid-cols-2 xl:grid-cols-3'>
+            {targetProviderIds.map((providerId) => {
+              const meta = providerMeta[providerId]
+              const installed = installedProviderIds.includes(providerId)
+
+              return (
+                <Card key={providerId} className='overflow-hidden border-slate-200 bg-white shadow-sm'>
+                  <CardContent className='space-y-5 p-5'>
+                    <ProviderArtwork
+                      providerId={providerId}
+                      className='h-24 w-24 rounded-3xl p-4'
+                      imageClassName='max-h-16 max-w-16'
+                    />
+                    <div className='space-y-2'>
+                      <div className='flex flex-wrap items-center gap-2'>
+                        <h3 className='text-xl font-semibold text-slate-950'>{meta.title}</h3>
+                        <span className='text-xs font-medium uppercase tracking-[0.14em] text-slate-400'>
+                          {meta.category}
+                        </span>
+                      </div>
+                      <p className='text-sm leading-6 text-slate-600'>{meta.description}</p>
+                    </div>
+
+                    <Button
+                      className='rounded-xl bg-slate-950 text-white hover:bg-slate-800'
+                      asChild
+                    >
+                      <Link to='/integrations/$provider' params={{ provider: providerId }}>
+                        {installed ? 'Open app page' : 'Connect app'}
+                        <ArrowUpRight className='h-4 w-4' />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className='space-y-6 rounded-3xl bg-gradient-to-b from-slate-50 via-white to-slate-100/80 p-4 md:p-6'>
+      <div className='overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm'>
+        <div className='border-b border-slate-200 bg-[linear-gradient(125deg,rgba(237,246,255,0.95)_0%,rgba(248,250,252,0.96)_44%,rgba(245,243,255,0.95)_100%)] p-6 md:p-7'>
+          <div className='flex flex-wrap items-start justify-between gap-6'>
+            <div className='max-w-3xl space-y-3'>
+              <Badge className='rounded-full border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700'>
+                Sellerslogin Toolkit
+              </Badge>
+              <div className='space-y-2'>
+                <h1 className='flex items-center gap-3 text-3xl font-semibold tracking-tight text-slate-950'>
+                  <Sparkles className='h-7 w-7 text-indigo-600' />
+                  {providerMeta[focusProvider].title}
+                </h1>
+                <p className='max-w-2xl text-sm leading-6 text-slate-600 sm:text-base'>
+                  Manage API keys, toggle access, set defaults, and remove this app from your toolkit from one
+                  place.
+                </p>
+              </div>
+              <div className='flex flex-wrap gap-2'>
+                <Badge className={categoryBadgeClass(providerMeta[focusProvider].category)}>
+                  {providerMeta[focusProvider].category}
+                </Badge>
+                <Badge
+                  className={statusBadgeClass(data?.providers?.[focusProvider]?.connected)}
+                >
+                  {data?.providers?.[focusProvider]?.connected ? 'Connected' : 'Not connected'}
+                </Badge>
+              </div>
+            </div>
+
+            <div className='flex flex-wrap items-center gap-2'>
+              {focusProvider && (
+                <Button
+                  variant='outline'
+                  size='sm'
+                  className='border-slate-200 bg-white hover:bg-slate-50'
+                  asChild
+                >
+                  <Link to='/integrations'>
+                    <Store className='h-4 w-4' />
+                    Toolkit Store
+                  </Link>
+                </Button>
+              )}
+              <Button
+                variant='outline'
+                size='sm'
+                className='border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'
+                onClick={() => loadIntegrations()}
+              >
+                <RefreshCcw className='h-4 w-4' />
+                Refresh
+              </Button>
+            </div>
           </div>
         </div>
+
       </div>
 
-      {role === 'admin' && (
-        <Card className='border-indigo-100 bg-white/90 shadow-sm'>
+      {effectiveRole === 'admin' && (
+        <Card className='border-slate-200 bg-white shadow-sm'>
           <CardHeader>
-            <CardTitle className='text-base'>Admin vendor scope</CardTitle>
-            <CardDescription>Enter vendor ID to manage integrations for that vendor.</CardDescription>
+            <CardTitle className='text-base'>Toolkit vendor scope</CardTitle>
+            <CardDescription>Enter a vendor ID to manage that vendor&apos;s toolkit apps.</CardDescription>
           </CardHeader>
           <CardContent className='flex flex-wrap items-end gap-3'>
             <div className='w-full max-w-xl space-y-2'>
               <Label>Vendor ID</Label>
               <Input
                 value={selectedVendorId}
-                onChange={(e) => setSelectedVendorId(e.target.value)}
+                onChange={(event) => setSelectedVendorId(event.target.value)}
                 placeholder='MongoDB vendor id'
               />
             </div>
             <Button
-              className='bg-indigo-600 text-white hover:bg-indigo-700'
+              className='bg-slate-950 text-white hover:bg-slate-800'
               onClick={async () => {
                 const id = selectedVendorId.trim()
                 if (!id) {
@@ -485,17 +686,17 @@ export default function IntegrationsPage({
                 await loadIntegrations(id)
               }}
             >
-              Load Vendor
+              Load Vendor Toolkit
             </Button>
           </CardContent>
         </Card>
       )}
 
-      <Card className='border-indigo-100 bg-white/90 shadow-sm'>
-        <CardHeader>
-          <CardTitle className='text-base text-slate-900'>Default apps</CardTitle>
+      <Card className='border-slate-200 bg-white shadow-sm'>
+        <CardHeader className='space-y-2'>
+          <CardTitle className='text-base text-slate-950'>App settings</CardTitle>
           <CardDescription>
-            These defaults are used for vendor template checkout experience by default.
+            Add credentials, enable or disable access, test the connection, and remove the app when needed.
           </CardDescription>
         </CardHeader>
         <CardContent className='grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end'>
@@ -503,8 +704,10 @@ export default function IntegrationsPage({
             <Label>Default payment app</Label>
             <select
               value={defaultPayment}
-              onChange={(e) => setDefaultPayment(e.target.value as 'cod' | 'razorpay' | 'cashfree')}
-              className='h-10 w-full rounded-md border border-indigo-200 bg-indigo-50/40 px-3 text-sm text-slate-900'
+              onChange={(event) =>
+                setDefaultPayment(event.target.value as 'cod' | 'razorpay' | 'cashfree')
+              }
+              className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
             >
               <option value='cod'>Cash on Delivery</option>
               <option value='razorpay'>Razorpay</option>
@@ -515,10 +718,10 @@ export default function IntegrationsPage({
             <Label>Default delivery app</Label>
             <select
               value={defaultDelivery}
-              onChange={(e) =>
-                setDefaultDelivery(e.target.value as 'none' | 'borzo' | 'delhivery')
+              onChange={(event) =>
+                setDefaultDelivery(event.target.value as 'none' | 'borzo' | 'delhivery')
               }
-              className='h-10 w-full rounded-md border border-emerald-200 bg-emerald-50/40 px-3 text-sm text-slate-900'
+              className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
             >
               <option value='none'>No auto-delivery</option>
               <option value='borzo'>Borzo</option>
@@ -528,7 +731,7 @@ export default function IntegrationsPage({
           <Button
             onClick={() => saveDefaults()}
             disabled={savingDefaults}
-            className='bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700'
+            className='h-11 rounded-xl bg-slate-950 text-white hover:bg-slate-800'
           >
             {savingDefaults ? (
               <>
@@ -545,57 +748,17 @@ export default function IntegrationsPage({
         </CardContent>
       </Card>
 
-      {!focusProvider && (
-        <div className='flex flex-wrap items-center gap-2'>
-          <Button
-            variant='outline'
-            size='sm'
-            className={cn(
-              'border-indigo-200',
-              filter === 'all'
-                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                : 'bg-white text-indigo-700 hover:bg-indigo-50',
-            )}
-            onClick={() => setFilter('all')}
-          >
-            All Apps
-          </Button>
-          <Button
-            variant='outline'
-            size='sm'
-            className={cn(
-              'border-amber-200',
-              filter === 'payment'
-                ? 'bg-amber-500 text-white hover:bg-amber-600'
-                : 'bg-white text-amber-700 hover:bg-amber-50',
-            )}
-            onClick={() => setFilter('payment')}
-          >
-            <CreditCard className='h-4 w-4' />
-            Payment Apps
-          </Button>
-          <Button
-            variant='outline'
-            size='sm'
-            className={cn(
-              'border-emerald-200',
-              filter === 'delivery'
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                : 'bg-white text-emerald-700 hover:bg-emerald-50',
-            )}
-            onClick={() => setFilter('delivery')}
-          >
-            <Truck className='h-4 w-4' />
-            Delivery Apps
-          </Button>
-        </div>
-      )}
-
       {loading ? (
-        <Card className='border-indigo-100 bg-white/90 shadow-sm'>
+        <Card className='border-slate-200 bg-white shadow-sm'>
           <CardContent className='flex items-center gap-2 py-10 text-sm text-muted-foreground'>
             <Loader2 className='h-4 w-4 animate-spin' />
-            Loading integrations...
+            Loading toolkit apps...
+          </CardContent>
+        </Card>
+      ) : targetProviderIds.length === 0 ? (
+        <Card className='border-slate-200 bg-white shadow-sm'>
+          <CardContent className='py-10 text-sm text-slate-600'>
+            No apps match this view yet. Try a different filter or connect a new app from the store.
           </CardContent>
         </Card>
       ) : (
@@ -606,72 +769,100 @@ export default function IntegrationsPage({
             const isDefault =
               meta.category === 'payment'
                 ? data?.defaults.payment === providerId
-                : data?.defaults.delivery === providerId
+                : meta.category === 'delivery'
+                  ? data?.defaults.delivery === providerId
+                  : false
             const saveBusy = Boolean(busyMap[`save-${providerId}`])
             const testBusy = Boolean(busyMap[`test-${providerId}`])
             const disconnectBusy = Boolean(busyMap[`disconnect-${providerId}`])
+            const primaryLabel = provider?.connected
+              ? 'Save changes'
+              : meta.fields.length
+                ? 'Connect app'
+                : 'Enable app'
 
             return (
-              <Card
-                key={providerId}
-                className={cn(
-                  'border-0 bg-gradient-to-br shadow-sm ring-1 ring-slate-200/70',
-                  providerCardTheme(meta.category),
-                  provider?.connected ? 'ring-emerald-300/60' : 'ring-slate-200/70',
-                )}
-              >
-                <CardHeader className='space-y-3'>
-                  <div className='flex flex-wrap items-start justify-between gap-3'>
-                    <div className='space-y-1'>
-                      <CardTitle className='flex items-center gap-2 text-base'>
-                        <PlugZap className='h-4 w-4 text-indigo-600' />
-                        {meta.title}
-                      </CardTitle>
-                      <CardDescription>{meta.description}</CardDescription>
+              <Card key={providerId} className='overflow-hidden border-slate-200 bg-white shadow-sm'>
+                <CardHeader className='space-y-4 border-b border-slate-100 bg-slate-50/60'>
+                  <div className='flex flex-wrap items-start justify-between gap-4'>
+                    <div className='flex min-w-0 items-start gap-4'>
+                      <ProviderArtwork
+                        providerId={providerId}
+                        className='h-14 w-14 shrink-0 rounded-2xl p-2.5'
+                        imageClassName='max-h-8 max-w-8'
+                      />
+                      <div className='min-w-0'>
+                        <div className='flex flex-wrap items-center gap-2'>
+                          <CardTitle className='text-lg text-slate-950'>{meta.title}</CardTitle>
+                          <Badge className={categoryBadgeClass(meta.category)}>
+                            {meta.category}
+                          </Badge>
+                          {isDefault && (
+                            <Badge className='border-indigo-200 bg-indigo-50 text-indigo-700'>
+                              Default
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription className='mt-1 text-sm text-slate-600'>
+                          {meta.description}
+                        </CardDescription>
+                      </div>
                     </div>
+
                     <div className='flex flex-wrap items-center gap-2'>
                       <Badge className={statusBadgeClass(provider?.connected)}>
                         {provider?.connected ? 'Connected' : 'Disconnected'}
                       </Badge>
-                      {isDefault && (
-                        <Badge className='border-indigo-200 bg-indigo-50 text-indigo-700'>Default</Badge>
+                      {!focusProvider && (
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          className='border-slate-200 bg-white hover:bg-slate-50'
+                          asChild
+                        >
+                          <Link to='/integrations/$provider' params={{ provider: providerId }}>
+                            Open app
+                          </Link>
+                        </Button>
                       )}
                     </div>
                   </div>
 
-                  {meta.docs && (
-                    <a
-                      href={meta.docs}
-                      target='_blank'
-                      rel='noreferrer'
-                      className='inline-flex w-fit items-center gap-1 text-xs font-medium text-indigo-600 hover:underline'
-                    >
-                      API docs <ExternalLink className='h-3 w-3' />
-                    </a>
-                  )}
+                  <div className='grid gap-3 md:grid-cols-3'>
+                    <div className='rounded-2xl border border-slate-200 bg-white p-3'>
+                      <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                        Connected at
+                      </div>
+                      <div className='mt-1 text-sm font-medium text-slate-900'>
+                        {toReadableTime(provider?.connected_at)}
+                      </div>
+                    </div>
+                    <div className='rounded-2xl border border-slate-200 bg-white p-3'>
+                      <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                        Last checked
+                      </div>
+                      <div className='mt-1 text-sm font-medium text-slate-900'>
+                        {toReadableTime(provider?.last_checked_at)}
+                      </div>
+                    </div>
+                    <div className='rounded-2xl border border-slate-200 bg-white p-3'>
+                      <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                        Toolkit mode
+                      </div>
+                      <div className='mt-1 text-sm font-medium text-slate-900'>
+                        {providerEnabled[providerId] ? 'Enabled' : 'Disabled'}
+                      </div>
+                    </div>
+                  </div>
                 </CardHeader>
 
-                <CardContent className='space-y-4'>
-                  <div className='rounded-lg border border-slate-200/80 bg-white/80 p-3 text-xs text-slate-600 backdrop-blur'>
-                    <div className='flex items-center justify-between gap-2'>
-                      <span>Connected at</span>
-                      <span>{toReadableTime(provider?.connected_at)}</span>
-                    </div>
-                    <div className='mt-2 flex items-center justify-between gap-2'>
-                      <span>Last checked</span>
-                      <span>{toReadableTime(provider?.last_checked_at)}</span>
-                    </div>
-                    {provider?.last_error ? (
-                      <div className='mt-2 rounded-md border border-rose-100 bg-rose-50 p-2 text-rose-700'>
-                        {provider.last_error}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className='flex items-center justify-between rounded-lg border border-slate-200/80 bg-white/80 p-3'>
+                <CardContent className='space-y-5 p-5'>
+                  <div className='flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/70 p-4'>
                     <div className='space-y-0.5'>
-                      <p className='text-sm font-medium'>Enable {meta.title}</p>
-                      <p className='text-xs text-muted-foreground'>Turn off to disable this app for checkout</p>
+                      <p className='text-sm font-medium text-slate-950'>Enable {meta.title}</p>
+                      <p className='text-xs text-slate-500'>
+                        Turn it on to expose this app across checkout and dashboard tools.
+                      </p>
                     </div>
                     <Switch
                       checked={providerEnabled[providerId]}
@@ -681,8 +872,14 @@ export default function IntegrationsPage({
                     />
                   </div>
 
+                  {provider?.last_error ? (
+                    <div className='rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700'>
+                      {provider.last_error}
+                    </div>
+                  ) : null}
+
                   {meta.fields.length > 0 && (
-                    <div className='grid gap-3'>
+                    <div className='grid gap-3 md:grid-cols-2'>
                       {meta.fields.map((field) => (
                         <div key={field.key} className='space-y-1.5'>
                           <Label>{field.label}</Label>
@@ -695,9 +892,10 @@ export default function IntegrationsPage({
                                 ? `Saved: ${provider.config[field.key]}`
                                 : '')
                             }
-                            onChange={(e) =>
-                              handleProviderDraftChange(providerId, field.key, e.target.value)
+                            onChange={(event) =>
+                              handleProviderDraftChange(providerId, field.key, event.target.value)
                             }
+                            className='h-11 rounded-xl border-slate-200 bg-slate-50'
                           />
                         </div>
                       ))}
@@ -707,7 +905,7 @@ export default function IntegrationsPage({
                   <div className='flex flex-wrap items-center gap-2'>
                     <Button
                       size='sm'
-                      className='bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700'
+                      className='rounded-xl bg-slate-950 text-white hover:bg-slate-800'
                       onClick={() => saveProvider(providerId)}
                       disabled={saveBusy}
                     >
@@ -719,7 +917,7 @@ export default function IntegrationsPage({
                       ) : (
                         <>
                           <CheckCircle2 className='h-4 w-4' />
-                          Save
+                          {primaryLabel}
                         </>
                       )}
                     </Button>
@@ -728,7 +926,7 @@ export default function IntegrationsPage({
                       <Button
                         size='sm'
                         variant='outline'
-                        className='border-cyan-200 bg-white text-cyan-700 hover:bg-cyan-50'
+                        className='rounded-xl border-sky-200 bg-white text-sky-700 hover:bg-sky-50'
                         onClick={() => testProvider(providerId)}
                         disabled={testBusy}
                       >
@@ -738,28 +936,9 @@ export default function IntegrationsPage({
                             Testing
                           </>
                         ) : (
-                          'Test Only'
-                        )}
-                      </Button>
-                    )}
-
-                    {providerId !== 'cod' && (
-                      <Button
-                        size='sm'
-                        variant='outline'
-                        className='border-rose-200 bg-white text-rose-700 hover:bg-rose-50'
-                        onClick={() => disconnectProvider(providerId)}
-                        disabled={disconnectBusy}
-                      >
-                        {disconnectBusy ? (
                           <>
-                            <Loader2 className='h-4 w-4 animate-spin' />
-                            Disconnecting
-                          </>
-                        ) : (
-                          <>
-                            <CircleOff className='h-4 w-4' />
-                            Disconnect
+                            <Settings2 className='h-4 w-4' />
+                            Test only
                           </>
                         )}
                       </Button>
@@ -767,21 +946,45 @@ export default function IntegrationsPage({
 
                     <Button
                       size='sm'
-                      variant='ghost'
-                      className='text-indigo-700 hover:bg-indigo-50'
-                      onClick={() => setAsDefault(providerId)}
+                      variant='outline'
+                      className='rounded-xl border-rose-200 bg-white text-rose-700 hover:bg-rose-50'
+                      onClick={() => disconnectProvider(providerId)}
+                      disabled={disconnectBusy}
                     >
-                      Set As Default
+                      {disconnectBusy ? (
+                        <>
+                          <Loader2 className='h-4 w-4 animate-spin' />
+                          Removing
+                        </>
+                      ) : (
+                        <>
+                          <CircleOff className='h-4 w-4' />
+                          Remove app
+                        </>
+                      )}
                     </Button>
 
-                    {!focusProvider && (
-                      <Button variant='ghost' size='sm' className='text-slate-700 hover:bg-slate-100' asChild>
-                        <Link to='/integrations/$provider' params={{ provider: providerId }}>
-                          Open Page
-                        </Link>
-                      </Button>
-                    )}
+                    <Button
+                      size='sm'
+                      variant='ghost'
+                      className='rounded-xl text-indigo-700 hover:bg-indigo-50'
+                      onClick={() => setAsDefault(providerId)}
+                    >
+                      Set as default
+                    </Button>
                   </div>
+
+                  {meta.docs && (
+                    <a
+                      href={meta.docs}
+                      target='_blank'
+                      rel='noreferrer'
+                      className='inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline'
+                    >
+                      Open API docs
+                      <ExternalLink className='h-3 w-3' />
+                    </a>
+                  )}
                 </CardContent>
               </Card>
             )

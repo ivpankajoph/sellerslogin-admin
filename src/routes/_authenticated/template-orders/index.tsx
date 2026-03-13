@@ -110,9 +110,15 @@ function TemplateOrdersReport() {
   })
   const role = useSelector((state: RootState) => state.auth?.user?.role)
   const token = useSelector((state: RootState) => state.auth?.token)
+  const vendorId = useSelector(
+    (state: RootState) => (state.auth?.user as any)?.id || (state.auth?.user as any)?._id || '',
+  )
   const isVendor = role === 'vendor'
   const { isProviderVisible } = useVendorIntegrations()
   const canUseBorzo = !isVendor || isProviderVisible('borzo')
+
+  const getTemplateLabel = (order?: TemplateOrder | null) =>
+    order?.template_name || order?.template_key || order?.template_id || ''
 
   const fetchOrders = async () => {
     try {
@@ -163,17 +169,19 @@ function TemplateOrdersReport() {
   }, [isVendor, token])
 
   useEffect(() => {
-    if (isVendor) return
-    if (vendorFilter === 'all') {
+    const templateVendorId = isVendor ? String(vendorId || '') : vendorFilter
+
+    if (!templateVendorId || templateVendorId === 'all') {
       setTemplates([])
       setTemplateFilter('all')
       return
     }
+
     const fetchTemplates = async () => {
       try {
         setTemplatesLoading(true)
         const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
-          params: { vendor_id: vendorFilter },
+          params: { vendor_id: templateVendorId },
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })
         setTemplates(res.data?.data || [])
@@ -184,7 +192,7 @@ function TemplateOrdersReport() {
       }
     }
     fetchTemplates()
-  }, [isVendor, vendorFilter, token])
+  }, [isVendor, vendorFilter, vendorId, token])
 
   useEffect(() => {
     if (!orders.length) {
@@ -433,7 +441,7 @@ function TemplateOrdersReport() {
               ))}
             </select>
           )}
-          {!isVendor && (
+          {(isVendor || vendorFilter !== 'all') && (
             <select
               value={templateFilter}
               onChange={(e) => {
@@ -441,10 +449,18 @@ function TemplateOrdersReport() {
                 setPage(1)
               }}
               className='h-10 min-w-[190px] rounded-md border border-input bg-background px-3 text-sm'
-              disabled={vendorFilter === 'all' || templatesLoading}
+              disabled={(isVendor ? !vendorId : vendorFilter === 'all') || templatesLoading}
             >
               <option value='all'>
-                {vendorFilter === 'all' ? 'Select vendor first' : templatesLoading ? 'Loading templates...' : 'All templates'}
+                {isVendor
+                  ? templatesLoading
+                    ? 'Loading templates...'
+                    : 'All templates'
+                  : vendorFilter === 'all'
+                    ? 'Select vendor first'
+                    : templatesLoading
+                      ? 'Loading templates...'
+                      : 'All templates'}
               </option>
               {templates.map((template) => (
                 <option key={template._id} value={template._id || ''}>
@@ -562,9 +578,9 @@ function TemplateOrdersReport() {
                       Vendor: {order.vendor_id?.name || order.vendor_id?.businessName || order.vendor_id?.storeName || order.vendor_id?._id}
                     </div>
                   )}
-                  {!isVendor && (order.template_name || order.template_key || order.template_id) && (
+                  {getTemplateLabel(order) && (
                     <div className='mt-1 text-xs text-slate-500'>
-                      Template: {order.template_name || order.template_key || order.template_id}
+                      Template: {getTemplateLabel(order)}
                     </div>
                   )}
                   <div className='mt-2 flex items-center justify-between text-sm font-semibold'>
@@ -676,11 +692,11 @@ function TemplateOrdersReport() {
                       </p>
                     </div>
                   )}
-                  {!isVendor && (selectedOrder.template_name || selectedOrder.template_key || selectedOrder.template_id) && (
+                  {getTemplateLabel(selectedOrder) && (
                     <div>
                       <p className='text-xs text-muted-foreground'>Template</p>
                       <p className='font-semibold'>
-                        {selectedOrder.template_name || selectedOrder.template_key || selectedOrder.template_id}
+                        {getTemplateLabel(selectedOrder)}
                       </p>
                     </div>
                   )}

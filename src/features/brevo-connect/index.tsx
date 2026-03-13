@@ -844,6 +844,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import api from '@/lib/axios'
+import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import {
   Tabs,
   TabsContent,
@@ -903,6 +904,7 @@ type EmailLog = {
 }
 
 export default function BrevoConnectPage() {
+  const { refresh: refreshVendorIntegrations } = useVendorIntegrations()
   const [open, setOpen] = useState(true)
   const [apiKey, setApiKey] = useState('')
   const [saving, setSaving] = useState(false)
@@ -984,6 +986,7 @@ export default function BrevoConnectPage() {
       setStatusMessage(res?.data?.message || 'You are connected with Brevo')
       setApiKey('')
       setOpen(false)
+      await refreshVendorIntegrations()
       toast.success(res?.data?.message || 'You are connected with Brevo')
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to connect Brevo')

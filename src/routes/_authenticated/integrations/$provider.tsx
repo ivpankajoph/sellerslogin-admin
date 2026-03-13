@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
+import BrevoConnectPage from '@/features/brevo-connect'
 import IntegrationsPage from '@/features/integrations'
 
-const supportedProviders = ['razorpay', 'cashfree', 'cod', 'borzo', 'delhivery'] as const
+const supportedProviders = ['razorpay', 'cashfree', 'cod', 'borzo', 'delhivery', 'brevo'] as const
 
 type ProviderId = (typeof supportedProviders)[number]
 
@@ -15,6 +16,10 @@ function ProviderIntegrationsPage() {
   const safeProvider = (supportedProviders.includes(normalized as ProviderId)
     ? normalized
     : 'razorpay') as ProviderId
+
+  if (safeProvider === 'brevo') {
+    return <BrevoConnectPage />
+  }
 
   return <IntegrationsPage focusProvider={safeProvider} />
 }

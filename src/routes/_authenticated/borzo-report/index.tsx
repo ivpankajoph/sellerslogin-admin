@@ -198,7 +198,7 @@ function BorzoReportPage() {
           <CardTitle className='text-base'>Borzo not connected</CardTitle>
         </CardHeader>
         <CardContent className='text-sm text-muted-foreground'>
-          Connect Borzo from Integrations to view delivery tracking reports.
+          Connect Borzo from Sellerslogin Toolkit to view delivery tracking reports.
         </CardContent>
       </Card>
     )

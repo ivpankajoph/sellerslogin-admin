@@ -45,7 +45,6 @@ import { Route as AuthenticatedSitemapsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedSeoIndexRouteImport } from './routes/_authenticated/seo/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authenticated/products/index'
-import { Route as AuthenticatedPaymentsIndexRouteImport } from './routes/_authenticated/payments/index'
 import { Route as AuthenticatedOrderIndexRouteImport } from './routes/_authenticated/order/index'
 import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './routes/_authenticated/inventory-management/index'
 import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
@@ -66,7 +65,6 @@ import { Route as ClerkauthSignInRouteImport } from './routes/clerk/(auth)/sign-
 import { Route as AuthenticatedVendorTemplateTemplateKeyRouteImport } from './routes/_authenticated/vendor-template/$templateKey'
 import { Route as AuthenticatedUsersUserIdRouteImport } from './routes/_authenticated/users/$userId'
 import { Route as AuthenticatedSeoEntitiesRouteImport } from './routes/_authenticated/seo/entities'
-import { Route as AuthenticatedPaymentsGatewayRouteImport } from './routes/_authenticated/payments/$gateway'
 import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedBorzoReportOrderIdRouteImport } from './routes/_authenticated/borzo-report/$orderId'
@@ -276,12 +274,6 @@ const AuthenticatedProductsIndexRoute =
     path: '/products/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedPaymentsIndexRoute =
-  AuthenticatedPaymentsIndexRouteImport.update({
-    id: '/payments/',
-    path: '/payments/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedOrderIndexRoute = AuthenticatedOrderIndexRouteImport.update({
   id: '/order/',
   path: '/order/',
@@ -398,12 +390,6 @@ const AuthenticatedSeoEntitiesRoute =
     path: '/seo/entities',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedPaymentsGatewayRoute =
-  AuthenticatedPaymentsGatewayRouteImport.update({
-    id: '/payments/$gateway',
-    path: '/payments/$gateway',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedIntegrationsProviderRoute =
   AuthenticatedIntegrationsProviderRouteImport.update({
     id: '/integrations/$provider',
@@ -493,7 +479,6 @@ export interface FileRoutesByFullPath {
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
-  '/payments/$gateway': typeof AuthenticatedPaymentsGatewayRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/vendor-template/$templateKey': typeof AuthenticatedVendorTemplateTemplateKeyRoute
@@ -514,7 +499,6 @@ export interface FileRoutesByFullPath {
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
-  '/payments': typeof AuthenticatedPaymentsIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/seo': typeof AuthenticatedSeoIndexRoute
@@ -560,7 +544,6 @@ export interface FileRoutesByTo {
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
-  '/payments/$gateway': typeof AuthenticatedPaymentsGatewayRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/vendor-template/$templateKey': typeof AuthenticatedVendorTemplateTemplateKeyRoute
@@ -581,7 +564,6 @@ export interface FileRoutesByTo {
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
-  '/payments': typeof AuthenticatedPaymentsIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/seo': typeof AuthenticatedSeoIndexRoute
@@ -632,7 +614,6 @@ export interface FileRoutesById {
   '/_authenticated/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
-  '/_authenticated/payments/$gateway': typeof AuthenticatedPaymentsGatewayRoute
   '/_authenticated/seo/entities': typeof AuthenticatedSeoEntitiesRoute
   '/_authenticated/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/_authenticated/vendor-template/$templateKey': typeof AuthenticatedVendorTemplateTemplateKeyRoute
@@ -653,7 +634,6 @@ export interface FileRoutesById {
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/inventory-management/': typeof AuthenticatedInventoryManagementIndexRoute
   '/_authenticated/order/': typeof AuthenticatedOrderIndexRoute
-  '/_authenticated/payments/': typeof AuthenticatedPaymentsIndexRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/seo/': typeof AuthenticatedSeoIndexRoute
@@ -702,7 +682,6 @@ export interface FileRouteTypes {
     | '/borzo-report/$orderId'
     | '/errors/$error'
     | '/integrations/$provider'
-    | '/payments/$gateway'
     | '/seo/entities'
     | '/users/$userId'
     | '/vendor-template/$templateKey'
@@ -723,7 +702,6 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/inventory-management'
     | '/order'
-    | '/payments'
     | '/products'
     | '/profile'
     | '/seo'
@@ -769,7 +747,6 @@ export interface FileRouteTypes {
     | '/borzo-report/$orderId'
     | '/errors/$error'
     | '/integrations/$provider'
-    | '/payments/$gateway'
     | '/seo/entities'
     | '/users/$userId'
     | '/vendor-template/$templateKey'
@@ -790,7 +767,6 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/inventory-management'
     | '/order'
-    | '/payments'
     | '/products'
     | '/profile'
     | '/seo'
@@ -840,7 +816,6 @@ export interface FileRouteTypes {
     | '/_authenticated/borzo-report/$orderId'
     | '/_authenticated/errors/$error'
     | '/_authenticated/integrations/$provider'
-    | '/_authenticated/payments/$gateway'
     | '/_authenticated/seo/entities'
     | '/_authenticated/users/$userId'
     | '/_authenticated/vendor-template/$templateKey'
@@ -861,7 +836,6 @@ export interface FileRouteTypes {
     | '/_authenticated/integrations/'
     | '/_authenticated/inventory-management/'
     | '/_authenticated/order/'
-    | '/_authenticated/payments/'
     | '/_authenticated/products/'
     | '/_authenticated/profile/'
     | '/_authenticated/seo/'
@@ -1155,13 +1129,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/payments/': {
-      id: '/_authenticated/payments/'
-      path: '/payments'
-      fullPath: '/payments'
-      preLoaderRoute: typeof AuthenticatedPaymentsIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/order/': {
       id: '/_authenticated/order/'
       path: '/order'
@@ -1302,13 +1269,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSeoEntitiesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/payments/$gateway': {
-      id: '/_authenticated/payments/$gateway'
-      path: '/payments/$gateway'
-      fullPath: '/payments/$gateway'
-      preLoaderRoute: typeof AuthenticatedPaymentsGatewayRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/integrations/$provider': {
       id: '/_authenticated/integrations/$provider'
       path: '/integrations/$provider'
@@ -1420,7 +1380,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBorzoReportOrderIdRoute: typeof AuthenticatedBorzoReportOrderIdRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
-  AuthenticatedPaymentsGatewayRoute: typeof AuthenticatedPaymentsGatewayRoute
   AuthenticatedSeoEntitiesRoute: typeof AuthenticatedSeoEntitiesRoute
   AuthenticatedUsersUserIdRoute: typeof AuthenticatedUsersUserIdRoute
   AuthenticatedVendorTemplateTemplateKeyRoute: typeof AuthenticatedVendorTemplateTemplateKeyRoute
@@ -1437,7 +1396,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
   AuthenticatedOrderIndexRoute: typeof AuthenticatedOrderIndexRoute
-  AuthenticatedPaymentsIndexRoute: typeof AuthenticatedPaymentsIndexRoute
   AuthenticatedProductsIndexRoute: typeof AuthenticatedProductsIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedSeoIndexRoute: typeof AuthenticatedSeoIndexRoute
@@ -1472,7 +1430,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedIntegrationsProviderRoute:
     AuthenticatedIntegrationsProviderRoute,
-  AuthenticatedPaymentsGatewayRoute: AuthenticatedPaymentsGatewayRoute,
   AuthenticatedSeoEntitiesRoute: AuthenticatedSeoEntitiesRoute,
   AuthenticatedUsersUserIdRoute: AuthenticatedUsersUserIdRoute,
   AuthenticatedVendorTemplateTemplateKeyRoute:
@@ -1494,7 +1451,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInventoryManagementIndexRoute:
     AuthenticatedInventoryManagementIndexRoute,
   AuthenticatedOrderIndexRoute: AuthenticatedOrderIndexRoute,
-  AuthenticatedPaymentsIndexRoute: AuthenticatedPaymentsIndexRoute,
   AuthenticatedProductsIndexRoute: AuthenticatedProductsIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedSeoIndexRoute: AuthenticatedSeoIndexRoute,
