@@ -28,6 +28,7 @@ import { Route as AuthenticatedAnalyticsRouteRouteImport } from './routes/_authe
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
 import { Route as AuthenticatedVendorIndexRouteImport } from './routes/_authenticated/vendor/index'
 import { Route as AuthenticatedVendorTemplateIndexRouteImport } from './routes/_authenticated/vendor-template/index'
+import { Route as AuthenticatedVendorTemplatePoliciesIndexRouteImport } from './routes/_authenticated/vendor-template-policies/index'
 import { Route as AuthenticatedVendorTemplatePagesIndexRouteImport } from './routes/_authenticated/vendor-template-pages/index'
 import { Route as AuthenticatedVendorTemplateOtherIndexRouteImport } from './routes/_authenticated/vendor-template-other/index'
 import { Route as AuthenticatedVendorTemplateContactIndexRouteImport } from './routes/_authenticated/vendor-template-contact/index'
@@ -66,6 +67,8 @@ import { Route as AuthenticatedVendorTemplateTemplateKeyRouteImport } from './ro
 import { Route as AuthenticatedUsersUserIdRouteImport } from './routes/_authenticated/users/$userId'
 import { Route as AuthenticatedSeoEntitiesRouteImport } from './routes/_authenticated/seo/entities'
 import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
+import { Route as AuthenticatedHelpCenterTicketsRouteImport } from './routes/_authenticated/help-center/tickets'
+import { Route as AuthenticatedHelpCenterChatRouteImport } from './routes/_authenticated/help-center/chat'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedBorzoReportOrderIdRouteImport } from './routes/_authenticated/borzo-report/$orderId'
 import { Route as AuthenticatedAnalyticsTrafficRouteImport } from './routes/_authenticated/analytics/traffic'
@@ -172,6 +175,12 @@ const AuthenticatedVendorTemplateIndexRoute =
   AuthenticatedVendorTemplateIndexRouteImport.update({
     id: '/vendor-template/',
     path: '/vendor-template/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVendorTemplatePoliciesIndexRoute =
+  AuthenticatedVendorTemplatePoliciesIndexRouteImport.update({
+    id: '/vendor-template-policies/',
+    path: '/vendor-template-policies/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedVendorTemplatePagesIndexRoute =
@@ -396,6 +405,18 @@ const AuthenticatedIntegrationsProviderRoute =
     path: '/integrations/$provider',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedHelpCenterTicketsRoute =
+  AuthenticatedHelpCenterTicketsRouteImport.update({
+    id: '/help-center/tickets',
+    path: '/help-center/tickets',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedHelpCenterChatRoute =
+  AuthenticatedHelpCenterChatRouteImport.update({
+    id: '/help-center/chat',
+    path: '/help-center/chat',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedErrorsErrorRoute =
   AuthenticatedErrorsErrorRouteImport.update({
     id: '/errors/$error',
@@ -478,6 +499,8 @@ export interface FileRoutesByFullPath {
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/help-center/chat': typeof AuthenticatedHelpCenterChatRoute
+  '/help-center/tickets': typeof AuthenticatedHelpCenterTicketsRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
@@ -516,6 +539,7 @@ export interface FileRoutesByFullPath {
   '/vendor-template-contact': typeof AuthenticatedVendorTemplateContactIndexRoute
   '/vendor-template-other': typeof AuthenticatedVendorTemplateOtherIndexRoute
   '/vendor-template-pages': typeof AuthenticatedVendorTemplatePagesIndexRoute
+  '/vendor-template-policies': typeof AuthenticatedVendorTemplatePoliciesIndexRoute
   '/vendor-template': typeof AuthenticatedVendorTemplateIndexRoute
   '/vendor': typeof AuthenticatedVendorIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
@@ -543,6 +567,8 @@ export interface FileRoutesByTo {
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/help-center/chat': typeof AuthenticatedHelpCenterChatRoute
+  '/help-center/tickets': typeof AuthenticatedHelpCenterTicketsRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
@@ -581,6 +607,7 @@ export interface FileRoutesByTo {
   '/vendor-template-contact': typeof AuthenticatedVendorTemplateContactIndexRoute
   '/vendor-template-other': typeof AuthenticatedVendorTemplateOtherIndexRoute
   '/vendor-template-pages': typeof AuthenticatedVendorTemplatePagesIndexRoute
+  '/vendor-template-policies': typeof AuthenticatedVendorTemplatePoliciesIndexRoute
   '/vendor-template': typeof AuthenticatedVendorTemplateIndexRoute
   '/vendor': typeof AuthenticatedVendorIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
@@ -613,6 +640,8 @@ export interface FileRoutesById {
   '/_authenticated/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/_authenticated/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/_authenticated/help-center/chat': typeof AuthenticatedHelpCenterChatRoute
+  '/_authenticated/help-center/tickets': typeof AuthenticatedHelpCenterTicketsRoute
   '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/_authenticated/seo/entities': typeof AuthenticatedSeoEntitiesRoute
   '/_authenticated/users/$userId': typeof AuthenticatedUsersUserIdRoute
@@ -651,6 +680,7 @@ export interface FileRoutesById {
   '/_authenticated/vendor-template-contact/': typeof AuthenticatedVendorTemplateContactIndexRoute
   '/_authenticated/vendor-template-other/': typeof AuthenticatedVendorTemplateOtherIndexRoute
   '/_authenticated/vendor-template-pages/': typeof AuthenticatedVendorTemplatePagesIndexRoute
+  '/_authenticated/vendor-template-policies/': typeof AuthenticatedVendorTemplatePoliciesIndexRoute
   '/_authenticated/vendor-template/': typeof AuthenticatedVendorTemplateIndexRoute
   '/_authenticated/vendor/': typeof AuthenticatedVendorIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
@@ -681,6 +711,8 @@ export interface FileRouteTypes {
     | '/analytics/traffic'
     | '/borzo-report/$orderId'
     | '/errors/$error'
+    | '/help-center/chat'
+    | '/help-center/tickets'
     | '/integrations/$provider'
     | '/seo/entities'
     | '/users/$userId'
@@ -719,6 +751,7 @@ export interface FileRouteTypes {
     | '/vendor-template-contact'
     | '/vendor-template-other'
     | '/vendor-template-pages'
+    | '/vendor-template-policies'
     | '/vendor-template'
     | '/vendor'
     | '/wallet'
@@ -746,6 +779,8 @@ export interface FileRouteTypes {
     | '/analytics/traffic'
     | '/borzo-report/$orderId'
     | '/errors/$error'
+    | '/help-center/chat'
+    | '/help-center/tickets'
     | '/integrations/$provider'
     | '/seo/entities'
     | '/users/$userId'
@@ -784,6 +819,7 @@ export interface FileRouteTypes {
     | '/vendor-template-contact'
     | '/vendor-template-other'
     | '/vendor-template-pages'
+    | '/vendor-template-policies'
     | '/vendor-template'
     | '/vendor'
     | '/wallet'
@@ -815,6 +851,8 @@ export interface FileRouteTypes {
     | '/_authenticated/analytics/traffic'
     | '/_authenticated/borzo-report/$orderId'
     | '/_authenticated/errors/$error'
+    | '/_authenticated/help-center/chat'
+    | '/_authenticated/help-center/tickets'
     | '/_authenticated/integrations/$provider'
     | '/_authenticated/seo/entities'
     | '/_authenticated/users/$userId'
@@ -853,6 +891,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vendor-template-contact/'
     | '/_authenticated/vendor-template-other/'
     | '/_authenticated/vendor-template-pages/'
+    | '/_authenticated/vendor-template-policies/'
     | '/_authenticated/vendor-template/'
     | '/_authenticated/vendor/'
     | '/_authenticated/wallet/'
@@ -1008,6 +1047,13 @@ declare module '@tanstack/react-router' {
       path: '/vendor-template'
       fullPath: '/vendor-template'
       preLoaderRoute: typeof AuthenticatedVendorTemplateIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vendor-template-policies/': {
+      id: '/_authenticated/vendor-template-policies/'
+      path: '/vendor-template-policies'
+      fullPath: '/vendor-template-policies'
+      preLoaderRoute: typeof AuthenticatedVendorTemplatePoliciesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/vendor-template-pages/': {
@@ -1276,6 +1322,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIntegrationsProviderRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/help-center/tickets': {
+      id: '/_authenticated/help-center/tickets'
+      path: '/help-center/tickets'
+      fullPath: '/help-center/tickets'
+      preLoaderRoute: typeof AuthenticatedHelpCenterTicketsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/help-center/chat': {
+      id: '/_authenticated/help-center/chat'
+      path: '/help-center/chat'
+      fullPath: '/help-center/chat'
+      preLoaderRoute: typeof AuthenticatedHelpCenterChatRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/errors/$error': {
       id: '/_authenticated/errors/$error'
       path: '/errors/$error'
@@ -1379,6 +1439,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedBorzoReportOrderIdRoute: typeof AuthenticatedBorzoReportOrderIdRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedHelpCenterChatRoute: typeof AuthenticatedHelpCenterChatRoute
+  AuthenticatedHelpCenterTicketsRoute: typeof AuthenticatedHelpCenterTicketsRoute
   AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
   AuthenticatedSeoEntitiesRoute: typeof AuthenticatedSeoEntitiesRoute
   AuthenticatedUsersUserIdRoute: typeof AuthenticatedUsersUserIdRoute
@@ -1413,6 +1475,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVendorTemplateContactIndexRoute: typeof AuthenticatedVendorTemplateContactIndexRoute
   AuthenticatedVendorTemplateOtherIndexRoute: typeof AuthenticatedVendorTemplateOtherIndexRoute
   AuthenticatedVendorTemplatePagesIndexRoute: typeof AuthenticatedVendorTemplatePagesIndexRoute
+  AuthenticatedVendorTemplatePoliciesIndexRoute: typeof AuthenticatedVendorTemplatePoliciesIndexRoute
   AuthenticatedVendorTemplateIndexRoute: typeof AuthenticatedVendorTemplateIndexRoute
   AuthenticatedVendorIndexRoute: typeof AuthenticatedVendorIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
@@ -1428,6 +1491,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedBorzoReportOrderIdRoute: AuthenticatedBorzoReportOrderIdRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedHelpCenterChatRoute: AuthenticatedHelpCenterChatRoute,
+  AuthenticatedHelpCenterTicketsRoute: AuthenticatedHelpCenterTicketsRoute,
   AuthenticatedIntegrationsProviderRoute:
     AuthenticatedIntegrationsProviderRoute,
   AuthenticatedSeoEntitiesRoute: AuthenticatedSeoEntitiesRoute,
@@ -1476,6 +1541,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedVendorTemplateOtherIndexRoute,
   AuthenticatedVendorTemplatePagesIndexRoute:
     AuthenticatedVendorTemplatePagesIndexRoute,
+  AuthenticatedVendorTemplatePoliciesIndexRoute:
+    AuthenticatedVendorTemplatePoliciesIndexRoute,
   AuthenticatedVendorTemplateIndexRoute: AuthenticatedVendorTemplateIndexRoute,
   AuthenticatedVendorIndexRoute: AuthenticatedVendorIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,

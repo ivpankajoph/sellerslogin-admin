@@ -1,7 +1,3 @@
-/* eslint-disable no-duplicate-imports */
-/* eslint-disable @typescript-eslint/consistent-type-imports */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { motion } from 'framer-motion'
 import { ListFilter, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -32,6 +28,7 @@ export function Category() {
   )
   const token = useSelector((state: RootState) => state.auth?.token)
   const role = useSelector((state: RootState) => state.auth?.user?.role)
+  const vendorId = useSelector((state: RootState) => (state.auth?.user as any)?.id)
   const isAdmin = role === 'admin'
   const totalPages = pagination?.totalPages || 1
   const limit = 100
@@ -60,6 +57,8 @@ export function Category() {
         search: searchQuery || undefined,
         level: typeFilter || undefined,
         main_category_id: mainFilter || undefined,
+        // For vendors, filter by their vendor_id so only relevant categories show
+        vendor_id: !isAdmin && vendorId ? vendorId : undefined,
       })
     )
   }
@@ -185,7 +184,9 @@ export function Category() {
                 Category List
               </h2>
               <p className='mt-1 text-sm text-slate-600 sm:text-base'>
-                Manage all category levels in a tabular drill-down workflow.
+                {isAdmin
+                  ? 'Manage all category levels in a tabular drill-down workflow.'
+                  : 'Showing categories relevant to your store products.'}
               </p>
             </div>
 

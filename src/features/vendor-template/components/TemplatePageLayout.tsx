@@ -20,6 +20,7 @@ const navItems = [
   { key: 'contact', label: 'Contact', to: '/vendor-template-contact' },
   { key: 'pages', label: 'Pages', to: '/vendor-template-pages' },
   { key: 'other', label: 'Social + FAQ', to: '/vendor-template-other' },
+  { key: 'policies', label: 'Policies', to: '/vendor-template-policies' },
 ]
 
 const MIN_EDITOR_PANEL_WIDTH = 320

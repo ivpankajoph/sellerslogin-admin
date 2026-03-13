@@ -3,6 +3,8 @@
 import { type JSX } from 'react/jsx-runtime'
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useSelector } from 'react-redux'
+import { useEffect, useState } from 'react'
+import api from '@/lib/axios'
 import { useLayout } from '@/context/layout-provider'
 import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import {
@@ -41,6 +43,25 @@ export function AppSidebar() {
     return installedToolkitProviders.includes(provider as IntegrationProviderId)
   }
 
+  const [unreadCounts, setUnreadCounts] = useState({ queries: 0, reviews: 0, vendors: 0, tickets: 0 })
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const res = await api.get('/users/support/queries/unread/counts')
+        if (res.data.success) {
+          setUnreadCounts(res.data.data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch unread counts for sidebar', error)
+      }
+    }
+    fetchCounts()
+    // Poll every 2 minutes
+    const interval = setInterval(fetchCounts, 120000)
+    return () => clearInterval(interval)
+  }, [])
+
   const filteredNavGroups = sidebarData.navGroups
     .filter((group: any) => !group.roles || group.roles.includes(effectiveRole))
     .map((group: any) => ({
@@ -53,20 +74,41 @@ export function AppSidebar() {
               ? canShowByToolkitInstall(item.requiresIntegration)
               : canShowByIntegration(item.requiresIntegration)),
         )
-        .map((item: any) => ({
-          ...item,
-          badge:
-            item.title === 'My Apps' && effectiveRole === 'vendor' && installedToolkitCount
-              ? String(installedToolkitCount)
-              : item.badge,
-          items: item.items?.filter(
+        .map((item: any) => {
+          let injectedBadge = item.badge
+          
+          if (item.title === 'My Apps' && effectiveRole === 'vendor' && installedToolkitCount) {
+             injectedBadge = String(installedToolkitCount)
+          } else if (item.title === 'Customer Queries' && unreadCounts.queries > 0) {
+             injectedBadge = String(unreadCounts.queries)
+          } else if (item.title === 'Customer Reviews' && unreadCounts.reviews > 0) {
+             injectedBadge = String(unreadCounts.reviews)
+          } else if (item.title === 'All Vendors' && effectiveRole === 'admin' && unreadCounts.vendors > 0) {
+             injectedBadge = String(unreadCounts.vendors)
+          } else if (item.title === 'Help Center' && unreadCounts.tickets > 0) {
+             // If parent has tickets unread, we show it on parent too or just child? 
+             // Usually parent shows sum.
+             injectedBadge = String(unreadCounts.tickets)
+          }
+
+          return {
+            ...item,
+            badge: injectedBadge,
+            items: item.items?.map((subItem: any) => {
+              let subBadge = subItem.badge
+              if (subItem.title === 'Ticket Centre' && unreadCounts.tickets > 0) {
+                subBadge = String(unreadCounts.tickets)
+              }
+              return { ...subItem, badge: subBadge }
+            }).filter(
             (subItem: any) =>
               (!subItem.roles || subItem.roles.includes(effectiveRole)) &&
               (group.title === 'Sellerslogin Toolkit'
                 ? canShowByToolkitInstall(subItem.requiresIntegration)
                 : canShowByIntegration(subItem.requiresIntegration)),
-          ),
-        }))
+            ),
+          }
+        })
         .filter((item: any) => !item.items || item.items.length > 0),
     }))
     .filter((group: any) => group.items.length > 0)

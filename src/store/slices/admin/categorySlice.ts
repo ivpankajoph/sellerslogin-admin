@@ -94,12 +94,14 @@ export const getAllCategories = createAsyncThunk(
       search,
       level,
       main_category_id,
+      vendor_id,
     }: {
       page?: number
       limit?: number
       search?: string
       level?: string
       main_category_id?: string
+      vendor_id?: string
     } = {},
     { rejectWithValue }
   ) => {
@@ -112,6 +114,7 @@ export const getAllCategories = createAsyncThunk(
       if (main_category_id && main_category_id !== 'all') {
         params.main_category_id = main_category_id
       }
+      if (vendor_id) params.vendor_id = vendor_id
 
       const res = await axios.get(`${BASE_URL}/v1/categories/getall`, {
         params,

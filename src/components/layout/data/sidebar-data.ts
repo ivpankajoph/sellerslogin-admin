@@ -59,9 +59,10 @@ export const sidebarData: any = {
         },
         {
           title: 'Orders',
+          url: '/order',
           icon: ShoppingCart,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
-          items: [
+          /* items: [
             {
               title: 'Ophmate Orders',
               url: '/order',
@@ -72,13 +73,14 @@ export const sidebarData: any = {
               url: '/template-orders',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
-          ],
+          ], */
         },
         {
           title: 'Wallets',
+          url: '/wallet',
           icon: LayoutDashboard,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
-          items: [
+          /* items: [
             {
               title: 'Ophmate Wallet',
               url: '/wallet',
@@ -89,7 +91,7 @@ export const sidebarData: any = {
               url: '/template-wallet',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
-          ],
+          ], */
         },
         {
           title: 'Delivery Charges',
@@ -100,17 +102,17 @@ export const sidebarData: any = {
         {
           title: 'SEO Manager',
           icon: SearchCheck,
-          roles: [ROLES.ADMIN],
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
             {
               title: 'SEO Rules',
               url: '/seo',
-              roles: [ROLES.ADMIN],
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
             {
               title: 'Entity SEO',
               url: '/seo/entities',
-              roles: [ROLES.ADMIN],
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
           ],
         },
@@ -144,6 +146,24 @@ export const sidebarData: any = {
           icon: Truck,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           requiresIntegration: 'borzo',
+        },
+      ],
+    },
+    {
+      title: 'Vendors',
+      roles: [ROLES.ADMIN],
+      items: [
+        {
+          title: 'All Vendors',
+          icon: ShieldCheck,
+          roles: [ROLES.ADMIN],
+          items: [
+            {
+              title: 'Show Vendors',
+              url: '/vendor',
+              roles: [ROLES.ADMIN],
+            },
+          ],
         },
       ],
     },
@@ -234,6 +254,50 @@ export const sidebarData: any = {
     },
 
     {
+      title: 'Create Website',
+      roles: [ROLES.VENDOR],
+      items: [
+        {
+          title: 'Create Website',
+          icon: ShieldCheck,
+          roles: [ROLES.VENDOR],
+          items: [
+            {
+              title: 'Create Your Template',
+              url: '/vendor-template',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Edit About Page',
+              url: '/vendor-template-about',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Edit Contact Page',
+              url: '/vendor-template-contact',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Edit Social + FAQs',
+              url: '/vendor-template-other',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Custom Pages',
+              url: '/vendor-template-pages',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Privacy & Shipping Policies',
+              url: '/vendor-template-policies',
+              roles: [ROLES.VENDOR],
+            },
+          ],
+        },
+      ],
+    },
+
+    {
       title: 'Products',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
@@ -268,26 +332,20 @@ export const sidebarData: any = {
     },
 
     {
-      title: 'Vendors',
-      roles: [ROLES.ADMIN],
+      title: 'Delivery',
+      roles: [ROLES.VENDOR],
       items: [
         {
-          title: 'All Vendors',
-          icon: ShieldCheck,
-          roles: [ROLES.ADMIN],
-          items: [
-            {
-              title: 'Show Vendors',
-              url: '/vendor',
-              roles: [ROLES.ADMIN],
-            },
-          ],
+          title: 'Courier Dispatch',
+          url: '/delivery',
+          icon: Truck,
+          roles: [ROLES.VENDOR],
         },
       ],
     },
 
     {
-      title: 'Template Admin',
+      title: 'Manage Location',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
@@ -297,7 +355,7 @@ export const sidebarData: any = {
           roles: [ROLES.ADMIN],
         },
         {
-          title: 'Template Workspace',
+          title: 'Location Workspace',
           url: '/template-workspace',
           icon: LayoutTemplate,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
@@ -312,54 +370,25 @@ export const sidebarData: any = {
     },
 
     {
-      title: 'Template',
-      roles: [ROLES.VENDOR],
-      items: [
-        {
-          title: 'Create Template',
-          icon: ShieldCheck,
-          roles: [ROLES.VENDOR],
-          items: [
-            {
-              title: 'Create Your Template',
-              url: '/vendor-template',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Edit About Page',
-              url: '/vendor-template-about',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Edit Contact Page',
-              url: '/vendor-template-contact',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Edit Social + FAQs',
-              url: '/vendor-template-other',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Custom Pages',
-              url: '/vendor-template-pages',
-              roles: [ROLES.VENDOR],
-            },
-
-          ],
-        },
-      ],
-    },
-
-    {
       title: 'Other',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
           title: 'Help Center',
-          url: '/help-center',
           icon: HelpCircle,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
+          items: [
+            {
+              title: 'Ticket Centre',
+              url: '/help-center/tickets',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+            },
+            {
+              title: 'Live Chat Centre',
+              url: '/help-center/chat',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+            },
+          ],
         },
         {
           title: 'Sitemaps',

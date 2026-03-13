@@ -21,7 +21,7 @@ interface TemplatePreviewPanelProps {
   isSyncing?: boolean
   syncDisabled?: boolean
   vendorId?: string
-  page?: 'home' | 'about' | 'contact' | 'full'
+  page?: 'home' | 'about' | 'contact' | 'full' | 'policies'
   previewData?: unknown
   sectionOrder?: string[]
   onSelectSection?: (sectionId: string, componentId?: string) => void

@@ -726,7 +726,7 @@ export default function TemplateWorkspacePage() {
           return current
         }
         return list[0]?.template_key || ''
-      })
+      }) 
     } catch {
       setTemplates([])
       setSelectedTemplateKey('')
