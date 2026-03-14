@@ -121,7 +121,7 @@ api.interceptors.request.use(
   (config) => {
     const state = store.getState();
     const token = state.auth?.token;
-    const role = state.auth?.user?.role;
+    const role = String(state.auth?.user?.role || "").toLowerCase();
 
     if (token && isJwtExpired(token)) {
       handleExpiredSession();

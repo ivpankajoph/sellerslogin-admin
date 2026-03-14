@@ -2,11 +2,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { type AppDispatch } from '@/store'
 import { logout } from '@/store/slices/authSlice'
 import { ChevronsUpDown, LogOut } from 'lucide-react'
-import { useDispatch } from 'react-redux'
-import { useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
+import { useEffect, useState } from 'react'
 import useDialogState from '@/hooks/use-dialog-state'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,46 @@ export function NavUser() {
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
   const user = useSelector((state: any) => state.auth.user)
+  const vendorProfileState = useSelector((state: any) => state.vendorprofile)
+  const vendorProfile =
+    vendorProfileState?.profile?.vendor ||
+    vendorProfileState?.profile?.data ||
+    vendorProfileState?.profile ||
+    null
+  const isVendor = String(user?.role || '').toLowerCase() === 'vendor'
+  const vendorLoading = Boolean(vendorProfileState?.loading)
+  const displayName = String(
+    vendorProfile?.name ||
+      user?.name ||
+      user?.business_name ||
+      user?.businessName ||
+      user?.email ||
+      ''
+  ).trim()
+  const displayEmail = String(
+    vendorProfile?.email || user?.email || ''
+  ).trim()
+  const userInitials = displayName
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+  const fallbackInitials =
+    userInitials ||
+    displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() ||
+    'V'
+  const avatarCandidate = vendorProfile?.avatar || user?.avatar
+  const avatarSrc =
+    avatarCandidate && String(avatarCandidate).trim()
+      ? String(avatarCandidate)
+      : undefined
+
+  useEffect(() => {
+    if (!isVendor || vendorLoading || vendorProfile) return
+    dispatch(fetchVendorProfile())
+  }, [dispatch, isVendor, vendorLoading, vendorProfile])
   const handleLogout = () => {
     // 1. Clear Redux auth state
     dispatch(logout())
@@ -62,12 +102,12 @@ export function NavUser() {
                 className='bg-sidebar-accent/40 shadow-sm ring-1 ring-sidebar-border transition-colors hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent'
               >
                 <Avatar className='h-8 w-8 rounded-lg'>
-                  <AvatarImage src={user?.avatar} alt={user?.name} />
-                  <AvatarFallback className='rounded-lg'>SN</AvatarFallback>
+                  <AvatarImage src={avatarSrc} alt={displayName || user?.name} />
+                  <AvatarFallback className='rounded-lg'>{fallbackInitials}</AvatarFallback>
                 </Avatar>
                 <div className='grid flex-1 text-start text-sm leading-tight'>
-                  <span className='truncate font-semibold'>{user?.name}</span>
-                  <span className='truncate text-xs'>{user?.email}</span>
+                  <span className='truncate font-semibold'>{displayName || user?.name}</span>
+                  <span className='truncate text-xs'>{displayEmail || user?.email}</span>
                 </div>
                 <ChevronsUpDown className='ms-auto size-4' />
               </SidebarMenuButton>
@@ -81,12 +121,12 @@ export function NavUser() {
               <DropdownMenuLabel className='p-0 font-normal'>
                 <div className='flex items-center gap-2 px-1 py-1.5 text-start text-sm'>
                   <Avatar className='h-8 w-8 rounded-lg'>
-                    <AvatarImage src={user?.avatar} alt={user?.name} />
-                    <AvatarFallback className='rounded-lg'>SN</AvatarFallback>
+                    <AvatarImage src={avatarSrc} alt={displayName || user?.name} />
+                    <AvatarFallback className='rounded-lg'>{fallbackInitials}</AvatarFallback>
                   </Avatar>
                   <div className='grid flex-1 text-start text-sm leading-tight'>
-                    <span className='truncate font-semibold'>{user?.name}</span>
-                    <span className='truncate text-xs'>{user?.email}</span>
+                    <span className='truncate font-semibold'>{displayName || user?.name}</span>
+                    <span className='truncate text-xs'>{displayEmail || user?.email}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
