@@ -1,5 +1,11 @@
 import React from 'react'
-import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { HelpCircle, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  StudioFieldLabel,
+  studioCardClass,
+  studioTextareaClass,
+} from './studio-ui'
 
 interface FAQ {
   question: string
@@ -28,96 +34,82 @@ const Step6FAQs: React.FC<Props> = ({
   aiLoading,
 }) => {
   return (
-    <section className='space-y-5'>
-      <div className='rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50/85 via-white to-orange-50/75 p-5'>
-        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-          <div>
-            <h2 className='text-2xl font-extrabold tracking-tight text-slate-900'>
-              FAQs
-            </h2>
-            <p className='mt-1 text-sm text-slate-600'>
-              Anticipate buyer questions and improve conversion confidence.
-            </p>
+    <div className='space-y-6'>
+      <div className={studioCardClass}>
+        <div className='flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-start lg:justify-between'>
+          <div className='flex items-center gap-2 text-base font-semibold text-foreground'>
+            <HelpCircle className='h-4 w-4 text-amber-600' />
+            FAQs
           </div>
           <div className='flex flex-wrap gap-2'>
-            <button
+            <Button
               type='button'
               onClick={onGenerate}
               disabled={aiLoading}
-              className='inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60'
+              className='h-11 rounded-xl border border-border bg-card px-5 text-foreground hover:bg-secondary disabled:opacity-70'
             >
               {aiLoading ? (
-                <Loader2 className='h-4 w-4 animate-spin' />
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
               ) : (
-                <Sparkles className='h-4 w-4' />
+                <Sparkles className='mr-2 h-4 w-4' />
               )}
-              Generate with AI
-            </button>
-            <button
+              Generate FAQs
+            </Button>
+            <Button
               type='button'
               onClick={onAddFAQ}
-              className='inline-flex items-center gap-1 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800'
+              className='h-11 rounded-xl bg-amber-500 px-5 text-white hover:bg-amber-600'
             >
-              <Plus className='h-4 w-4' />
+              <Plus className='mr-2 h-4 w-4' />
               Add FAQ
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
       {faqs.length === 0 ? (
-        <div className='rounded-xl border border-slate-200 bg-white/90 p-5 text-sm text-slate-500 shadow-sm'>
-          No FAQs added yet. Click <span className='font-semibold'>"Add FAQ"</span>{' '}
-          to start.
+        <div className={studioCardClass}>
+          <h3 className='text-base font-semibold text-foreground'>No FAQs added yet</h3>
         </div>
       ) : (
         <div className='space-y-4'>
           {faqs.map((faq, index) => (
-            <article
-              key={index}
-              className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'
-            >
-              <div className='mb-3 flex items-center justify-between gap-3'>
-                <h3 className='text-sm font-bold uppercase tracking-[0.11em] text-slate-500'>
+            <article key={index} className={studioCardClass}>
+              <div className='mb-4 flex items-center justify-between gap-3'>
+                <div className='inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300'>
                   FAQ {index + 1}
-                </h3>
-                <button
+                </div>
+                <Button
                   type='button'
+                  variant='outline'
                   onClick={() => onRemoveFAQ(index)}
-                  className='inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100'
-                  aria-label={`Remove FAQ ${index + 1}`}
+                  className='h-10 rounded-xl border-red-500/25 bg-red-500/10 px-4 text-red-600 hover:bg-red-500/15 hover:text-red-700'
                 >
-                  <Trash2 className='h-4 w-4' />
-                </button>
+                  <Trash2 className='mr-2 h-4 w-4' />
+                  Remove
+                </Button>
               </div>
 
-              <div className='space-y-3'>
+              <div className='space-y-4'>
                 <div>
-                  <label className='mb-1 block text-sm font-semibold text-slate-700'>
-                    Question
-                  </label>
+                  <StudioFieldLabel label='Question' />
                   <textarea
                     value={faq.question}
-                    onChange={(event) =>
-                      onFAQChange(index, 'question', event.target.value)
-                    }
+                    onChange={(event) => onFAQChange(index, 'question', event.target.value)}
                     rows={2}
-                    className='w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200'
-                    placeholder='What will customers ask first?'
+                    className={studioTextareaClass}
+                    placeholder='Example: Is this product suitable for outdoor use?'
                   />
                 </div>
+
                 <div>
-                  <label className='mb-1 block text-sm font-semibold text-slate-700'>
-                    Answer
-                  </label>
+                  <StudioFieldLabel label='Answer' />
                   <textarea
                     value={faq.answer}
-                    onChange={(event) =>
-                      onFAQChange(index, 'answer', event.target.value)
-                    }
-                    rows={3}
-                    className='w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200'
-                    placeholder='Provide a clear and concise answer.'
+                    onChange={(event) => onFAQChange(index, 'answer', event.target.value)}
+                    rows={4}
+                    className={studioTextareaClass}
+                    placeholder='Example: Yes, it is designed for outdoor use and includes weather-resistant construction.'
                   />
                 </div>
               </div>
@@ -125,7 +117,7 @@ const Step6FAQs: React.FC<Props> = ({
           ))}
         </div>
       )}
-    </section>
+    </div>
   )
 }
 

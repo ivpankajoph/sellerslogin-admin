@@ -121,16 +121,17 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           icon: ShieldCheck,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
+              {
+              title: 'Create Product',
+              url: '/products/create-products',
+              roles: [ROLES.VENDOR],
+            },
             {
               title: 'Show Products',
               url: '/products',
               roles: [ROLES.VENDOR],
             },
-            {
-              title: 'Create Product',
-              url: '/products/create-products',
-              roles: [ROLES.VENDOR],
-            },
+          
             {
               title: 'All Admin Products',
               url: '/products/admin-products',
@@ -191,7 +192,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           roles: [ROLES.ADMIN],
         },
         {
-          title: 'Template Workspace',
+          title: 'My Websites',
           url: '/template-workspace',
           icon: LayoutTemplate,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
@@ -207,38 +208,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           url: '/get-domain',
           icon: Globe,
           roles: [ROLES.VENDOR],
-        },
-        {
-          title: 'Website Pages',
-          icon: LayoutTemplate,
-          roles: [ROLES.VENDOR],
-          items: [
-            {
-              title: 'Homepage',
-              url: '/vendor-template',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'About Page',
-              url: '/vendor-template-about',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Contact Page',
-              url: '/vendor-template-contact',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Social + FAQs',
-              url: '/vendor-template-other',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Custom Pages',
-              url: '/vendor-template-pages',
-              roles: [ROLES.VENDOR],
-            },
-          ],
         },
       ],
     },

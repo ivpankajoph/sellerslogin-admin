@@ -5,13 +5,13 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Layers3,
   Loader2,
   PackagePlus,
-  Sparkles,
+  Search,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -40,9 +40,18 @@ import {
 // Specification templates by category
 
 const PRODUCT_CREATE_DRAFT_STORAGE_PREFIX = 'product_create_draft'
-const PRODUCT_CREATE_DRAFT_VERSION = 1
+const PRODUCT_CREATE_DRAFT_VERSION = 2
 const PRODUCT_CREATE_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const PRODUCT_CREATE_STEP_COUNT = 3
+
+const createSpecificationRecord = (keys: string[]) =>
+  keys.reduce<Record<string, string>>((acc, key) => {
+    const normalizedKey = toTrimmedText(key)
+    if (normalizedKey) {
+      acc[normalizedKey] = ''
+    }
+    return acc
+  }, {})
 
 const createInitialFormData = (): ProductFormData => ({
   mainCategory: '',
@@ -55,7 +64,7 @@ const createInitialFormData = (): ProductFormData => ({
   shortDescription: '',
   description: '',
   defaultImages: [],
-  specifications: [{}],
+  specifications: [createSpecificationRecord(SPECIFICATION_TEMPLATES.default)],
   isAvailable: true,
   metaTitle: '',
   metaDescription: '',
@@ -73,9 +82,6 @@ type ProductCreateDraft = {
   currentStep: number
   specificationKeys: string[]
   metaKeywordInput: string
-  tempAttributeKey: string
-  tempAttributeValue: string
-  variantMetaKeywordInput: string
 }
 
 const buildProductCreateDraftStorageKey = (vendorId: string) =>
@@ -153,9 +159,6 @@ const sanitizeVariant = (value: unknown): Variant => {
     finalPrice: toNumberValue(raw.finalPrice),
     stockQuantity: toNumberValue(raw.stockQuantity),
     variantsImageUrls: sanitizeImageUploads(raw.variantsImageUrls),
-    variantMetaTitle: toText(raw.variantMetaTitle),
-    variantMetaDescription: toText(raw.variantMetaDescription),
-    variantMetaKeywords: sanitizeStringList(raw.variantMetaKeywords),
     isActive: raw.isActive !== false,
   }
 }
@@ -228,9 +231,6 @@ const sanitizeProductCreateDraft = (value: unknown): ProductCreateDraft | null =
     currentStep: clampProductCreateStep(value.currentStep),
     specificationKeys: sanitizeStringList(value.specificationKeys),
     metaKeywordInput: toText(value.metaKeywordInput),
-    tempAttributeKey: toText(value.tempAttributeKey),
-    tempAttributeValue: toText(value.tempAttributeValue),
-    variantMetaKeywordInput: toText(value.variantMetaKeywordInput),
   }
 }
 
@@ -253,13 +253,10 @@ const ProductCreateForm: React.FC = () => {
   const [cities, setCities] = useState<any[]>([])
   const [isMainCategoryLoading, setIsMainCategoryLoading] = useState(false)
   const [isCategoryLoading, setIsCategoryLoading] = useState(false)
-  const [isCityLoading, setIsCityLoading] = useState(false)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [selectedMainCategoryId, setSelectedMainCategoryId] = useState('')
   const [filteredSubcategories, setFilteredSubcategories] = useState<any[]>([])
-  const [specificationKeys, setSpecificationKeys] = useState<string[]>(
-    SPECIFICATION_TEMPLATES.default
-  )
+  const [specificationKeys, setSpecificationKeys] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState<any>({
     metaTitle: false,
@@ -270,9 +267,7 @@ const ProductCreateForm: React.FC = () => {
   })
   const [currentStep, setCurrentStep] = useState(1)
   const [metaKeywordInput, setMetaKeywordInput] = useState('')
-  const [tempAttributeKey, setTempAttributeKey] = useState('')
-  const [tempAttributeValue, setTempAttributeValue] = useState('')
-  const [variantMetaKeywordInput, setVariantMetaKeywordInput] = useState('')
+  const [variantOptionKeyInput, setVariantOptionKeyInput] = useState('')
   const [isDraftHydrated, setIsDraftHydrated] = useState(false)
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
@@ -285,12 +280,10 @@ const ProductCreateForm: React.FC = () => {
     setSelectedCategoryIds([])
     setCategories([])
     setFilteredSubcategories([])
-    setSpecificationKeys(SPECIFICATION_TEMPLATES.default)
+    setSpecificationKeys([])
     setCurrentStep(1)
     setMetaKeywordInput('')
-    setTempAttributeKey('')
-    setTempAttributeValue('')
-    setVariantMetaKeywordInput('')
+    setVariantOptionKeyInput('')
   }
 
   const clearDraftStorage = () => {
@@ -348,14 +341,10 @@ const ProductCreateForm: React.FC = () => {
       setSpecificationKeys(
         parsedDraft.specificationKeys.length
           ? parsedDraft.specificationKeys
-          : Object.keys(parsedDraft.formData.specifications?.[0] || {}).length
-            ? Object.keys(parsedDraft.formData.specifications[0])
-            : SPECIFICATION_TEMPLATES.default
+          : []
       )
       setMetaKeywordInput(parsedDraft.metaKeywordInput)
-      setTempAttributeKey(parsedDraft.tempAttributeKey)
-      setTempAttributeValue(parsedDraft.tempAttributeValue)
-      setVariantMetaKeywordInput(parsedDraft.variantMetaKeywordInput)
+      setVariantOptionKeyInput('')
       setDraftSavedAt(parsedDraft.savedAt)
     } catch {
       clearDraftStorage()
@@ -391,9 +380,6 @@ const ProductCreateForm: React.FC = () => {
         currentStep: clampProductCreateStep(currentStep),
         specificationKeys: specificationKeysToPersist,
         metaKeywordInput,
-        tempAttributeKey,
-        tempAttributeValue,
-        variantMetaKeywordInput,
       }
 
       try {
@@ -414,9 +400,7 @@ const ProductCreateForm: React.FC = () => {
     selectedCategoryIds,
     selectedMainCategoryId,
     specificationKeys,
-    tempAttributeKey,
-    tempAttributeValue,
-    variantMetaKeywordInput,
+    variantOptionKeyInput,
     vendorId,
   ])
 
@@ -468,7 +452,6 @@ const ProductCreateForm: React.FC = () => {
   }, [])
 
   const loadCities = useCallback(async () => {
-    setIsCityLoading(true)
     try {
       const res = await fetch(
         `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities?includeInactive=false`,
@@ -488,8 +471,6 @@ const ProductCreateForm: React.FC = () => {
     } catch {
       setCities([])
       return []
-    } finally {
-      setIsCityLoading(false)
     }
   }, [AUTH_TOKEN])
 
@@ -500,24 +481,22 @@ const ProductCreateForm: React.FC = () => {
   useEffect(() => {
     if (!isDraftHydrated) return
 
-    const validCityIds = new Set(
-      cities
-        .map((city: any) => String(city?._id || '').trim())
-        .filter(Boolean)
-    )
+    const allVisibleCityIds = cities
+      .map((city: any) => String(city?._id || '').trim())
+      .filter(Boolean)
 
     setFormData((prev: ProductFormData) => {
-      const filteredCities = (prev.availableCities || []).filter((cityId) =>
-        validCityIds.has(String(cityId || '').trim())
-      )
-
-      if (filteredCities.length === (prev.availableCities || []).length) {
+      const currentCityIds = sanitizeStringList(prev.availableCities)
+      if (
+        currentCityIds.length === allVisibleCityIds.length &&
+        currentCityIds.every((cityId, index) => cityId === allVisibleCityIds[index])
+      ) {
         return prev
       }
 
       return {
         ...prev,
-        availableCities: filteredCities,
+        availableCities: allVisibleCityIds,
       }
     })
   }, [cities, isDraftHydrated])
@@ -777,161 +756,37 @@ const ProductCreateForm: React.FC = () => {
     }))
   }
 
-  const discoverStateCities = useCallback(
-    async (state: string, country: string) => {
-      const safeState = String(state || '').trim()
-      const safeCountry = String(country || '').trim() || 'India'
+  const syncVariantsWithOptionKeys = useCallback((keys: string[]) => {
+    const normalizedKeys = sanitizeStringList(keys)
 
-      if (!safeState) return []
-      if (!AUTH_TOKEN) {
-        throw new Error('Your session has expired. Please login again.')
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities/discover?state=${encodeURIComponent(
-          safeState
-        )}&country=${encodeURIComponent(safeCountry)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${AUTH_TOKEN}`,
-          },
-        }
-      )
-
-      const payload = await response.json().catch(() => null)
-      if (!response.ok || payload?.success === false) {
-        throw new Error(payload?.message || 'Failed to fetch cities for selected state.')
-      }
-
-      return Array.isArray(payload?.cities)
-        ? payload.cities
-            .map((city: unknown) => String(city || '').trim())
-            .filter(Boolean)
-        : []
-    },
-    [AUTH_TOKEN]
-  )
-
-  const handleCreateCities = useCallback(
-    async ({
-      name,
-      state,
-      country,
-      cities: cityNames,
-    }: {
-      name: string
-      state: string
-      country: string
-      cities: string[]
-    }) => {
-      const trimmedName = String(name || '').trim()
-      const safeState = String(state || '').trim()
-      const safeCountry = String(country || '').trim() || 'India'
-      const normalizedCityNames = Array.from(
-        new Set(
-          (Array.isArray(cityNames) ? cityNames : [])
-            .map((cityName) => String(cityName || '').trim())
-            .filter(Boolean)
-        )
-      )
-
-      if (!AUTH_TOKEN) {
-        throw new Error('Your session has expired. Please login again.')
-      }
-      if (!trimmedName && !normalizedCityNames.length) {
-        throw new Error('City name is required.')
-      }
-
-      const endpoint = normalizedCityNames.length
-        ? `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities/bulk`
-        : `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities`
-      const requestBody = normalizedCityNames.length
-        ? {
-            state: safeState,
-            country: safeCountry,
-            isActive: true,
-            cities: normalizedCityNames,
-          }
-        : {
-            name: trimmedName,
-            state: safeState,
-            country: safeCountry,
-            isActive: true,
-          }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${AUTH_TOKEN}`,
-        },
-        body: JSON.stringify(requestBody),
-      })
-
-      const payload = await response.json().catch(() => null)
-      if (!response.ok || payload?.success === false) {
-        throw new Error(payload?.message || 'Failed to create city.')
-      }
-
-      const latestCities = await loadCities()
-      const explicitCityIds = new Set<string>()
-
-      const collectEntityId = (entity: any) => {
-        const id = String(entity?._id || '').trim()
-        if (id) explicitCityIds.add(id)
-      }
-
-      collectEntityId(payload?.data)
-      ;(Array.isArray(payload?.created) ? payload.created : []).forEach(collectEntityId)
-      ;(Array.isArray(payload?.added) ? payload.added : []).forEach(collectEntityId)
-
-      const targetNames = new Set(
-        (normalizedCityNames.length ? normalizedCityNames : [trimmedName])
-          .map((cityName) => String(cityName || '').trim().toLowerCase())
-          .filter(Boolean)
-      )
-      const normalizedState = safeState.toLowerCase()
-      const normalizedCountry = safeCountry.toLowerCase()
-
-      latestCities.forEach((city: any) => {
-        const cityId = String(city?._id || '').trim()
-        const cityName = String(city?.name || '').trim().toLowerCase()
-        const cityState = String(city?.state || '').trim().toLowerCase()
-        const cityCountry = String(city?.country || '').trim().toLowerCase()
-
-        if (!cityId || !targetNames.has(cityName)) return
-        if (normalizedState && cityState && cityState !== normalizedState) return
-        if (normalizedCountry && cityCountry && cityCountry !== normalizedCountry) return
-
-        explicitCityIds.add(cityId)
-      })
-
-      return {
-        message: String(payload?.message || '').trim(),
-        cityIds: Array.from(explicitCityIds),
-      }
-    },
-    [AUTH_TOKEN, loadCities]
-  )
+    setFormData((prev: ProductFormData) => ({
+      ...prev,
+      variants: prev.variants.map((variant) => ({
+        ...variant,
+        variantAttributes: normalizedKeys.reduce<Record<string, string>>((acc, key) => {
+          acc[key] = String(variant.variantAttributes?.[key] || '')
+          return acc
+        }, {}),
+      })),
+      specifications:
+        prev.specifications?.length && Object.keys(prev.specifications[0] || {}).length
+          ? prev.specifications
+          : [createSpecificationRecord(SPECIFICATION_TEMPLATES.default)],
+    }))
+  }, [])
 
   useEffect(() => {
     const applySpecificationKeys = (keys: string[]) => {
-      setSpecificationKeys(keys)
-      setFormData((prev: ProductFormData) => {
-        const existing = prev.specifications?.[0] || {}
-        const nextSpecs: Record<string, string> = {}
-        keys.forEach((key: string) => {
-          nextSpecs[key] = existing[key] || ''
-        })
-        return { ...prev, specifications: [nextSpecs] }
-      })
+      const normalizedKeys = sanitizeStringList(keys)
+      setSpecificationKeys(normalizedKeys)
+      syncVariantsWithOptionKeys(normalizedKeys)
     }
 
     if (!isDraftHydrated) return
 
     if (!selectedMainCategoryId) {
       restoredSpecificationKeysRef.current = null
-      applySpecificationKeys(SPECIFICATION_TEMPLATES.default)
+      applySpecificationKeys([])
       return
     }
 
@@ -944,7 +799,7 @@ const ProductCreateForm: React.FC = () => {
         if (!res.ok) throw new Error('Failed to fetch specification keys')
         const json = await res.json()
         const apiKeys = Array.isArray(json?.data?.keys) ? json.data.keys : []
-        const nextKeys = apiKeys.length ? apiKeys : SPECIFICATION_TEMPLATES.default
+        const nextKeys = apiKeys.length ? apiKeys : []
         const restoredSpecificationKeys = restoredSpecificationKeysRef.current
         const mergedKeys = restoredSpecificationKeys?.length
           ? Array.from(new Set([...nextKeys, ...restoredSpecificationKeys]))
@@ -954,13 +809,8 @@ const ProductCreateForm: React.FC = () => {
       } catch (err) {
         const restoredSpecificationKeys = restoredSpecificationKeysRef.current
         const fallbackKeys = restoredSpecificationKeys?.length
-          ? Array.from(
-              new Set([
-                ...SPECIFICATION_TEMPLATES.default,
-                ...restoredSpecificationKeys,
-              ])
-            )
-          : SPECIFICATION_TEMPLATES.default
+          ? Array.from(new Set(restoredSpecificationKeys))
+          : []
 
         applySpecificationKeys(fallbackKeys)
       } finally {
@@ -969,126 +819,7 @@ const ProductCreateForm: React.FC = () => {
     }
 
     fetchSpecificationKeys()
-  }, [isDraftHydrated, selectedMainCategoryId])
-
-  // --- AI Handlers for Variants ---
-  const handleGenerateVariantMetaTitle = async (vIndex: number) => {
-    const variant = formData.variants[vIndex]
-    const attrText = Object.entries(variant.variantAttributes)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join(', ')
-    const context = `Product: ${formData.productName}, Brand: ${formData.brand}, Attributes: ${attrText}`
-
-    setAiLoading((prev: any) => ({ ...prev, [`variantMetaTitle_${vIndex}`]: true }))
-
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ field: 'metaTitle', context }),
-        }
-      )
-      const data = await res.json()
-      if (data.success) {
-        setFormData((prev: ProductFormData) => {
-          const newVariants = [...prev.variants]
-          newVariants[vIndex].variantMetaTitle = data.data
-          return { ...prev, variants: newVariants }
-        })
-      }
-    } catch (err) {
-      toast.error('AI generation failed')
-    } finally {
-      setAiLoading((prev: any) => ({
-        ...prev,
-        [`variantMetaTitle_${vIndex}`]: false,
-      }))
-    }
-  }
-
-  const handleGenerateVariantMetaDescription = async (vIndex: number) => {
-    const variant = formData.variants[vIndex]
-    const attrText = Object.entries(variant.variantAttributes)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join(', ')
-    const context = `Product: ${formData.productName}, Brand: ${formData.brand}, Attributes: ${attrText}, Short: ${formData.shortDescription}`
-
-    setAiLoading((prev: any) => ({
-      ...prev,
-      [`variantMetaDescription_${vIndex}`]: true,
-    }))
-
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ field: 'metaDescription', context }),
-        }
-      )
-      const data = await res.json()
-      if (data.success) {
-        setFormData((prev: ProductFormData) => {
-          const newVariants = [...prev.variants]
-          newVariants[vIndex].variantMetaDescription = data.data
-          return { ...prev, variants: newVariants }
-        })
-      }
-    } catch (err) {
-      toast.error('AI generation failed')
-    } finally {
-      setAiLoading((prev: any) => ({
-        ...prev,
-        [`variantMetaDescription_${vIndex}`]: false,
-      }))
-    }
-  }
-
-  const handleGenerateVariantMetaKeywords = async (vIndex: number) => {
-    const variant = formData.variants[vIndex]
-    const attrText = Object.entries(variant.variantAttributes)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join(', ')
-    const context = `Product: ${formData.productName}, Brand: ${formData.brand}, Attributes: ${attrText}, Short: ${formData.shortDescription}`
-
-    setAiLoading((prev: any) => ({
-      ...prev,
-      [`variantMetaKeywords_${vIndex}`]: true,
-    }))
-
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ field: 'metaKeywords', context }),
-        }
-      )
-      const data = await res.json()
-      if (data.success && typeof data.data === 'string') {
-        const keywords = data.data.split(',').map((k: string) => k.trim()).filter(Boolean)
-        setFormData((prev: ProductFormData) => {
-          const newVariants = [...prev.variants]
-          newVariants[vIndex].variantMetaKeywords = [
-            ...newVariants[vIndex].variantMetaKeywords,
-            ...keywords
-          ]
-          return { ...prev, variants: newVariants }
-        })
-      }
-    } catch (err) {
-      toast.error('AI generation failed')
-    } finally {
-      setAiLoading((prev: any) => ({
-        ...prev,
-        [`variantMetaKeywords_${vIndex}`]: false,
-      }))
-    }
-  }
+  }, [isDraftHydrated, selectedMainCategoryId, syncVariantsWithOptionKeys])
 
   // --- AI Handlers ---
   const generateShortDesc = () =>
@@ -1133,14 +864,17 @@ const ProductCreateForm: React.FC = () => {
       variants: [
         ...prev.variants,
         {
-          variantAttributes: {},
+          variantAttributes: specificationKeys.reduce<Record<string, string>>(
+            (acc, key) => {
+              acc[key] = ''
+              return acc
+            },
+            {}
+          ),
           actualPrice: 0,
           finalPrice: 0,
           stockQuantity: 0,
           variantsImageUrls: [],
-          variantMetaTitle: '',
-          variantMetaDescription: '',
-          variantMetaKeywords: [],
           isActive: true,
         },
       ],
@@ -1161,6 +895,31 @@ const ProductCreateForm: React.FC = () => {
     const newVariants = [...formData.variants]
     newVariants[index] = { ...newVariants[index], [field]: value }
     setFormData((prev: ProductFormData) => ({ ...prev, variants: newVariants }))
+  }
+
+  const handleVariantAttributeChange = (
+    index: number,
+    key: string,
+    value: string
+  ) => {
+    const normalizedKey = toTrimmedText(key)
+    if (!normalizedKey) return
+
+    setFormData((prev: ProductFormData) => {
+      const variants = [...prev.variants]
+      const targetVariant = variants[index]
+      if (!targetVariant) return prev
+
+      variants[index] = {
+        ...targetVariant,
+        variantAttributes: {
+          ...targetVariant.variantAttributes,
+          [normalizedKey]: value,
+        },
+      }
+
+      return { ...prev, variants }
+    })
   }
 
   const uploadVariantFiles = async (variantIndex: number, files: File[]) => {
@@ -1245,42 +1004,20 @@ const ProductCreateForm: React.FC = () => {
     setFormData((prev: ProductFormData) => ({ ...prev, variants: newVariants }))
   }
 
-  const addAttributeToVariant = (vIndex: number) => {
-    if (!tempAttributeKey.trim() || !tempAttributeValue.trim()) return
-    setFormData((prev: ProductFormData) => {
-      const variants = [...prev.variants]
-      variants[vIndex].variantAttributes[tempAttributeKey.trim()] =
-        tempAttributeValue.trim()
-      return { ...prev, variants }
-    })
-    setTempAttributeKey('')
-    setTempAttributeValue('')
+  const handleAddVariantOptionKey = () => {
+    const normalizedKey = toTrimmedText(variantOptionKeyInput)
+    if (!normalizedKey || specificationKeys.includes(normalizedKey)) return
+
+    const nextKeys = [...specificationKeys, normalizedKey]
+    setSpecificationKeys(nextKeys)
+    syncVariantsWithOptionKeys(nextKeys)
+    setVariantOptionKeyInput('')
   }
 
-  const removeAttributeFromVariant = (vIndex: number, key: string) => {
-    setFormData((prev: ProductFormData) => {
-      const variants = [...prev.variants]
-      delete variants[vIndex].variantAttributes[key]
-      return { ...prev, variants }
-    })
-  }
-
-  const addMetaKeywordToVariant = (vIndex: number) => {
-    if (!variantMetaKeywordInput.trim()) return
-    setFormData((prev: ProductFormData) => {
-      const variants = [...prev.variants]
-      variants[vIndex].variantMetaKeywords.push(variantMetaKeywordInput.trim())
-      return { ...prev, variants }
-    })
-    setVariantMetaKeywordInput('')
-  }
-
-  const removeMetaKeywordFromVariant = (vIndex: number, kwIndex: number) => {
-    setFormData((prev: ProductFormData) => {
-      const variants = [...prev.variants]
-      variants[vIndex].variantMetaKeywords.splice(kwIndex, 1)
-      return { ...prev, variants }
-    })
+  const handleRemoveVariantOptionKey = (keyToRemove: string) => {
+    const nextKeys = specificationKeys.filter((key) => key !== keyToRemove)
+    setSpecificationKeys(nextKeys)
+    syncVariantsWithOptionKeys(nextKeys)
   }
 
   // --- FAQ Handlers ---
@@ -1326,18 +1063,16 @@ const ProductCreateForm: React.FC = () => {
         return
       }
 
-      if (!Array.isArray(formData.availableCities) || formData.availableCities.length === 0) {
-        toast.error('Please select at least one city in Basic Information.')
-        goToStep(1)
-        return
-      }
+      const autoAvailableCityIds = cities
+        .map((city: any) => String(city?._id || '').trim())
+        .filter(Boolean)
 
       const payload = {
         ...formData,
         mainCategory: selectedMainCategoryId || formData.mainCategory,
         productCategory: selectedCategoryIds[0] || '',
         productCategories: selectedCategoryIds,
-        availableCities: formData.availableCities,
+        availableCities: autoAvailableCityIds,
         specifications: formData.specifications[0],
         variants: formData.variants.map((v) => ({
           ...v,
@@ -1403,26 +1138,22 @@ const ProductCreateForm: React.FC = () => {
             categories={categories}
             selectedCategoryIds={selectedCategoryIds}
             setSelectedCategoryIds={setSelectedCategoryIds}
-            cities={cities}
             filteredSubcategories={filteredSubcategories}
             isMainCategoryLoading={isMainCategoryLoading}
             isCategoryLoading={isCategoryLoading}
-            isCityLoading={isCityLoading}
             aiLoading={aiLoading}
             generateWithAI={generateShortDesc}
             generateDescription={generateDescription}
             onCreateMainCategory={handleCreateMainCategory}
             onCreateCategory={handleCreateCategory}
             onCreateSubcategory={handleCreateSubcategory}
-            onDiscoverStateCities={discoverStateCities}
-            onCreateCities={handleCreateCities}
           />
         )
       case 2:
         return (
           <>
             <Step3Specifications
-              specificationKeys={specificationKeys}
+              variantAttributeKeys={specificationKeys}
               specifications={formData.specifications}
               isAvailable={formData.isAvailable}
               aiLoading={aiLoading.specifications}
@@ -1442,49 +1173,40 @@ const ProductCreateForm: React.FC = () => {
                   formData,
                   selectedCategoryIds,
                   categories,
-                  specificationKeys,
+                  Object.keys(formData.specifications?.[0] || {}),
                   setAiLoading,
                   setFormData
                 )
               }
               onAddKey={(newKey) => {
-                if (!specificationKeys.includes(newKey)) {
-                  setSpecificationKeys((prev: string[]) => [...prev, newKey]);
-                  // Also ensure the new key is in formData with empty value to avoid undefined issues
-                  setFormData((prev: ProductFormData) => {
-                    const specs = [...prev.specifications]
-                    if (!specs[0]) specs[0] = {}
-                    specs[0] = { ...specs[0], [newKey]: '' }
-                    return { ...prev, specifications: specs }
-                  })
-                }
+                const normalizedKey = toTrimmedText(newKey)
+                if (!normalizedKey) return
+
+                setFormData((prev: ProductFormData) => {
+                  const specs = [...prev.specifications]
+                  const existingSpecs = specs[0] || {}
+                  if (normalizedKey in existingSpecs) return prev
+
+                  specs[0] = { ...existingSpecs, [normalizedKey]: '' }
+                  return { ...prev, specifications: specs }
+                })
               }}
             />
             <div className="mt-8">
               <Step5Variants
                 variants={formData.variants}
-                tempAttributeKey={tempAttributeKey}
-                tempAttributeValue={tempAttributeValue}
-                metaKeywordInput={variantMetaKeywordInput}
-                onTempAttributeKeyChange={setTempAttributeKey}
-                onTempAttributeValueChange={setTempAttributeValue}
-                onMetaKeywordInputChange={setVariantMetaKeywordInput}
+                attributeKeys={specificationKeys}
+                newAttributeKey={variantOptionKeyInput}
+                onNewAttributeKeyChange={setVariantOptionKeyInput}
+                onAddAttributeKey={handleAddVariantOptionKey}
+                onRemoveAttributeKey={handleRemoveVariantOptionKey}
                 onAddVariant={handleAddVariant}
                 onRemoveVariant={handleRemoveVariant}
-                onAddAttributeToVariant={addAttributeToVariant}
-                onRemoveAttributeFromVariant={removeAttributeFromVariant}
                 onVariantFieldChange={handleVariantFieldChange}
+                onVariantAttributeChange={handleVariantAttributeChange}
                 onVariantImageUpload={handleVariantImageUpload}
                 onVariantImageDrop={handleVariantImageDrop}
                 onVariantImageDelete={handleVariantImageDelete}
-                onAddMetaKeywordToVariant={addMetaKeywordToVariant}
-                onRemoveMetaKeywordFromVariant={removeMetaKeywordFromVariant}
-                aiLoading={aiLoading}
-                onGenerateVariantMetaTitle={handleGenerateVariantMetaTitle}
-                onGenerateVariantMetaDescription={
-                  handleGenerateVariantMetaDescription
-                }
-                onGenerateVariantMetaKeywords={handleGenerateVariantMetaKeywords}
               />
             </div>
           </>
@@ -1628,57 +1350,53 @@ const ProductCreateForm: React.FC = () => {
   const steps = [
     {
       title: 'Basics',
-      description: 'Identity and category mapping',
+      icon: PackagePlus,
     },
     {
       title: 'Specs & Variants',
-      description: 'Technical details and sellable options',
+      icon: Layers3,
     },
     {
       title: 'SEO & FAQs',
-      description: 'Search visibility and buyer guidance',
+      icon: Search,
     },
   ]
 
   return (
-    <div className='relative min-h-screen overflow-x-clip px-4 py-6 sm:py-8'>
-      <div className='pointer-events-none absolute inset-0 -z-10 overflow-hidden'>
-        <div className='absolute -left-24 -top-24 h-72 w-72 rounded-full bg-cyan-300/20 blur-3xl' />
-        <div className='absolute -right-24 top-10 h-96 w-96 rounded-full bg-amber-300/20 blur-3xl' />
-        <div className='absolute bottom-[-8rem] left-1/3 h-80 w-80 rounded-full bg-indigo-300/15 blur-3xl' />
-      </div>
-
-      <div className='mx-auto max-w-5xl space-y-5'>
-        <section className='rounded-3xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50/80 via-white to-indigo-50/70 p-6 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.6)]'>
-          <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
+    <div className='min-h-screen px-4 py-6 sm:py-8'>
+      <div className='mx-auto max-w-7xl space-y-6'>
+        <section className='rounded-3xl border border-border bg-card p-6 shadow-sm'>
+          <div className='flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'>
             <div>
-              <div className='mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700'>
-                <Sparkles className='h-3.5 w-3.5' />
-                Product Studio
+              <div className='text-sm font-medium text-muted-foreground'>
+                Products / Create product
               </div>
-              <h1 className='text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl'>
-                Create New Product
+              <h1 className='mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl'>
+                Create product
               </h1>
-              <p className='mt-1 text-sm text-slate-600 sm:text-base'>
-                Build category-ready products with structured specs, variants, and
-                SEO details.
+              <p className='mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base'>
+                Add product details, configure variants, and finish search content in
+                a cleaner step-by-step editor.
               </p>
             </div>
             <div className='flex flex-wrap items-center gap-2'>
-              <Badge className='border border-cyan-200 bg-cyan-100/70 text-cyan-800'>
-                Step {currentStep} / {steps.length}
-              </Badge>
-              <Badge className='border border-slate-200 bg-white text-slate-700'>
-                Draft Mode
-              </Badge>
-              <Badge className='border border-emerald-200 bg-emerald-100/70 text-emerald-800'>
-                Autosaved Locally
-              </Badge>
+              <div className='rounded-full border border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground'>
+                Step {currentStep} of {steps.length}
+              </div>
+              <div className='rounded-full border border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground'>
+                Autosaved locally
+              </div>
               {lastSavedLabel ? (
-                <span className='text-xs font-medium text-slate-500'>
+                <div className='rounded-full border border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground'>
                   Saved {lastSavedLabel}
-                </span>
+                </div>
               ) : null}
+              <Link to='/upload-products'>
+                <Button variant='outline' className='h-10 rounded-full px-4'>
+                  <PackagePlus className='mr-2 h-4 w-4' />
+                  Upload Excel
+                </Button>
+              </Link>
               <Button
                 type='button'
                 variant='outline'
@@ -1692,7 +1410,7 @@ const ProductCreateForm: React.FC = () => {
                   clearDraftStorage()
                   resetDraftState()
                 }}
-                className='h-9 rounded-full border-slate-300 bg-white px-4 text-slate-700 hover:bg-slate-50'
+                className='h-10 rounded-full px-4'
               >
                 Reset Draft
               </Button>
@@ -1700,75 +1418,73 @@ const ProductCreateForm: React.FC = () => {
           </div>
         </section>
 
-        <div
-          ref={formTopRef}
-          className='rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur-sm sm:p-8'
-        >
-          <Link to='/upload-products'>
-            <Button
-              variant='outline'
-              className='mb-8 h-11 rounded-xl border-slate-300 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50'
-            >
-              <PackagePlus className='mr-2 h-4 w-4' />
-              Upload Excel or Download Template
-            </Button>
-          </Link>
+        <div ref={formTopRef} className='rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6'>
+          <div className='mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'>
+            <div>
+              <div className='rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground inline-flex'>
+                Step {currentStep}
+              </div>
+              <h2 className='mt-3 text-xl font-semibold text-foreground'>
+                {steps[currentStep - 1]?.title}
+              </h2>
+            </div>
 
-          <div className='mb-8 grid gap-3 md:grid-cols-3'>
-            {steps.map((step, i) => {
-              const stepIndex = i + 1
-              const isActive = currentStep === stepIndex
-              const isCompleted = currentStep > stepIndex
+            <div className='grid gap-2 md:grid-cols-3 xl:min-w-[520px]'>
+              {steps.map((step, i) => {
+                const stepIndex = i + 1
+                const isActive = currentStep === stepIndex
+                const isCompleted = currentStep > stepIndex
+                const StepIcon = step.icon
 
-              return (
-                <button
-                  key={step.title}
-                  type='button'
-                  onClick={() => goToStep(stepIndex)}
-                  aria-current={isActive ? 'step' : undefined}
-                  className={`rounded-2xl border p-4 transition ${
-                    isActive
-                      ? 'border-cyan-300 bg-cyan-50/70 shadow-sm'
-                      : isCompleted
-                        ? 'border-emerald-300 bg-emerald-50/70'
-                        : 'border-slate-200 bg-slate-50/70'
-                  } cursor-pointer text-left hover:border-cyan-300 hover:bg-cyan-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400`}
-                >
-                  <div className='flex items-start gap-3'>
-                    <div
-                      className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
-                        isActive
-                          ? 'bg-cyan-600 text-white'
-                          : isCompleted
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-slate-300 text-slate-700'
-                      }`}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle2 className='h-4 w-4' />
-                      ) : (
-                        stepIndex
-                      )}
+                return (
+                  <button
+                    key={step.title}
+                    type='button'
+                    onClick={() => goToStep(stepIndex)}
+                    aria-current={isActive ? 'step' : undefined}
+                    className={`rounded-2xl border px-4 py-3 text-left transition ${
+                      isActive
+                        ? 'border-cyan-500/30 bg-cyan-500/10'
+                        : isCompleted
+                          ? 'border-emerald-500/30 bg-emerald-500/10'
+                          : 'border-border bg-background/60'
+                    } hover:border-cyan-500/30 hover:bg-cyan-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400`}
+                  >
+                    <div className='flex items-start gap-3'>
+                      <div className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background'>
+                        <StepIcon
+                          className={`h-4 w-4 ${
+                            isActive
+                              ? 'text-cyan-600'
+                              : isCompleted
+                                ? 'text-emerald-600'
+                                : 'text-muted-foreground'
+                          }`}
+                        />
+                      </div>
+                      <div className='min-w-0'>
+                        <div className='mb-1 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground'>
+                          {isCompleted ? <CheckCircle2 className='h-3.5 w-3.5 text-emerald-600' /> : null}
+                          Step {stepIndex}
+                        </div>
+                        <p className='text-sm font-semibold text-foreground'>{step.title}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className='text-sm font-bold text-slate-900'>{step.title}</p>
-                      <p className='text-xs text-slate-600'>{step.description}</p>
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           <form onSubmit={(e) => e.preventDefault()} className='space-y-6'>
             {renderCurrentStep()}
 
-            <div className='flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4'>
+            <div className='flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4'>
               <button
                 type='button'
                 onClick={() => goToStep(currentStep - 1)}
                 disabled={currentStep === 1}
-                className='inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
+                className='inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-background px-5 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50'
               >
                 <ArrowLeft className='h-4 w-4' />
                 Previous
@@ -1800,23 +1516,23 @@ const ProductCreateForm: React.FC = () => {
       </div>
 
       <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
-        <DialogContent className='max-w-md rounded-[28px] border-slate-200 p-0 shadow-2xl'>
-          <div className='rounded-t-[28px] border-b border-emerald-100 bg-emerald-50 px-6 py-5'>
+        <DialogContent className='max-w-md rounded-[28px] border-border p-0 shadow-2xl'>
+          <div className='rounded-t-[28px] border-b border-border bg-card px-6 py-5'>
             <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white'>
               <CheckCircle2 className='h-6 w-6' />
             </div>
             <DialogHeader className='text-left'>
-              <DialogTitle className='text-2xl font-semibold text-slate-950'>
+              <DialogTitle className='text-2xl font-semibold text-foreground'>
                 Product Created
               </DialogTitle>
-              <DialogDescription className='text-sm leading-6 text-slate-600'>
+              <DialogDescription className='text-sm leading-6 text-muted-foreground'>
                 {successDialogMessage}
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className='space-y-4 px-6 py-5'>
-            <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600'>
+            <div className='rounded-2xl border border-border bg-background p-4 text-sm leading-6 text-muted-foreground'>
               The form has been cleared, draft data has been removed, and you have been returned to the Basic Information step so you can create the next product immediately.
             </div>
             <DialogFooter className='sm:justify-start'>

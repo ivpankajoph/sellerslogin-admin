@@ -1,9 +1,17 @@
 import React, { useMemo, useState } from 'react'
-import { Loader2, Plus, Sparkles } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { FileText, Loader2, Plus, Settings2, Sparkles, ToggleLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import {
+  StudioFieldLabel,
+  studioCardClass,
+  studioInputClass,
+  studioSubtleCardClass,
+  studioTextareaClass,
+} from './studio-ui'
 
 interface Props {
-  specificationKeys: string[]
+  variantAttributeKeys: string[]
   specifications: Record<string, string>[]
   isAvailable: boolean
   aiLoading: boolean
@@ -22,7 +30,6 @@ const toLabel = (value: string) =>
     .replace(/\b\w/g, (char) => char.toUpperCase())
 
 const Step3Specifications: React.FC<Props> = ({
-  specificationKeys,
   specifications,
   isAvailable,
   aiLoading,
@@ -33,14 +40,8 @@ const Step3Specifications: React.FC<Props> = ({
 }) => {
   const [newKey, setNewKey] = useState('')
 
-  const activeSpecs = specifications[0] || {}
-  const filledCount = useMemo(
-    () =>
-      specificationKeys.filter(
-        (key) => String(activeSpecs[key] || '').trim().length > 0
-      ).length,
-    [activeSpecs, specificationKeys]
-  )
+  const activeSpecs = useMemo(() => specifications[0] || {}, [specifications])
+  const activeSpecKeys = useMemo(() => Object.keys(activeSpecs), [activeSpecs])
 
   const handleAddKey = () => {
     const normalized = newKey.trim()
@@ -50,103 +51,113 @@ const Step3Specifications: React.FC<Props> = ({
   }
 
   return (
-    <section className='space-y-5'>
-      <div className='rounded-2xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50/80 via-white to-sky-50/70 p-5'>
-        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-          <div>
-            <h2 className='text-2xl font-extrabold tracking-tight text-slate-900'>
-              Specifications
-            </h2>
-            <p className='mt-1 text-sm text-slate-600'>
-              Build clean, searchable product specs for catalogs and filters.
-            </p>
+    <div className='space-y-6'>
+      <div className={studioCardClass}>
+        <div className='flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-center lg:justify-between'>
+          <div className='flex items-center gap-2 text-base font-semibold text-foreground'>
+            <Settings2 className='h-4 w-4 text-emerald-600' />
+            Specifications
           </div>
-          <button
+          <Button
             type='button'
             onClick={onGenerate}
             disabled={aiLoading}
-            className='inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+            className='h-11 rounded-xl bg-emerald-600 px-5 text-white hover:bg-emerald-700 disabled:opacity-70'
           >
             {aiLoading ? (
-              <Loader2 className='h-4 w-4 animate-spin' />
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
             ) : (
-              <Sparkles className='h-4 w-4' />
+              <Sparkles className='mr-2 h-4 w-4' />
             )}
-            Generate with AI
-          </button>
+            Generate Specs
+          </Button>
         </div>
-        <div className='mt-4 flex flex-wrap gap-2'>
-          <Badge className='border border-cyan-200 bg-cyan-100/70 text-cyan-800'>
-            Keys: {specificationKeys.length}
-          </Badge>
-          <Badge className='border border-emerald-200 bg-emerald-100/70 text-emerald-800'>
-            Filled: {filledCount}
-          </Badge>
-          <Badge className='border border-slate-200 bg-white text-slate-700'>
-            Status: {isAvailable ? 'Available' : 'Hidden'}
-          </Badge>
+
+        <div className='grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]'>
+          <div className={studioSubtleCardClass}>
+            <StudioFieldLabel label='Fields' />
+            <div className='mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]'>
+              <input
+                type='text'
+                value={newKey}
+                onChange={(event) => setNewKey(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    handleAddKey()
+                  }
+                }}
+                placeholder='e.g. warranty_period'
+                className={studioInputClass}
+              />
+              <Button
+                type='button'
+                onClick={handleAddKey}
+                className='h-11 rounded-xl border border-border bg-card px-5 text-foreground hover:bg-secondary'
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                Add Field
+              </Button>
+            </div>
+          </div>
+
+          <div className={studioSubtleCardClass}>
+            <StudioFieldLabel label='Availability' />
+            <div className='flex items-center justify-between gap-4 rounded-2xl bg-background/50 px-4 py-3'>
+              <span className='text-sm font-medium text-foreground'>
+                {isAvailable ? 'Available' : 'Hidden'}
+              </span>
+              <div className='flex items-center gap-3'>
+                <ToggleLeft className='h-4 w-4 text-emerald-600' />
+                <Switch checked={isAvailable} onCheckedChange={onToggleAvailable} />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className='grid gap-4 sm:grid-cols-2'>
-        {specificationKeys.map((key) => (
-          <label
-            key={key}
-            className='rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm'
-          >
-            <span className='mb-2 block text-xs font-semibold uppercase tracking-[0.11em] text-slate-500'>
-              {toLabel(key)}
-            </span>
-            <input
-              type='text'
-              value={activeSpecs[key] || ''}
-              onChange={(event) => onSpecChange(key, event.target.value)}
-              className='h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
-              placeholder={`Enter ${toLabel(key).toLowerCase()}`}
-            />
-          </label>
-        ))}
-      </div>
+      {activeSpecKeys.length ? (
+        <div className='grid gap-4 lg:grid-cols-2'>
+          {activeSpecKeys.map((key) => {
+            const value = activeSpecs[key] || ''
+            const isLongField =
+              value.length > 80 || key.toLowerCase().includes('instruction')
 
-      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-        <div className='mb-2 text-sm font-semibold text-slate-800'>
-          Add Custom Specification
+            return (
+              <div key={key} className={studioCardClass}>
+                <StudioFieldLabel label={toLabel(key)} />
+                {isLongField ? (
+                  <textarea
+                    rows={4}
+                    value={value}
+                    onChange={(event) => onSpecChange(key, event.target.value)}
+                    className={studioTextareaClass}
+                    placeholder={`Enter ${toLabel(key).toLowerCase()}`}
+                  />
+                ) : (
+                  <input
+                    type='text'
+                    value={value}
+                    onChange={(event) => onSpecChange(key, event.target.value)}
+                    className={studioInputClass}
+                    placeholder={`Enter ${toLabel(key).toLowerCase()}`}
+                  />
+                )}
+              </div>
+            )
+          })}
         </div>
-        <div className='flex flex-col gap-2 sm:flex-row'>
-          <input
-            type='text'
-            value={newKey}
-            onChange={(event) => setNewKey(event.target.value)}
-            placeholder='e.g. battery_type'
-            className='h-10 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                handleAddKey()
-              }
-            }}
-          />
-          <button
-            type='button'
-            onClick={handleAddKey}
-            className='inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-slate-300 bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-200'
-          >
-            <Plus className='h-4 w-4' />
-            Add
-          </button>
+      ) : (
+        <div className={studioCardClass}>
+          <div className='flex items-center gap-3'>
+            <div className='inline-flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10'>
+              <FileText className='h-4 w-4 text-emerald-600' />
+            </div>
+            <h3 className='text-base font-semibold text-foreground'>No fields added yet</h3>
+          </div>
         </div>
-      </div>
-
-      <label className='inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm'>
-        <input
-          type='checkbox'
-          checked={isAvailable}
-          onChange={onToggleAvailable}
-          className='h-4 w-4 rounded text-cyan-600 focus:ring-cyan-500'
-        />
-        Product Available
-      </label>
-    </section>
+      )}
+    </div>
   )
 }
 

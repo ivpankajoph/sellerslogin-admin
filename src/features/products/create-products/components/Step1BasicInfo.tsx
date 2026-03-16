@@ -1,10 +1,20 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronsUpDown, Loader2, Plus, Sparkles, X } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import {
+  Building2,
+  Check,
+  ChevronsUpDown,
+  FileText,
+  FolderOpen,
+  Loader2,
+  Package,
+  Plus,
+  Sparkles,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import RichTextEditor from '@/components/product/RichTextEditor'
 import { Input } from '@/components/ui/input'
-import HyperlinkInsert from '@/components/product/HyperlinkInsert'
 import { cn } from '@/lib/utils'
 import {
   Command,
@@ -16,72 +26,22 @@ import {
   CommandSeparator,
 } from '@/components/ui/command'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  StudioFieldLabel,
+  StudioSection,
+  studioCardClass,
+  studioInputClass,
+  studioSubtleCardClass,
+} from './studio-ui'
 
 type SelectOption = {
   value: string
   label: string
 }
-
-const INDIA_STATES = [
-  'Andhra Pradesh',
-  'Arunachal Pradesh',
-  'Assam',
-  'Bihar',
-  'Chhattisgarh',
-  'Goa',
-  'Gujarat',
-  'Haryana',
-  'Himachal Pradesh',
-  'Jharkhand',
-  'Karnataka',
-  'Kerala',
-  'Madhya Pradesh',
-  'Maharashtra',
-  'Manipur',
-  'Meghalaya',
-  'Mizoram',
-  'Nagaland',
-  'Odisha',
-  'Punjab',
-  'Rajasthan',
-  'Sikkim',
-  'Tamil Nadu',
-  'Telangana',
-  'Tripura',
-  'Uttar Pradesh',
-  'Uttarakhand',
-  'West Bengal',
-  'Andaman and Nicobar Islands',
-  'Chandigarh',
-  'Dadra and Nagar Haveli and Daman and Diu',
-  'Delhi',
-  'Jammu and Kashmir',
-  'Ladakh',
-  'Lakshadweep',
-  'Puducherry',
-]
-
-const DEFAULT_COUNTRIES = [
-  'India',
-  'United States',
-  'United Kingdom',
-  'Canada',
-  'Australia',
-  'United Arab Emirates',
-  'Singapore',
-]
 
 const normalizeSearchText = (value: string) =>
   String(value || '')
@@ -89,12 +49,6 @@ const normalizeSearchText = (value: string) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
-
-const toTitleCase = (value: string) =>
-  String(value || '')
-    .trimStart()
-    .replace(/\s+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
 
 const filterOptions = (options: SelectOption[], search: string) => {
   const normalizedSearch = normalizeSearchText(search)
@@ -146,27 +100,15 @@ interface Props {
   categories: any[]
   selectedCategoryIds: string[]
   setSelectedCategoryIds: React.Dispatch<React.SetStateAction<string[]>>
-  cities: any[]
   filteredSubcategories: any[]
   isMainCategoryLoading: boolean
   isCategoryLoading: boolean
-  isCityLoading: boolean
   aiLoading: Record<string, boolean>
   generateWithAI: () => void
   generateDescription: () => void
   onCreateMainCategory: (name: string) => Promise<void>
   onCreateCategory: (name: string) => Promise<void>
   onCreateSubcategory: (payload: { name: string; categoryId: string }) => Promise<void>
-  onDiscoverStateCities: (state: string, country: string) => Promise<string[]>
-  onCreateCities: (payload: {
-    name: string
-    state: string
-    country: string
-    cities: string[]
-  }) => Promise<{
-    message?: string
-    cityIds: string[]
-  }>
 }
 
 const SearchableSelect: React.FC<{
@@ -203,7 +145,7 @@ const SearchableSelect: React.FC<{
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'h-11 w-full justify-between rounded-xl border-slate-300 bg-white text-left shadow-sm hover:bg-slate-50',
+            'h-11 w-full justify-between rounded-xl border-border bg-background text-left text-foreground shadow-sm hover:bg-secondary',
             !selectedOption && 'text-muted-foreground'
           )}
         >
@@ -320,7 +262,7 @@ const SearchableMultiSelect: React.FC<{
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'h-11 w-full justify-between rounded-xl border-slate-300 bg-white text-left shadow-sm hover:bg-slate-50',
+            'h-11 w-full justify-between rounded-xl border-border bg-background text-left text-foreground shadow-sm hover:bg-secondary',
             !selectedLabels.length && 'text-muted-foreground'
           )}
         >
@@ -399,7 +341,7 @@ const SearchableMultiSelect: React.FC<{
 }
 
 const aiButtonClass =
-  'inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex items-center gap-1 rounded-2xl border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60'
 
 const Step1BasicInfo: React.FC<Props> = ({
   formData,
@@ -410,42 +352,27 @@ const Step1BasicInfo: React.FC<Props> = ({
   categories,
   selectedCategoryIds,
   setSelectedCategoryIds,
-  cities,
   filteredSubcategories,
   isMainCategoryLoading,
   isCategoryLoading,
-  isCityLoading,
   aiLoading,
   generateWithAI,
   generateDescription,
   onCreateMainCategory,
   onCreateCategory,
   onCreateSubcategory,
-  onDiscoverStateCities,
-  onCreateCities,
 }) => {
   const [subCategorySearch, setSubCategorySearch] = useState('')
   const [showMainCategoryCreator, setShowMainCategoryCreator] = useState(false)
   const [showCategoryCreator, setShowCategoryCreator] = useState(false)
   const [showSubCategoryCreator, setShowSubCategoryCreator] = useState(false)
-  const [showCityCreator, setShowCityCreator] = useState(false)
   const [newMainCategoryName, setNewMainCategoryName] = useState('')
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newSubCategoryName, setNewSubCategoryName] = useState('')
-  const [newCityName, setNewCityName] = useState('')
-  const [newCityState, setNewCityState] = useState('')
-  const [newCityCountry, setNewCityCountry] = useState('India')
-  const [stateCityOptions, setStateCityOptions] = useState<string[]>([])
-  const [selectedStateCities, setSelectedStateCities] = useState<string[]>([])
-  const [stateCitySearch, setStateCitySearch] = useState('')
-  const [isLoadingStateCities, setIsLoadingStateCities] = useState(false)
   const [newSubCategoryCategoryId, setNewSubCategoryCategoryId] = useState('')
   const [isCreatingMainCategory, setIsCreatingMainCategory] = useState(false)
   const [isCreatingCategory, setIsCreatingCategory] = useState(false)
   const [isCreatingSubCategory, setIsCreatingSubCategory] = useState(false)
-  const [isCreatingCity, setIsCreatingCity] = useState(false)
-  const shortDescriptionRef = useRef<HTMLTextAreaElement>(null)
-  const descriptionRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     setSubCategorySearch('')
@@ -492,19 +419,6 @@ const Step1BasicInfo: React.FC<Props> = ({
     [categories]
   )
 
-  const cityOptions = useMemo(
-    () =>
-      cities
-        .map((city: any) => ({
-          value: city._id,
-          label: [city.name, city.state].filter(Boolean).join(', '),
-        }))
-        .sort((a: SelectOption, b: SelectOption) =>
-          a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
-        ),
-    [cities]
-  )
-
   const visibleSubcategories = useMemo(() => {
     if (!subCategorySearch.trim()) return filteredSubcategories
     const search = subCategorySearch.trim().toLowerCase()
@@ -528,117 +442,6 @@ const Step1BasicInfo: React.FC<Props> = ({
     () => categoryOptions.filter((option) => selectedCategoryIds.includes(option.value)),
     [categoryOptions, selectedCategoryIds]
   )
-
-  const selectedCities = useMemo<Array<{ id: string; label: string }>>(() => {
-    const map = new Map(cityOptions.map((option) => [option.value, option.label]))
-    return (formData.availableCities || [])
-      .map((id: string) => ({
-        id,
-        label: map.get(id),
-      }))
-      .filter((item: { id: string; label: string | undefined }): item is { id: string; label: string } =>
-        Boolean(item.label)
-      )
-  }, [cityOptions, formData.availableCities])
-
-  const allCityIds = useMemo(
-    () => cityOptions.map((option) => option.value),
-    [cityOptions]
-  )
-
-  const hasAllCitiesSelected = useMemo(() => {
-    if (!allCityIds.length) return false
-    const selectedCityIds = new Set((formData.availableCities || []).map((id: string) => String(id)))
-    return allCityIds.every((cityId) => selectedCityIds.has(cityId))
-  }, [allCityIds, formData.availableCities])
-
-  const stateOptions = useMemo(() => {
-    const dynamicStates = cities
-      .map((city: any) => String(city?.state || '').trim())
-      .filter(Boolean)
-
-    return Array.from(new Set([...INDIA_STATES, ...dynamicStates])).sort((a, b) =>
-      a.localeCompare(b)
-    )
-  }, [cities])
-
-  const countryOptions = useMemo(() => {
-    const dynamicCountries = cities
-      .map((city: any) => String(city?.country || '').trim())
-      .filter(Boolean)
-    const allCountries = Array.from(new Set([...DEFAULT_COUNTRIES, ...dynamicCountries]))
-    const india = allCountries.find((country) => country.toLowerCase() === 'india')
-    const rest = allCountries.filter((country) => country.toLowerCase() !== 'india')
-
-    return india ? [india, ...rest.sort((a, b) => a.localeCompare(b))] : rest
-  }, [cities])
-
-  const filteredStateCityOptions = useMemo(() => {
-    const search = stateCitySearch.trim().toLowerCase()
-    if (!search) return stateCityOptions
-    return stateCityOptions.filter((cityName) =>
-      cityName.toLowerCase().includes(search)
-    )
-  }, [stateCityOptions, stateCitySearch])
-
-  const resetCityCreator = () => {
-    setShowCityCreator(false)
-    setNewCityName('')
-    setNewCityState('')
-    setNewCityCountry('India')
-    setStateCityOptions([])
-    setSelectedStateCities([])
-    setStateCitySearch('')
-  }
-
-  const openCityCreator = (prefillName = '') => {
-    const safeName = String(prefillName || '').trim()
-    setNewCityName(safeName ? toTitleCase(safeName.split(',')[0] || safeName) : '')
-    setNewCityState('')
-    setNewCityCountry('India')
-    setStateCityOptions([])
-    setSelectedStateCities([])
-    setStateCitySearch('')
-    setShowCityCreator(true)
-  }
-
-  useEffect(() => {
-    if (!showCityCreator) return
-    if (!newCityState) {
-      setStateCityOptions([])
-      setSelectedStateCities([])
-      setStateCitySearch('')
-      return
-    }
-
-    let isMounted = true
-    setIsLoadingStateCities(true)
-
-    onDiscoverStateCities(newCityState, newCityCountry)
-      .then((options) => {
-        if (!isMounted) return
-        setStateCityOptions(options)
-        setSelectedStateCities((prev) => {
-          const optionSet = new Set(options.map((item) => item.toLowerCase()))
-          return prev.filter((item) => optionSet.has(item.toLowerCase()))
-        })
-      })
-      .catch((error: any) => {
-        if (!isMounted) return
-        toast.error(error?.message || 'Failed to fetch cities for selected state.')
-        setStateCityOptions([])
-        setSelectedStateCities([])
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoadingStateCities(false)
-        }
-      })
-
-    return () => {
-      isMounted = false
-    }
-  }, [newCityCountry, newCityState, onDiscoverStateCities, showCityCreator])
 
   const handleCreateMainCategory = async () => {
     const trimmedName = newMainCategoryName.trim()
@@ -711,104 +514,81 @@ const Step1BasicInfo: React.FC<Props> = ({
     }
   }
 
-  const handleCreateCity = async () => {
-    const trimmedName = newCityName.trim()
-    const bulkCities = Array.from(
-      new Set(
-        selectedStateCities
-          .map((cityName) => String(cityName || '').trim())
-          .filter(Boolean)
-      )
-    )
-
-    if (!trimmedName && !bulkCities.length) {
-      toast.error('City name is required.')
-      return
-    }
-
-    setIsCreatingCity(true)
-    try {
-      const response = await onCreateCities({
-        name: trimmedName,
-        state: newCityState,
-        country: newCityCountry,
-        cities: bulkCities,
-      })
-      setFormData((prev: any) => ({
-        ...prev,
-        availableCities: Array.from(
-          new Set([...(prev.availableCities || []), ...(response.cityIds || [])])
-        ),
-      }))
-
-      toast.success(
-        response?.message ||
-          (bulkCities.length
-            ? 'Cities added to your list and selected.'
-            : 'City created and selected.')
-      )
-      resetCityCreator()
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to create city.')
-    } finally {
-      setIsCreatingCity(false)
-    }
-  }
-
   return (
-    <section className='space-y-5'>
-      <div className='rounded-2xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50/80 via-white to-indigo-50/70 p-5'>
-        <h2 className='text-2xl font-extrabold tracking-tight text-slate-900'>
-          Basic Information
-        </h2>
-        <p className='mt-1 text-sm text-slate-600'>
-          Define core product identity, category mapping, and sales copy.
-        </p>
-      </div>
+    <div className='space-y-6'>
+        <StudioSection
+          icon={Package}
+          tone='cyan'
+          eyebrow='Step 1'
+          title='Product details'
+          description='Start with the information a vendor naturally knows first: the product name, brand, and the copy buyers will read.'
+          help='Keep this step simple. Fill product identity, buyer-facing copy, and category mapping in one clean flow.'
+        >
+          <div className='space-y-5'>
+            <div className={studioSubtleCardClass}>
+              <div className='mb-4 flex items-center gap-2 text-sm font-semibold text-foreground'>
+                <Building2 className='h-4 w-4 text-cyan-600' />
+                Product identity
+              </div>
+              <div className='grid gap-4 sm:grid-cols-2'>
+                <div>
+                  <StudioFieldLabel
+                    label='Product Name'
+                    required
+                    help='Use the exact customer-facing name you want to publish.'
+                  />
+                  <input
+                    type='text'
+                    value={formData.productName}
+                    onChange={(event) =>
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        productName: event.target.value,
+                      }))
+                    }
+                    className={studioInputClass}
+                    placeholder='Example: Industrial Dust Collector'
+                    required
+                  />
+                </div>
 
-      <div className='grid gap-4 sm:grid-cols-2'>
-        <label className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-          <span className='mb-2 block text-sm font-semibold text-slate-700'>
-            Product Name *
-          </span>
-          <input
-            type='text'
-            value={formData.productName}
-            onChange={(event) =>
-              setFormData((prev: any) => ({
-                ...prev,
-                productName: event.target.value,
-              }))
-            }
-            className='h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
-            required
-          />
-        </label>
+                <div>
+                  <StudioFieldLabel
+                    label='Brand'
+                    required
+                    help='Add the brand buyers should see on the listing.'
+                  />
+                  <input
+                    type='text'
+                    value={formData.brand}
+                    onChange={(event) =>
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        brand: event.target.value,
+                      }))
+                    }
+                    className={studioInputClass}
+                    placeholder='Example: Dust Filter India'
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </StudioSection>
 
-        <label className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-          <span className='mb-2 block text-sm font-semibold text-slate-700'>
-            Brand *
-          </span>
-          <input
-            type='text'
-            value={formData.brand}
-            onChange={(event) =>
-              setFormData((prev: any) => ({
-                ...prev,
-                brand: event.target.value,
-              }))
-            }
-            className='h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
-            required
-          />
-        </label>
-      </div>
-
-      <div className='grid gap-4 lg:grid-cols-2'>
-        <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-          <label className='mb-2 block text-sm font-semibold text-slate-700'>
-            Main Category *
-          </label>
+      <div className={studioCardClass}>
+        <div className='mb-5 flex items-center gap-2 text-sm font-semibold text-foreground'>
+          <FolderOpen className='h-4 w-4 text-indigo-600' />
+          Category Mapping
+        </div>
+        <div className='grid gap-4 lg:grid-cols-2'>
+          <div className={studioSubtleCardClass}>
+            <StudioFieldLabel
+              label='Main Category'
+              required
+              help='Choose the high-level catalog bucket first so the rest of the form can adapt correctly.'
+            />
           <SearchableSelect
             value={selectedMainCategoryId}
             onChange={(value) => {
@@ -835,26 +615,23 @@ const Step1BasicInfo: React.FC<Props> = ({
             Can&apos;t find it? Create main category
           </button>
           {showMainCategoryCreator ? (
-            <div className='mt-3 rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3'>
-              <p className='text-xs text-slate-600'>
-                Create a new main category directly in the database and select it automatically.
-              </p>
+            <div className='mt-3 rounded-2xl bg-background/40 p-4'>
               <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
                 <Input
                   value={newMainCategoryName}
                   onChange={(event) => setNewMainCategoryName(event.target.value)}
                   placeholder='Enter main category name'
-                  className='h-10 rounded-lg border-slate-300 bg-white'
+                  className='h-11 rounded-xl border-border bg-background'
                 />
                 <div className='flex gap-2'>
                   <Button
                     type='button'
                     onClick={handleCreateMainCategory}
                     disabled={isCreatingMainCategory}
-                    className='h-10 rounded-lg bg-cyan-600 px-4 text-white hover:bg-cyan-700'
+                    className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-cyan-700'
                   >
                     {isCreatingMainCategory ? (
-                      <Loader2 className='h-4 w-4 animate-spin' />
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                     ) : null}
                     Create
                   </Button>
@@ -865,7 +642,7 @@ const Step1BasicInfo: React.FC<Props> = ({
                       setShowMainCategoryCreator(false)
                       setNewMainCategoryName('')
                     }}
-                    className='h-10 rounded-lg border-slate-300 bg-white px-4'
+                    className='h-11 rounded-xl px-4'
                   >
                     Cancel
                   </Button>
@@ -873,12 +650,14 @@ const Step1BasicInfo: React.FC<Props> = ({
               </div>
             </div>
           ) : null}
-        </div>
+          </div>
 
-        <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-          <label className='mb-2 block text-sm font-semibold text-slate-700'>
-            Categories *
-          </label>
+          <div className={studioSubtleCardClass}>
+            <StudioFieldLabel
+              label='Categories'
+              required
+              help='Pick the browsing categories customers should see. Keep the list focused to avoid confusion.'
+            />
           <SearchableMultiSelect
             values={selectedCategoryIds}
             onChange={(values) => {
@@ -903,32 +682,29 @@ const Step1BasicInfo: React.FC<Props> = ({
             type='button'
             onClick={() => setShowCategoryCreator((prev) => !prev)}
             disabled={!selectedMainCategoryId}
-            className='mt-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800 disabled:cursor-not-allowed disabled:text-slate-400'
+            className='mt-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800 disabled:cursor-not-allowed disabled:text-muted-foreground'
           >
             <Plus className='h-3.5 w-3.5' />
             Can&apos;t find it? Create category
           </button>
           {showCategoryCreator ? (
-            <div className='mt-3 rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3'>
-              <p className='text-xs text-slate-600'>
-                This category will be created under the selected main category and added to your current selection.
-              </p>
+            <div className='mt-3 rounded-2xl bg-background/40 p-4'>
               <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
                 <Input
                   value={newCategoryName}
                   onChange={(event) => setNewCategoryName(event.target.value)}
                   placeholder='Enter category name'
-                  className='h-10 rounded-lg border-slate-300 bg-white'
+                  className='h-11 rounded-xl border-border bg-background'
                 />
                 <div className='flex gap-2'>
                   <Button
                     type='button'
                     onClick={handleCreateCategory}
                     disabled={isCreatingCategory || !selectedMainCategoryId}
-                    className='h-10 rounded-lg bg-cyan-600 px-4 text-white hover:bg-cyan-700'
+                    className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-cyan-700'
                   >
                     {isCreatingCategory ? (
-                      <Loader2 className='h-4 w-4 animate-spin' />
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                     ) : null}
                     Create
                   </Button>
@@ -939,7 +715,7 @@ const Step1BasicInfo: React.FC<Props> = ({
                       setShowCategoryCreator(false)
                       setNewCategoryName('')
                     }}
-                    className='h-10 rounded-lg border-slate-300 bg-white px-4'
+                    className='h-11 rounded-xl px-4'
                   >
                     Cancel
                   </Button>
@@ -952,7 +728,7 @@ const Step1BasicInfo: React.FC<Props> = ({
               <Badge
                 key={label}
                 variant='outline'
-                className='border-cyan-200 bg-cyan-100/70 text-cyan-800'
+                className='border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'
               >
                 {label}
               </Badge>
@@ -960,277 +736,13 @@ const Step1BasicInfo: React.FC<Props> = ({
           </div>
         </div>
       </div>
-
-      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-        <label className='mb-2 block text-sm font-semibold text-slate-700'>
-          Available Cities *
-        </label>
-        <SearchableMultiSelect
-          values={formData.availableCities || []}
-          onChange={(values) =>
-            setFormData((prev: any) => ({
-              ...prev,
-              availableCities: values,
-            }))
-          }
-          options={cityOptions}
-          placeholder='Select one or more cities'
-          loading={isCityLoading}
-          searchPlaceholder='Search cities...'
-          emptyLabel='No cities found.'
-          onSelectAll={() =>
-            setFormData((prev: any) => ({
-              ...prev,
-              availableCities: allCityIds,
-            }))
-          }
-          selectAllLabel='Select all cities'
-          selectAllDisabled={isCityLoading || !allCityIds.length || hasAllCitiesSelected}
-          onCreateOption={openCityCreator}
-          createOptionLabel="Can't find it? Create city"
-        />
-        <div className='mt-2 flex flex-wrap items-center justify-between gap-2'>
-          <span className='text-xs text-slate-500'>
-            {selectedCities.length} of {cityOptions.length} cities selected
-          </span>
-          <div className='flex flex-wrap items-center gap-3'>
-            <button
-              type='button'
-              onClick={() => openCityCreator()}
-              className='text-xs font-semibold text-cyan-700 transition hover:text-cyan-800'
-            >
-              Can&apos;t find it? Create city
-            </button>
-            {selectedCities.length ? (
-              <button
-                type='button'
-                onClick={() =>
-                  setFormData((prev: any) => ({
-                    ...prev,
-                    availableCities: [],
-                  }))
-                }
-                className='text-xs font-medium text-slate-500 transition hover:text-slate-700'
-              >
-                Clear all cities
-              </button>
-            ) : null}
-          </div>
-        </div>
-        {selectedCities.length ? (
-          <div className='mt-2 space-y-2'>
-              <div className='flex flex-wrap gap-1.5'>
-              {selectedCities.map((city: { id: string; label: string }) => (
-                <Badge
-                  key={city.id}
-                  variant='outline'
-                  className='border-emerald-200 bg-emerald-100/70 pr-1 text-emerald-800'
-                >
-                  <span>{city.label}</span>
-                  <button
-                    type='button'
-                    onClick={() =>
-                      setFormData((prev: any) => ({
-                        ...prev,
-                        availableCities: (prev.availableCities || []).filter(
-                          (id: string) => id !== city.id
-                        ),
-                      }))
-                    }
-                    className='rounded-full p-0.5 text-emerald-700 transition hover:bg-emerald-200'
-                    aria-label={`Remove ${city.label}`}
-                    title={`Remove ${city.label}`}
-                  >
-                    <X className='h-3 w-3' />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          </div>
-        ) : null}
       </div>
 
-      <Dialog
-        open={showCityCreator}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            resetCityCreator()
-            return
-          }
-
-          setShowCityCreator(true)
-        }}
-      >
-        <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>
-          <DialogHeader>
-            <DialogTitle>Create City</DialogTitle>
-            <DialogDescription>
-              Add a city to your private city list without leaving the product form.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className='space-y-4'>
-            <div>
-              <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                City Name
-              </label>
-              <Input
-                value={newCityName}
-                onChange={(event) => setNewCityName(toTitleCase(event.target.value))}
-                placeholder={
-                  selectedStateCities.length
-                    ? 'Bulk mode active: using selected cities below'
-                    : 'e.g. Bangalore'
-                }
-                disabled={selectedStateCities.length > 0}
-              />
-              <p className='mt-1 text-xs text-slate-500'>
-                Enter one city manually, or select multiple cities from the selected state.
-              </p>
-            </div>
-
-            <div className='grid gap-3 sm:grid-cols-2'>
-              <div>
-                <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                  State
-                </label>
-                <select
-                  value={newCityState}
-                  onChange={(event) => setNewCityState(event.target.value)}
-                  className='h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
-                >
-                  <option value=''>Select state</option>
-                  {stateOptions.map((state) => (
-                    <option key={state} value={state}>
-                      {state}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                  Country
-                </label>
-                <select
-                  value={newCityCountry}
-                  onChange={(event) => setNewCityCountry(event.target.value)}
-                  className='h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
-                >
-                  {countryOptions.map((country) => (
-                    <option key={country} value={country}>
-                      {country}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <div className='mb-1 flex items-center justify-between gap-2'>
-                <label className='block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                  Cities In Selected State
-                </label>
-                <div className='flex gap-1'>
-                  <Button
-                    type='button'
-                    size='sm'
-                    variant='outline'
-                    onClick={() =>
-                      setSelectedStateCities((prev) => {
-                        const merged = new Set([...prev, ...filteredStateCityOptions])
-                        return Array.from(merged)
-                      })
-                    }
-                    disabled={!filteredStateCityOptions.length || isLoadingStateCities}
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    type='button'
-                    size='sm'
-                    variant='outline'
-                    onClick={() => setSelectedStateCities([])}
-                    disabled={!selectedStateCities.length}
-                  >
-                    Clear
-                  </Button>
-                </div>
-              </div>
-
-              <Input
-                value={stateCitySearch}
-                onChange={(event) => setStateCitySearch(event.target.value)}
-                placeholder='Search state cities...'
-                disabled={!newCityState || isLoadingStateCities}
-                className='mb-2'
-              />
-
-              <div className='max-h-[220px] space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm'>
-                {isLoadingStateCities ? (
-                  <div className='flex items-center gap-2 py-2 text-xs text-slate-500'>
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                    Loading state cities...
-                  </div>
-                ) : !filteredStateCityOptions.length ? (
-                  <p className='py-2 text-xs text-slate-500'>
-                    {newCityState ? 'No cities found.' : 'Select state to load cities.'}
-                  </p>
-                ) : (
-                  filteredStateCityOptions.map((cityName) => {
-                    const checked = selectedStateCities.includes(cityName)
-                    return (
-                      <label
-                        key={cityName}
-                        className='flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-white'
-                      >
-                        <input
-                          type='checkbox'
-                          checked={checked}
-                          onChange={(event) =>
-                            setSelectedStateCities((prev) =>
-                              event.target.checked
-                                ? [...prev, cityName]
-                                : prev.filter((item) => item !== cityName)
-                            )
-                          }
-                          className='h-4 w-4 rounded text-cyan-600 focus:ring-cyan-500'
-                        />
-                        <span>{cityName}</span>
-                      </label>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type='button'
-              variant='outline'
-              onClick={resetCityCreator}
-              disabled={isCreatingCity}
-            >
-              Cancel
-            </Button>
-            <Button
-              type='button'
-              onClick={handleCreateCity}
-              disabled={isCreatingCity}
-              className='bg-cyan-600 text-white hover:bg-cyan-700'
-            >
-              {isCreatingCity ? <Loader2 className='h-4 w-4 animate-spin' /> : null}
-              {selectedStateCities.length ? 'Add Selected Cities' : 'Create City'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-        <label className='mb-2 block text-sm font-semibold text-slate-700'>
-          Sub Categories
-        </label>
+      <div className={studioCardClass}>
+        <StudioFieldLabel
+          label='Subcategories'
+          help='Use subcategories to narrow down product placement only when they genuinely apply.'
+        />
         <Input
           value={subCategorySearch}
           onChange={(event) => setSubCategorySearch(event.target.value)}
@@ -1240,27 +752,24 @@ const Step1BasicInfo: React.FC<Props> = ({
               : 'Select categories first'
           }
           disabled={!selectedCategoryIds.length}
-          className='mb-3 h-10 rounded-lg border-slate-300'
+          className='mb-3 h-11 rounded-xl border-border bg-background'
         />
         <button
           type='button'
           onClick={() => setShowSubCategoryCreator((prev) => !prev)}
           disabled={!selectedCategoryIds.length}
-          className='mb-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800 disabled:cursor-not-allowed disabled:text-slate-400'
+          className='mb-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800 disabled:cursor-not-allowed disabled:text-muted-foreground'
         >
           <Plus className='h-3.5 w-3.5' />
           Can&apos;t find it? Create subcategory
         </button>
         {showSubCategoryCreator ? (
-          <div className='mb-3 rounded-xl border border-dashed border-cyan-300 bg-cyan-50/60 p-3'>
-            <p className='text-xs text-slate-600'>
-              Create a subcategory under one of the selected categories and add it to this product immediately.
-            </p>
+          <div className='mb-3 rounded-2xl bg-background/40 p-4'>
             <div className='mt-3 grid gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto]'>
               <select
                 value={newSubCategoryCategoryId}
                 onChange={(event) => setNewSubCategoryCategoryId(event.target.value)}
-                className='h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
+                className='h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15'
               >
                 <option value=''>Select parent category</option>
                 {selectedCategoryCreateOptions.map((option) => (
@@ -1273,17 +782,17 @@ const Step1BasicInfo: React.FC<Props> = ({
                 value={newSubCategoryName}
                 onChange={(event) => setNewSubCategoryName(event.target.value)}
                 placeholder='Enter subcategory name'
-                className='h-10 rounded-lg border-slate-300 bg-white'
+                className='h-11 rounded-xl border-border bg-background'
               />
               <div className='flex gap-2'>
                 <Button
                   type='button'
                   onClick={handleCreateSubCategory}
                   disabled={isCreatingSubCategory || !selectedCategoryIds.length}
-                  className='h-10 rounded-lg bg-cyan-600 px-4 text-white hover:bg-cyan-700'
+                  className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-cyan-700'
                 >
                   {isCreatingSubCategory ? (
-                    <Loader2 className='h-4 w-4 animate-spin' />
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                   ) : null}
                   Create
                 </Button>
@@ -1295,7 +804,7 @@ const Step1BasicInfo: React.FC<Props> = ({
                     setNewSubCategoryName('')
                     setNewSubCategoryCategoryId(selectedCategoryIds[0] || '')
                   }}
-                  className='h-10 rounded-lg border-slate-300 bg-white px-4'
+                  className='h-11 rounded-xl px-4'
                 >
                   Cancel
                 </Button>
@@ -1304,13 +813,13 @@ const Step1BasicInfo: React.FC<Props> = ({
           </div>
         ) : null}
 
-        <div className='max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/70 p-3'>
+        <div className='max-h-64 space-y-2 overflow-y-auto rounded-2xl bg-background/40 p-3'>
           {!selectedCategoryIds.length ? (
-            <p className='text-sm text-slate-500'>
+            <p className='text-sm text-muted-foreground'>
               Select categories to see subcategories.
             </p>
           ) : visibleSubcategories.length === 0 ? (
-            <p className='text-sm text-slate-500'>No subcategories found.</p>
+            <p className='text-sm text-muted-foreground'>No subcategories found.</p>
           ) : (
             visibleSubcategories.map((sub: any) => {
               const categoryLabel =
@@ -1321,7 +830,7 @@ const Step1BasicInfo: React.FC<Props> = ({
               return (
                 <label
                   key={sub._id}
-                  className='flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 transition hover:border-cyan-300'
+                  className='flex cursor-pointer items-center justify-between gap-3 rounded-2xl bg-card/70 px-4 py-3 transition hover:bg-secondary/60'
                 >
                   <span className='flex items-center gap-2'>
                     <input
@@ -1339,9 +848,9 @@ const Step1BasicInfo: React.FC<Props> = ({
                       }}
                       className='h-4 w-4 rounded text-cyan-600 focus:ring-cyan-500'
                     />
-                    <span className='text-sm font-medium text-slate-700'>{sub.name}</span>
+                    <span className='text-sm font-medium text-foreground'>{sub.name}</span>
                   </span>
-                  <span className='text-xs font-medium text-slate-500'>
+                  <span className='text-xs font-medium text-muted-foreground'>
                     {categoryLabel}
                   </span>
                 </label>
@@ -1351,89 +860,83 @@ const Step1BasicInfo: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-        <label className='mb-2 flex items-center justify-between gap-3 text-sm font-semibold text-slate-700'>
-          <span>Short Description *</span>
-          <button
-            type='button'
-            onClick={generateWithAI}
-            disabled={aiLoading.shortDescription}
-            className={aiButtonClass}
-          >
-            {aiLoading.shortDescription ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
-            ) : (
-              <Sparkles className='h-3.5 w-3.5' />
-            )}
-            Generate
-          </button>
-        </label>
-        <textarea
-          ref={shortDescriptionRef}
-          value={formData.shortDescription}
-          onChange={(event) =>
-            setFormData((prev: any) => ({
-              ...prev,
-              shortDescription: event.target.value,
-            }))
-          }
-          rows={3}
-          className='w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
+      <div className={studioCardClass}>
+        <div className='mb-5 flex items-center gap-2 text-sm font-semibold text-foreground'>
+          <FileText className='h-4 w-4 text-rose-600' />
+          Sales Copy
+        </div>
+        <StudioFieldLabel
+          label='Short Description'
           required
+          help='Keep this concise and easy to scan. Buyers should understand the product quickly.'
+          action={
+            <button
+              type='button'
+              onClick={generateWithAI}
+              disabled={aiLoading.shortDescription}
+              className={aiButtonClass}
+            >
+              {aiLoading.shortDescription ? (
+                <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              ) : (
+                <Sparkles className='h-3.5 w-3.5' />
+              )}
+              Generate
+            </button>
+          }
         />
-        <HyperlinkInsert
-          fieldLabel='Short Description'
+        <RichTextEditor
           value={formData.shortDescription}
-          textareaRef={shortDescriptionRef}
-          onValueChange={(nextValue) =>
+          onChange={(nextValue) =>
             setFormData((prev: any) => ({
               ...prev,
               shortDescription: nextValue,
             }))
           }
+          placeholder='Write a concise buyer-facing summary. This appears near the product title and should quickly explain what the product is for.'
+          minHeight='min-h-[180px]'
+          className='mt-3'
+          allowImages={false}
+          allowVideo={false}
         />
       </div>
 
-      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-        <label className='mb-2 flex items-center justify-between gap-3 text-sm font-semibold text-slate-700'>
-          <span>Description *</span>
-          <button
-            type='button'
-            onClick={generateDescription}
-            disabled={aiLoading.description}
-            className={aiButtonClass}
-          >
-            {aiLoading.description ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
-            ) : (
-              <Sparkles className='h-3.5 w-3.5' />
-            )}
-            Generate
-          </button>
-        </label>
-        <textarea
-          ref={descriptionRef}
-          value={formData.description}
-          onChange={(event) =>
-            setFormData((prev: any) => ({ ...prev, description: event.target.value }))
-          }
-          rows={5}
-          className='w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200'
+      <div className={studioCardClass}>
+        <StudioFieldLabel
+          label='Description'
           required
-        />
-        <HyperlinkInsert
-          fieldLabel='Description'
-          value={formData.description}
-          textareaRef={descriptionRef}
-          onValueChange={(nextValue) =>
-            setFormData((prev: any) => ({
-              ...prev,
-              description: nextValue,
-            }))
+          help='Use this for full product explanation, buyer confidence points, and important usage details.'
+          action={
+            <button
+              type='button'
+              onClick={generateDescription}
+              disabled={aiLoading.description}
+              className={aiButtonClass}
+            >
+              {aiLoading.description ? (
+                <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              ) : (
+                <Sparkles className='h-3.5 w-3.5' />
+              )}
+              Generate
+            </button>
           }
         />
+        <RichTextEditor
+          value={formData.description}
+          onChange={(nextValue) =>
+            setFormData((prev: any) => ({ ...prev, description: nextValue }))
+          }
+          placeholder='Design the full product description exactly how it should appear on the storefront. Use headings, lists, emphasis, and hyperlinks inside the editor.'
+          minHeight='min-h-[320px]'
+          className='mt-3'
+        />
+        <p className='mt-3 text-xs leading-5 text-muted-foreground'>
+          The formatting you create here is saved as rich content and rendered on product detail
+          pages with the same headings, lists, emphasis, and hyperlinks.
+        </p>
       </div>
-    </section>
+    </div>
   )
 }
 

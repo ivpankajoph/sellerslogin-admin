@@ -23,7 +23,7 @@ function TabsList({
     <TabsPrimitive.List
       data-slot='tabs-list'
       className={cn(
-        'inline-flex h-10 w-fit items-center justify-center rounded-none border border-border/70 bg-white/80 p-1 text-muted-foreground shadow-sm',
+        'inline-flex h-10 w-fit items-center justify-center rounded-none border border-border/70 bg-background/80 p-1 text-muted-foreground shadow-sm backdrop-blur-sm',
         className
       )}
       {...props}

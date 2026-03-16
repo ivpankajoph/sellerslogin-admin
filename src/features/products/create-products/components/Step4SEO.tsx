@@ -1,5 +1,12 @@
 import React from 'react'
-import { Loader2, Sparkles, X } from 'lucide-react'
+import { Loader2, Search, Sparkles, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  StudioFieldLabel,
+  studioCardClass,
+  studioInputClass,
+  studioTextareaClass,
+} from './studio-ui'
 
 interface Props {
   metaTitle: string
@@ -7,18 +14,21 @@ interface Props {
   metaKeywords: string[]
   metaKeywordInput: string
   aiLoading: Record<string, boolean>
-  onMetaTitleChange: (val: string) => void
-  onMetaDescChange: (val: string) => void
-  onKeywordInputChange: (val: string) => void
-  onAddKeyword: (e: React.KeyboardEvent) => void
+  onMetaTitleChange: (value: string) => void
+  onMetaDescChange: (value: string) => void
+  onKeywordInputChange: (value: string) => void
+  onAddKeyword: (event: React.KeyboardEvent) => void
   onRemoveKeyword: (index: number) => void
   onGenerateTitle: () => void
   onGenerateDesc: () => void
   onGenerateKeywords: () => void
 }
 
-const aiButtonBase =
-  'inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+const aiButtonClass =
+  'h-10 rounded-xl border border-border bg-card px-4 text-foreground hover:bg-secondary'
+
+const chipClass =
+  'inline-flex items-center gap-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300'
 
 const Step4SEO: React.FC<Props> = ({
   metaTitle,
@@ -36,114 +46,117 @@ const Step4SEO: React.FC<Props> = ({
   onGenerateKeywords,
 }) => {
   return (
-    <section className='space-y-5'>
-      <div className='rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50/80 via-white to-cyan-50/70 p-5'>
-        <h2 className='text-2xl font-extrabold tracking-tight text-slate-900'>
-          SEO & Discovery
-        </h2>
-        <p className='mt-1 text-sm text-slate-600'>
-          Optimize how this product appears in search and social previews.
-        </p>
+    <div className='space-y-6'>
+      <div className={studioCardClass}>
+        <div className='flex items-center gap-2 text-base font-semibold text-foreground'>
+          <Search className='h-4 w-4 text-cyan-600' />
+          SEO
+        </div>
       </div>
 
-      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-        <label className='mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-slate-700'>
-          Meta Title
-          <button
-            type='button'
-            onClick={onGenerateTitle}
-            disabled={aiLoading.metaTitle}
-            className={aiButtonBase}
-          >
-            {aiLoading.metaTitle ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
-            ) : (
-              <Sparkles className='h-3.5 w-3.5' />
-            )}
-            Generate
-          </button>
-        </label>
+      <div className={studioCardClass}>
+        <StudioFieldLabel
+          label='Meta Title'
+          action={
+            <Button
+              type='button'
+              onClick={onGenerateTitle}
+              disabled={aiLoading.metaTitle}
+              className={aiButtonClass}
+            >
+              {aiLoading.metaTitle ? (
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              ) : (
+                <Sparkles className='mr-2 h-4 w-4' />
+              )}
+              Generate
+            </Button>
+          }
+        />
         <input
           type='text'
           value={metaTitle}
           onChange={(event) => onMetaTitleChange(event.target.value)}
-          className='h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200'
-          placeholder='Product title for search engines'
+          placeholder='Brand + product name + core keyword'
+          className={studioInputClass}
         />
       </div>
 
-      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-        <label className='mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-slate-700'>
-          Meta Description
-          <button
-            type='button'
-            onClick={onGenerateDesc}
-            disabled={aiLoading.metaDescription}
-            className={aiButtonBase}
-          >
-            {aiLoading.metaDescription ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
-            ) : (
-              <Sparkles className='h-3.5 w-3.5' />
-            )}
-            Generate
-          </button>
-        </label>
+      <div className={studioCardClass}>
+        <StudioFieldLabel
+          label='Meta Description'
+          action={
+            <Button
+              type='button'
+              onClick={onGenerateDesc}
+              disabled={aiLoading.metaDescription}
+              className={aiButtonClass}
+            >
+              {aiLoading.metaDescription ? (
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              ) : (
+                <Sparkles className='mr-2 h-4 w-4' />
+              )}
+              Generate
+            </Button>
+          }
+        />
         <textarea
+          rows={4}
           value={metaDescription}
           onChange={(event) => onMetaDescChange(event.target.value)}
-          rows={4}
-          className='w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200'
-          placeholder='Summary users see in search snippets'
+          placeholder='Explain what the product is, who it is for, and why it matters.'
+          className={studioTextareaClass}
         />
       </div>
 
-      <div className='rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-        <label className='mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-slate-700'>
-          Meta Keywords
-          <button
-            type='button'
-            onClick={onGenerateKeywords}
-            disabled={aiLoading.metaKeywords}
-            className={aiButtonBase}
-          >
-            {aiLoading.metaKeywords ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
-            ) : (
-              <Sparkles className='h-3.5 w-3.5' />
-            )}
-            Generate
-          </button>
-        </label>
-
+      <div className={studioCardClass}>
+        <StudioFieldLabel
+          label='Meta Keywords'
+          action={
+            <Button
+              type='button'
+              onClick={onGenerateKeywords}
+              disabled={aiLoading.metaKeywords}
+              className={aiButtonClass}
+            >
+              {aiLoading.metaKeywords ? (
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              ) : (
+                <Sparkles className='mr-2 h-4 w-4' />
+              )}
+              Generate
+            </Button>
+          }
+        />
         <input
           type='text'
           value={metaKeywordInput}
           onChange={(event) => onKeywordInputChange(event.target.value)}
           onKeyDown={onAddKeyword}
           placeholder='Type keyword and press Enter'
-          className='h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200'
+          className={studioInputClass}
         />
 
-        <div className='mt-3 flex flex-wrap gap-2'>
-          {metaKeywords.map((keyword, index) => (
-            <span
-              key={`${keyword}-${index}`}
-              className='inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-100/70 px-3 py-1 text-xs font-semibold text-emerald-800'
-            >
-              {keyword}
-              <button
-                type='button'
-                onClick={() => onRemoveKeyword(index)}
-                className='rounded-full p-0.5 text-emerald-700 transition hover:bg-emerald-200'
-              >
-                <X className='h-3 w-3' />
-              </button>
-            </span>
-          ))}
-        </div>
+        {metaKeywords.length ? (
+          <div className='mt-4 flex flex-wrap gap-2'>
+            {metaKeywords.map((keyword, index) => (
+              <span key={`${keyword}-${index}`} className={chipClass}>
+                {keyword}
+                <button
+                  type='button'
+                  onClick={() => onRemoveKeyword(index)}
+                  className='rounded-full p-0.5 transition hover:bg-background hover:text-foreground'
+                  aria-label={`Remove ${keyword}`}
+                >
+                  <X className='h-3 w-3' />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
-    </section>
+    </div>
   )
 }
 

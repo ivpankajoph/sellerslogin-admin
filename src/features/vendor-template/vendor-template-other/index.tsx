@@ -29,6 +29,7 @@ import {
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
+import { getStoredActiveWebsiteId } from '../components/websiteStudioStorage'
 
 const selectVendorId = (state: any): string | undefined => state?.auth?.user?.id
 
@@ -215,6 +216,10 @@ function VendorTemplateOther() {
     () => getStoredEditingTemplateKey(vendor_id),
     [vendor_id]
   )
+  const activeWebsiteId = useMemo(
+    () => getStoredActiveWebsiteId(vendor_id),
+    [vendor_id]
+  )
 
   useEffect(() => {
     if (!vendor_id) return
@@ -287,7 +292,9 @@ function VendorTemplateOther() {
     }
 
     const endpoints = [
-      `${BASE_URL}/v1/templates/social-faqs?vendor_id=${vendor_id}`,
+      `${BASE_URL}/v1/templates/social-faqs?vendor_id=${vendor_id}${
+        activeWebsiteId ? `&website_id=${encodeURIComponent(activeWebsiteId)}` : ''
+      }`,
       `${BASE_URL}/v1/templates/social-faqs/${vendor_id}`,
       `${BASE_URL}/v1/templates/${vendor_id}/social`,
       `${BASE_URL}/v1/templates/${vendor_id}`,
@@ -339,7 +346,7 @@ function VendorTemplateOther() {
     }
 
     load()
-  }, [vendor_id, token])
+  }, [activeWebsiteId, vendor_id, token])
 
   const updateField = (path: string[], value: unknown) => {
     setData((prev) => updateFieldImmutable(prev, path, value))
@@ -363,6 +370,7 @@ function VendorTemplateOther() {
     try {
       const payload = {
         vendor_id,
+        website_id: activeWebsiteId,
         social_page: data.components.social_page,
         vendor_profile: data.components.vendor_profile,
         theme: data.components.theme,
@@ -399,6 +407,7 @@ function VendorTemplateOther() {
       setIsSaving(false)
     }
   }, [
+    activeWebsiteId,
     data.components.social_page,
     data.components.theme,
     data.components.vendor_profile,
@@ -425,7 +434,8 @@ function VendorTemplateOther() {
   const previewBaseUrl = getVendorTemplatePreviewUrl(
     vendor_id,
     selectedTemplateKey,
-    previewCity.slug
+    previewCity.slug,
+    activeWebsiteId
   )
   const footerConfig = (((data?.components?.social_page as any)?.footer ||
     {}) as Record<string, any>)

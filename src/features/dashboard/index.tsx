@@ -65,9 +65,11 @@ export function Dashboard() {
           </div>
           <div className='flex items-center space-x-4'>
             <div className='flex items-center space-x-2'>
-              <Button variant='outline'>
-                <Sparkles className='h-4 w-4 text-primary' />
-                Create your website for free
+              <Button variant='outline' asChild>
+                <Link to='/template-workspace'>
+                  <Sparkles className='h-4 w-4 text-primary' />
+                  Create your website for free
+                </Link>
               </Button>
               {isVendor && (
                 <DropdownMenu>

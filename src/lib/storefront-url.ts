@@ -81,23 +81,29 @@ export const getVendorTemplateBaseUrl = (vendorId?: string) => {
 export const getVendorTemplatePageUrl = (
   vendorId?: string,
   citySlug?: string,
-  templateKey?: string
+  templateKey?: string,
+  websiteId?: string
 ) => {
   const base = getVendorTemplateBaseUrl(vendorId)
   if (!base) return undefined
 
   const finalCity = normalizeCitySlug(citySlug || getStoredTemplatePreviewCity())
+  const search = websiteId
+    ? `?website=${encodeURIComponent(String(websiteId).trim())}`
+    : ''
+
   if (templateKey) {
-    return `${base}/preview/${encodeURIComponent(templateKey)}/${encodeURIComponent(finalCity)}`
+    return `${base}/preview/${encodeURIComponent(templateKey)}/${encodeURIComponent(finalCity)}${search}`
   }
 
-  return `${base}/${encodeURIComponent(finalCity)}`
+  return `${base}/${encodeURIComponent(finalCity)}${search}`
 }
 
 export const getVendorTemplatePreviewUrl = (
   vendorId?: string,
   templateKey?: string,
-  citySlug?: string
+  citySlug?: string,
+  websiteId?: string
 ) => {
-  return getVendorTemplatePageUrl(vendorId, citySlug, templateKey)
+  return getVendorTemplatePageUrl(vendorId, citySlug, templateKey, websiteId)
 }

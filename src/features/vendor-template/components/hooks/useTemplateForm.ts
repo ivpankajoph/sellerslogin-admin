@@ -8,6 +8,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { initialData } from '../../data'
 import { updateFieldImmutable } from './utils'
 import { uploadFile, uploadImage } from '../../helper/fileupload'
+import { getStoredActiveWebsiteId } from '../websiteStudioStorage'
 
 type TemplateCatalogItem = {
   key: string
@@ -42,32 +43,45 @@ export function useTemplateForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState('idle')
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
-  const [open, setOpen] = useState(false)
-  const [isDeploying, setIsDeploying] = useState(false)
-  const [deployMessage, setDeployMessage] = useState('Deploying website...')
   const [loadedSectionOrder, setLoadedSectionOrder] = useState<string[]>([])
   const [isDeletingTemplateKey, setIsDeletingTemplateKey] = useState<
     string | null
   >(null)
 
-  const vendor_id = useSelector((s: any) => s.auth?.user?.id)
+  const authUser = useSelector((s: any) => s.auth?.user || null)
   const role = useSelector((s: any) => s.auth?.user?.role)
   const token = useSelector((s: any) => s.auth?.token)
-  const vendor_weburl = useSelector(
-    (s: any) => s.vendorprofile?.profile?.vendor?.bound_url
-  )
-  const vendor_default_city_slug = useSelector(
+  const vendorProfile = useSelector(
     (s: any) =>
-      s.vendorprofile?.profile?.vendor?.default_city_slug ||
-      s.auth?.user?.default_city_slug ||
-      ''
+      s.vendorprofile?.profile?.vendor ||
+      s.vendorprofile?.profile?.data ||
+      s.vendorprofile?.profile ||
+      null
   )
+  const vendor_id = String(
+    authUser?.id ||
+      authUser?._id ||
+      authUser?.vendor_id ||
+      authUser?.vendorId ||
+      vendorProfile?._id ||
+      vendorProfile?.id ||
+      vendorProfile?.vendor_id ||
+      ''
+  ).trim()
+  const vendor_weburl = String(
+    vendorProfile?.bound_url || authUser?.bound_url || ''
+  ).trim()
+  const vendor_default_city_slug = String(
+    vendorProfile?.default_city_slug || authUser?.default_city_slug || ''
+  ).trim()
+  const activeWebsiteId = getStoredActiveWebsiteId(vendor_id)
   const isAdmin = role === 'admin' || role === 'superadmin'
 
   const dispatch = useDispatch<AppDispatch>()
   useEffect(() => {
+    if (!token || vendorProfile) return
     dispatch(fetchVendorProfile())
-  }, [dispatch])
+  }, [dispatch, token, vendorProfile])
 
   useEffect(() => {
     if (!vendor_id) return
@@ -122,7 +136,9 @@ export function useTemplateForm() {
     }
 
     const endpoints = [
-      `${BASE_URL}/v1/templates/home?vendor_id=${vendor_id}`,
+      `${BASE_URL}/v1/templates/home?vendor_id=${vendor_id}${
+        activeWebsiteId ? `&website_id=${encodeURIComponent(activeWebsiteId)}` : ''
+      }`,
       `${BASE_URL}/v1/templates/home/${vendor_id}`,
       `${BASE_URL}/v1/templates/${vendor_id}`,
     ]
@@ -174,7 +190,7 @@ export function useTemplateForm() {
     }
 
     load()
-  }, [vendor_id])
+  }, [activeWebsiteId, token, vendor_id])
 
   useEffect(() => {
     const loadCatalog = async () => {
@@ -260,6 +276,7 @@ export function useTemplateForm() {
     try {
       const payload = {
         vendor_id,
+        website_id: activeWebsiteId,
         components: data.components,
         section_order: sectionOrder,
       }
@@ -321,6 +338,7 @@ export function useTemplateForm() {
         {
           vendor_id,
           template_key: selectedTemplateKey,
+          website_id: activeWebsiteId,
         },
         {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -395,71 +413,6 @@ export function useTemplateForm() {
     }
   }
 
-  // Deployment + binding
-  async function bindURL(url: string) {
-    try {
-      await axios.put(`${BASE_URL}/vendor/bind-url`, {
-        url,
-        vendor_id,
-      })
-      toast.success('URL bound successfully!')
-    } catch {
-      toast.error('URL binding failed')
-    }
-  }
- 
-
-  const handleDeploy = async () => {
-    setIsDeploying(true)
-    toast.loading('Starting deployment...', { id: 'deploy' })
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/v1/templates/deploy`,
-        {
-          projectName: `sellerslogin-${vendor_id}`,
-          templatePath: `../vendor-template`,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          responseType: 'stream', // IMPORTANT for Node streaming
-        }
-      )
-
-      let serviceUrl = null
-
-      response.data.on('data', (chunk: any) => {
-        const text = chunk.toString()
-
-        setDeployMessage((prev) => prev + text)
-
-        const match = text.match(/https:\/\/[a-zA-Z0-9.-]+\.run\.app/)
-        if (match) serviceUrl = match[0]
-      })
-
-      await new Promise((resolve) => response.data.on('end', resolve))
-
-      toast.success('Deployment complete', { id: 'deploy' })
-
-      if (serviceUrl) await bindURL(serviceUrl)
-    } catch {
-      toast.error('Deployment failed', { id: 'deploy' })
-    } finally {
-      setIsDeploying(false)
-    }
-  }
-
-  // Cancel Deployment
-  const handleCancel = async () => {
-    try {
-      await axios.post(`${BASE_URL}/v1/templates/deploy/cancel`)
-      toast.success('Deployment canceled')
-    } catch {
-      toast.error('Cancel failed')
-    }
-  }
-
   return {
     data,
     setData,
@@ -479,12 +432,7 @@ export function useTemplateForm() {
     vendor_id,
     vendor_weburl,
     vendor_default_city_slug,
-    open,
-    setOpen,
-    isDeploying,
-    deployMessage,
-    handleDeploy,
-    handleCancel,
+    activeWebsiteId,
     loadedSectionOrder,
     isAdmin,
     deleteTemplateVariant,

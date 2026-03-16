@@ -29,6 +29,7 @@ import {
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
+import { getStoredActiveWebsiteId } from '../components/websiteStudioStorage'
 
 type PageSection = any
 
@@ -245,6 +246,10 @@ export default function VendorTemplatePages() {
     () => getStoredEditingTemplateKey(vendor_id),
     [vendor_id]
   )
+  const activeWebsiteId = useMemo(
+    () => getStoredActiveWebsiteId(vendor_id),
+    [vendor_id]
+  )
 
   useEffect(() => {
     if (!vendor_id) return
@@ -252,7 +257,9 @@ export default function VendorTemplatePages() {
     const load = async () => {
       try {
         const res = await axios.get(
-          `${BASE_URL}/v1/templates/pages?vendor_id=${vendor_id}`
+          `${BASE_URL}/v1/templates/pages?vendor_id=${vendor_id}${
+            activeWebsiteId ? `&website_id=${encodeURIComponent(activeWebsiteId)}` : ''
+          }`
         )
 
         const root = res.data as unknown
@@ -293,7 +300,7 @@ export default function VendorTemplatePages() {
     }
 
     load()
-  }, [vendor_id])
+  }, [activeWebsiteId, vendor_id])
 
   const pages = (data.components.custom_pages as any[]) || []
   const selectedPage =
@@ -310,7 +317,8 @@ export default function VendorTemplatePages() {
   const previewBaseUrl = getVendorTemplatePreviewUrl(
     vendor_id,
     selectedTemplateKey,
-    previewCity.slug
+    previewCity.slug,
+    activeWebsiteId
   )
   const previewPath = selectedPage?.slug ? `/page/${selectedPage.slug}` : ''
 
@@ -493,13 +501,14 @@ export default function VendorTemplatePages() {
     try {
       await axios.put(`${BASE_URL}/v1/templates/pages`, {
         vendor_id,
+        website_id: activeWebsiteId,
         custom_pages: pages,
         theme: data.components.theme,
       })
     } finally {
       setIsSaving(false)
     }
-  }, [data.components.theme, pages, vendor_id])
+  }, [activeWebsiteId, data.components.theme, pages, vendor_id])
 
   const updateField = (path: string[], value: any) => {
     setData((prev) => updateFieldImmutable(prev, path, value))

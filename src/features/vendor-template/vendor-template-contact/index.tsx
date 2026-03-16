@@ -31,6 +31,7 @@ import {
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
+import { getStoredActiveWebsiteId } from '../components/websiteStudioStorage'
 
 function VendorTemplateContact() {
   const [data, setData] = useState<TemplateData>(initialData)
@@ -51,6 +52,10 @@ function VendorTemplateContact() {
   )
   const selectedTemplateKey = useMemo(
     () => getStoredEditingTemplateKey(vendor_id),
+    [vendor_id]
+  )
+  const activeWebsiteId = useMemo(
+    () => getStoredActiveWebsiteId(vendor_id),
     [vendor_id]
   )
   const mapRef = useRef<HTMLDivElement>(null)
@@ -101,7 +106,9 @@ function VendorTemplateContact() {
     }
 
     const endpoints = [
-      `${BASE_URL}/v1/templates/contact?vendor_id=${vendor_id}`,
+      `${BASE_URL}/v1/templates/contact?vendor_id=${vendor_id}${
+        activeWebsiteId ? `&website_id=${encodeURIComponent(activeWebsiteId)}` : ''
+      }`,
       `${BASE_URL}/v1/templates/contact/${vendor_id}`,
       `${BASE_URL}/v1/templates/${vendor_id}/contact`,
       `${BASE_URL}/v1/templates/${vendor_id}`,
@@ -150,7 +157,7 @@ function VendorTemplateContact() {
     }
 
     load()
-  }, [vendor_id, token])
+  }, [activeWebsiteId, vendor_id, token])
 
   useEffect(() => {
     if (!selectedSection) return
@@ -383,6 +390,7 @@ function VendorTemplateContact() {
     try {
       await axios.put(`${BASE_URL}/v1/templates/contact`, {
         vendor_id,
+        website_id: activeWebsiteId,
         components: data.components.contact_page,
         vendor_profile: data.components.vendor_profile,
         theme: data.components.theme,
@@ -397,6 +405,7 @@ function VendorTemplateContact() {
       }
     }
   }, [
+    activeWebsiteId,
     data.components.contact_page,
     data.components.theme,
     data.components.vendor_profile,
@@ -423,7 +432,8 @@ function VendorTemplateContact() {
   const previewBaseUrl = getVendorTemplatePreviewUrl(
     vendor_id,
     selectedTemplateKey,
-    previewCity.slug
+    previewCity.slug,
+    activeWebsiteId
   )
 
   const sections = useMemo(

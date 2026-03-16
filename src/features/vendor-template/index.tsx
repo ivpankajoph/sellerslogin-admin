@@ -2,7 +2,7 @@
 
 import { type JSX, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Link2, Rocket, Search as SearchIcon, Wand2 } from 'lucide-react'
+import { ArrowLeft, Link2, Search as SearchIcon, Wand2 } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -12,7 +12,6 @@ import { TemplatePageLayout } from './components/TemplatePageLayout'
 import { TemplatePreviewPanel } from './components/TemplatePreviewPanel'
 import { TemplateSectionOrder } from './components/TemplateSectionOrder'
 import { BasicInfoSection } from './components/form/BasicInfoSection'
-import { DeploymentModal } from './components/form/DeploymentModal'
 import { DescriptionSection } from './components/form/DescriptionSection'
 import { HeroSection } from './components/form/HeroSection'
 import { TemplateVariantSelector } from './components/form/TemplateVariantSelector'
@@ -62,17 +61,12 @@ export default function TemplateForm() {
     isUpdatingTemplate,
   
     isSubmitting,
-    open,
-    setOpen,
-    handleDeploy,
-    isDeploying,
-    deployMessage,
-    handleCancel,
     loadedSectionOrder,
     isAdmin,
     deleteTemplateVariant,
     isDeletingTemplateKey,
     vendor_default_city_slug,
+    activeWebsiteId,
   } = useTemplateForm()
 
   const handleInlineEdit = (path: string[], value: unknown) => {
@@ -97,6 +91,10 @@ export default function TemplateForm() {
     const segments = pathname.split('/').filter(Boolean)
     if (segments[0] !== 'vendor-template') return undefined
     return normalizeTemplateParam(segments[1])
+  }, [pathname])
+  const isTemplateBaseRoute = useMemo(() => {
+    const segments = pathname.split('/').filter(Boolean)
+    return segments.length === 1 && segments[0] === 'vendor-template'
   }, [pathname])
 
   useEffect(() => {
@@ -190,6 +188,20 @@ export default function TemplateForm() {
   ])
 
   useEffect(() => {
+    if (!isTemplateBaseRoute) return
+    if (!activeWebsiteId || !vendor_id || !selectedTemplateKey || pathnameTemplateKey) return
+    setIsBuilderOpen(true)
+    void navigate({ to: `/vendor-template/${selectedTemplateKey}` })
+  }, [
+    activeWebsiteId,
+    isTemplateBaseRoute,
+    navigate,
+    pathnameTemplateKey,
+    selectedTemplateKey,
+    vendor_id,
+  ])
+
+  useEffect(() => {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
     if (!url.searchParams.has('template')) return
@@ -219,8 +231,10 @@ export default function TemplateForm() {
   const previewBaseUrl = getVendorTemplatePreviewUrl(
     vendor_id,
     selectedTemplateKey,
-    previewCity.slug
+    previewCity.slug,
+    activeWebsiteId
   )
+  const isEditingWebsite = Boolean(activeWebsiteId)
 
   const handleSubmitWithOrder = () => handleSubmit(sectionOrder)
 
@@ -691,10 +705,12 @@ export default function TemplateForm() {
       <Toaster position='top-right' />
 
     <TemplatePageLayout
-        title={isBuilderOpen ? 'Website Builder' : 'Choose Template'}
+        title={isBuilderOpen ? (isEditingWebsite ? 'Edit Website' : 'Website Builder') : 'Choose Template'}
         description={
           isBuilderOpen
-            ? 'Craft your storefront hero, brand story, and key metrics. Drag sections to reorder and sync to preview how products appear on your live template.'
+            ? isEditingWebsite
+              ? 'Update this website using the selected template. Template changes are locked for existing websites, but all page content remains editable.'
+              : 'Craft your storefront hero, brand story, and key metrics. Drag sections to reorder and sync to preview how products appear on your live template.'
             : 'Select a storefront template card first. The editor and live preview will open after selection.'
         }
         activeKey='home'
@@ -748,31 +764,27 @@ export default function TemplateForm() {
                 setIsBuilderOpen(false)
                 setSelectedSection(null)
                 setSelectedComponent(null)
-                void navigate({ to: '/vendor-template' })
+                void navigate({ to: '/template-workspace' })
               }}
               className='rounded-full border-slate-300'
             >
-              <ArrowLeft className='h-4 w-4' /> All Templates
+              <ArrowLeft className='h-4 w-4' /> My Websites
             </Button>
-            <Button
-              onClick={applyTemplateVariant}
-              disabled={isUpdatingTemplate || selectedTemplateKey === activeTemplateKey}
-              className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
-            >
-              {isUpdatingTemplate ? 'Applying...' : 'Set as Default'}
-            </Button>
+            {!isEditingWebsite ? (
+              <Button
+                onClick={applyTemplateVariant}
+                disabled={isUpdatingTemplate || selectedTemplateKey === activeTemplateKey}
+                className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
+              >
+                {isUpdatingTemplate ? 'Applying...' : 'Set as Default'}
+              </Button>
+            ) : null}
             <Button
               onClick={handleSubmitWithOrder}
               disabled={isSubmitting || uploadingPaths.size > 0}
               className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
             >
               {isSubmitting ? 'Saving...' : 'Save Template'}
-            </Button>
-            <Button
-              onClick={() => setOpen(true)}
-              className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
-            >
-              <Rocket className='h-4 w-4' /> Deploy
             </Button>
             <Button
               variant='outline'
@@ -907,15 +919,6 @@ export default function TemplateForm() {
           </>
         ) : null}
       </TemplatePageLayout>
-
-      <DeploymentModal
-        open={open}
-        setOpen={setOpen}
-        isDeploying={isDeploying}
-        deployMessage={deployMessage}
-        handleDeploy={handleDeploy}
-        handleCancel={handleCancel}
-      />
       <DomainModal open={domainOpen} setOpen={setDomainOpen} />
     </>
   )

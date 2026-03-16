@@ -1,3266 +1,772 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
+import { useNavigate } from '@tanstack/react-router'
 import {
+  CheckCircle2,
   ExternalLink,
-  FilePenLine,
+  Globe,
   LayoutTemplate,
   Loader2,
-  MapPin,
-  Save,
+  PencilLine,
+  Plus,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
-import { Header } from '@/components/layout/header'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { Main } from '@/components/layout/main'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import { cn } from '@/lib/utils'
+import { type AppDispatch } from '@/store'
+import { BASE_URL } from '@/store/slices/vendor/productSlice'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
+import { setStoredEditingTemplateKey } from '@/features/vendor-template/components/templateVariantParam'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import HyperlinkInsert from '@/components/product/HyperlinkInsert'
-import {
-  getVendorTemplatePageUrl,
-  getVendorTemplatePreviewUrl,
-  setStoredTemplatePreviewCity,
-} from '@/lib/storefront-url'
+  getStoredActiveWebsiteId,
+  setStoredActiveWebsiteId,
+} from '@/features/vendor-template/components/websiteStudioStorage'
 
-type VendorRow = {
-  _id: string
-  name?: string
-  registrar_name?: string
-  business_name?: string
-  email?: string
-  default_city_slug?: string
-  default_city_id?: string
-}
-
-type CityRow = {
-  _id: string
+type TemplateCatalogItem = {
+  key: string
   name: string
-  slug: string
-  state?: string
-  country?: string
-  isActive: boolean
+  description?: string
+  previewImage?: string
 }
 
-type TemplateRow = {
+type WebsiteCard = {
   _id: string
   template_key: string
   template_name?: string
   name?: string
+  business_name?: string
+  previewImage?: string
+  createdAt?: string
 }
 
-type ImageAsset = {
-  url: string
-  publicId: string
+const cardClass =
+  'group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-md'
+const REQUEST_TIMEOUT_MS = 10000
+const LIVE_PREVIEW_SCALE = 0.25
+const LIVE_PREVIEW_DIMENSION = `${100 / LIVE_PREVIEW_SCALE}%`
+
+const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
+  {
+    key: 'mquiq',
+    name: 'StorageMax Gold',
+    description:
+      'Industrial storage layout with bold yellow highlights and sectioned storytelling.',
+    previewImage:
+      'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1200',
+  },
+  {
+    key: 'poupqz',
+    name: 'RackFlow Blue',
+    description:
+      'Industrial rack layout with clean blue-white sections and dense content blocks.',
+    previewImage:
+      'https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&q=80&w=1200',
+  },
+  {
+    key: 'oragze',
+    name: 'Organic Freshmart',
+    description:
+      'Organic storefront layout with vibrant grocery-first sections and promotional blocks.',
+    previewImage:
+      'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=1200',
+  },
+  {
+    key: 'whiterose',
+    name: 'White Rose',
+    description:
+      'Premium furniture storefront with clean white-blue utility navigation and launch-first merchandising.',
+    previewImage:
+      'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&q=80&w=1200',
+  },
+]
+
+type StorefrontThumbnailProps = {
+  title: string
+  previewUrl?: string
+  fallbackImage?: string
+  className?: string
 }
 
-type FaqItem = {
-  question: string
-  answer: string
-}
+function StorefrontThumbnail({
+  title,
+  previewUrl,
+  fallbackImage,
+  className,
+}: StorefrontThumbnailProps) {
+  const [iframeLoaded, setIframeLoaded] = useState(false)
 
-type AttributeItem = {
-  key: string
-  value: string
-}
-
-type ProductVariantRow = {
-  _id?: string
-  variantSku?: string
-  variantAttributes?: Record<string, string>
-  actualPrice?: number
-  finalPrice?: number
-  stockQuantity?: number
-  isActive?: boolean
-  variantsImageUrls?: ImageAsset[]
-  variantMetaTitle?: string
-  variantMetaDescription?: string
-  variantMetaKeywords?: string[]
-  variantCanonicalUrl?: string
-}
-
-type MainCategoryOption = {
-  _id: string
-  name: string
-  slug?: string
-}
-
-type CategoryOption = {
-  _id: string
-  name: string
-  slug?: string
-  mainCategoryId: string
-}
-
-type SubCategoryOption = {
-  _id: string
-  name: string
-  slug?: string
-  categoryId: string
-  mainCategoryId?: string
-}
-
-type WorkspaceProduct = {
-  _id: string
-  productName: string
-  slug: string
-  status: string
-  isAvailable: boolean
-  brand: string
-  shortDescription: string
-  description: string
-  metaTitle: string
-  metaDescription: string
-  metaKeywords: string[]
-  baseSku?: string
-  mainCategory?: string | { _id?: string; name?: string; slug?: string }
-  productCategory?: string | { _id?: string; name?: string; slug?: string }
-  productCategories?: Array<string | { _id?: string; name?: string; slug?: string }>
-  productSubCategories?: Array<string | { _id?: string; name?: string; slug?: string }>
-  defaultImages?: ImageAsset[]
-  specifications?: Array<Record<string, string>>
-  variants?: ProductVariantRow[]
-  faqs?: FaqItem[]
-  availableCities?: Array<{ _id: string; name: string; slug: string }>
-  availableCityData?: Array<{ _id: string; name: string; slug: string }>
-}
-
-type ProductPageCityContext = {
-  scope: 'global' | 'city'
-  cityId: string
-  citySlug: string
-  cityName: string
-}
-
-type WorkspaceProductPageRow = {
-  rowKey: string
-  product: WorkspaceProduct
-  pageCity: ProductPageCityContext
-}
-
-type ProductEditor = {
-  _id: string
-  editScope: 'global' | 'city'
-  editCityId: string
-  editCitySlug: string
-  editCityName: string
-  productName: string
-  slug: string
-  baseSku: string
-  mainCategoryId: string
-  productCategoryId: string
-  productCategoryIds: string[]
-  productSubCategoryIds: string[]
-  brand: string
-  shortDescription: string
-  description: string
-  metaTitle: string
-  metaDescription: string
-  metaKeywords: string
-  defaultImages: ImageAsset[]
-  specificationRows: Array<{ key: string; value: string }>
-  variants: Array<{
-    tempId: string
-    _id?: string
-    variantSku: string
-    variantAttributes: AttributeItem[]
-    actualPrice: string
-    finalPrice: string
-    stockQuantity: string
-    isActive: boolean
-    variantsImageUrls: ImageAsset[]
-    variantMetaTitle: string
-    variantMetaDescription: string
-    variantMetaKeywords: string
-    variantCanonicalUrl: string
-  }>
-  faqs: FaqItem[]
-  status: string
-  isAvailable: boolean
-  availableCities: string[]
-}
-
-type MappedCity = {
-  _id: string
-  name: string
-  slug: string
-}
-
-const normalizeRole = (value: unknown) =>
-  String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_-]/g, '')
-
-const normalizeCitySlug = (value?: string) =>
-  String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'all'
-
-const toTitleCase = (value: string) =>
-  value
-    .split(' ')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-
-const getCitySeoLabel = (cityName = '', citySlug = '') => {
-  const normalizedName = String(cityName || '').trim()
-  if (normalizedName && normalizeCitySlug(normalizedName) !== 'all') return normalizedName
-
-  const normalizedSlug = normalizeCitySlug(citySlug)
-  if (!normalizedSlug || normalizedSlug === 'all') return ''
-  return toTitleCase(normalizedSlug.replace(/-/g, ' '))
-}
-
-const normalizeSeoComparable = (value = '') =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-
-const hasCityInSeoText = (text = '', cityLabel = '') => {
-  const normalizedText = normalizeSeoComparable(text)
-  const normalizedCity = normalizeSeoComparable(cityLabel)
-  if (!normalizedText || !normalizedCity) return false
-  return normalizedText.includes(normalizedCity)
-}
-
-const ensureCityInSeoTitle = (title = '', cityLabel = '', fallback = '') => {
-  const baseTitle = String(title || fallback || '').trim()
-  if (!baseTitle || !cityLabel) return baseTitle
-  if (hasCityInSeoText(baseTitle, cityLabel)) return baseTitle
-  return `${baseTitle} | ${cityLabel}`
-}
-
-const ensureCityInSeoDescription = (
-  description = '',
-  cityLabel = '',
-  fallback = ''
-) => {
-  const baseDescription = String(description || fallback || '').trim()
-  if (!baseDescription || !cityLabel) return baseDescription
-  if (hasCityInSeoText(baseDescription, cityLabel)) return baseDescription
-  const cleanSuffix = `Available in ${cityLabel}.`
-  const needsDot = !/[.!?]$/.test(baseDescription)
-  return `${baseDescription}${needsDot ? '.' : ''} ${cleanSuffix}`
-}
-
-const toObjectIdString = (value: unknown) => {
-  if (!value) return ''
-  if (typeof value === 'string') return value
-  if (typeof value === 'object' && value !== null && '_id' in value) {
-    return String((value as any)._id || '')
-  }
-  return ''
-}
-
-const toObjectIdList = (value: unknown) =>
-  (Array.isArray(value) ? value : [])
-    .map((item) => toObjectIdString(item))
-    .filter(Boolean)
-
-const derivePublicIdFromUrl = (url: string, fallback = 'asset') => {
-  const raw = String(url || '').trim()
-  if (!raw) return fallback
-  try {
-    const pathname = new URL(raw).pathname
-    const fileName = pathname.split('/').filter(Boolean).pop() || fallback
-    return fileName.replace(/\.[a-z0-9]+$/i, '') || fallback
-  } catch {
-    const fileName = raw.split('/').filter(Boolean).pop() || fallback
-    return fileName.replace(/\.[a-z0-9]+$/i, '') || fallback
-  }
-}
-
-const normalizeImageAsset = (value: any, fallback = 'asset'): ImageAsset | null => {
-  if (!value) return null
-  if (typeof value === 'string') {
-    const url = value.trim()
-    if (!url) return null
-    return {
-      url,
-      publicId: derivePublicIdFromUrl(url, fallback),
-    }
-  }
-
-  if (typeof value === 'object') {
-    const url = String(value.url || value.secure_url || '').trim()
-    if (!url) return null
-    const publicId = String(value.publicId || value.public_id || '').trim()
-    return {
-      url,
-      publicId: publicId || derivePublicIdFromUrl(url, fallback),
-    }
-  }
-
-  return null
-}
-
-const objectToAttributeItems = (value: unknown): AttributeItem[] => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return []
-  return Object.entries(value as Record<string, unknown>)
-    .map(([key, rawValue]) => ({
-      key: String(key || '').trim(),
-      value: String(rawValue || '').trim(),
-    }))
-    .filter((item) => item.key && item.value)
-}
-
-const createEmptyVariantEditor = () => ({
-  tempId: `variant-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-  _id: undefined,
-  variantSku: '',
-  variantAttributes: [{ key: 'Color', value: '' }],
-  actualPrice: '',
-  finalPrice: '',
-  stockQuantity: '',
-  isActive: true,
-  variantsImageUrls: [{ url: '', publicId: '' }],
-  variantMetaTitle: '',
-  variantMetaDescription: '',
-  variantMetaKeywords: '',
-  variantCanonicalUrl: '',
-})
-
-const getVendorLabel = (vendor: VendorRow) =>
-  vendor.business_name || vendor.registrar_name || vendor.name || vendor.email || vendor._id
-
-const MAPPED_CITY_PREVIEW_COUNT = 3
-
-function MappedCitiesSummary({ cities = [] }: { cities?: MappedCity[] }) {
-  const normalizedCities = (Array.isArray(cities) ? cities : []).filter(
-    (city): city is MappedCity => Boolean(city?._id || city?.slug)
-  )
-
-  if (!normalizedCities.length) {
-    return (
-      <div className='max-w-[240px] space-y-1'>
-        <span className='inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600'>
-          All / not mapped
-        </span>
-        <p className='text-[11px] text-slate-500'>Visible across all cities</p>
-      </div>
-    )
-  }
-
-  const previewCities = normalizedCities.slice(0, MAPPED_CITY_PREVIEW_COUNT)
-  const remainingCount = normalizedCities.length - previewCities.length
+  useEffect(() => {
+    setIframeLoaded(false)
+  }, [previewUrl])
 
   return (
-    <div className='max-w-[240px] space-y-2'>
-      <div className='flex flex-wrap gap-1.5'>
-        {previewCities.map((city) => (
-          <span
-            key={city._id}
-            title={city.name}
-            className='max-w-[140px] truncate rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-700'
+    <div className={cn('relative aspect-[16/9] overflow-hidden bg-muted', className)}>
+      {fallbackImage ? (
+        <img
+          src={fallbackImage}
+          alt={title}
+          className={cn(
+            'h-full w-full object-cover transition duration-300',
+            iframeLoaded ? 'opacity-0' : 'opacity-100'
+          )}
+        />
+      ) : (
+        <div
+          className={cn(
+            'flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.18),transparent_45%),linear-gradient(135deg,rgba(15,23,42,0.06),rgba(15,23,42,0.14))] transition duration-300',
+            iframeLoaded ? 'opacity-0' : 'opacity-100'
+          )}
+        >
+          <LayoutTemplate className='h-10 w-10 text-muted-foreground' />
+        </div>
+      )}
+
+      {previewUrl ? (
+        <div
+          className={cn(
+            'absolute inset-0 bg-background transition-opacity duration-300',
+            iframeLoaded ? 'opacity-100' : 'opacity-0'
+          )}
+        >
+          <div
+            className='pointer-events-none absolute left-0 top-0 origin-top-left overflow-hidden'
+            style={{
+              width: LIVE_PREVIEW_DIMENSION,
+              height: LIVE_PREVIEW_DIMENSION,
+              transform: `scale(${LIVE_PREVIEW_SCALE})`,
+            }}
           >
-            {city.name}
-          </span>
-        ))}
-        {remainingCount > 0 ? (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type='button'
-                className='inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 transition hover:border-cyan-200 hover:text-cyan-700'
-              >
-                +{remainingCount} more
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align='start'
-              className='w-[300px] rounded-2xl border-slate-200 p-0 shadow-xl'
-            >
-              <div className='border-b border-slate-100 px-4 py-3'>
-                <p className='text-sm font-semibold text-slate-900'>Mapped Cities</p>
-                <p className='text-xs text-slate-500'>
-                  {normalizedCities.length} cities mapped to this page
-                </p>
-              </div>
-              <ScrollArea className='max-h-64'>
-                <div className='flex flex-wrap gap-2 p-4'>
-                  {normalizedCities.map((city) => (
-                    <span
-                      key={city._id}
-                      className='rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-700'
-                    >
-                      {city.name}
-                    </span>
-                  ))}
-                </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
-        ) : null}
-      </div>
-      <p className='text-[11px] text-slate-500'>
-        {normalizedCities.length} mapped {normalizedCities.length === 1 ? 'city' : 'cities'}
-      </p>
+            <iframe
+              src={previewUrl}
+              title={`${title} storefront preview`}
+              className='h-full w-full border-0 bg-white'
+              loading='lazy'
+              onLoad={() => setIframeLoaded(true)}
+              tabIndex={-1}
+              aria-hidden='true'
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <div className='pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/10 via-black/[0.03] to-transparent' />
     </div>
   )
 }
 
-const defaultEditor = (
-  product: WorkspaceProduct,
-  pageCity: ProductPageCityContext = {
-    scope: 'global',
-    cityId: '',
-    citySlug: 'all',
-    cityName: 'All Cities',
-  }
-): ProductEditor => {
-  const isCityScoped = pageCity.scope === 'city'
-  const citySeoLabel = isCityScoped
-    ? getCitySeoLabel(pageCity.cityName, pageCity.citySlug)
-    : ''
-  const normalizedMappedCities = Array.isArray(product.availableCities)
-    ? product.availableCities
-    : Array.isArray(product.availableCityData)
-      ? product.availableCityData
-      : []
-  const baseMetaTitle = String(product.metaTitle || '').trim()
-  const baseMetaDescription = String(product.metaDescription || '').trim()
-
-  return {
-    _id: product._id,
-    editScope: pageCity.scope,
-    editCityId: pageCity.cityId,
-    editCitySlug: pageCity.citySlug,
-    editCityName: pageCity.cityName,
-    productName: product.productName || '',
-    slug: product.slug || '',
-    baseSku: product.baseSku || '',
-    mainCategoryId: toObjectIdString(product.mainCategory),
-    productCategoryId: toObjectIdString(product.productCategory),
-    productCategoryIds: toObjectIdList(product.productCategories),
-    productSubCategoryIds: toObjectIdList(product.productSubCategories),
-    brand: product.brand || '',
-    shortDescription: product.shortDescription || '',
-    description: product.description || '',
-    metaTitle: isCityScoped
-      ? ensureCityInSeoTitle(baseMetaTitle, citySeoLabel, product.productName || '')
-      : baseMetaTitle,
-    metaDescription: isCityScoped
-      ? ensureCityInSeoDescription(
-          baseMetaDescription,
-          citySeoLabel,
-          product.shortDescription || product.description || product.productName || ''
-        )
-      : baseMetaDescription,
-    metaKeywords: Array.isArray(product.metaKeywords)
-      ? product.metaKeywords.join(', ')
-      : '',
-    defaultImages: (Array.isArray(product.defaultImages) ? product.defaultImages : [])
-      .map((image, index) => normalizeImageAsset(image, `default-${index + 1}`))
-      .filter((image): image is ImageAsset => Boolean(image)),
-    specificationRows: (
-      Array.isArray(product.specifications) ? product.specifications : []
-    ).flatMap((row) =>
-      row && typeof row === 'object'
-        ? Object.entries(row).map(([key, value]) => ({
-            key: String(key || ''),
-            value: String(value || ''),
-          }))
-        : []
-    ),
-    variants: (() => {
-      const mappedVariants = (Array.isArray(product.variants) ? product.variants : []).map(
-        (variant, index) => ({
-          tempId: `variant-${variant?._id || index}`,
-          _id: variant?._id,
-          variantSku: String(variant?.variantSku || ''),
-          variantAttributes: objectToAttributeItems(variant?.variantAttributes),
-          actualPrice:
-            variant?.actualPrice !== undefined ? String(variant.actualPrice) : '',
-          finalPrice: variant?.finalPrice !== undefined ? String(variant.finalPrice) : '',
-          stockQuantity:
-            variant?.stockQuantity !== undefined ? String(variant.stockQuantity) : '',
-          isActive: variant?.isActive !== false,
-          variantsImageUrls: (Array.isArray(variant?.variantsImageUrls)
-            ? variant.variantsImageUrls
-            : []
-          )
-            .map((image, imageIndex) =>
-              normalizeImageAsset(image, `variant-${index + 1}-${imageIndex + 1}`)
-            )
-            .filter((image): image is ImageAsset => Boolean(image)),
-          variantMetaTitle: String(variant?.variantMetaTitle || ''),
-          variantMetaDescription: String(variant?.variantMetaDescription || ''),
-          variantMetaKeywords: Array.isArray(variant?.variantMetaKeywords)
-            ? variant.variantMetaKeywords.join(', ')
-            : '',
-          variantCanonicalUrl: String(variant?.variantCanonicalUrl || ''),
-        })
-      )
-      return mappedVariants.length ? mappedVariants : [createEmptyVariantEditor()]
-    })(),
-    faqs: (Array.isArray(product.faqs) ? product.faqs : []).map((faq) => ({
-      question: String(faq?.question || ''),
-      answer: String(faq?.answer || ''),
-    })),
-    status: product.status || 'pending',
-    isAvailable: product.isAvailable !== false,
-    availableCities: Array.isArray(normalizedMappedCities)
-      ? Array.from(
-          new Set(
-            normalizedMappedCities
-              .map((city) => toObjectIdString(city))
-              .filter(Boolean)
-          )
-        )
-      : [],
-  }
-}
-
-export default function TemplateWorkspacePage() {
-  const token = useSelector((state: any) => state.auth?.token || '')
+export default function TemplateWorkspace() {
+  const dispatch = useDispatch<AppDispatch>()
+  const navigate = useNavigate()
   const authUser = useSelector((state: any) => state.auth?.user || null)
-  const role = normalizeRole(useSelector((state: any) => state.auth?.user?.role))
-  const isAdmin = role === 'admin' || role === 'superadmin'
-  const isVendor = role === 'vendor'
-  const canAccess = isAdmin || isVendor
+  const vendorProfile = useSelector(
+    (state: any) =>
+      state.vendorprofile?.profile?.vendor ||
+      state.vendorprofile?.profile?.data ||
+      state.vendorprofile?.profile ||
+      null
+  )
+  const vendorId = String(
+    authUser?.id ||
+      authUser?._id ||
+      authUser?.vendor_id ||
+      authUser?.vendorId ||
+      vendorProfile?._id ||
+      vendorProfile?.id ||
+      vendorProfile?.vendor_id ||
+      ''
+  ).trim()
+  const token = useSelector((state: any) => state.auth?.token)
+  const vendorName = String(
+    vendorProfile?.name ||
+      vendorProfile?.business_name ||
+      authUser?.name ||
+      authUser?.business_name ||
+      authUser?.businessName ||
+      'your brand'
+  ).trim()
+  const vendorDefaultCitySlug = String(
+    vendorProfile?.default_city_slug || authUser?.default_city_slug || 'all'
+  )
 
-  const [vendors, setVendors] = useState<VendorRow[]>([])
-  const [cities, setCities] = useState<CityRow[]>([])
-  const [mainCategories, setMainCategories] = useState<MainCategoryOption[]>([])
-  const [categories, setCategories] = useState<CategoryOption[]>([])
-  const [subCategories, setSubCategories] = useState<SubCategoryOption[]>([])
-  const [templates, setTemplates] = useState<TemplateRow[]>([])
-  const [products, setProducts] = useState<WorkspaceProduct[]>([])
-  const [loadingVendors, setLoadingVendors] = useState(false)
-  const [loadingCategoryMeta, setLoadingCategoryMeta] = useState(false)
-  const [loadingWorkspace, setLoadingWorkspace] = useState(false)
-  const [savingProduct, setSavingProduct] = useState(false)
-  const [openingEditorRowKey, setOpeningEditorRowKey] = useState('')
-  const [uploadingVariantImageKey, setUploadingVariantImageKey] = useState('')
-  const [selectedVendorId, setSelectedVendorId] = useState('')
+  const [websites, setWebsites] = useState<WebsiteCard[]>([])
+  const [templateCatalog, setTemplateCatalog] = useState<TemplateCatalogItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('')
-  const [selectedCitySlug, setSelectedCitySlug] = useState('all')
-  const [selectedStateName, setSelectedStateName] = useState('all')
-  const [stateCitySearchTerm, setStateCitySearchTerm] = useState('')
-  const [vendorDefaultCitySlug, setVendorDefaultCitySlug] = useState('all')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [editingProduct, setEditingProduct] = useState<ProductEditor | null>(null)
-  const shortDescriptionRef = useRef<HTMLTextAreaElement>(null)
-  const descriptionRef = useRef<HTMLTextAreaElement>(null)
-  const [savingDefaultCity, setSavingDefaultCity] = useState(false)
-  const [loadingDefaultCity, setLoadingDefaultCity] = useState(false)
+  const [websiteName, setWebsiteName] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<WebsiteCard | null>(null)
+  const [deletingWebsiteId, setDeletingWebsiteId] = useState<string | null>(null)
 
-  const loadVendorsAndCities = useCallback(async () => {
-    setLoadingVendors(true)
+  const availableTemplates = templateCatalog.length
+    ? templateCatalog
+    : DEFAULT_TEMPLATE_CATALOG
+
+  const selectedTemplate = useMemo(
+    () => availableTemplates.find((template) => template.key === selectedTemplateKey),
+    [availableTemplates, selectedTemplateKey]
+  )
+  const trimmedWebsiteName = websiteName.trim()
+  const canCreateWebsite = Boolean(trimmedWebsiteName && selectedTemplateKey && !creating)
+
+  const templateByKey = useMemo(
+    () => new Map(availableTemplates.map((template) => [template.key, template])),
+    [availableTemplates]
+  )
+
+  const loadWorkspace = async () => {
+    if (!vendorId) {
+      setLoading(false)
+      setWebsites([])
+      setTemplateCatalog([])
+      setSelectedTemplateKey('')
+      return
+    }
+
+    setLoading(true)
     try {
-      const citiesResPromise = fetch(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/cities?includeInactive=true`, {
+      const requestConfig = {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      })
-
-      const vendorsResPromise = isAdmin
-        ? fetch(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/vendors/getall`)
-        : Promise.resolve(null)
-
-      const [vendorsRes, citiesRes] = await Promise.all([vendorsResPromise, citiesResPromise])
-
-      let nextVendors: VendorRow[] = []
-      if (isAdmin) {
-        const vendorsBody = await vendorsRes?.json()
-        nextVendors = Array.isArray(vendorsBody?.vendors) ? vendorsBody.vendors : []
-      } else if (isVendor) {
-        const ownId = String(authUser?.id || authUser?._id || '')
-        if (ownId) {
-          nextVendors = [
-            {
-              _id: ownId,
-              name: authUser?.name,
-              business_name: authUser?.business_name,
-              registrar_name: authUser?.registrar_name,
-              email: authUser?.email,
-              default_city_slug: normalizeCitySlug(authUser?.default_city_slug || 'all'),
-              default_city_id: authUser?.default_city_id,
-            },
-          ]
-        }
+        timeout: REQUEST_TIMEOUT_MS,
       }
 
-      const citiesBody = await citiesRes.json()
-
-      setVendors(nextVendors)
-      setSelectedVendorId((current) => {
-        if (current && nextVendors.some((vendor) => vendor._id === current)) return current
-        return nextVendors[0]?._id || ''
-      })
-      setTemplates([])
-      setSelectedTemplateKey('')
-      setProducts([])
-      setEditingProduct(null)
-      setSearchTerm('')
-      setVendorDefaultCitySlug('all')
-      setSelectedCitySlug('all')
-      setSelectedStateName('all')
-      setStateCitySearchTerm('')
-
-      setCities(Array.isArray(citiesBody?.data) ? citiesBody.data : [])
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to load workspace data')
-      setVendors([])
-      setCities([])
-      setSelectedVendorId('')
-      setTemplates([])
-      setSelectedTemplateKey('')
-      setProducts([])
-      setEditingProduct(null)
-      setSearchTerm('')
-      setVendorDefaultCitySlug('all')
-      setSelectedCitySlug('all')
-      setSelectedStateName('all')
-      setStateCitySearchTerm('')
-    } finally {
-      setLoadingVendors(false)
-    }
-  }, [authUser, isAdmin, isVendor, token])
-
-  useEffect(() => {
-    if (!canAccess) return
-    loadVendorsAndCities()
-  }, [canAccess, loadVendorsAndCities])
-
-  const loadCategoryMetadata = useCallback(async () => {
-    setLoadingCategoryMeta(true)
-    try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined
-      const [mainRes, categoryRes, subRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/maincategories/getall`, {
-          headers,
-        }),
-        fetch(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/categories/getall`, { headers }),
-        fetch(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/subcategories/getall`, { headers }),
+      const [catalogResponse, websitesResponse] = await Promise.allSettled([
+        axios.get(`${BASE_URL}/v1/templates/catalog`, requestConfig),
+        axios.get(`${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`, requestConfig),
       ])
 
-      const [mainBody, categoryBody, subBody] = await Promise.all([
-        mainRes.json(),
-        categoryRes.json(),
-        subRes.json(),
-      ])
+      const fetchedCatalog =
+        catalogResponse.status === 'fulfilled' &&
+        Array.isArray(catalogResponse.value.data?.data)
+          ? (catalogResponse.value.data.data as TemplateCatalogItem[])
+          : []
+      const nextCatalog = fetchedCatalog.length ? fetchedCatalog : DEFAULT_TEMPLATE_CATALOG
+      const nextWebsites =
+        websitesResponse.status === 'fulfilled' &&
+        Array.isArray(websitesResponse.value.data?.data)
+          ? (websitesResponse.value.data.data as WebsiteCard[])
+          : []
 
-      const normalizedMainCategories: MainCategoryOption[] = Array.isArray(mainBody?.data)
-        ? mainBody.data
-            .map((item: any) => ({
-              _id: String(item?._id || ''),
-              name: String(item?.name || ''),
-              slug: String(item?.slug || ''),
-            }))
-            .filter((item: MainCategoryOption) => item._id && item.name)
-        : []
-
-      const normalizedCategories: CategoryOption[] = Array.isArray(categoryBody?.data)
-        ? categoryBody.data
-            .map((item: any) => ({
-              _id: String(item?._id || ''),
-              name: String(item?.name || ''),
-              slug: String(item?.slug || ''),
-              mainCategoryId:
-                toObjectIdString(item?.main_category_id) ||
-                toObjectIdString(item?.mainCategory) ||
-                toObjectIdString(item?.mainCategory?._id),
-            }))
-            .filter((item: CategoryOption) => item._id && item.name && item.mainCategoryId)
-        : []
-
-      const normalizedSubCategories: SubCategoryOption[] = Array.isArray(subBody?.data)
-        ? subBody.data
-            .map((item: any) => ({
-              _id: String(item?._id || ''),
-              name: String(item?.name || ''),
-              slug: String(item?.slug || ''),
-              categoryId:
-                toObjectIdString(item?.category_id) ||
-                toObjectIdString(item?.category_id?._id),
-              mainCategoryId:
-                toObjectIdString(item?.main_category_id) ||
-                toObjectIdString(item?.main_category_id?._id),
-            }))
-            .filter((item: SubCategoryOption) => item._id && item.name && item.categoryId)
-        : []
-
-      setMainCategories(normalizedMainCategories)
-      setCategories(normalizedCategories)
-      setSubCategories(normalizedSubCategories)
-    } catch {
-      setMainCategories([])
-      setCategories([])
-      setSubCategories([])
-      toast.error('Failed to load category metadata')
-    } finally {
-      setLoadingCategoryMeta(false)
-    }
-  }, [token])
-
-  useEffect(() => {
-    if (!canAccess) return
-    loadCategoryMetadata()
-  }, [canAccess, loadCategoryMetadata])
-
-  const loadTemplates = useCallback(async (vendorId: string) => {
-    if (!vendorId) {
-      setTemplates([])
-      setSelectedTemplateKey('')
-      return
-    }
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`
-      )
-      const body = await res.json()
-      const list = Array.isArray(body?.data) ? body.data : []
-      setTemplates(list)
+      setTemplateCatalog(nextCatalog)
+      setWebsites(nextWebsites)
       setSelectedTemplateKey((current) => {
-        if (current && list.some((item: TemplateRow) => item.template_key === current)) {
+        if (current && nextCatalog.some((template) => template.key === current)) {
           return current
         }
-        return list[0]?.template_key || ''
+        return nextCatalog[0]?.key || ''
       })
-    } catch {
-      setTemplates([])
-      setSelectedTemplateKey('')
-    }
-  }, [])
 
-  useEffect(() => {
-    if (!selectedVendorId) return
-    loadTemplates(selectedVendorId)
-  }, [selectedVendorId, loadTemplates])
-
-  const loadVendorDefaultCity = useCallback(async () => {
-    if (!isVendor || !token) return
-    setLoadingDefaultCity(true)
-    try {
-      const res = await fetch(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/vendor/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      const body = await res.json()
-      const nextSlug = normalizeCitySlug(body?.vendor?.default_city_slug || 'all')
-      setVendorDefaultCitySlug(nextSlug)
-      setSelectedCitySlug((current) =>
-        normalizeCitySlug(current) === 'all' ? nextSlug : normalizeCitySlug(current)
-      )
-    } catch {
-      setVendorDefaultCitySlug('all')
+      if (websitesResponse.status === 'rejected') {
+        const failure = websitesResponse.reason
+        toast.error(
+          failure?.response?.data?.message ||
+            failure?.message ||
+            'Some website data could not be loaded'
+        )
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to load websites')
     } finally {
-      setLoadingDefaultCity(false)
+      setLoading(false)
     }
-  }, [isVendor, token])
+  }
 
   useEffect(() => {
-    if (!selectedVendorId) {
-      setVendorDefaultCitySlug('all')
-      return
-    }
+    void loadWorkspace()
+  }, [vendorId, token])
 
-    if (isVendor) {
-      loadVendorDefaultCity()
-      return
-    }
+  useEffect(() => {
+    if (!token || vendorId || vendorProfile) return
+    void dispatch(fetchVendorProfile())
+  }, [dispatch, token, vendorId, vendorProfile])
 
-    const vendor = vendors.find((item) => item._id === selectedVendorId)
-    const nextDefaultSlug = normalizeCitySlug(vendor?.default_city_slug || 'all')
-    setVendorDefaultCitySlug(nextDefaultSlug)
-    setSelectedCitySlug((current) =>
-      normalizeCitySlug(current) === 'all' ? nextDefaultSlug : normalizeCitySlug(current)
+  const openCreateDialog = () => {
+    setWebsiteName('')
+    setSelectedTemplateKey(
+      (current) => current || availableTemplates[0]?.key || DEFAULT_TEMPLATE_CATALOG[0]?.key || ''
     )
-  }, [selectedVendorId, vendors, isVendor, loadVendorDefaultCity])
+    setDialogOpen(true)
+  }
 
-  const effectiveCitySlug = useMemo(() => {
-    const selected = normalizeCitySlug(selectedCitySlug)
-    if (selected !== 'all') return selected
-    return normalizeCitySlug(vendorDefaultCitySlug)
-  }, [selectedCitySlug, vendorDefaultCitySlug])
-
-  const loadWorkspace = useCallback(async () => {
-    if (!selectedVendorId) {
-      setProducts([])
+  const handleEditWebsite = (website: WebsiteCard) => {
+    const templateKey = String(website.template_key || '').trim()
+    if (!vendorId || !templateKey) {
+      toast.error('Website template could not be opened')
       return
     }
 
-    setLoadingWorkspace(true)
+    setStoredActiveWebsiteId(vendorId, website._id)
+    setStoredEditingTemplateKey(vendorId, templateKey)
+    void navigate({
+      to: '/vendor-template/$templateKey',
+      params: { templateKey },
+    })
+  }
+
+  const handleCreateWebsite = async () => {
+    if (!vendorId) {
+      toast.error('Vendor profile is still loading. Please refresh and try again.')
+      return
+    }
+    if (!trimmedWebsiteName) {
+      toast.error('Enter a website name first')
+      return
+    }
+    if (!selectedTemplate) {
+      toast.error('Select a template first')
+      return
+    }
+
+    const cleanName = trimmedWebsiteName
+    setCreating(true)
+
     try {
-      const productListCityScope = normalizeCitySlug(selectedCitySlug)
-      const productsRes = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/all?includeUnavailable=true&ownerId=${selectedVendorId}&city=${encodeURIComponent(productListCityScope)}`,
+      const response = await axios.post(
+        `${BASE_URL}/v1/templates`,
+        {
+          vendor_id: vendorId,
+          name: cleanName,
+          template_key: selectedTemplate.key,
+          previewImage: selectedTemplate.previewImage,
+        },
         {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         }
       )
-      const productsBody = await productsRes.json()
 
-      setProducts(Array.isArray(productsBody?.products) ? productsBody.products : [])
+      const createdWebsite = response.data?.data as Partial<WebsiteCard> | undefined
+      const createdWebsiteId = String(createdWebsite?._id || '').trim()
+      const createdTemplateKey = String(
+        createdWebsite?.template_key || selectedTemplate.key || ''
+      ).trim()
+
+      if (!createdWebsiteId || !createdTemplateKey) {
+        throw new Error('Website was created, but editor data is incomplete')
+      }
+
+      setStoredActiveWebsiteId(vendorId, createdWebsiteId)
+      setStoredEditingTemplateKey(vendorId, createdTemplateKey)
+      setDialogOpen(false)
+      toast.success('Website created. Opening builder...')
+
+      try {
+        await navigate({
+          to: '/vendor-template/$templateKey',
+          params: { templateKey: createdTemplateKey },
+        })
+      } catch (navigationError: any) {
+        await loadWorkspace()
+        toast.error(
+          navigationError?.message ||
+            'Website created, but the builder could not be opened automatically'
+        )
+      }
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to load template workspace')
-      setProducts([])
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to create website')
     } finally {
-      setLoadingWorkspace(false)
-    }
-  }, [selectedVendorId, selectedCitySlug, token])
-
-  useEffect(() => {
-    if (!selectedVendorId) return
-    loadWorkspace()
-  }, [selectedVendorId, effectiveCitySlug, loadWorkspace])
-
-  const stateOptions = useMemo(() => {
-    const states = Array.from(
-      new Set(
-        cities
-          .filter((city) => city?.isActive)
-          .map((city) => String(city?.state || '').trim())
-          .filter(Boolean)
-      )
-    )
-    return states.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
-  }, [cities])
-
-  const citiesForSelectedState = useMemo(() => {
-    const selectedState = String(selectedStateName || 'all').trim()
-    const search = stateCitySearchTerm.trim().toLowerCase()
-
-    const visibleCities = cities
-      .filter((city) => city?.isActive)
-      .filter((city) =>
-        selectedState === 'all'
-          ? true
-          : String(city?.state || '').trim() === selectedState
-      )
-      .filter((city) => {
-        if (!search) return true
-        return `${city.name} ${city.slug} ${city.state || ''}`
-          .toLowerCase()
-          .includes(search)
-      })
-
-    return visibleCities.sort((a, b) =>
-      String(a?.name || '').localeCompare(String(b?.name || ''), undefined, {
-        sensitivity: 'base',
-      })
-    )
-  }, [cities, selectedStateName, stateCitySearchTerm])
-
-  useEffect(() => {
-    if (!stateOptions.length) {
-      setSelectedStateName('all')
-      return
-    }
-    setSelectedStateName((current) => {
-      if (current === 'all') return current
-      return stateOptions.includes(current) ? current : 'all'
-    })
-  }, [stateOptions])
-
-  useEffect(() => {
-    const selectedSlug = normalizeCitySlug(selectedCitySlug)
-    if (selectedSlug === 'all') return
-    const selectedCity = cities.find(
-      (city) => normalizeCitySlug(city.slug) === selectedSlug
-    )
-    const selectedState = String(selectedCity?.state || '').trim()
-    if (!selectedState) return
-    setSelectedStateName((current) => (current === selectedState ? current : selectedState))
-  }, [selectedCitySlug, cities])
-
-  useEffect(() => {
-    if (selectedStateName === 'all') return
-    const selectedSlug = normalizeCitySlug(selectedCitySlug)
-    if (selectedSlug === 'all') return
-    const selectedCity = cities.find(
-      (city) => normalizeCitySlug(city.slug) === selectedSlug
-    )
-    const selectedState = String(selectedCity?.state || '').trim()
-    if (!selectedState || selectedState !== selectedStateName) {
-      setSelectedCitySlug('all')
-      setStoredTemplatePreviewCity('all')
-    }
-  }, [selectedStateName, selectedCitySlug, cities])
-
-  const searchedProducts = useMemo(() => {
-    const search = searchTerm.trim().toLowerCase()
-    if (!search) return products
-    return products.filter((product) =>
-      `${product.productName} ${product.slug} ${product.metaTitle} ${product.metaDescription}`
-        .toLowerCase()
-        .includes(search)
-    )
-  }, [products, searchTerm])
-
-  const cityOptions = useMemo(
-    () =>
-      [{ _id: 'all', name: 'All Cities', slug: 'all', isActive: true }, ...cities].filter(
-        (city, index, arr) => arr.findIndex((item) => item.slug === city.slug) === index
-      ),
-    [cities]
-  )
-
-  const cityLabelBySlug = useMemo(
-    () =>
-      cityOptions.reduce<Record<string, string>>((acc, city) => {
-        acc[normalizeCitySlug(city.slug)] = city.name
-        return acc
-      }, {}),
-    [cityOptions]
-  )
-
-  const productPageRows = useMemo<WorkspaceProductPageRow[]>(() => {
-    const selectedSlug = normalizeCitySlug(selectedCitySlug)
-
-    if (selectedSlug !== 'all') {
-      const selectedCity = cityOptions.find(
-        (city) => normalizeCitySlug(city.slug) === selectedSlug
-      )
-      const selectedPageCity: ProductPageCityContext = {
-        scope: 'city',
-        cityId: selectedCity?._id || '',
-        citySlug: selectedSlug,
-        cityName:
-          selectedCity?.name ||
-          cityLabelBySlug[selectedSlug] ||
-          selectedSlug,
-      }
-
-      return searchedProducts.map((product) => ({
-        rowKey: `${product._id}::${selectedPageCity.cityId || selectedPageCity.citySlug}`,
-        product,
-        pageCity: selectedPageCity,
-      }))
-    }
-
-    return searchedProducts.flatMap((product) => {
-      const globalRow: WorkspaceProductPageRow = {
-        rowKey: `${product._id}::all`,
-        product,
-        pageCity: {
-          scope: 'global',
-          cityId: '',
-          citySlug: 'all',
-          cityName: 'All Cities',
-        },
-      }
-
-      const mappedCities = Array.isArray(product.availableCities)
-        ? product.availableCities.filter((city) => city?._id || city?.slug)
-        : []
-
-      if (!mappedCities.length) {
-        return [globalRow]
-      }
-
-      const cityRows = mappedCities.map((city) => ({
-        rowKey: `${product._id}::${city._id || city.slug}`,
-        product,
-        pageCity: {
-          scope: 'city' as const,
-          cityId: String(city._id || '').trim(),
-          citySlug: normalizeCitySlug(city.slug),
-          cityName: city.name || city.slug || 'City Page',
-        },
-      }))
-
-      return [globalRow, ...cityRows]
-    })
-  }, [searchedProducts, selectedCitySlug, cityOptions, cityLabelBySlug])
-
-  const previewUrl = useMemo(() => {
-    if (!selectedVendorId || !selectedTemplateKey) return ''
-    return (
-      getVendorTemplatePreviewUrl(selectedVendorId, selectedTemplateKey, effectiveCitySlug) || ''
-    )
-  }, [selectedVendorId, selectedTemplateKey, effectiveCitySlug])
-
-  const getProductPreviewUrl = useCallback(
-    (row: WorkspaceProductPageRow) => {
-      if (!selectedVendorId || !row?.product?._id) return ''
-
-      const selectedSlug = normalizeCitySlug(selectedCitySlug)
-      const citySlugForPreview =
-        row.pageCity.scope === 'city'
-          ? normalizeCitySlug(row.pageCity.citySlug)
-          : selectedSlug !== 'all'
-            ? selectedSlug
-            : normalizeCitySlug(effectiveCitySlug)
-
-      const baseUrl =
-        getVendorTemplatePageUrl(
-          selectedVendorId,
-          citySlugForPreview,
-          selectedTemplateKey
-        ) || ''
-      if (!baseUrl) return ''
-      return `${baseUrl.replace(/\/$/, '')}/product/${row.product._id}`
-    },
-    [selectedVendorId, selectedTemplateKey, selectedCitySlug, effectiveCitySlug]
-  )
-
-  const mainCategoryNameById = useMemo(
-    () =>
-      mainCategories.reduce<Record<string, string>>((acc, item) => {
-        acc[item._id] = item.name
-        return acc
-      }, {}),
-    [mainCategories]
-  )
-
-  const categoryNameById = useMemo(
-    () =>
-      categories.reduce<Record<string, string>>((acc, item) => {
-        acc[item._id] = item.name
-        return acc
-      }, {}),
-    [categories]
-  )
-
-  const subCategoryNameById = useMemo(
-    () =>
-      subCategories.reduce<Record<string, string>>((acc, item) => {
-        acc[item._id] = item.name
-        return acc
-      }, {}),
-    [subCategories]
-  )
-
-  const editorCategoryOptions = useMemo(() => {
-    if (!editingProduct?.mainCategoryId) return []
-    return categories
-      .filter((item) => item.mainCategoryId === editingProduct.mainCategoryId)
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-  }, [categories, editingProduct?.mainCategoryId])
-
-  const editorSelectedCategoryIds = useMemo(() => {
-    if (!editingProduct) return [] as string[]
-    const raw = [editingProduct.productCategoryId, ...editingProduct.productCategoryIds]
-      .map((item) => String(item || '').trim())
-      .filter(Boolean)
-    return Array.from(new Set(raw))
-  }, [editingProduct])
-
-  const editorSubCategoryOptions = useMemo(() => {
-    if (!editorSelectedCategoryIds.length) return [] as SubCategoryOption[]
-    return subCategories
-      .filter((item) => editorSelectedCategoryIds.includes(item.categoryId))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-  }, [editorSelectedCategoryIds, subCategories])
-
-  useEffect(() => {
-    if (!editingProduct) return
-
-    setEditingProduct((prev) => {
-      if (!prev) return prev
-
-      let nextMainCategoryId = prev.mainCategoryId
-      if (!nextMainCategoryId && prev.productCategoryId) {
-        const category = categories.find((item) => item._id === prev.productCategoryId)
-        if (category?.mainCategoryId) {
-          nextMainCategoryId = category.mainCategoryId
-        }
-      }
-
-      const validCategoryIdsForMain = categories
-        .filter((item) =>
-          nextMainCategoryId ? item.mainCategoryId === nextMainCategoryId : true
-        )
-        .map((item) => item._id)
-
-      const normalizedCategoryIds = Array.from(
-        new Set(
-          [prev.productCategoryId, ...prev.productCategoryIds]
-            .map((item) => String(item || '').trim())
-            .filter((item) =>
-              validCategoryIdsForMain.length
-                ? validCategoryIdsForMain.includes(item)
-                : true
-            )
-        )
-      )
-
-      const nextPrimaryCategoryId = normalizedCategoryIds[0] || ''
-      const normalizedSubCategoryIds = prev.productSubCategoryIds.filter((id) =>
-        subCategories.some(
-          (sub) =>
-            sub._id === id &&
-            normalizedCategoryIds.includes(sub.categoryId)
-        )
-      )
-
-      const noChanges =
-        nextMainCategoryId === prev.mainCategoryId &&
-        nextPrimaryCategoryId === prev.productCategoryId &&
-        JSON.stringify(normalizedCategoryIds) ===
-          JSON.stringify(prev.productCategoryIds) &&
-        JSON.stringify(normalizedSubCategoryIds) ===
-          JSON.stringify(prev.productSubCategoryIds)
-
-      if (noChanges) return prev
-
-      return {
-        ...prev,
-        mainCategoryId: nextMainCategoryId,
-        productCategoryId: nextPrimaryCategoryId,
-        productCategoryIds: normalizedCategoryIds,
-        productSubCategoryIds: normalizedSubCategoryIds,
-      }
-    })
-  }, [categories, subCategories, editingProduct?._id])
-
-  const saveDefaultCity = async () => {
-    if (!isVendor || !token) return
-    const nextSlug = normalizeCitySlug(vendorDefaultCitySlug)
-    setSavingDefaultCity(true)
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/vendor/profile/default-city`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            citySlug: nextSlug,
-          }),
-        }
-      )
-      const body = await res.json()
-      if (!res.ok || body?.success === false) {
-        throw new Error(body?.message || `Failed to update default city (HTTP ${res.status})`)
-      }
-
-      const updatedSlug = normalizeCitySlug(
-        body?.city?.slug || body?.vendor?.default_city_slug || nextSlug
-      )
-      setVendorDefaultCitySlug(updatedSlug)
-      setSelectedCitySlug((current) =>
-        normalizeCitySlug(current) === 'all' ? updatedSlug : normalizeCitySlug(current)
-      )
-      setStoredTemplatePreviewCity(updatedSlug)
-      toast.success('Default city updated')
-      loadWorkspace()
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to update default city')
-    } finally {
-      setSavingDefaultCity(false)
+      setCreating(false)
     }
   }
 
-  const fetchProductForEditor = useCallback(
-    async (productId: string, pageCity?: ProductPageCityContext) => {
-      const cityQuery =
-        pageCity?.scope === 'city'
-          ? pageCity.cityId
-            ? `cityId=${encodeURIComponent(pageCity.cityId)}`
-            : `city=${encodeURIComponent(pageCity.citySlug)}`
-          : ''
+  const handleDeleteWebsite = async () => {
+    if (!deleteTarget?._id) return
 
-      const queryParams = new URLSearchParams()
-      queryParams.set('includeUnavailable', 'true')
-      if (cityQuery) {
-        const scopedParams = new URLSearchParams(cityQuery)
-        scopedParams.forEach((value, key) => queryParams.set(key, value))
-      }
-
-      const endpoint = `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/${productId}?${queryParams.toString()}`
-      const response = await fetch(endpoint, {
+    setDeletingWebsiteId(deleteTarget._id)
+    try {
+      await axios.delete(`${BASE_URL}/v1/templates/website/${deleteTarget._id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       })
-      const body = await response.json()
 
-      if (!response.ok) {
-        throw new Error(body?.message || `Failed to load product content (HTTP ${response.status})`)
+      if (vendorId && getStoredActiveWebsiteId(vendorId) === deleteTarget._id) {
+        setStoredActiveWebsiteId(vendorId, undefined)
+        setStoredEditingTemplateKey(vendorId, undefined)
       }
 
-      return (body?.product || null) as WorkspaceProduct | null
-    },
-    [token]
-  )
-
-  const openEditor = async (row: WorkspaceProductPageRow) => {
-    const rowKey = row.rowKey
-    setOpeningEditorRowKey(rowKey)
-    try {
-      const resolvedProduct = (await fetchProductForEditor(row.product._id, row.pageCity)) || row.product
-      setEditingProduct(defaultEditor(resolvedProduct, row.pageCity))
+      toast.success('Website deleted')
+      setDeleteTarget(null)
+      await loadWorkspace()
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to load product editor')
-      setEditingProduct(defaultEditor(row.product, row.pageCity))
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to delete website')
     } finally {
-      setOpeningEditorRowKey((current) => (current === rowKey ? '' : current))
+      setDeletingWebsiteId(null)
     }
   }
 
-  const closeEditor = () => {
-    setEditingProduct(null)
-    setUploadingVariantImageKey('')
-  }
-
-  const openGlobalEditorForProduct = async (productId: string) => {
-    const rowKey = `${productId}::all`
-    setOpeningEditorRowKey(rowKey)
+  const formatDate = (value?: string) => {
+    if (!value) return 'Recently created'
     try {
-      const globalContext: ProductPageCityContext = {
-        scope: 'global',
-        cityId: '',
-        citySlug: 'all',
-        cityName: 'All Cities',
-      }
-      const fallbackProduct =
-        products.find((product) => product._id === productId) ||
-        productPageRows.find((row) => row.product._id === productId)?.product
-
-      const resolvedProduct =
-        (await fetchProductForEditor(productId, globalContext)) || fallbackProduct
-
-      if (!resolvedProduct) {
-        throw new Error('Product not found for global editor')
-      }
-
-      setEditingProduct(defaultEditor(resolvedProduct, globalContext))
-    } catch (error: any) {
-      toast.error(error?.message || 'Unable to open global mode')
-    } finally {
-      setOpeningEditorRowKey((current) => (current === rowKey ? '' : current))
+      return new Intl.DateTimeFormat('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }).format(new Date(value))
+    } catch {
+      return 'Recently created'
     }
   }
 
-  const uploadImageAsset = useCallback(
-    async (file: File, folder: string): Promise<ImageAsset | null> => {
-      try {
-        const signatureRes = await fetch(
-          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/cloudinary/signature?folder=${encodeURIComponent(folder)}`,
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          }
-        )
-        const signatureBody = await signatureRes.json()
-
-        if (!signatureRes.ok) {
-          throw new Error(
-            signatureBody?.message || `Failed to fetch Cloudinary signature (HTTP ${signatureRes.status})`
-          )
-        }
-
-        const cloudName = String(signatureBody?.cloudName || '').trim()
-        const apiKey = String(signatureBody?.apiKey || '').trim()
-        const timestamp = String(signatureBody?.timestamp || '').trim()
-        const signature = String(signatureBody?.signature || '').trim()
-        const resolvedFolder = String(signatureBody?.folder || folder || '').trim()
-
-        if (!cloudName || !apiKey || !timestamp || !signature) {
-          throw new Error('Cloudinary signature response is incomplete')
-        }
-
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('api_key', apiKey)
-        formData.append('timestamp', timestamp)
-        formData.append('signature', signature)
-        if (resolvedFolder) {
-          formData.append('folder', resolvedFolder)
-        }
-
-        const uploadRes = await fetch(
-          `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-          {
-            method: 'POST',
-            body: formData,
-          }
-        )
-
-        const uploadBody = await uploadRes.json()
-        if (!uploadRes.ok || !uploadBody?.secure_url) {
-          throw new Error(uploadBody?.error?.message || 'Failed to upload image to Cloudinary')
-        }
-
-        const secureUrl = String(uploadBody?.secure_url || '').trim()
-        if (!secureUrl) {
-          throw new Error('Cloudinary returned empty image URL')
-        }
-
-        const publicId = String(uploadBody?.public_id || '').trim()
-        return {
-          url: secureUrl,
-          publicId: publicId || derivePublicIdFromUrl(secureUrl, 'variant-image'),
-        }
-      } catch (error: any) {
-        toast.error(error?.message || 'Image upload failed')
-        return null
-      }
-    },
-    [token]
-  )
-
-  const handleVariantImageUpload = async (
-    variantTempId: string,
-    imageIndex: number,
-    file?: File | null
-  ) => {
-    if (!file) return
-
-    const uploadKey = `${variantTempId}-${imageIndex}`
-    setUploadingVariantImageKey(uploadKey)
-
-    try {
-      const uploaded = await uploadImageAsset(file, 'product_variants')
-      if (!uploaded) return
-
-      setEditingProduct((prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          variants: prev.variants.map((item) => {
-            if (item.tempId !== variantTempId) return item
-            const nextImages = [...item.variantsImageUrls]
-            while (nextImages.length <= imageIndex) {
-              nextImages.push({ url: '', publicId: '' })
-            }
-            nextImages[imageIndex] = uploaded
-            return { ...item, variantsImageUrls: nextImages }
-          }),
-        }
-      })
-
-      toast.success('Variant image uploaded')
-    } finally {
-      setUploadingVariantImageKey((current) => (current === uploadKey ? '' : current))
-    }
-  }
-
-  const saveProduct = async () => {
-    if (!editingProduct) return
-    setSavingProduct(true)
-    try {
-      const normalizedDefaultImages = editingProduct.defaultImages
-        .map((image, index) =>
-          normalizeImageAsset(image, `default-${index + 1}`)
-        )
-        .filter((image): image is ImageAsset => Boolean(image))
-        .filter((image) => image.url)
-
-      const normalizedSpecifications = editingProduct.specificationRows
-        .map((row) => ({
-          key: String(row?.key || '').trim(),
-          value: String(row?.value || '').trim(),
-        }))
-        .filter((row) => row.key && row.value)
-        .map((row) => ({ [row.key]: row.value }))
-
-      const normalizedFaqs = editingProduct.faqs
-        .map((faq) => ({
-          question: String(faq?.question || '').trim(),
-          answer: String(faq?.answer || '').trim(),
-        }))
-        .filter((faq) => faq.question && faq.answer)
-
-      const normalizedVariants = editingProduct.variants.map((variant, index) => {
-        const parsedAttributes = variant.variantAttributes.reduce<Record<string, string>>(
-          (acc, row) => {
-            const safeKey = String(row?.key || '').trim()
-            const safeValue = String(row?.value || '').trim()
-            if (!safeKey || !safeValue) return acc
-            acc[safeKey] = safeValue
-            return acc
-          },
-          {}
-        )
-
-        const parsedImages = variant.variantsImageUrls
-          .map((image, imageIndex) =>
-            normalizeImageAsset(image, `variant-${index + 1}-${imageIndex + 1}`)
-          )
-          .filter((image): image is ImageAsset => Boolean(image))
-          .filter((image) => image.url)
-
-        const actualPrice = Number(variant.actualPrice || 0)
-        const finalPrice = Number(variant.finalPrice || 0)
-        const stockQuantity = Number(variant.stockQuantity || 0)
-
-        if (!Object.keys(parsedAttributes).length) {
-          throw new Error(`Variant ${index + 1}: at least one attribute is required`)
-        }
-        if (!parsedImages.length) {
-          throw new Error(`Variant ${index + 1}: at least one image is required`)
-        }
-        if (!Number.isFinite(actualPrice) || actualPrice <= 0) {
-          throw new Error(`Variant ${index + 1}: actual price must be greater than 0`)
-        }
-        if (!Number.isFinite(finalPrice) || finalPrice <= 0) {
-          throw new Error(`Variant ${index + 1}: final price must be greater than 0`)
-        }
-        if (finalPrice > actualPrice) {
-          throw new Error(`Variant ${index + 1}: final price cannot exceed actual price`)
-        }
-        if (!Number.isFinite(stockQuantity) || stockQuantity < 0) {
-          throw new Error(`Variant ${index + 1}: stock quantity must be 0 or greater`)
-        }
-
-        const normalizedVariant: Record<string, unknown> = {
-          variantSku: String(variant.variantSku || '').trim(),
-          variantAttributes: parsedAttributes,
-          actualPrice,
-          finalPrice,
-          stockQuantity,
-          isActive: variant.isActive !== false,
-          variantsImageUrls: parsedImages,
-          variantMetaTitle: String(variant.variantMetaTitle || '').trim(),
-          variantMetaDescription: String(variant.variantMetaDescription || '').trim(),
-          variantMetaKeywords: String(variant.variantMetaKeywords || '')
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean),
-          variantCanonicalUrl: String(variant.variantCanonicalUrl || '').trim(),
-        }
-
-        if (variant._id) {
-          normalizedVariant._id = variant._id
-        }
-
-        return normalizedVariant
-      })
-
-      if (!normalizedVariants.length) {
-        throw new Error('At least one variant is required')
-      }
-
-      const normalizedCategoryIds = Array.from(
-        new Set(
-          [editingProduct.productCategoryId, ...editingProduct.productCategoryIds]
-            .map((item) => String(item || '').trim())
-            .filter(Boolean)
-        )
-      )
-
-      const normalizedSubCategoryIds = Array.from(
-        new Set(
-          editingProduct.productSubCategoryIds
-            .map((item) => String(item || '').trim())
-            .filter(Boolean)
-        )
-      )
-
-      if (!editingProduct.mainCategoryId) {
-        throw new Error('Main category is required')
-      }
-      if (!normalizedCategoryIds.length) {
-        throw new Error('At least one category is required')
-      }
-
-      const cityScopedEditing =
-        editingProduct.editScope === 'city' &&
-        Boolean(editingProduct.editCityId || editingProduct.editCitySlug)
-
-      const cityQuery = editingProduct.editCityId
-        ? `cityId=${encodeURIComponent(editingProduct.editCityId)}`
-        : `city=${encodeURIComponent(editingProduct.editCitySlug || 'all')}`
-
-      const endpoint = cityScopedEditing
-        ? `${import.meta.env.VITE_PUBLIC_API_URL}/v1/admin/products/${editingProduct._id}/content/city?${cityQuery}`
-        : `${import.meta.env.VITE_PUBLIC_API_URL}/v1/admin/products/${editingProduct._id}/content`
-
-      const requestPayload: Record<string, unknown> = {
-        productName: editingProduct.productName,
-        slug: editingProduct.slug,
-        brand: editingProduct.brand,
-        shortDescription: editingProduct.shortDescription,
-        description: editingProduct.description,
-        metaTitle: editingProduct.metaTitle,
-        metaDescription: editingProduct.metaDescription,
-        metaKeywords: editingProduct.metaKeywords
-          .split(',')
-          .map((item) => item.trim())
-          .filter(Boolean),
-        mainCategory: editingProduct.mainCategoryId,
-        productCategory: editingProduct.productCategoryId || normalizedCategoryIds[0],
-        productCategories: normalizedCategoryIds,
-        productSubCategories: normalizedSubCategoryIds,
-        defaultImages: normalizedDefaultImages,
-        specifications: normalizedSpecifications,
-        variants: normalizedVariants,
-        faqs: normalizedFaqs,
-        status: editingProduct.status,
-        isAvailable: editingProduct.isAvailable,
-      }
-
-      if (!cityScopedEditing) {
-        requestPayload.availableCities = editingProduct.availableCities
-      } else {
-        requestPayload.cityId = editingProduct.editCityId
-        requestPayload.citySlug = editingProduct.editCitySlug
-      }
-
-      const res = await fetch(endpoint, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestPayload),
-      })
-      const data = await res.json()
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.message || `Failed to update product page (HTTP ${res.status})`)
-      }
-      toast.success('Product page updated')
-      closeEditor()
-      loadWorkspace()
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to update product page')
-    } finally {
-      setSavingProduct(false)
-    }
-  }
-
-  const isCityScopedEditor = editingProduct?.editScope === 'city'
-
-  if (!canAccess) {
-    return (
-      <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
-        <div className='rounded-xl border border-rose-200 bg-rose-50 px-4 py-5 text-sm text-rose-700'>
-          Only admins and vendors can access template workspace.
-        </div>
-      </Main>
-    )
+  const getTemplateBlurb = (description?: string) => {
+    const text = String(description || 'Use this storefront template to start your site.').trim()
+    if (text.length <= 110) return text
+    return `${text.slice(0, 107).trimEnd()}...`
   }
 
   return (
     <>
-      <Header fixed>
-        <Search />
-        <div className='ms-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ConfigDrawer />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <TablePageHeader title='My Websites'>
+        <Button
+          type='button'
+          variant='outline'
+          className='shrink-0'
+          onClick={loadWorkspace}
+          disabled={loading}
+        >
+          {loading ? (
+            <Loader2 className='h-4 w-4 animate-spin' />
+          ) : (
+            <RefreshCw className='h-4 w-4' />
+          )}
+          Refresh
+        </Button>
+        <Button type='button' className='shrink-0' onClick={openCreateDialog}>
+          <Plus className='h-4 w-4' />
+          Create Website
+        </Button>
+      </TablePageHeader>
 
-      <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
-        <div className='flex flex-wrap items-end justify-between gap-3'>
+      <Main className='flex flex-1 flex-col gap-6'>
+        <section className='grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(180px,0.5fr)_minmax(180px,0.5fr)]'>
+          <div className='rounded-2xl border border-border bg-card p-6 shadow-sm'>
+            <p className='text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground'>
+              Workspace
+            </p>
+            <h2 className='mt-2 text-xl font-semibold tracking-tight text-foreground'>
+              Manage storefront websites for {vendorName}
+            </h2>
+            <p className='mt-2 text-sm leading-6 text-muted-foreground'>
+              Create a new website from any available template, jump straight into the builder,
+              and manage every preview link from this one page.
+            </p>
+          </div>
+
+          <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
+            <p className='text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+              Websites
+            </p>
+            <p className='mt-2 text-3xl font-semibold tracking-tight text-foreground'>
+              {websites.length}
+            </p>
+            <p className='mt-2 text-sm text-muted-foreground'>Active website entries in your workspace.</p>
+          </div>
+
+          <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
+            <p className='text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+              Templates
+            </p>
+            <p className='mt-2 text-3xl font-semibold tracking-tight text-foreground'>
+              {availableTemplates.length}
+            </p>
+            <p className='mt-2 text-sm text-muted-foreground'>Starting layouts ready for new websites.</p>
+          </div>
+        </section>
+
+        <section className='space-y-4'>
           <div>
-            <h2 className='text-2xl font-bold tracking-tight'>Template Workspace</h2>
-            <p className='text-muted-foreground'>
-              Choose vendor template, view all pages, and edit full product page SEO + city mapping.
+            <h2 className='text-2xl font-semibold tracking-tight text-foreground'>Created Websites</h2>
+            <p className='text-sm text-muted-foreground'>
+              Preview, edit, or remove any website from here.
             </p>
           </div>
-          <Button variant='outline' onClick={loadWorkspace} disabled={loadingWorkspace}>
-            {loadingWorkspace ? (
-              <Loader2 className='h-4 w-4 animate-spin' />
-            ) : (
-              <LayoutTemplate className='h-4 w-4' />
-            )}
-            Refresh Workspace
-          </Button>
-        </div>
 
-        <div className='rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-          <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-5'>
-            <div>
-              <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                Vendor
-              </label>
-              <select
-                value={selectedVendorId}
-                onChange={(e) => setSelectedVendorId(e.target.value)}
-                className='h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm'
-                disabled={loadingVendors || isVendor}
-              >
-                <option value=''>{loadingVendors ? 'Loading vendors...' : 'Select vendor'}</option>
-                {vendors.map((vendor) => (
-                  <option key={vendor._id} value={vendor._id}>
-                    {getVendorLabel(vendor)}
-                  </option>
-                ))}
-              </select>
+          {loading ? (
+            <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className={`${cardClass} h-[420px] animate-pulse bg-muted/30`} />
+              ))}
             </div>
-
-            <div>
-              <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                Template
-              </label>
-              <select
-                value={selectedTemplateKey}
-                onChange={(e) => setSelectedTemplateKey(e.target.value)}
-                className='h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm'
-                disabled={!selectedVendorId}
-              >
-                <option value=''>Select template</option>
-                {templates.map((template) => (
-                  <option key={template._id} value={template.template_key}>
-                    {template.template_name || template.template_key}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                City URL
-              </label>
-              <select
-                value={selectedCitySlug}
-                onChange={(e) => {
-                  const nextCity = normalizeCitySlug(e.target.value)
-                  setSelectedCitySlug(nextCity)
-                  setStoredTemplatePreviewCity(nextCity)
-                }}
-                className='h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm'
-              >
-                {cityOptions
-                  .filter((city) => city.isActive || city.slug === 'all')
-                  .map((city) => (
-                    <option key={city._id} value={city.slug}>
-                      {city.name}
-                    </option>
-                  ))}
-              </select>
-              <p className='mt-1 text-xs text-slate-500'>
-                Preview/product data resolves city as:{' '}
-                <span className='font-semibold text-slate-700'>
-                  {cityLabelBySlug[normalizeCitySlug(effectiveCitySlug)] || 'All Cities'}
-                </span>
-              </p>
-            </div>
-
-            <div>
-              <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                Vendor Default City
-              </label>
-              <div className='flex gap-2'>
-                <select
-                  value={vendorDefaultCitySlug}
-                  onChange={(e) => setVendorDefaultCitySlug(normalizeCitySlug(e.target.value))}
-                  className='h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm'
-                  disabled={!isVendor || loadingDefaultCity || savingDefaultCity}
-                >
-                  {cityOptions
-                    .filter((city) => city.isActive || city.slug === 'all')
-                    .map((city) => (
-                      <option key={`default-${city._id}`} value={city.slug}>
-                        {city.name}
-                      </option>
-                    ))}
-                </select>
-                {isVendor ? (
-                  <Button
-                    type='button'
-                    variant='outline'
-                    className='h-11 min-w-[98px]'
-                    onClick={saveDefaultCity}
-                    disabled={savingDefaultCity || loadingDefaultCity}
-                  >
-                    {savingDefaultCity ? (
-                      <Loader2 className='h-4 w-4 animate-spin' />
-                    ) : (
-                      <MapPin className='h-4 w-4' />
-                    )}
-                    Save
-                  </Button>
-                ) : null}
-              </div>
-              <p className='mt-1 text-xs text-slate-500'>
-                {isVendor
-                  ? 'Used automatically when City URL is set to All Cities.'
-                  : `Vendor default: ${
-                      cityLabelBySlug[normalizeCitySlug(vendorDefaultCitySlug)] || 'All Cities'
-                    }`}
-              </p>
-            </div>
-
-            <div className='flex items-end md:col-span-2 xl:col-span-1'>
-              {previewUrl ? (
-                <a href={previewUrl} target='_blank' rel='noreferrer' className='w-full'>
-                  <Button className='w-full'>
-                    <ExternalLink className='h-4 w-4' />
-                    Open City Preview
-                  </Button>
-                </a>
-              ) : (
-                <Button className='w-full' disabled>
-                  Open City Preview
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className='grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]'>
-          <div className='min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-            <h3 className='text-lg font-semibold text-slate-900'>State & City Products</h3>
-            <p className='mt-1 text-sm text-slate-500'>
-              State select karo, phir city choose karo. City choose karte hi us city ke products
-              right side me load honge.
-            </p>
-
-            <div className='mt-4'>
-              <label className='mb-1 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                State
-              </label>
-              <select
-                value={selectedStateName}
-                onChange={(e) => setSelectedStateName(e.target.value)}
-                className='h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm'
-              >
-                <option value='all'>All States</option>
-                {stateOptions.map((stateName) => (
-                  <option key={stateName} value={stateName}>
-                    {stateName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className='mt-3 flex items-center justify-between'>
-              <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                Cities
-              </p>
-              <Button
-                type='button'
-                variant='outline'
-                size='sm'
-                className='h-7 px-2 text-xs'
-                onClick={() => {
-                  setSelectedCitySlug('all')
-                  setStoredTemplatePreviewCity('all')
-                }}
-              >
-                Show All Cities
-              </Button>
-            </div>
-
-            <Input
-              value={stateCitySearchTerm}
-              onChange={(e) => setStateCitySearchTerm(e.target.value)}
-              placeholder='Search city...'
-              className='mt-2'
-            />
-
-            <div className='mt-3 max-h-[420px] space-y-2 overflow-y-auto pe-1'>
-              {citiesForSelectedState.map((city) => {
-                const citySlug = normalizeCitySlug(city.slug)
-                const selected = normalizeCitySlug(selectedCitySlug) === citySlug
-                return (
-                  <button
-                    key={city._id}
-                    type='button'
-                    onClick={() => {
-                      setSelectedCitySlug(citySlug)
-                      setStoredTemplatePreviewCity(citySlug)
-                    }}
-                    className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-                      selected
-                        ? 'border-cyan-300 bg-cyan-50'
-                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                    }`}
-                  >
-                    <p className='text-sm font-medium text-slate-800'>{city.name}</p>
-                    <p className='text-xs text-slate-500'>
-                      {city.state || 'State N/A'} - {city.country || 'India'}
-                    </p>
-                  </button>
+          ) : websites.length ? (
+            <div className='grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
+              {websites.map((website) => {
+                const templateKey = String(website.template_key || '').trim()
+                const websiteTemplate = templateByKey.get(templateKey)
+                const previewUrl = getVendorTemplatePreviewUrl(
+                  vendorId,
+                  templateKey,
+                  vendorDefaultCitySlug,
+                  website._id
                 )
-              })}
-              {!citiesForSelectedState.length ? (
-                <div className='rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500'>
-                  No cities found for selected state.
-                </div>
-              ) : null}
-            </div>
-          </div>
+                const thumbnail = website.previewImage || websiteTemplate?.previewImage || ''
 
-          <div className='min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
-            <div className='mb-4 flex flex-wrap items-center justify-between gap-2'>
-              <div>
-                <h3 className='text-lg font-semibold text-slate-900'>Product Pages</h3>
-                <p className='text-sm text-slate-500'>
-                  Edit complete product page + SEO. Use city rows to maintain city-specific product pages.
-                </p>
-                <p className='mt-1 text-xs font-medium text-amber-700'>
-                  Har product ki 1 row "All Cities" hoti hai (city list + common content), aur
-                  alag city rows hoti hain (sirf us city ke changes).
-                </p>
-              </div>
-              <Input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder='Search product pages...'
-                className='max-w-xs'
-              />
-            </div>
+                return (
+                  <article key={website._id} className={cardClass}>
+                    <div className='relative'>
+                      <StorefrontThumbnail
+                        title={website.name || website.template_name || 'Website preview'}
+                        previewUrl={previewUrl}
+                        fallbackImage={thumbnail}
+                        className='transition duration-300 group-hover:scale-[1.02]'
+                      />
 
-            <div className='w-full overflow-x-auto pb-2'>
-              <table className='w-full min-w-[1560px] table-auto'>
-                <thead>
-                  <tr className='border-b border-slate-200 text-left text-xs uppercase tracking-[0.2em] text-slate-500'>
-                    <th className='w-[220px] pb-2 pe-3 whitespace-nowrap'>Product</th>
-                    <th className='w-[170px] pb-2 pe-3 whitespace-nowrap'>Slug</th>
-                    <th className='w-[240px] pb-2 pe-3 whitespace-nowrap'>SEO Title</th>
-                    <th className='w-[150px] pb-2 pe-3 whitespace-nowrap'>Page City</th>
-                    <th className='w-[220px] pb-2 pe-3 whitespace-nowrap'>Mapped Cities</th>
-                    <th className='w-[110px] pb-2 pe-3 whitespace-nowrap'>Status</th>
-                    <th className='w-[190px] pb-2 pe-3 whitespace-nowrap'>Preview URL</th>
-                    <th className='w-[220px] pb-2 text-right whitespace-nowrap'>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productPageRows.map((row) => {
-                    const product = row.product
-                    const isCityScopedRow = row.pageCity.scope === 'city'
-                    const isOpeningEditor = openingEditorRowKey === row.rowKey
-                    const rowPreviewUrl = getProductPreviewUrl(row)
-
-                    return (
-                    <tr key={row.rowKey} className='border-b border-slate-100'>
-                      <td className='py-3 pe-3 align-top'>
-                        <p className='truncate font-medium text-slate-900'>{product.productName}</p>
-                        <p className='truncate text-xs text-slate-500'>{product.brand || 'N/A'}</p>
-                      </td>
-                      <td className='py-3 pe-3 align-top text-sm text-slate-600'>
-                        <p className='truncate'>{product.slug}</p>
-                      </td>
-                      <td className='py-3 pe-3 align-top text-sm text-slate-700'>
-                        <p className='truncate'>{product.metaTitle || '-'}</p>
-                      </td>
-                      <td className='py-3 pe-3 align-top'>
-                        {isCityScopedRow ? (
-                          <>
-                            <span className='inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700'>
-                              {row.pageCity.cityName || row.pageCity.citySlug}
-                            </span>
-                            <p className='mt-1 text-[11px] text-slate-500'>Only this city</p>
-                          </>
-                        ) : (
-                          <>
-                            <span className='inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600'>
-                              All Cities
-                            </span>
-                            <p className='mt-1 text-[11px] font-medium text-amber-700'>
-                              Edit city list here
-                            </p>
-                          </>
-                        )}
-                      </td>
-                      <td className='py-3 pe-3 align-top'>
-                        <MappedCitiesSummary cities={product.availableCities || []} />
-                      </td>
-                      <td className='py-3 pe-3 align-top text-sm text-slate-600'>
-                        <p className='truncate'>{product.status}</p>
-                      </td>
-                      <td className='py-3 pe-3 align-top'>
-                        {rowPreviewUrl ? (
-                          <div className='min-w-[170px]'>
-                            <a href={rowPreviewUrl} target='_blank' rel='noreferrer'>
-                              <Button size='sm' variant='outline' className='h-8 whitespace-nowrap'>
-                                <ExternalLink className='h-3.5 w-3.5' />
-                                Open Preview
-                              </Button>
-                            </a>
-                            <p
-                              className='mt-1 max-w-[180px] truncate text-[11px] text-slate-500'
-                              title={rowPreviewUrl}
-                            >
-                              {rowPreviewUrl}
-                            </p>
-                          </div>
-                        ) : (
-                          <span className='text-xs text-slate-400'>N/A</span>
-                        )}
-                      </td>
-                      <td className='py-3 text-right align-top'>
-                        <div className='flex min-w-[200px] flex-col items-end gap-1'>
-                          <Button
-                            size='sm'
-                            variant='outline'
-                            className='whitespace-nowrap'
-                            onClick={() => openEditor(row)}
-                            disabled={isOpeningEditor}
-                          >
-                            {isOpeningEditor ? (
-                              <Loader2 className='h-4 w-4 animate-spin' />
-                            ) : (
-                              <FilePenLine className='h-4 w-4' />
-                            )}
-                            {isCityScopedRow
-                              ? `Edit ${row.pageCity.cityName || row.pageCity.citySlug} only`
-                              : 'Edit All Cities'}
-                          </Button>
-                          {isCityScopedRow ? (
-                            <Button
-                              size='sm'
-                              variant='ghost'
-                              className='h-7 px-2 text-xs'
-                              title='Edit city list where this product is visible'
-                              onClick={() => void openGlobalEditorForProduct(product._id)}
-                            >
-                              Edit City List
-                            </Button>
-                          ) : null}
+                      <div className='absolute inset-x-0 top-0 flex items-start justify-between p-4'>
+                        <div className='inline-flex rounded-full border border-white/30 bg-black/55 px-3 py-1 text-xs font-semibold text-white backdrop-blur'>
+                          {website.template_name || websiteTemplate?.name || templateKey}
                         </div>
-                      </td>
-                    </tr>
-                  )})}
-                </tbody>
-              </table>
-            </div>
-
-            {!loadingWorkspace && productPageRows.length === 0 ? (
-              <div className='mt-4 rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500'>
-                No product pages found for selected vendor/city.
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </Main>
-
-      {editingProduct ? (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4'>
-          <div className='max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl'>
-            <div className='mb-4 flex items-center justify-between'>
-              <div>
-                <h3 className='text-xl font-semibold text-slate-900'>
-                  {isCityScopedEditor
-                    ? `Edit Product for ${editingProduct.editCityName || editingProduct.editCitySlug}`
-                    : 'Edit Product for All Cities'}
-                </h3>
-                <p className='text-sm text-slate-500'>
-                  Edit full product details including specs, variants, images, FAQs, SEO and cities.
-                </p>
-                <div className='mt-2 flex flex-wrap items-center gap-2 text-xs'>
-                  {isCityScopedEditor ? (
-                    <span className='inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-700'>
-                      Save target: {editingProduct.editCityName || editingProduct.editCitySlug} only
-                    </span>
-                  ) : (
-                    <span className='inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600'>
-                      Save target: All Cities
-                    </span>
-                  )}
-                </div>
-                <div
-                  className={`mt-2 rounded-md border px-2.5 py-2 text-xs ${
-                    isCityScopedEditor
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                      : 'border-slate-200 bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  {isCityScopedEditor
-                    ? `Aap yahan jo save karenge wo sirf ${
-                        editingProduct.editCityName || editingProduct.editCitySlug || 'this city'
-                      } page par lagega. Dusre cities par koi effect nahi hoga.`
-                    : 'Yahan save karne se product ka common content sab cities me update hoga.'}
-                </div>
-                {isCityScopedEditor ? (
-                  <div className='mt-2 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800'>
-                    <span>
-                      Available Cities list yahan edit nahi hoti.
-                    </span>
-                    <Button
-                      type='button'
-                      size='sm'
-                      variant='outline'
-                      className='h-7'
-                      onClick={() => void openGlobalEditorForProduct(editingProduct._id)}
-                    >
-                      Edit City List
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-              <Button variant='outline' onClick={closeEditor}>
-                Close
-              </Button>
-            </div>
-
-            <div className='grid gap-3 md:grid-cols-2 lg:grid-cols-3'>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>Product Name</span>
-                <Input
-                  value={editingProduct.productName}
-                  onChange={(e) =>
-                    setEditingProduct((prev) =>
-                      prev ? { ...prev, productName: e.target.value } : prev
-                    )
-                  }
-                />
-              </label>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>Slug</span>
-                <Input
-                  value={editingProduct.slug}
-                  onChange={(e) =>
-                    setEditingProduct((prev) =>
-                      prev ? { ...prev, slug: e.target.value } : prev
-                    )
-                  }
-                />
-              </label>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>Brand</span>
-                <Input
-                  value={editingProduct.brand}
-                  onChange={(e) =>
-                    setEditingProduct((prev) =>
-                      prev ? { ...prev, brand: e.target.value } : prev
-                    )
-                  }
-                />
-              </label>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>Status</span>
-                <select
-                  value={editingProduct.status}
-                  onChange={(e) =>
-                    setEditingProduct((prev) =>
-                      prev ? { ...prev, status: e.target.value } : prev
-                    )
-                  }
-                  className='h-10 w-full rounded-md border border-slate-300 bg-white px-3'
-                >
-                  <option value='draft'>Draft</option>
-                  <option value='pending'>Pending</option>
-                  <option value='approved'>Approved</option>
-                  <option value='rejected'>Rejected</option>
-                </select>
-              </label>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>Base SKU (readonly)</span>
-                <Input value={editingProduct.baseSku} readOnly />
-              </label>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>Main Category</span>
-                <select
-                  value={editingProduct.mainCategoryId}
-                  onChange={(e) =>
-                    setEditingProduct((prev) => {
-                      if (!prev) return prev
-                      return {
-                        ...prev,
-                        mainCategoryId: e.target.value,
-                        productCategoryId: '',
-                        productCategoryIds: [],
-                        productSubCategoryIds: [],
-                      }
-                    })
-                  }
-                  className='h-10 w-full rounded-md border border-slate-300 bg-white px-3'
-                  disabled={loadingCategoryMeta || isCityScopedEditor}
-                >
-                  <option value=''>
-                    {loadingCategoryMeta ? 'Loading categories...' : 'Select main category'}
-                  </option>
-                  {mainCategories.map((item) => (
-                    <option key={item._id} value={item._id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>
-                  Primary Category (required)
-                </span>
-                <select
-                  value={editingProduct.productCategoryId}
-                  onChange={(e) =>
-                    setEditingProduct((prev) => {
-                      if (!prev) return prev
-                      const nextPrimary = e.target.value
-                      const nextCategories = Array.from(
-                        new Set(
-                          [nextPrimary, ...prev.productCategoryIds]
-                            .map((item) => String(item || '').trim())
-                            .filter(Boolean)
-                        )
-                      )
-                      const nextSubCategoryIds = prev.productSubCategoryIds.filter((subId) =>
-                        subCategories.some(
-                          (sub) => sub._id === subId && nextCategories.includes(sub.categoryId)
-                        )
-                      )
-                      return {
-                        ...prev,
-                        productCategoryId: nextPrimary,
-                        productCategoryIds: nextCategories,
-                        productSubCategoryIds: nextSubCategoryIds,
-                      }
-                    })
-                  }
-                  className='h-10 w-full rounded-md border border-slate-300 bg-white px-3'
-                  disabled={!editingProduct.mainCategoryId || loadingCategoryMeta || isCityScopedEditor}
-                >
-                  <option value=''>Select primary category</option>
-                  {editorCategoryOptions.length ? (
-                    editorCategoryOptions.map((item) => (
-                      <option key={item._id} value={item._id}>
-                        {item.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option value='' disabled>
-                      No categories found for selected main category
-                    </option>
-                  )}
-                </select>
-                <span className='mt-1 block text-xs text-slate-500'>
-                  <code className='rounded bg-slate-100 px-1 py-0.5 text-[11px]'>
-                    productCategory
-                  </code>{' '}
-                  is the single primary category in schema.{' '}
-                  <code className='rounded bg-slate-100 px-1 py-0.5 text-[11px]'>
-                    productCategories
-                  </code>{' '}
-                  is the multi-category list.
-                </span>
-              </label>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>Categories</span>
-                <div
-                  className={`max-h-[132px] space-y-2 overflow-y-auto rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ${
-                    !editingProduct.mainCategoryId || loadingCategoryMeta || isCityScopedEditor
-                      ? 'opacity-70'
-                      : ''
-                  }`}
-                >
-                  {editorCategoryOptions.length ? (
-                    editorCategoryOptions.map((item) => {
-                      const checked = editingProduct.productCategoryIds.includes(item._id)
-                      return (
-                        <label
-                          key={`category-${item._id}`}
-                          className='flex items-center gap-2 text-slate-700'
+                        <button
+                          type='button'
+                          onClick={() => setDeleteTarget(website)}
+                          className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/90 text-destructive shadow-sm transition hover:bg-white'
+                          aria-label={`Delete ${website.name || website.business_name || 'website'}`}
                         >
-                          <input
-                            type='checkbox'
-                            checked={checked}
-                            disabled={
-                              !editingProduct.mainCategoryId ||
-                              loadingCategoryMeta ||
-                              isCityScopedEditor
-                            }
-                            onChange={(e) =>
-                              setEditingProduct((prev) => {
-                                if (!prev) return prev
-
-                                const nextCategories = e.target.checked
-                                  ? Array.from(new Set([...prev.productCategoryIds, item._id]))
-                                  : prev.productCategoryIds.filter((id) => id !== item._id)
-
-                                const nextPrimary =
-                                  prev.productCategoryId &&
-                                  nextCategories.includes(prev.productCategoryId)
-                                    ? prev.productCategoryId
-                                    : nextCategories[0] || ''
-
-                                const nextSubCategoryIds = prev.productSubCategoryIds.filter(
-                                  (subId) =>
-                                    subCategories.some(
-                                      (sub) =>
-                                        sub._id === subId &&
-                                        nextCategories.includes(sub.categoryId)
-                                    )
-                                )
-
-                                return {
-                                  ...prev,
-                                  productCategoryIds: nextCategories,
-                                  productCategoryId: nextPrimary,
-                                  productSubCategoryIds: nextSubCategoryIds,
-                                }
-                              })
-                            }
-                          />
-                          <span>{item.name}</span>
-                        </label>
-                      )
-                    })
-                  ) : (
-                    <p className='text-xs text-slate-500'>
-                      No categories found for selected main category
-                    </p>
-                  )}
-                </div>
-                <span className='mt-1 block text-xs text-slate-500'>
-                  Multiple select with checkboxes.
-                </span>
-              </label>
-              <label className='text-sm lg:col-span-2'>
-                <span className='mb-1 block font-medium text-slate-700'>Subcategories</span>
-                <div
-                  className={`max-h-[132px] space-y-2 overflow-y-auto rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ${
-                    !editorSelectedCategoryIds.length || loadingCategoryMeta || isCityScopedEditor
-                      ? 'opacity-70'
-                      : ''
-                  }`}
-                >
-                  {editorSubCategoryOptions.length ? (
-                    editorSubCategoryOptions.map((item) => {
-                      const checked = editingProduct.productSubCategoryIds.includes(item._id)
-                      return (
-                        <label
-                          key={`subcategory-${item._id}`}
-                          className='flex items-center gap-2 text-slate-700'
-                        >
-                          <input
-                            type='checkbox'
-                            checked={checked}
-                            disabled={
-                              !editorSelectedCategoryIds.length ||
-                              loadingCategoryMeta ||
-                              isCityScopedEditor
-                            }
-                            onChange={(e) =>
-                              setEditingProduct((prev) => {
-                                if (!prev) return prev
-
-                                const nextSubCategoryIds = e.target.checked
-                                  ? Array.from(
-                                      new Set([...prev.productSubCategoryIds, item._id])
-                                    )
-                                  : prev.productSubCategoryIds.filter(
-                                      (id) => id !== item._id
-                                    )
-
-                                return { ...prev, productSubCategoryIds: nextSubCategoryIds }
-                              })
-                            }
-                          />
-                          <span>{item.name}</span>
-                        </label>
-                      )
-                    })
-                  ) : (
-                    <p className='text-xs text-slate-500'>
-                      No subcategories found for selected categories
-                    </p>
-                  )}
-                </div>
-                <span className='mt-1 block text-xs text-slate-500'>
-                  {editorSelectedCategoryIds.length
-                    ? 'Subcategories filtered by selected categories.'
-                    : 'Select categories first to see subcategories.'}
-                </span>
-              </label>
-              {editingProduct.mainCategoryId ? (
-                <div className='rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600'>
-                  Main: {mainCategoryNameById[editingProduct.mainCategoryId] || 'N/A'} | Primary:{' '}
-                  {categoryNameById[editingProduct.productCategoryId] || 'N/A'}
-                  {editingProduct.productSubCategoryIds.length ? (
-                    <div className='mt-1'>
-                      Subcategories:{' '}
-                      {editingProduct.productSubCategoryIds
-                        .map((id) => subCategoryNameById[id] || id)
-                        .join(', ')}
+                          <Trash2 className='h-4 w-4' />
+                        </button>
+                      </div>
                     </div>
-                  ) : null}
-                </div>
-              ) : null}
-              {isCityScopedEditor ? (
-                <div className='rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700'>
-                  Category mapping is global. For city-specific page editing, category fields are read-only.
-                </div>
-              ) : null}
-            </div>
 
-            <label className='mt-3 block text-sm'>
-              <span className='mb-1 block font-medium text-slate-700'>Short Description</span>
-              <textarea
-                ref={shortDescriptionRef}
-                value={editingProduct.shortDescription}
-                onChange={(e) =>
-                  setEditingProduct((prev) =>
-                    prev ? { ...prev, shortDescription: e.target.value } : prev
-                  )
-                }
-                className='min-h-[88px] w-full rounded-md border border-slate-300 px-3 py-2'
-              />
-              <HyperlinkInsert
-                fieldLabel='Short Description'
-                value={editingProduct.shortDescription}
-                textareaRef={shortDescriptionRef}
-                onValueChange={(nextValue) =>
-                  setEditingProduct((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          shortDescription: nextValue,
-                        }
-                      : prev
-                  )
-                }
-              />
-            </label>
+                    <div className='flex flex-1 flex-col gap-4 p-5'>
+                      <div>
+                        <h3 className='truncate text-xl font-semibold text-foreground'>
+                          {website.name || website.business_name || 'Untitled Website'}
+                        </h3>
+                        <p className='mt-1 text-sm text-muted-foreground'>
+                          Created {formatDate(website.createdAt)}
+                        </p>
+                      </div>
 
-            <label className='mt-3 block text-sm'>
-              <span className='mb-1 block font-medium text-slate-700'>Description</span>
-              <textarea
-                ref={descriptionRef}
-                value={editingProduct.description}
-                onChange={(e) =>
-                  setEditingProduct((prev) =>
-                    prev ? { ...prev, description: e.target.value } : prev
-                  )
-                }
-                className='min-h-[110px] w-full rounded-md border border-slate-300 px-3 py-2'
-              />
-              <HyperlinkInsert
-                fieldLabel='Description'
-                value={editingProduct.description}
-                textareaRef={descriptionRef}
-                onValueChange={(nextValue) =>
-                  setEditingProduct((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          description: nextValue,
-                        }
-                      : prev
-                  )
-                }
-              />
-            </label>
-
-            <div className='mt-3 grid gap-3 md:grid-cols-2'>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>Meta Title</span>
-                <Input
-                  value={editingProduct.metaTitle}
-                  onChange={(e) =>
-                    setEditingProduct((prev) =>
-                      prev ? { ...prev, metaTitle: e.target.value } : prev
-                    )
-                  }
-                />
-              </label>
-              <label className='text-sm'>
-                <span className='mb-1 block font-medium text-slate-700'>Meta Keywords</span>
-                <Input
-                  value={editingProduct.metaKeywords}
-                  onChange={(e) =>
-                    setEditingProduct((prev) =>
-                      prev ? { ...prev, metaKeywords: e.target.value } : prev
-                    )
-                  }
-                  placeholder='Comma separated'
-                />
-              </label>
-            </div>
-
-            <label className='mt-3 block text-sm'>
-              <span className='mb-1 block font-medium text-slate-700'>Meta Description</span>
-              <textarea
-                value={editingProduct.metaDescription}
-                onChange={(e) =>
-                  setEditingProduct((prev) =>
-                    prev ? { ...prev, metaDescription: e.target.value } : prev
-                  )
-                }
-                className='min-h-[86px] w-full rounded-md border border-slate-300 px-3 py-2'
-              />
-            </label>
-
-            <div className='mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3'>
-              <div className='mb-2 flex items-center justify-between'>
-                <p className='text-sm font-semibold text-slate-800'>Default Images</p>
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  disabled={isCityScopedEditor}
-                  onClick={() =>
-                    setEditingProduct((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            defaultImages: [...prev.defaultImages, { url: '', publicId: '' }],
-                          }
-                        : prev
-                    )
-                  }
-                >
-                  Add Image
-                </Button>
-              </div>
-              <div className='space-y-2'>
-                {(editingProduct.defaultImages.length
-                  ? editingProduct.defaultImages
-                  : [{ url: '', publicId: '' }]
-                ).map((image, index) => (
-                  <div
-                    key={`default-image-${index}`}
-                    className='grid gap-2 md:grid-cols-[72px_1fr_1fr_auto]'
-                  >
-                    <div className='flex items-center justify-center'>
-                      {image.url ? (
-                        <a
-                          href={image.url}
-                          target='_blank'
-                          rel='noreferrer'
-                          className='block h-14 w-14 overflow-hidden rounded-md border border-slate-200 bg-white'
-                          title='Open image in new tab'
-                        >
-                          <img
-                            src={image.url}
-                            alt={`Default image ${index + 1}`}
-                            className='h-full w-full object-cover'
-                          />
-                        </a>
-                      ) : (
-                        <div className='flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-slate-300 text-[10px] font-medium text-slate-400'>
-                          No image
+                      <div className='rounded-2xl border border-border bg-background/70 p-3'>
+                        <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                          <Globe className='h-3.5 w-3.5' />
+                          Preview URL
                         </div>
-                      )}
-                    </div>
-                    <Input
-                      value={image.url}
-                      placeholder='Image URL'
-                      onChange={(e) =>
-                        setEditingProduct((prev) => {
-                          if (!prev) return prev
-                          const next = [...prev.defaultImages]
-                          while (next.length <= index) next.push({ url: '', publicId: '' })
-                          next[index] = { ...next[index], url: e.target.value }
-                          return { ...prev, defaultImages: next }
-                        })
-                      }
-                    />
-                    <Input
-                      value={image.publicId}
-                      placeholder='Public ID'
-                      onChange={(e) =>
-                        setEditingProduct((prev) => {
-                          if (!prev) return prev
-                          const next = [...prev.defaultImages]
-                          while (next.length <= index) next.push({ url: '', publicId: '' })
-                          next[index] = { ...next[index], publicId: e.target.value }
-                          return { ...prev, defaultImages: next }
-                        })
-                      }
-                    />
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() =>
-                        setEditingProduct((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                defaultImages: prev.defaultImages.filter((_, i) => i !== index),
-                              }
-                            : prev
-                        )
-                      }
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
+                        <p className='mt-2 break-all text-sm leading-6 text-foreground'>
+                          {previewUrl || 'Preview not available'}
+                        </p>
+                      </div>
 
-            <div className='mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3'>
-              <div className='mb-2 flex items-center justify-between'>
-                <p className='text-sm font-semibold text-slate-800'>Specifications</p>
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  onClick={() =>
-                    setEditingProduct((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            specificationRows: [...prev.specificationRows, { key: '', value: '' }],
-                          }
-                        : prev
-                    )
-                  }
-                >
-                  Add Specification
-                </Button>
-              </div>
-              <div className='space-y-2'>
-                {(editingProduct.specificationRows.length
-                  ? editingProduct.specificationRows
-                  : [{ key: '', value: '' }]
-                ).map((row, index) => (
-                  <div key={`spec-row-${index}`} className='grid gap-2 md:grid-cols-[1fr_1fr_auto]'>
-                    <Input
-                      value={row.key}
-                      placeholder='Specification key'
-                      onChange={(e) =>
-                        setEditingProduct((prev) => {
-                          if (!prev) return prev
-                          const next = [...prev.specificationRows]
-                          while (next.length <= index) next.push({ key: '', value: '' })
-                          next[index] = { ...next[index], key: e.target.value }
-                          return { ...prev, specificationRows: next }
-                        })
-                      }
-                    />
-                    <Input
-                      value={row.value}
-                      placeholder='Specification value'
-                      onChange={(e) =>
-                        setEditingProduct((prev) => {
-                          if (!prev) return prev
-                          const next = [...prev.specificationRows]
-                          while (next.length <= index) next.push({ key: '', value: '' })
-                          next[index] = { ...next[index], value: e.target.value }
-                          return { ...prev, specificationRows: next }
-                        })
-                      }
-                    />
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() =>
-                        setEditingProduct((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                specificationRows: prev.specificationRows.filter(
-                                  (_, i) => i !== index
-                                ),
-                              }
-                            : prev
-                        )
-                      }
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className='mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3'>
-              <div className='mb-2 flex items-center justify-between'>
-                <p className='text-sm font-semibold text-slate-800'>Variants</p>
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  onClick={() =>
-                    setEditingProduct((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            variants: [...prev.variants, createEmptyVariantEditor()],
-                          }
-                        : prev
-                    )
-                  }
-                >
-                  Add Variant
-                </Button>
-              </div>
-              {isCityScopedEditor ? (
-                <p className='mb-2 text-xs text-amber-700'>
-                  City-specific page supports variant field edits, but adding/removing variants is locked.
-                </p>
-              ) : null}
-              <div className='space-y-3'>
-                {editingProduct.variants.map((variant, index) => (
-                    <div
-                      key={variant.tempId || `variant-${index}`}
-                      className='rounded-lg border border-slate-200 bg-white p-3'
-                    >
-                      <div className='mb-2 flex items-center justify-between'>
-                        <p className='text-sm font-semibold text-slate-700'>Variant {index + 1}</p>
+                      <div className='mt-auto grid gap-3 sm:grid-cols-2'>
                         <Button
                           type='button'
-                          variant='outline'
-                          size='sm'
-                          disabled={isCityScopedEditor}
-                          onClick={() =>
-                            setEditingProduct((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    variants: (() => {
-                                      const nextVariants = prev.variants.filter(
-                                        (item) => item.tempId !== variant.tempId
-                                      )
-                                      return nextVariants.length
-                                        ? nextVariants
-                                        : [createEmptyVariantEditor()]
-                                    })(),
-                                  }
-                                : prev
-                            )
-                          }
+                          onClick={() => handleEditWebsite(website)}
+                          className='h-11 w-full rounded-2xl'
                         >
-                          Remove
+                          <PencilLine className='h-4 w-4' />
+                          Edit Website
                         </Button>
-                      </div>
-                      <div className='grid gap-2 md:grid-cols-3'>
-                        <label className='text-xs text-slate-600'>
-                          <span className='mb-1 block font-semibold'>Variant SKU</span>
-                          <Input
-                            value={variant.variantSku}
-                            onChange={(e) =>
-                              setEditingProduct((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      variants: prev.variants.map((item) =>
-                                        item.tempId === variant.tempId
-                                          ? { ...item, variantSku: e.target.value }
-                                          : item
-                                      ),
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                        </label>
-                        <label className='text-xs text-slate-600'>
-                          <span className='mb-1 block font-semibold'>Actual Price</span>
-                          <Input
-                            type='number'
-                            value={variant.actualPrice}
-                            onChange={(e) =>
-                              setEditingProduct((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      variants: prev.variants.map((item) =>
-                                        item.tempId === variant.tempId
-                                          ? { ...item, actualPrice: e.target.value }
-                                          : item
-                                      ),
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                        </label>
-                        <label className='text-xs text-slate-600'>
-                          <span className='mb-1 block font-semibold'>Final Price</span>
-                          <Input
-                            type='number'
-                            value={variant.finalPrice}
-                            onChange={(e) =>
-                              setEditingProduct((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      variants: prev.variants.map((item) =>
-                                        item.tempId === variant.tempId
-                                          ? { ...item, finalPrice: e.target.value }
-                                          : item
-                                      ),
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                        </label>
-                        <label className='text-xs text-slate-600'>
-                          <span className='mb-1 block font-semibold'>Stock Quantity</span>
-                          <Input
-                            type='number'
-                            value={variant.stockQuantity}
-                            onChange={(e) =>
-                              setEditingProduct((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      variants: prev.variants.map((item) =>
-                                        item.tempId === variant.tempId
-                                          ? { ...item, stockQuantity: e.target.value }
-                                          : item
-                                      ),
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                        </label>
-                        <label className='text-xs text-slate-600 md:col-span-2'>
-                          <span className='mb-1 block font-semibold'>Variant Canonical URL</span>
-                          <Input
-                            value={variant.variantCanonicalUrl}
-                            onChange={(e) =>
-                              setEditingProduct((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      variants: prev.variants.map((item) =>
-                                        item.tempId === variant.tempId
-                                          ? { ...item, variantCanonicalUrl: e.target.value }
-                                          : item
-                                      ),
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                        </label>
-                      </div>
-                      <label className='mt-2 flex items-center gap-2 text-sm text-slate-700'>
-                        <input
-                          type='checkbox'
-                          checked={variant.isActive}
-                          onChange={(e) =>
-                            setEditingProduct((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    variants: prev.variants.map((item) =>
-                                      item.tempId === variant.tempId
-                                        ? { ...item, isActive: e.target.checked }
-                                        : item
-                                    ),
-                                  }
-                                : prev
-                            )
-                          }
-                        />
-                        Variant is active
-                      </label>
-                      <div className='mt-2 grid gap-2 md:grid-cols-2'>
-                        <label className='text-xs text-slate-600'>
-                          <span className='mb-1 block font-semibold'>Variant Meta Title</span>
-                          <Input
-                            value={variant.variantMetaTitle}
-                            onChange={(e) =>
-                              setEditingProduct((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      variants: prev.variants.map((item) =>
-                                        item.tempId === variant.tempId
-                                          ? { ...item, variantMetaTitle: e.target.value }
-                                          : item
-                                      ),
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                        </label>
-                        <label className='text-xs text-slate-600'>
-                          <span className='mb-1 block font-semibold'>Variant Meta Keywords</span>
-                          <Input
-                            value={variant.variantMetaKeywords}
-                            placeholder='Comma separated'
-                            onChange={(e) =>
-                              setEditingProduct((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      variants: prev.variants.map((item) =>
-                                        item.tempId === variant.tempId
-                                          ? { ...item, variantMetaKeywords: e.target.value }
-                                          : item
-                                      ),
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                        </label>
-                      </div>
-                      <label className='mt-2 block text-xs text-slate-600'>
-                        <span className='mb-1 block font-semibold'>Variant Meta Description</span>
-                        <textarea
-                          value={variant.variantMetaDescription}
-                          onChange={(e) =>
-                            setEditingProduct((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    variants: prev.variants.map((item) =>
-                                      item.tempId === variant.tempId
-                                        ? { ...item, variantMetaDescription: e.target.value }
-                                        : item
-                                    ),
-                                  }
-                                : prev
-                            )
-                          }
-                          className='min-h-[88px] w-full rounded-md border border-slate-300 px-3 py-2'
-                        />
-                      </label>
-                      <div className='mt-2 rounded-md border border-slate-200 bg-slate-50 p-2'>
-                        <div className='mb-2 flex items-center justify-between'>
-                          <p className='text-xs font-semibold text-slate-700'>Variant Attributes</p>
+
+                        {previewUrl ? (
+                          <a href={previewUrl} target='_blank' rel='noreferrer' className='block'>
+                            <Button type='button' variant='outline' className='h-11 w-full rounded-2xl'>
+                              <ExternalLink className='h-4 w-4' />
+                              Open Preview
+                            </Button>
+                          </a>
+                        ) : (
                           <Button
                             type='button'
                             variant='outline'
-                            size='sm'
-                            onClick={() =>
-                              setEditingProduct((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      variants: prev.variants.map((item) =>
-                                        item.tempId === variant.tempId
-                                          ? {
-                                              ...item,
-                                              variantAttributes: [
-                                                ...item.variantAttributes,
-                                                { key: '', value: '' },
-                                              ],
-                                            }
-                                          : item
-                                      ),
-                                    }
-                                  : prev
-                              )
-                            }
+                            className='h-11 w-full rounded-2xl'
+                            disabled
                           >
-                            Add Attribute
+                            <ExternalLink className='h-4 w-4' />
+                            Preview Unavailable
                           </Button>
-                        </div>
-                        <div className='space-y-2'>
-                          {(variant.variantAttributes.length
-                            ? variant.variantAttributes
-                            : [{ key: '', value: '' }]
-                          ).map((attribute, attributeIndex) => (
-                            <div
-                              key={`${variant.tempId}-attr-${attributeIndex}`}
-                              className='grid gap-2 md:grid-cols-[1fr_1fr_auto]'
-                            >
-                              <Input
-                                value={attribute.key}
-                                placeholder='Attribute name (e.g. Color)'
-                                onChange={(e) =>
-                                  setEditingProduct((prev) =>
-                                    prev
-                                      ? {
-                                          ...prev,
-                                          variants: prev.variants.map((item) => {
-                                            if (item.tempId !== variant.tempId) return item
-                                            const nextAttributes = [...item.variantAttributes]
-                                            while (nextAttributes.length <= attributeIndex) {
-                                              nextAttributes.push({ key: '', value: '' })
-                                            }
-                                            nextAttributes[attributeIndex] = {
-                                              ...nextAttributes[attributeIndex],
-                                              key: e.target.value,
-                                            }
-                                            return { ...item, variantAttributes: nextAttributes }
-                                          }),
-                                        }
-                                      : prev
-                                  )
-                                }
-                              />
-                              <Input
-                                value={attribute.value}
-                                placeholder='Attribute value (e.g. Gray)'
-                                onChange={(e) =>
-                                  setEditingProduct((prev) =>
-                                    prev
-                                      ? {
-                                          ...prev,
-                                          variants: prev.variants.map((item) => {
-                                            if (item.tempId !== variant.tempId) return item
-                                            const nextAttributes = [...item.variantAttributes]
-                                            while (nextAttributes.length <= attributeIndex) {
-                                              nextAttributes.push({ key: '', value: '' })
-                                            }
-                                            nextAttributes[attributeIndex] = {
-                                              ...nextAttributes[attributeIndex],
-                                              value: e.target.value,
-                                            }
-                                            return { ...item, variantAttributes: nextAttributes }
-                                          }),
-                                        }
-                                      : prev
-                                  )
-                                }
-                              />
-                              <Button
-                                type='button'
-                                variant='outline'
-                                size='sm'
-                                onClick={() =>
-                                  setEditingProduct((prev) =>
-                                    prev
-                                      ? {
-                                          ...prev,
-                                          variants: prev.variants.map((item) =>
-                                            item.tempId === variant.tempId
-                                              ? {
-                                                  ...item,
-                                                  variantAttributes: item.variantAttributes.filter(
-                                                    (_, i) => i !== attributeIndex
-                                                  ),
-                                                }
-                                              : item
-                                          ),
-                                        }
-                                      : prev
-                                  )
-                                }
-                              >
-                                Remove
-                              </Button>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          ) : (
+            <div className='rounded-[24px] border border-dashed border-border bg-card px-6 py-12 text-center shadow-sm'>
+              <LayoutTemplate className='mx-auto h-10 w-10 text-muted-foreground' />
+              <h3 className='mt-4 text-xl font-semibold text-foreground'>No websites created yet</h3>
+              <p className='mt-2 text-sm text-muted-foreground'>
+                Create your first website from a template and it will appear here with its preview
+                link and edit access.
+              </p>
+              <Button type='button' onClick={openCreateDialog} className='mt-6 h-11 rounded-2xl'>
+                <Plus className='h-4 w-4' />
+                Create First Website
+              </Button>
+            </div>
+          )}
+        </section>
+      </Main>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className='w-[min(96vw,1120px)] max-w-[min(96vw,1120px)] gap-0 overflow-hidden rounded-2xl border-border/70 p-0 sm:max-w-[min(96vw,1120px)]'>
+          <div className='flex max-h-[90vh] flex-col'>
+            <DialogHeader className='border-b border-border px-6 py-5 text-left sm:px-8'>
+              <DialogTitle className='text-2xl font-semibold tracking-tight text-foreground'>
+                Create Website
+              </DialogTitle>
+              <DialogDescription className='max-w-3xl text-sm leading-6'>
+                Give your website a name, choose one template, and continue directly to the builder.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className='flex-1 overflow-y-auto px-6 py-6 sm:px-8'>
+              <div className='space-y-6'>
+                <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
+                  <label className='mb-3 block text-sm font-medium text-foreground'>
+                    Website Name
+                  </label>
+                  <Input
+                    value={websiteName}
+                    onChange={(event) => setWebsiteName(event.target.value)}
+                    placeholder='Example: Dust Filter India Storefront'
+                    className='h-12 rounded-2xl'
+                  />
+                  <p className='mt-3 text-sm leading-6 text-muted-foreground'>
+                    This name will help you identify the website later in your dashboard.
+                  </p>
+                </div>
+
+                <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
+                  <div className='flex flex-wrap items-center justify-between gap-3'>
+                    <div>
+                      <h3 className='text-lg font-semibold text-foreground'>Choose a Template</h3>
+                      <p className='mt-1 text-sm leading-6 text-muted-foreground'>
+                        Pick one clean starting point. You can edit the website later, but you
+                        cannot switch its template after creation.
+                      </p>
+                    </div>
+                    <div className='inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground'>
+                      {availableTemplates.length} templates
+                    </div>
+                  </div>
+
+                  <div className='mt-5 grid grid-cols-[repeat(auto-fit,minmax(260px,320px))] justify-center gap-4'>
+                    {availableTemplates.map((template) => {
+                      const isSelected = selectedTemplateKey === template.key
+                      const previewUrl = getVendorTemplatePreviewUrl(
+                        vendorId,
+                        template.key,
+                        vendorDefaultCitySlug
+                      )
+                      return (
+                        <button
+                          key={template.key}
+                          type='button'
+                          onClick={() => setSelectedTemplateKey(template.key)}
+                          className={`group mx-auto flex h-full w-full max-w-[320px] min-h-[220px] flex-col overflow-hidden rounded-2xl border bg-background text-left shadow-sm transition ${
+                            isSelected
+                              ? 'border-primary ring-1 ring-primary/20'
+                              : 'border-border hover:border-primary/40 hover:shadow-md'
+                          }`}
+                        >
+                          <div className='relative overflow-hidden bg-muted'>
+                            <StorefrontThumbnail
+                              title={template.name}
+                              previewUrl={previewUrl}
+                              fallbackImage={template.previewImage}
+                              className='aspect-[16/9] transition duration-300 group-hover:scale-[1.02]'
+                            />
+                            {isSelected ? (
+                              <div className='absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-background/95 px-3 py-1 text-xs font-semibold text-foreground shadow-sm'>
+                                <CheckCircle2 className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
+                                Selected
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className='flex flex-1 flex-col p-4'>
+                            <div>
+                              <h4 className='text-base font-semibold leading-snug text-foreground'>
+                                {template.name}
+                              </h4>
+                              <p className='mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                                {template.key}
+                              </p>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className='mt-2 rounded-md border border-slate-200 bg-slate-50 p-2'>
-                        <div className='mb-2 flex items-center justify-between'>
-                          <p className='text-xs font-semibold text-slate-700'>Variant Images</p>
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() =>
-                              setEditingProduct((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      variants: prev.variants.map((item) =>
-                                        item.tempId === variant.tempId
-                                          ? {
-                                              ...item,
-                                              variantsImageUrls: [
-                                                ...item.variantsImageUrls,
-                                                { url: '', publicId: '' },
-                                              ],
-                                            }
-                                          : item
-                                      ),
-                                    }
-                                  : prev
-                              )
-                            }
-                          >
-                            Add Image
-                          </Button>
-                        </div>
-                        <div className='space-y-2'>
-                          {(variant.variantsImageUrls.length
-                            ? variant.variantsImageUrls
-                            : [{ url: '', publicId: '' }]
-                          ).map((image, imageIndex) => {
-                            const uploadKey = `${variant.tempId}-${imageIndex}`
-                            const uploadInputId = `variant-upload-${variant.tempId}-${imageIndex}`
-                            const isUploading = uploadingVariantImageKey === uploadKey
-                            return (
+
+                            <p className='mt-3 flex-1 text-sm leading-6 text-muted-foreground'>
+                              {getTemplateBlurb(template.description)}
+                            </p>
+
+                            <div className='mt-3'>
                               <div
-                                key={`${variant.tempId}-image-${imageIndex}`}
-                                className='grid gap-2 md:grid-cols-[72px_1fr_1fr_auto_auto]'
+                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                                  isSelected
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted text-muted-foreground'
+                                }`}
                               >
-                              <div className='flex items-center justify-center'>
-                                {image.url ? (
-                                  <a
-                                    href={image.url}
-                                    target='_blank'
-                                    rel='noreferrer'
-                                    className='block h-14 w-14 overflow-hidden rounded-md border border-slate-200 bg-white'
-                                    title='Open image in new tab'
-                                  >
-                                    <img
-                                      src={image.url}
-                                      alt={`Variant ${index + 1} image ${imageIndex + 1}`}
-                                      className='h-full w-full object-cover'
-                                    />
-                                  </a>
+                                {isSelected ? (
+                                  <>
+                                    <CheckCircle2 className='h-3.5 w-3.5' />
+                                    Selected for this website
+                                  </>
                                 ) : (
-                                  <div className='flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-slate-300 text-[10px] font-medium text-slate-400'>
-                                    No image
-                                  </div>
+                                  'Click to use this template'
                                 )}
                               </div>
-                              <Input
-                                value={image.url}
-                                placeholder='Image URL'
-                                onChange={(e) =>
-                                  setEditingProduct((prev) =>
-                                    prev
-                                      ? {
-                                          ...prev,
-                                          variants: prev.variants.map((item) => {
-                                            if (item.tempId !== variant.tempId) return item
-                                            const nextImages = [...item.variantsImageUrls]
-                                            while (nextImages.length <= imageIndex) {
-                                              nextImages.push({ url: '', publicId: '' })
-                                            }
-                                            nextImages[imageIndex] = {
-                                              ...nextImages[imageIndex],
-                                              url: e.target.value,
-                                            }
-                                            return { ...item, variantsImageUrls: nextImages }
-                                          }),
-                                        }
-                                      : prev
-                                  )
-                                }
-                              />
-                              <Input
-                                value={image.publicId}
-                                placeholder='Public ID'
-                                onChange={(e) =>
-                                  setEditingProduct((prev) =>
-                                    prev
-                                      ? {
-                                          ...prev,
-                                          variants: prev.variants.map((item) => {
-                                            if (item.tempId !== variant.tempId) return item
-                                            const nextImages = [...item.variantsImageUrls]
-                                            while (nextImages.length <= imageIndex) {
-                                              nextImages.push({ url: '', publicId: '' })
-                                            }
-                                            nextImages[imageIndex] = {
-                                              ...nextImages[imageIndex],
-                                              publicId: e.target.value,
-                                            }
-                                            return { ...item, variantsImageUrls: nextImages }
-                                          }),
-                                        }
-                                      : prev
-                                  )
-                                }
-                              />
-                              <div className='flex items-center'>
-                                <input
-                                  id={uploadInputId}
-                                  type='file'
-                                  accept='image/*'
-                                  className='hidden'
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0]
-                                    void handleVariantImageUpload(
-                                      variant.tempId,
-                                      imageIndex,
-                                      file
-                                    )
-                                    e.currentTarget.value = ''
-                                  }}
-                                  disabled={isUploading}
-                                />
-                                <label
-                                  htmlFor={uploadInputId}
-                                  className={`inline-flex h-10 min-w-[122px] items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-medium text-slate-700 ${
-                                    isUploading
-                                      ? 'cursor-not-allowed bg-slate-100 text-slate-500'
-                                      : 'cursor-pointer bg-white hover:bg-slate-50'
-                                  }`}
-                                >
-                                  {isUploading ? (
-                                    <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                                  ) : null}
-                                  {isUploading ? 'Uploading...' : 'Upload Image'}
-                                </label>
-                              </div>
-                              <Button
-                                type='button'
-                                variant='outline'
-                                size='sm'
-                                onClick={() =>
-                                  setEditingProduct((prev) =>
-                                    prev
-                                      ? {
-                                          ...prev,
-                                          variants: prev.variants.map((item) =>
-                                            item.tempId === variant.tempId
-                                              ? {
-                                                  ...item,
-                                                  variantsImageUrls: item.variantsImageUrls.filter(
-                                                    (_, i) => i !== imageIndex
-                                                  ),
-                                                }
-                                              : item
-                                          ),
-                                        }
-                                      : prev
-                                  )
-                                }
-                              >
-                                Remove
-                              </Button>
                             </div>
-                          )})}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div className='mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3'>
-              <div className='mb-2 flex items-center justify-between'>
-                <p className='text-sm font-semibold text-slate-800'>FAQs</p>
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  onClick={() =>
-                    setEditingProduct((prev) =>
-                      prev
-                        ? { ...prev, faqs: [...prev.faqs, { question: '', answer: '' }] }
-                        : prev
-                    )
-                  }
-                >
-                  Add FAQ
-                </Button>
-              </div>
-              <div className='space-y-3'>
-                {(editingProduct.faqs.length
-                  ? editingProduct.faqs
-                  : [{ question: '', answer: '' }]
-                ).map((faq, index) => (
-                  <div key={`faq-${index}`} className='rounded-lg border border-slate-200 bg-white p-3'>
-                    <div className='grid gap-2 md:grid-cols-[1fr_auto]'>
-                      <Input
-                        value={faq.question}
-                        placeholder='Question'
-                        onChange={(e) =>
-                          setEditingProduct((prev) => {
-                            if (!prev) return prev
-                            const next = [...prev.faqs]
-                            while (next.length <= index) next.push({ question: '', answer: '' })
-                            next[index] = { ...next[index], question: e.target.value }
-                            return { ...prev, faqs: next }
-                          })
-                        }
-                      />
-                      <Button
-                        type='button'
-                        variant='outline'
-                        size='sm'
-                        onClick={() =>
-                          setEditingProduct((prev) =>
-                            prev ? { ...prev, faqs: prev.faqs.filter((_, i) => i !== index) } : prev
-                          )
-                        }
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                    <textarea
-                      value={faq.answer}
-                      placeholder='Answer'
-                      onChange={(e) =>
-                        setEditingProduct((prev) => {
-                          if (!prev) return prev
-                          const next = [...prev.faqs]
-                          while (next.length <= index) next.push({ question: '', answer: '' })
-                          next[index] = { ...next[index], answer: e.target.value }
-                          return { ...prev, faqs: next }
-                        })
-                      }
-                      className='mt-2 min-h-[88px] w-full rounded-md border border-slate-300 px-3 py-2'
-                    />
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className='mt-3'>
-              <p className='mb-1 text-sm font-medium text-slate-700'>Available Cities</p>
-              <div
-                className={`grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 md:grid-cols-3 ${
-                  isCityScopedEditor ? 'opacity-60' : ''
-                }`}
-              >
-                {cities
-                  .filter((city) => city.isActive)
-                  .map((city) => {
-                    const cityId = String(city._id || '').trim()
-                    const checked = editingProduct.availableCities.includes(cityId)
-                    return (
-                      <label key={city._id} className='flex items-center gap-2 text-sm text-slate-700'>
-                        <input
-                          type='checkbox'
-                          checked={checked}
-                          disabled={isCityScopedEditor}
-                          onChange={(e) =>
-                            setEditingProduct((prev) => {
-                              if (!prev) return prev
-                              if (e.target.checked) {
-                                return {
-                                  ...prev,
-                                  availableCities: Array.from(
-                                    new Set([...prev.availableCities, cityId])
-                                  ),
-                                }
-                              }
-                              return {
-                                ...prev,
-                                availableCities: prev.availableCities.filter(
-                                  (id) => id !== cityId
-                                ),
-                              }
-                            })
-                          }
-                        />
-                        <span>{city.name}</span>
-                      </label>
-                    )
-                  })}
-              </div>
-              {isCityScopedEditor ? (
-                <div className='mt-2 flex flex-wrap items-center gap-2'>
-                  <p className='text-xs text-amber-700'>
-                    Available Cities list yahan locked hai.
-                  </p>
-                  <Button
-                    type='button'
-                    size='sm'
-                    variant='outline'
-                    className='h-7'
-                    onClick={() => void openGlobalEditorForProduct(editingProduct._id)}
-                  >
-                    Edit City List
-                  </Button>
                 </div>
-              ) : null}
+              </div>
             </div>
 
-            <label className='mt-3 flex items-center gap-2 text-sm text-slate-700'>
-              <input
-                type='checkbox'
-                checked={editingProduct.isAvailable}
-                onChange={(e) =>
-                  setEditingProduct((prev) =>
-                    prev ? { ...prev, isAvailable: e.target.checked } : prev
-                  )
-                }
-              />
-              Product is available
-            </label>
-
-            <div className='mt-4 flex justify-end gap-2'>
-              <Button variant='outline' onClick={closeEditor}>
+            <div className='flex flex-wrap items-center justify-end gap-3 border-t border-border px-6 py-4 sm:px-8'>
+              <Button type='button' variant='outline' onClick={() => setDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={saveProduct} disabled={savingProduct}>
-                {savingProduct ? (
+              <Button type='button' onClick={handleCreateWebsite} disabled={!canCreateWebsite}>
+                {creating ? (
                   <Loader2 className='h-4 w-4 animate-spin' />
                 ) : (
-                  <Save className='h-4 w-4' />
+                  <Plus className='h-4 w-4' />
                 )}
-                {isCityScopedEditor
-                  ? `Save for ${
-                      editingProduct.editCityName || editingProduct.editCitySlug || 'This City'
-                    } only`
-                  : 'Save for all cities'}
+                Create Website
               </Button>
             </div>
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!deletingWebsiteId) {
+            if (!open) setDeleteTarget(null)
+          }
+        }}
+        title={
+          deleteTarget
+            ? `Delete website "${deleteTarget.name || deleteTarget.business_name || 'Untitled Website'}"?`
+            : 'Delete website?'
+        }
+        desc={
+          <div className='space-y-2 text-sm'>
+            <p>This will permanently remove the website from your workspace.</p>
+            <p>You can create a new website again later, but this deleted website cannot be restored.</p>
+          </div>
+        }
+        destructive
+        confirmText='Delete Website'
+        cancelBtnText='Cancel'
+        isLoading={Boolean(deletingWebsiteId)}
+        handleConfirm={handleDeleteWebsite}
+      />
     </>
   )
 }

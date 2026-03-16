@@ -11,9 +11,6 @@ export interface Variant {
   finalPrice: number
   stockQuantity: number
   variantsImageUrls: ImageUpload[]
-  variantMetaTitle: string
-  variantMetaDescription: string
-  variantMetaKeywords: string[]
   isActive: boolean
 }
 

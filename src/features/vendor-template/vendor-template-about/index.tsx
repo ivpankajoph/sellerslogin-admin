@@ -30,6 +30,7 @@ import {
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
+import { getStoredActiveWebsiteId } from '../components/websiteStudioStorage'
 
 function VendorTemplateAbout() {
   const [data, setData] = useState<TemplateData>(initialData)
@@ -52,6 +53,10 @@ function VendorTemplateAbout() {
   )
   const selectedTemplateKey = useMemo(
     () => getStoredEditingTemplateKey(vendor_id),
+    [vendor_id]
+  )
+  const activeWebsiteId = useMemo(
+    () => getStoredActiveWebsiteId(vendor_id),
     [vendor_id]
   )
 
@@ -166,7 +171,9 @@ function VendorTemplateAbout() {
     }
 
     const endpoints = [
-      `${BASE_URL}/v1/templates/about?vendor_id=${vendor_id}`,
+      `${BASE_URL}/v1/templates/about?vendor_id=${vendor_id}${
+        activeWebsiteId ? `&website_id=${encodeURIComponent(activeWebsiteId)}` : ''
+      }`,
       `${BASE_URL}/v1/templates/about/${vendor_id}`,
       `${BASE_URL}/v1/templates/${vendor_id}/about`,
       `${BASE_URL}/v1/templates/${vendor_id}`,
@@ -217,7 +224,7 @@ function VendorTemplateAbout() {
     }
 
     load()
-  }, [vendor_id, token])
+  }, [activeWebsiteId, vendor_id, token])
 
   useEffect(() => {
     if (!selectedSection) return
@@ -279,6 +286,7 @@ function VendorTemplateAbout() {
     try {
       await axios.put(`${BASE_URL}/v1/templates/about`, {
         vendor_id,
+        website_id: activeWebsiteId,
         components: data.components.about_page,
         vendor_profile: data.components.vendor_profile,
         theme: data.components.theme,
@@ -293,6 +301,7 @@ function VendorTemplateAbout() {
       }
     }
   }, [
+    activeWebsiteId,
     data.components.about_page,
     data.components.theme,
     data.components.vendor_profile,
@@ -319,7 +328,8 @@ function VendorTemplateAbout() {
   const previewBaseUrl = getVendorTemplatePreviewUrl(
     vendor_id,
     selectedTemplateKey,
-    previewCity.slug
+    previewCity.slug,
+    activeWebsiteId
   )
 
   const sections = useMemo(
