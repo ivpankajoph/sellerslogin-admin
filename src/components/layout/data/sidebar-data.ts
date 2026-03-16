@@ -37,7 +37,8 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           title: 'Users',
           url: '/users',
           icon: Users,
-          roles: [ROLES.ADMIN],
+          // roles: [ROLES.ADMIN],
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
           title: 'Customers',
@@ -49,7 +50,8 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           title: 'Analytics',
           url: '/analytics',
           icon: LayoutDashboard,
-          roles: [ROLES.ADMIN],
+          // roles: [ROLES.ADMIN],
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
           title: 'Storefront Analytics',
@@ -269,22 +271,22 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
     },
     {
       title: 'Marketing & SEO',
-      roles: [ROLES.ADMIN],
+      roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
           title: 'SEO Manager',
           icon: SearchCheck,
-          roles: [ROLES.ADMIN],
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
             {
               title: 'SEO Rules',
               url: '/seo',
-              roles: [ROLES.ADMIN],
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
             {
               title: 'Entity SEO',
               url: '/seo/entities',
-              roles: [ROLES.ADMIN],
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
           ],
         },

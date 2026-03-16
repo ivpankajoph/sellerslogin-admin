@@ -109,7 +109,7 @@ export function Dashboard() {
                           </Link>
                         </DropdownMenuItem>
                       ))
-                    ) : (
+                    ) : ( 
                       <DropdownMenuItem disabled>
                         No connected apps yet
                       </DropdownMenuItem>

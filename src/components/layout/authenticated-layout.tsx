@@ -45,6 +45,8 @@ function ContentNavigationLoader({ rect }: { rect: LoaderViewportRect | null }) 
   )
 }
 
+import { CreatePasswordModal } from '@/components/auth/create-password-modal'
+
 export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const defaultOpen = getCookie('sidebar_state') !== 'false'
   const pathname = useLocation({ select: (location) => location.pathname })
@@ -111,6 +113,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
             <div className='vendor-flow dashboard-square relative min-h-svh w-full'>
               <div ref={contentViewportRef} className='relative min-h-svh w-full'>
                 {content}
+                <CreatePasswordModal />
               </div>
               {showNavigationLoader ? (
                 <ContentNavigationLoader rect={loaderRect} />
@@ -150,6 +153,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                 {showNavigationLoader ? (
                   <ContentNavigationLoader rect={loaderRect} />
                 ) : null}
+                <CreatePasswordModal />
               </SidebarInset>
             </SidebarProvider>
           </div>
