@@ -389,7 +389,7 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
 
   return (
     <div className='space-y-6 pb-4'>
-      <Card className='border-0 bg-gradient-to-r from-sky-600 via-cyan-600 to-emerald-600 text-white shadow-xl'>
+      <Card className='border-0 !bg-gradient-to-r from-sky-600 via-cyan-600 to-emerald-600 !text-white shadow-xl !rounded-xl'>
         <CardHeader className='flex flex-wrap items-start justify-between gap-4'>
           <div>
             <Badge className='border-white/40 bg-white/20 text-white'>SEO Control Center</Badge>
