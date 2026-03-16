@@ -12,6 +12,7 @@ import {
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
+import { NotificationBell } from '@/components/notifications/notification-bell'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import VendorDashboard from './components/VendorDashboard'
@@ -125,6 +126,7 @@ export function Dashboard() {
                 </DropdownMenu>
               )}
             </div>
+            <NotificationBell />
             <ThemeSwitch />
             <ConfigDrawer />
             <ProfileDropdown />
