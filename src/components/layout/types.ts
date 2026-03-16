@@ -38,6 +38,7 @@ type NavGroup = {
   title: string
   items: NavItem[]
   roles?: ("admin" | "vendor")[]
+  useToolkitInstallFilter?: boolean
 }
 
 type SidebarData = {

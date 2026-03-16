@@ -510,7 +510,7 @@ export default function SitemapsPage() {
             Sitemap Pages
           </h1>
           <p className='text-sm text-slate-600'>
-            Browse Ophmate storefront and vendor template URLs.
+            Browse SellersLogin storefront and vendor template URLs.
           </p>
         </div>
         <div className='flex items-center gap-2'>
@@ -614,7 +614,7 @@ export default function SitemapsPage() {
 
       <Card className='border-slate-200 bg-white shadow-sm'>
         <CardHeader className='border-b border-slate-100'>
-          <CardTitle className='text-slate-900'>Ophmate storefront</CardTitle>
+          <CardTitle className='text-slate-900'>SellersLogin storefront</CardTitle>
         </CardHeader>
         <CardContent className='space-y-4'>
           {storefrontGroups.map((group, index) => (

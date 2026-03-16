@@ -35,7 +35,7 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
     >
       <div
         className={cn(
-          'relative flex h-full items-center gap-3 p-4 sm:gap-4',
+          'relative flex h-full items-center gap-3 border border-border/70 bg-white/80 p-4 shadow-sm backdrop-blur sm:gap-4',
           offset > 10 &&
             fixed &&
             'after:bg-background/20 after:absolute after:inset-0 after:-z-10 after:backdrop-blur-lg'
@@ -43,7 +43,7 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
       >
         <SidebarTrigger
           variant='outline'
-          className='max-md:scale-125 md:hidden text-pink-800 bg-yellow-200'
+          className='max-md:scale-125 md:hidden border border-border/70 bg-white/90 text-foreground shadow-sm hover:border-primary/40 hover:text-primary'
         />
         <Separator orientation='vertical' className='h-6 md:hidden' />
         {children}

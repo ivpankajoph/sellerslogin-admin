@@ -1,27 +1,23 @@
+import { useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { type AppDispatch } from '@/store'
 import { logout } from '@/store/slices/authSlice'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
+import { UserRound } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
-import useDialogState from '@/hooks/use-dialog-state'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { SignOutDialog } from '@/components/sign-out-dialog'
-import { useEffect } from 'react'
-import { type AppDispatch } from '@/store'
-import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 
 export function ProfileDropdown() {
-  const [open, setOpen] = useDialogState()
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
   const user = useSelector((state: any) => state.auth.user)
@@ -41,9 +37,7 @@ export function ProfileDropdown() {
       user?.email ||
       ''
   ).trim()
-  const displayEmail = String(
-    vendorProfile?.email || user?.email || ''
-  ).trim()
+  const displayEmail = String(vendorProfile?.email || user?.email || '').trim()
   const userInitials = displayName
     .split(/[\s._-]+/)
     .filter(Boolean)
@@ -53,7 +47,10 @@ export function ProfileDropdown() {
     .join('')
   const fallbackInitials =
     userInitials ||
-    displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() ||
+    displayName
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .slice(0, 2)
+      .toUpperCase() ||
     'V'
   const avatarCandidate = vendorProfile?.avatar || user?.avatar
   const avatarSrc =
@@ -97,10 +94,11 @@ export function ProfileDropdown() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-           
-          
-          </DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => navigate({ to: '/profile' })}>
+            <UserRound />
+            Profile
+            <DropdownMenuShortcut>Ctrl+P</DropdownMenuShortcut>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>
             Sign out
@@ -108,8 +106,6 @@ export function ProfileDropdown() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <SignOutDialog open={!!open} onOpenChange={setOpen} />
     </>
   )
 }

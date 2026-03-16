@@ -1,16 +1,14 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { type AppDispatch } from '@/store'
 import { logout } from '@/store/slices/authSlice'
-import { ChevronsUpDown, LogOut } from 'lucide-react'
-import { useDispatch, useSelector } from 'react-redux'
-import { useEffect, useState } from 'react'
-import useDialogState from '@/hooks/use-dialog-state'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
+import { ChevronsUpDown, LogOut, UserRound } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -22,11 +20,9 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { SignOutDialog } from '@/components/sign-out-dialog'
 
 export function NavUser() {
   const { setHoverLock, setOpen } = useSidebar()
-  const [dialogOpen, setDialogOpen] = useDialogState()
   const [menuOpen, setMenuOpen] = useState(false)
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
@@ -47,9 +43,7 @@ export function NavUser() {
       user?.email ||
       ''
   ).trim()
-  const displayEmail = String(
-    vendorProfile?.email || user?.email || ''
-  ).trim()
+  const displayEmail = String(vendorProfile?.email || user?.email || '').trim()
   const userInitials = displayName
     .split(/[\s._-]+/)
     .filter(Boolean)
@@ -59,7 +53,10 @@ export function NavUser() {
     .join('')
   const fallbackInitials =
     userInitials ||
-    displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() ||
+    displayName
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .slice(0, 2)
+      .toUpperCase() ||
     'V'
   const avatarCandidate = vendorProfile?.avatar || user?.avatar
   const avatarSrc =
@@ -99,15 +96,24 @@ export function NavUser() {
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size='lg'
-                className='bg-sidebar-accent/40 shadow-sm ring-1 ring-sidebar-border transition-colors hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent'
+                className='bg-sidebar-accent/40 ring-sidebar-border hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent shadow-sm ring-1 transition-colors'
               >
                 <Avatar className='h-8 w-8 rounded-lg'>
-                  <AvatarImage src={avatarSrc} alt={displayName || user?.name} />
-                  <AvatarFallback className='rounded-lg'>{fallbackInitials}</AvatarFallback>
+                  <AvatarImage
+                    src={avatarSrc}
+                    alt={displayName || user?.name}
+                  />
+                  <AvatarFallback className='rounded-lg'>
+                    {fallbackInitials}
+                  </AvatarFallback>
                 </Avatar>
                 <div className='grid flex-1 text-start text-sm leading-tight'>
-                  <span className='truncate font-semibold'>{displayName || user?.name}</span>
-                  <span className='truncate text-xs'>{displayEmail || user?.email}</span>
+                  <span className='truncate font-semibold'>
+                    {displayName || user?.name}
+                  </span>
+                  <span className='truncate text-xs'>
+                    {displayEmail || user?.email}
+                  </span>
                 </div>
                 <ChevronsUpDown className='ms-auto size-4' />
               </SidebarMenuButton>
@@ -121,24 +127,29 @@ export function NavUser() {
               <DropdownMenuLabel className='p-0 font-normal'>
                 <div className='flex items-center gap-2 px-1 py-1.5 text-start text-sm'>
                   <Avatar className='h-8 w-8 rounded-lg'>
-                    <AvatarImage src={avatarSrc} alt={displayName || user?.name} />
-                    <AvatarFallback className='rounded-lg'>{fallbackInitials}</AvatarFallback>
+                    <AvatarImage
+                      src={avatarSrc}
+                      alt={displayName || user?.name}
+                    />
+                    <AvatarFallback className='rounded-lg'>
+                      {fallbackInitials}
+                    </AvatarFallback>
                   </Avatar>
                   <div className='grid flex-1 text-start text-sm leading-tight'>
-                    <span className='truncate font-semibold'>{displayName || user?.name}</span>
-                    <span className='truncate text-xs'>{displayEmail || user?.email}</span>
+                    <span className='truncate font-semibold'>
+                      {displayName || user?.name}
+                    </span>
+                    <span className='truncate text-xs'>
+                      {displayEmail || user?.email}
+                    </span>
                   </div>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-             
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-            
-            
-              </DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => navigate({ to: '/profile' })}>
+                <UserRound />
+                Profile
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut />
@@ -148,8 +159,6 @@ export function NavUser() {
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
-
-      <SignOutDialog open={!!dialogOpen} onOpenChange={setDialogOpen} />
     </>
   )
 }

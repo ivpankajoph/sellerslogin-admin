@@ -3,8 +3,9 @@ import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowRight, Loader2 } from 'lucide-react'
+import Swal from 'sweetalert2'
 import { toast } from 'sonner'
-import { sleep, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -27,25 +28,53 @@ export function ForgotPasswordForm({
   ...props
 }: React.HTMLAttributes<HTMLFormElement>) {
   const [isLoading, setIsLoading] = useState(false)
+  const apiBaseUrl = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/$/, '')
+  const authBaseUrl = apiBaseUrl.endsWith('/v1')
+    ? apiBaseUrl.slice(0, -3)
+    : apiBaseUrl
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { email: '' },
   })
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
 
-    toast.promise(sleep(2000), {
-      loading: 'Sending email...',
-      success: () => {
-        setIsLoading(false)
-        form.reset()
-     
-        return `Email sent to ${data.email}`
-      },
-      error: 'Error',
-    })
+    try {
+      const res = await fetch(`${authBaseUrl}/v1/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const message =
+          res.status === 404
+            ? 'u dont exists'
+            : body?.message || 'Unable to send reset link'
+        throw new Error(message)
+      }
+      const successMessage = 'Link has been sent to email'
+      toast.success(successMessage)
+      await Swal.fire({
+        icon: 'success',
+        title: 'Email Sent',
+        text: successMessage,
+      })
+      form.reset()
+    } catch (error: any) {
+      const message = error?.message || 'Unable to send reset link'
+      const title = message === 'u dont exists' ? 'Email Not Found' : 'Request Failed'
+      toast.error(message)
+      await Swal.fire({
+        icon: 'error',
+        title,
+        text: message,
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

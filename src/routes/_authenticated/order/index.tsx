@@ -1,15 +1,41 @@
-﻿import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
-import api from '@/lib/axios'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
+﻿import { useEffect, useMemo, useState } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import type { RootState } from '@/store'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
-import type { RootState } from '@/store'
+import api from '@/lib/axios'
 import { formatINR } from '@/lib/currency'
 import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { ServerPagination } from '@/components/data-table/server-pagination'
+import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
+import { TablePageHeader } from '@/components/data-table/table-page-header'
+import { TableShell } from '@/components/data-table/table-shell'
+import { Main } from '@/components/layout/main'
 
 type OrderSummary = {
   totalOrders: number
@@ -77,14 +103,20 @@ function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
   const [borzoActionLoading, setBorzoActionLoading] = useState(false)
   const [borzoQuoteLoading, setBorzoQuoteLoading] = useState(false)
   const [borzoError, setBorzoError] = useState('')
-  const [borzoQuote, setBorzoQuote] = useState<{ amount?: number; warnings?: string[] } | null>(null)
+  const [borzoQuote, setBorzoQuote] = useState<{
+    amount?: number
+    warnings?: string[]
+  } | null>(null)
   const [pickupOverride, setPickupOverride] = useState({
     name: '',
     phone: '',
@@ -111,7 +143,7 @@ function OrdersPage() {
       const res = await api.get('/orders', {
         params: {
           page,
-          limit: 20,
+          limit,
           search: search || undefined,
           status: status === 'all' ? undefined : status,
         },
@@ -133,7 +165,7 @@ function OrdersPage() {
   useEffect(() => {
     fetchOrders()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, status])
+  }, [page, status, limit])
 
   useEffect(() => {
     if (!orders.length) {
@@ -147,14 +179,27 @@ function OrdersPage() {
 
   const selectedOrder = useMemo(
     () => orders.find((order) => order._id === selectedId) || null,
-    [orders, selectedId],
+    [orders, selectedId]
   )
 
-  const emptyOverride = { name: '', phone: '', address: '', latitude: '', longitude: '' }
+  const emptyOverride = {
+    name: '',
+    phone: '',
+    address: '',
+    latitude: '',
+    longitude: '',
+  }
 
   const buildAddressString = (address?: Order['shipping_address']) => {
     if (!address) return ''
-    return [address.line1, address.line2, address.city, address.state, address.pincode, address.country]
+    return [
+      address.line1,
+      address.line2,
+      address.city,
+      address.state,
+      address.pincode,
+      address.country,
+    ]
       .filter((value) => value && String(value).trim().length)
       .join(', ')
   }
@@ -195,7 +240,9 @@ function OrdersPage() {
       : null
 
     setPickupOverride(pickupFromPayload || emptyOverride)
-    setDropoffOverride(dropoffFromPayload || dropoffFromShipping || emptyOverride)
+    setDropoffOverride(
+      dropoffFromPayload || dropoffFromShipping || emptyOverride
+    )
   }, [selectedOrder?._id])
 
   const formatMoney = (value?: number) => formatINR(value)
@@ -211,7 +258,9 @@ function OrdersPage() {
       cancelled: 'bg-rose-100 text-rose-700',
     }
     return (
-      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${map[key] || 'bg-slate-100 text-slate-700'}`}>
+      <span
+        className={`rounded-full px-2 py-1 text-xs font-semibold ${map[key] || 'bg-slate-100 text-slate-700'}`}
+      >
         {key}
       </span>
     )
@@ -222,26 +271,63 @@ function OrdersPage() {
     summary?.totalRevenue ||
     orders.reduce(
       (acc, o) => acc + (isVendor ? o.vendor_subtotal || 0 : o.total || 0),
-      0,
+      0
     )
   const paidCount = summary?.paymentStatusCounts?.paid || 0
   const failedCount = summary?.paymentStatusCounts?.failed || 0
   const paidRevenue = summary?.paidRevenue || 0
-  const pageCount = Math.max(Math.ceil(total / 20), 1)
+  const pageCount = Math.max(Math.ceil(total / limit), 1)
+  const statsItems = [
+    {
+      label: 'Total Orders',
+      value: totalOrders,
+      helper: 'Orders returned for the current filters.',
+    },
+    {
+      label: 'Total Revenue',
+      value: formatMoney(totalRevenue),
+      helper: 'Gross value across the visible result set.',
+    },
+    {
+      label: 'Pending',
+      value: summary?.statusCounts?.pending || 0,
+      helper: 'Orders waiting for action.',
+    },
+    {
+      label: 'Delivered',
+      value: summary?.statusCounts?.delivered || 0,
+      helper: 'Orders marked delivered.',
+    },
+    {
+      label: 'Payments Paid',
+      value: paidCount,
+      helper: 'Orders with successful payment.',
+    },
+    {
+      label: 'Payments Failed',
+      value: failedCount,
+      helper: 'Orders with failed payment attempts.',
+    },
+    {
+      label: 'Paid Revenue',
+      value: formatMoney(paidRevenue),
+      helper: 'Revenue collected from paid orders.',
+    },
+  ]
 
   const hasActiveBorzo =
     Boolean(selectedOrder?.borzo?.order_id) &&
     !['canceled', 'cancelled', 'failed'].includes(
-      String(selectedOrder?.borzo?.status || '').toLowerCase(),
+      String(selectedOrder?.borzo?.status || '').toLowerCase()
     )
   const borzoBusy = borzoActionLoading || borzoQuoteLoading
 
   const buildBorzoPayload = () => {
-    const hasPickupOverride = Object.values(pickupOverride).some((value) =>
-      String(value || '').trim().length,
+    const hasPickupOverride = Object.values(pickupOverride).some(
+      (value) => String(value || '').trim().length
     )
-    const hasDropoffOverride = Object.values(dropoffOverride).some((value) =>
-      String(value || '').trim().length,
+    const hasDropoffOverride = Object.values(dropoffOverride).some(
+      (value) => String(value || '').trim().length
     )
     return {
       ...(hasPickupOverride ? { pickup: pickupOverride } : {}),
@@ -284,7 +370,10 @@ function OrdersPage() {
       setBorzoQuoteLoading(true)
       setBorzoError('')
       const payload = buildBorzoPayload()
-      const res = await api.post(`/orders/${selectedOrder._id}/borzo/calculate`, payload)
+      const res = await api.post(
+        `/orders/${selectedOrder._id}/borzo/calculate`,
+        payload
+      )
       const amount = Number(res?.data?.response?.order?.payment_amount || 0)
       const warnings = res?.data?.response?.warnings || []
       setBorzoQuote({ amount: Number.isFinite(amount) ? amount : 0, warnings })
@@ -334,185 +423,201 @@ function OrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedOrder?._id, pickupOverride, dropoffOverride, canUseBorzo])
 
+  const openDetails = (order: Order) => {
+    setSelectedId(order._id)
+    setDetailsOpen(true)
+  }
+
   return (
-    <div className='space-y-6'>
-      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-        <div>
-          <h1 className='text-2xl font-semibold text-slate-900'>Orders</h1>
-          <p className='text-sm text-muted-foreground'>Review order history and track order details</p>
-        </div>
-        <div className='flex flex-wrap items-center gap-2'>
-          <div className='relative'>
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setPage(1)
-                  fetchOrders()
-                }
-              }}
-              placeholder='Search order number or customer'
-              className='w-64'
-            />
-          </div>
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value)
-              setPage(1)
+    <>
+      <TablePageHeader title='Orders'>
+        <div className='relative shrink-0'>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setPage(1)
+                fetchOrders()
+              }
             }}
-            className='h-10 rounded-md border border-input bg-background px-3 text-sm'
-          >
-            <option value='all'>All status</option>
-            <option value='pending'>Pending</option>
-            <option value='confirmed'>Confirmed</option>
-            <option value='shipped'>Shipped</option>
-            <option value='delivered'>Delivered</option>
-            <option value='failed'>Failed</option>
-            <option value='cancelled'>Cancelled</option>
-          </select>
-          <Button onClick={() => fetchOrders()} disabled={loading}>
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </Button>
+            placeholder='Search order number or customer'
+            className='h-10 w-64 shrink-0'
+          />
         </div>
-      </div>
+        <Select
+          value={status}
+          onValueChange={(value) => {
+            setStatus(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className='w-36 shrink-0'>
+            <SelectValue placeholder='All status' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>All status</SelectItem>
+            <SelectItem value='pending'>Pending</SelectItem>
+            <SelectItem value='confirmed'>Confirmed</SelectItem>
+            <SelectItem value='shipped'>Shipped</SelectItem>
+            <SelectItem value='delivered'>Delivered</SelectItem>
+            <SelectItem value='failed'>Failed</SelectItem>
+            <SelectItem value='cancelled'>Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant='outline'
+          className='shrink-0'
+          onClick={() => setStatsOpen(true)}
+        >
+          Statistics
+        </Button>
+        <Button
+          className='shrink-0'
+          onClick={() => fetchOrders()}
+          disabled={loading}
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </Button>
+      </TablePageHeader>
 
-      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Total Orders</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{totalOrders}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Total Revenue</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{formatMoney(totalRevenue)}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Pending</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>
-            {summary?.statusCounts?.pending || 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Delivered</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>
-            {summary?.statusCounts?.delivered || 0}
-          </CardContent>
-        </Card>
-      </div>
+      <Main className='flex flex-1 flex-col gap-6'>
+        <TableShell
+          className='flex-1'
+          title='Order list'
+          footer={
+            <ServerPagination
+              page={page}
+              totalPages={pageCount}
+              totalItems={total}
+              pageSize={limit}
+              pageSizeOptions={[10, 20, 50]}
+              onPageChange={setPage}
+              onPageSizeChange={(value) => {
+                setLimit(value)
+                setPage(1)
+              }}
+              disabled={loading}
+            />
+          }
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className='min-w-[160px]'>Order</TableHead>
+                <TableHead className='min-w-[200px]'>Customer</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className='min-w-[160px]'>Payment</TableHead>
+                <TableHead className='min-w-[110px]'>Items</TableHead>
+                <TableHead className='min-w-[140px]'>Total</TableHead>
+                <TableHead className='min-w-[160px]'>Created</TableHead>
+                <TableHead className='text-right'>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && orders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className='h-24 text-center'>
+                    Loading orders...
+                  </TableCell>
+                </TableRow>
+              ) : orders.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className='text-muted-foreground h-24 text-center'
+                  >
+                    {error || 'No orders found.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                orders.map((order) => (
+                  <TableRow key={order._id}>
+                    <TableCell>
+                      <div className='text-sm font-medium'>
+                        #{order.order_number}
+                      </div>
+                      <div className='text-muted-foreground text-xs'>
+                        {order.delivery_provider || 'Store delivery'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className='text-sm font-medium'>
+                        {order.user_id?.name ||
+                          order.shipping_address?.full_name ||
+                          'Customer'}
+                      </div>
+                      <div className='text-muted-foreground text-xs'>
+                        {order.user_id?.email ||
+                          order.shipping_address?.phone ||
+                          'N/A'}
+                      </div>
+                    </TableCell>
+                    <TableCell>{statusBadge(order.status)}</TableCell>
+                    <TableCell className='text-muted-foreground text-sm'>
+                      {order.payment_method || 'cod'} (
+                      {order.payment_status || 'pending'})
+                    </TableCell>
+                    <TableCell className='text-muted-foreground text-sm'>
+                      {order.items?.length || 0} items
+                    </TableCell>
+                    <TableCell className='text-sm font-semibold'>
+                      {formatMoney(
+                        isVendor ? order.vendor_subtotal : order.total
+                      )}
+                    </TableCell>
+                    <TableCell className='text-muted-foreground text-sm'>
+                      {order.createdAt
+                        ? new Date(order.createdAt).toLocaleDateString()
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell className='text-right'>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={() => openDetails(order)}
+                      >
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableShell>
+      </Main>
 
-      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Payments Paid</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{paidCount}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Payments Failed</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{failedCount}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Paid Revenue</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{formatMoney(paidRevenue)}</CardContent>
-        </Card>
-      </div>
-
-      <div className='grid gap-6 xl:grid-cols-[360px_1fr]'>
-        <Card className='h-fit'>
-          <CardHeader className='pb-3'>
-            <CardTitle className='text-base'>Order list</CardTitle>
-          </CardHeader>
-          <CardContent className='space-y-3'>
-            {loading && <p className='text-sm text-muted-foreground'>Loading orders...</p>}
-            {!loading && error && <p className='text-sm text-rose-600'>{error}</p>}
-            {!loading && !error && orders.length === 0 && (
-              <p className='text-sm text-muted-foreground'>No orders found.</p>
-            )}
-            <div className='space-y-3 max-h-[520px] overflow-y-auto pr-2'>
-              {orders.map((order) => (
-                <button
-                  key={order._id}
-                  onClick={() => setSelectedId(order._id)}
-                  className={`w-full rounded-lg border p-3 text-left transition ${
-                    selectedId === order._id
-                      ? 'border-slate-900 bg-slate-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className='flex flex-wrap items-center justify-between gap-3'>
-                    <span className='text-sm font-semibold'>#{order.order_number}</span>
-                    {statusBadge(order.status)}
-                  </div>
-                  <div className='mt-2 text-xs text-muted-foreground'>
-                    {order.user_id?.name || order.shipping_address?.full_name || 'Customer'} |{' '}
-                    {order.user_id?.email || order.shipping_address?.phone || 'N/A'}
-                  </div>
-                  <div className='mt-2 flex items-center justify-between text-sm font-semibold'>
-                    <span>{order.items?.length || 0} items</span>
-                    <span>{formatMoney(isVendor ? order.vendor_subtotal : order.total)}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-            {pageCount > 1 && (
-              <div className='flex items-center justify-between pt-2 text-sm'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                  disabled={page <= 1 || loading}
-                >
-                  Previous
-                </Button>
-                <span className='text-xs text-muted-foreground'>
-                  Page {page} of {pageCount}
-                </span>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => setPage((prev) => Math.min(prev + 1, pageCount))}
-                  disabled={page >= pageCount || loading}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className='text-base'>Order details</CardTitle>
-          </CardHeader>
-          <CardContent className='space-y-4'>
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className='max-h-[92vh] w-[min(96vw,1000px)] overflow-y-auto overscroll-contain rounded-none'>
+          <DialogHeader className='text-left'>
+            <DialogTitle>Order details</DialogTitle>
+            <DialogDescription>
+              Review items, customer details, and delivery actions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-4'>
             {!selectedOrder ? (
-              <p className='text-sm text-muted-foreground'>Select an order to view details.</p>
+              <p className='text-muted-foreground text-sm'>
+                No order selected.
+              </p>
             ) : (
               <>
                 <div className='flex flex-wrap items-center justify-between gap-3 text-sm'>
                   <div>
-                    <p className='text-xs text-muted-foreground'>Order number</p>
-                    <p className='font-semibold'>#{selectedOrder.order_number}</p>
+                    <p className='text-muted-foreground text-xs'>
+                      Order number
+                    </p>
+                    <p className='font-semibold'>
+                      #{selectedOrder.order_number}
+                    </p>
                   </div>
                   <div>
-                    <p className='text-xs text-muted-foreground'>Status</p>
+                    <p className='text-muted-foreground text-xs'>Status</p>
                     <div>{statusBadge(selectedOrder.status)}</div>
                   </div>
                   <div>
-                    <p className='text-xs text-muted-foreground'>Created</p>
+                    <p className='text-muted-foreground text-xs'>Created</p>
                     <p className='font-semibold'>
                       {selectedOrder.createdAt
                         ? new Date(selectedOrder.createdAt).toLocaleString()
@@ -566,7 +671,10 @@ function OrdersPage() {
                   <p className='text-sm font-semibold'>Items</p>
                   <div className='max-h-[360px] space-y-3 overflow-y-auto pr-2'>
                     {selectedOrder.items.map((item) => (
-                      <div key={item.product_id || item._id} className='flex gap-3 rounded-lg border p-3'>
+                      <div
+                        key={item.product_id || item._id}
+                        className='flex gap-3 rounded-lg border p-3'
+                      >
                         <div className='h-14 w-14 overflow-hidden rounded-md bg-slate-100'>
                           <img
                             src={item.image_url || '/placeholder.png'}
@@ -576,13 +684,17 @@ function OrdersPage() {
                         </div>
                         <div className='flex flex-1 items-start justify-between gap-3'>
                           <div className='min-w-0'>
-                            <p className='text-sm font-semibold text-slate-900 line-clamp-2'>
+                            <p className='line-clamp-2 text-sm font-semibold text-slate-900'>
                               {item.product_name}
                             </p>
-                            <p className='text-xs text-muted-foreground'>
-                              {Object.values(item.variant_attributes || {}).join(' / ')}
+                            <p className='text-muted-foreground text-xs'>
+                              {Object.values(
+                                item.variant_attributes || {}
+                              ).join(' / ')}
                             </p>
-                            <p className='text-xs text-muted-foreground'>Qty: {item.quantity}</p>
+                            <p className='text-muted-foreground text-xs'>
+                              Qty: {item.quantity}
+                            </p>
                           </div>
                           <div className='text-sm font-semibold whitespace-nowrap'>
                             {formatMoney(item.total_price)}
@@ -598,9 +710,16 @@ function OrdersPage() {
                 <div className='grid gap-4 md:grid-cols-2'>
                   <div className='space-y-2 rounded-lg border p-3'>
                     <p className='text-sm font-semibold'>Customer</p>
-                    <p className='text-sm'>{selectedOrder.user_id?.name || selectedOrder.shipping_address?.full_name}</p>
-                    <p className='text-xs text-muted-foreground'>{selectedOrder.user_id?.email}</p>
-                    <p className='text-xs text-muted-foreground'>{selectedOrder.shipping_address?.phone}</p>
+                    <p className='text-sm'>
+                      {selectedOrder.user_id?.name ||
+                        selectedOrder.shipping_address?.full_name}
+                    </p>
+                    <p className='text-muted-foreground text-xs'>
+                      {selectedOrder.user_id?.email}
+                    </p>
+                    <p className='text-muted-foreground text-xs'>
+                      {selectedOrder.shipping_address?.phone}
+                    </p>
                   </div>
                   <div className='space-y-2 rounded-lg border p-3'>
                     <p className='text-sm font-semibold'>Shipping address</p>
@@ -610,11 +729,12 @@ function OrdersPage() {
                         ? `, ${selectedOrder.shipping_address?.line2}`
                         : ''}
                     </p>
-                    <p className='text-xs text-muted-foreground'>
-                      {selectedOrder.shipping_address?.city}, {selectedOrder.shipping_address?.state}{' '}
+                    <p className='text-muted-foreground text-xs'>
+                      {selectedOrder.shipping_address?.city},{' '}
+                      {selectedOrder.shipping_address?.state}{' '}
                       {selectedOrder.shipping_address?.pincode}
                     </p>
-                    <p className='text-xs text-muted-foreground'>
+                    <p className='text-muted-foreground text-xs'>
                       {selectedOrder.shipping_address?.country || 'India'}
                     </p>
                   </div>
@@ -626,33 +746,48 @@ function OrdersPage() {
                   <div className='flex justify-between'>
                     <span className='text-muted-foreground'>Payment</span>
                     <span className='font-semibold'>
-                      {selectedOrder.payment_method || 'cod'} ({selectedOrder.payment_status || 'pending'})
+                      {selectedOrder.payment_method || 'cod'} (
+                      {selectedOrder.payment_status || 'pending'})
                     </span>
                   </div>
                   <div className='flex justify-between'>
                     <span className='text-muted-foreground'>Items total</span>
                     <span className='font-semibold'>
-                      {formatMoney(isVendor ? selectedOrder.vendor_subtotal : selectedOrder.subtotal)}
+                      {formatMoney(
+                        isVendor
+                          ? selectedOrder.vendor_subtotal
+                          : selectedOrder.subtotal
+                      )}
                     </span>
                   </div>
                   {!isVendor && (
                     <>
                       <div className='flex justify-between'>
                         <span className='text-muted-foreground'>Shipping</span>
-                        <span className='font-semibold'>{formatMoney(selectedOrder.shipping_fee)}</span>
+                        <span className='font-semibold'>
+                          {formatMoney(selectedOrder.shipping_fee)}
+                        </span>
                       </div>
                       <div className='flex justify-between'>
                         <span className='text-muted-foreground'>Discount</span>
-                        <span className='font-semibold'>-{formatMoney(selectedOrder.discount)}</span>
+                        <span className='font-semibold'>
+                          -{formatMoney(selectedOrder.discount)}
+                        </span>
                       </div>
                     </>
                   )}
                   <div className='flex justify-between text-base font-semibold'>
                     <span>{isVendor ? 'Your total' : 'Total'}</span>
-                    <span>{formatMoney(isVendor ? selectedOrder.vendor_subtotal : selectedOrder.total)}</span>
+                    <span>
+                      {formatMoney(
+                        isVendor
+                          ? selectedOrder.vendor_subtotal
+                          : selectedOrder.total
+                      )}
+                    </span>
                   </div>
                   {isVendor && (
-                    <div className='flex justify-between text-xs text-muted-foreground'>
+                    <div className='text-muted-foreground flex justify-between text-xs'>
                       <span>Customer paid</span>
                       <span>{formatMoney(selectedOrder.total)}</span>
                     </div>
@@ -666,7 +801,9 @@ function OrdersPage() {
                     <div className='space-y-4 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 shadow-sm'>
                       <div className='flex flex-wrap items-center justify-between gap-3'>
                         <div>
-                          <p className='text-sm font-semibold text-slate-900'>Borzo delivery</p>
+                          <p className='text-sm font-semibold text-slate-900'>
+                            Borzo delivery
+                          </p>
                           <p className='text-xs text-slate-600'>
                             {selectedOrder.borzo?.order_id
                               ? `Order ID ${selectedOrder.borzo.order_id} | ${selectedOrder.borzo.status || 'created'}`
@@ -696,63 +833,117 @@ function OrdersPage() {
 
                       <div className='grid gap-3 lg:grid-cols-2'>
                         <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
-                          <p className='text-xs font-semibold text-slate-700'>Pickup address override (optional)</p>
+                          <p className='text-xs font-semibold text-slate-700'>
+                            Pickup address override (optional)
+                          </p>
                           <Input
                             placeholder='Pickup name'
                             value={pickupOverride.name}
-                            onChange={(e) => setPickupOverride((prev) => ({ ...prev, name: e.target.value }))}
+                            onChange={(e) =>
+                              setPickupOverride((prev) => ({
+                                ...prev,
+                                name: e.target.value,
+                              }))
+                            }
                           />
                           <Input
                             placeholder='Pickup phone'
                             value={pickupOverride.phone}
-                            onChange={(e) => setPickupOverride((prev) => ({ ...prev, phone: e.target.value }))}
+                            onChange={(e) =>
+                              setPickupOverride((prev) => ({
+                                ...prev,
+                                phone: e.target.value,
+                              }))
+                            }
                           />
                           <Input
                             placeholder='Pickup address'
                             value={pickupOverride.address}
-                            onChange={(e) => setPickupOverride((prev) => ({ ...prev, address: e.target.value }))}
+                            onChange={(e) =>
+                              setPickupOverride((prev) => ({
+                                ...prev,
+                                address: e.target.value,
+                              }))
+                            }
                           />
                           <div className='grid gap-2 sm:grid-cols-2'>
                             <Input
                               placeholder='Pickup latitude'
                               value={pickupOverride.latitude}
-                              onChange={(e) => setPickupOverride((prev) => ({ ...prev, latitude: e.target.value }))}
+                              onChange={(e) =>
+                                setPickupOverride((prev) => ({
+                                  ...prev,
+                                  latitude: e.target.value,
+                                }))
+                              }
                             />
                             <Input
                               placeholder='Pickup longitude'
                               value={pickupOverride.longitude}
-                              onChange={(e) => setPickupOverride((prev) => ({ ...prev, longitude: e.target.value }))}
+                              onChange={(e) =>
+                                setPickupOverride((prev) => ({
+                                  ...prev,
+                                  longitude: e.target.value,
+                                }))
+                              }
                             />
                           </div>
                         </div>
 
                         <div className='grid gap-2 rounded-xl border border-white/80 bg-white/80 p-3 shadow-sm'>
-                          <p className='text-xs font-semibold text-slate-700'>Drop-off override (optional)</p>
+                          <p className='text-xs font-semibold text-slate-700'>
+                            Drop-off override (optional)
+                          </p>
                           <Input
                             placeholder='Drop-off name'
                             value={dropoffOverride.name}
-                            onChange={(e) => setDropoffOverride((prev) => ({ ...prev, name: e.target.value }))}
+                            onChange={(e) =>
+                              setDropoffOverride((prev) => ({
+                                ...prev,
+                                name: e.target.value,
+                              }))
+                            }
                           />
                           <Input
                             placeholder='Drop-off phone'
                             value={dropoffOverride.phone}
-                            onChange={(e) => setDropoffOverride((prev) => ({ ...prev, phone: e.target.value }))}
+                            onChange={(e) =>
+                              setDropoffOverride((prev) => ({
+                                ...prev,
+                                phone: e.target.value,
+                              }))
+                            }
                           />
                           <Input
                             placeholder='Drop-off address'
                             value={dropoffOverride.address}
-                            onChange={(e) => setDropoffOverride((prev) => ({ ...prev, address: e.target.value }))}
+                            onChange={(e) =>
+                              setDropoffOverride((prev) => ({
+                                ...prev,
+                                address: e.target.value,
+                              }))
+                            }
                           />
                           <div className='grid gap-2 sm:grid-cols-2'>
                             <Input
                               placeholder='Drop-off latitude'
                               value={dropoffOverride.latitude}
-                              onChange={(e) => setDropoffOverride((prev) => ({ ...prev, latitude: e.target.value }))}
+                              onChange={(e) =>
+                                setDropoffOverride((prev) => ({
+                                  ...prev,
+                                  latitude: e.target.value,
+                                }))
+                              }
                             />
                             <Input
                               placeholder='Drop-off longitude'
                               value={dropoffOverride.longitude}
-                              onChange={(e) => setDropoffOverride((prev) => ({ ...prev, longitude: e.target.value }))}
+                              onChange={(e) =>
+                                setDropoffOverride((prev) => ({
+                                  ...prev,
+                                  longitude: e.target.value,
+                                }))
+                              }
                             />
                           </div>
                         </div>
@@ -765,7 +956,11 @@ function OrdersPage() {
                           disabled={borzoBusy || hasActiveBorzo}
                           className='bg-gradient-to-r from-indigo-600 to-sky-600 text-white shadow-sm hover:from-indigo-500 hover:to-sky-500'
                         >
-                          {borzoActionLoading ? 'Creating...' : hasActiveBorzo ? 'Already created' : 'Create Borzo delivery'}
+                          {borzoActionLoading
+                            ? 'Creating...'
+                            : hasActiveBorzo
+                              ? 'Already created'
+                              : 'Create Borzo delivery'}
                         </Button>
                         <Button
                           size='sm'
@@ -774,11 +969,17 @@ function OrdersPage() {
                           disabled={borzoBusy || !selectedOrder.borzo?.order_id}
                           className='border-indigo-200 text-indigo-700 hover:bg-indigo-50'
                         >
-                          {borzoActionLoading ? 'Canceling...' : 'Cancel Borzo delivery'}
+                          {borzoActionLoading
+                            ? 'Canceling...'
+                            : 'Cancel Borzo delivery'}
                         </Button>
                       </div>
                       <div className='flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600'>
-                        <span>{borzoQuoteLoading ? 'Updating quote...' : 'Auto-quote updates as you type.'}</span>
+                        <span>
+                          {borzoQuoteLoading
+                            ? 'Updating quote...'
+                            : 'Auto-quote updates as you type.'}
+                        </span>
                         {borzoQuote && (
                           <span className='font-semibold text-slate-900'>
                             Quote:{' '}
@@ -786,7 +987,9 @@ function OrdersPage() {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}
-                            {borzoQuote.warnings?.length ? ` | ${borzoQuote.warnings.join(', ')}` : ''}
+                            {borzoQuote.warnings?.length
+                              ? ` | ${borzoQuote.warnings.join(', ')}`
+                              : ''}
                           </span>
                         )}
                       </div>
@@ -795,10 +998,17 @@ function OrdersPage() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <StatisticsDialog
+        open={statsOpen}
+        onOpenChange={setStatsOpen}
+        title='Order statistics'
+        description='Summary for the current filters.'
+        items={statsItems}
+      />
+    </>
   )
 }
-

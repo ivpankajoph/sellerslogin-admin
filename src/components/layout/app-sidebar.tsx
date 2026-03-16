@@ -9,24 +9,28 @@ import {
   getInstalledProviderIds,
   type IntegrationProviderId,
 } from '@/lib/vendor-integrations'
+import type { RootState } from '@/store'
 import { Button } from '@/components/ui/button'
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
 import { sidebarData } from './data/sidebar-data'
 import { NavGroup } from './nav-group'
+import type { NavCollapsible, NavGroup as SidebarNavGroup, NavItem } from './types'
 import { NavUser } from './nav-user'
+
+const hasChildren = (item: NavItem): item is NavCollapsible =>
+  'items' in item && Array.isArray(item.items)
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
   const { data, isProviderVisible } = useVendorIntegrations()
   const { state, toggleSidebar } = useSidebar()
-  const user = useSelector((state: any) => state.auth.user)
+  const user = useSelector((state: RootState) => state.auth.user)
   const userType = user?.role
   const effectiveRole = userType === 'superadmin' ? 'admin' : userType
   const installedToolkitProviders = getInstalledProviderIds(data)
@@ -42,57 +46,65 @@ export function AppSidebar() {
   }
 
   const filteredNavGroups = sidebarData.navGroups
-    .filter((group: any) => !group.roles || group.roles.includes(effectiveRole))
-    .map((group: any) => ({
+    .filter(
+      (group): group is SidebarNavGroup =>
+        !group.roles || group.roles.includes(effectiveRole)
+    )
+    .map((group): SidebarNavGroup => ({
       ...group,
       items: group.items
-        ?.filter(
-          (item: any) =>
+        .filter(
+          (item) =>
             (!item.roles || item.roles.includes(effectiveRole)) &&
-            (group.title === 'Sellerslogin Toolkit'
+            (group.useToolkitInstallFilter
               ? canShowByToolkitInstall(item.requiresIntegration)
               : canShowByIntegration(item.requiresIntegration)),
         )
-        .map((item: any) => ({
-          ...item,
-          badge:
-            item.title === 'My Apps' && effectiveRole === 'vendor' && installedToolkitCount
+        .map((item): NavItem => {
+          const badge =
+            item.title === 'My Apps' &&
+            effectiveRole === 'vendor' &&
+            installedToolkitCount
               ? String(installedToolkitCount)
-              : item.badge,
-          items: item.items?.filter(
-            (subItem: any) =>
-              (!subItem.roles || subItem.roles.includes(effectiveRole)) &&
-              (group.title === 'Sellerslogin Toolkit'
-                ? canShowByToolkitInstall(subItem.requiresIntegration)
-                : canShowByIntegration(subItem.requiresIntegration)),
-          ),
-        }))
-        .filter((item: any) => !item.items || item.items.length > 0),
+              : item.badge
+
+          if (!hasChildren(item)) {
+            return { ...item, badge }
+          }
+
+          return {
+            ...item,
+            badge,
+            items: item.items.filter(
+              (subItem) =>
+                (!subItem.roles || subItem.roles.includes(effectiveRole)) &&
+                (group.useToolkitInstallFilter
+                  ? canShowByToolkitInstall(subItem.requiresIntegration)
+                  : canShowByIntegration(subItem.requiresIntegration))
+            ),
+          }
+        })
+        .filter((item) => !hasChildren(item) || item.items.length > 0),
     }))
-    .filter((group: any) => group.items.length > 0)
+    .filter((group) => group.items.length > 0)
 
   return (
     <Sidebar
       collapsible={collapsible}
       variant={variant}
-      className='[&_[data-slot=sidebar-inner]]:border-e [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar [&_[data-slot=sidebar-inner]]:text-sidebar-foreground [&_[data-slot=sidebar-inner]]:shadow-sm'
+      className='[&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar/90 [&_[data-slot=sidebar-inner]]:text-sidebar-foreground [&_[data-slot=sidebar-inner]]:shadow-[0_24px_56px_rgba(15,23,42,0.08)]'
     >
       <SidebarHeader className='border-b border-sidebar-border/70 p-3 group-data-[collapsible=icon]:px-2'>
-        <div className='flex items-center justify-between gap-2 rounded-xl border border-sidebar-border/70 bg-sidebar-accent/40 p-2 shadow-sm group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-1.5'>
-          <div className='min-w-0 group-data-[collapsible=icon]:hidden'>
-            <p className='truncate text-sm font-semibold text-sidebar-foreground'>
-              Navigation
-            </p>
-            <p className='truncate text-xs text-sidebar-foreground/65'>
-              Expand or collapse sidebar
-            </p>
+        <div className='flex items-center gap-2 border border-sidebar-border/70 bg-sidebar-accent/40 p-2 shadow-sm group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-1.5'>
+          <div className='min-w-0 flex-1 group-data-[collapsible=icon]:hidden'>
+            <NavUser />
           </div>
           <Button
             type='button'
             variant='ghost'
             size='icon'
             onClick={toggleSidebar}
-            className='size-8 rounded-lg border border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-sm hover:bg-sidebar-accent'
+            className='size-8 border border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-sm hover:bg-sidebar-accent'
             title={state === 'expanded' ? 'Collapse sidebar' : 'Expand sidebar'}
             aria-label={state === 'expanded' ? 'Collapse sidebar' : 'Expand sidebar'}
           >
@@ -106,14 +118,10 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {filteredNavGroups.map((props: JSX.IntrinsicAttributes & any) => (
-          <NavGroup key={props.title} {...props} />
+        {filteredNavGroups.map((group: JSX.IntrinsicAttributes & SidebarNavGroup) => (
+          <NavGroup key={group.title} {...group} />
         ))}
       </SidebarContent>
-
-      <SidebarFooter className='border-t border-sidebar-border/70'>
-        <NavUser />
-      </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>

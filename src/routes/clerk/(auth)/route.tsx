@@ -15,7 +15,7 @@ function ClerkAuthLayout() {
           to='/'
           className='relative z-20 flex items-center text-lg font-medium'
         >
-          OPH-Mart
+          SellersLogin
         </Link>
 
         {/* <ClerkFullLogo className='relative m-auto size-96' /> */}

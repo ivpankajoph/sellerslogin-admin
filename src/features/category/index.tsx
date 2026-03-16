@@ -1,12 +1,16 @@
 /* eslint-disable no-duplicate-imports */
 /* eslint-disable @typescript-eslint/consistent-type-imports */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
+import { useCallback, useEffect, useState } from 'react'
+import axios from 'axios'
+import { useNavigate } from '@tanstack/react-router'
+import { AppDispatch } from '@/store'
+import type { RootState } from '@/store'
+import { getAllCategories } from '@/store/slices/admin/categorySlice'
 import { motion } from 'framer-motion'
 import { ListFilter, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import axios from 'axios'
+import { Input } from '@/components/ui/input'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -14,16 +18,12 @@ import { Pagination } from '@/components/pagination'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { Input } from '@/components/ui/input'
-import { AppDispatch } from '@/store'
-import { getAllCategories } from '@/store/slices/admin/categorySlice'
 import { CategoryTree } from './components/category-tree'
 import { UsersDialogs } from './components/users-dialogs'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersProvider } from './components/users-provider'
-import type { RootState } from '@/store'
 
-export function Category() {
+function AdminCategoryPage() {
   const dispatch = useDispatch<AppDispatch>()
   const MAIN_CATEGORY_PAGE_SIZE = 100
 
@@ -47,12 +47,13 @@ export function Category() {
     categories: 0,
     subcategories: 0,
   })
-  const mainCategoryTotal = backendTotals.mainCategories || mainCategoryOptions.length
+  const mainCategoryTotal =
+    backendTotals.mainCategories || mainCategoryOptions.length
   const categoryTotal = backendTotals.categories || pagination?.total || 0
   const subcategoryTotal = backendTotals.subcategories
   const totalRows = pagination?.total || 0
 
-  const refreshCategories = () => {
+  const refreshCategories = useCallback(() => {
     dispatch(
       getAllCategories({
         page,
@@ -62,11 +63,11 @@ export function Category() {
         main_category_id: mainFilter || undefined,
       })
     )
-  }
+  }, [dispatch, limit, mainFilter, page, searchQuery, typeFilter])
 
   useEffect(() => {
     refreshCategories()
-  }, [dispatch, page, limit, searchQuery, typeFilter, mainFilter])
+  }, [refreshCategories])
 
   const handlePageChange = (nextPage: number) => {
     setPage(nextPage)
@@ -122,20 +123,28 @@ export function Category() {
         const headers = token ? { Authorization: `Bearer ${token}` } : undefined
 
         const [categoriesRes, subcategoriesRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/categories/getall`, {
-            params: { page: 1, limit: 1, level: 'category' },
-            headers,
-          }),
-          axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/subcategories/getall`, {
-            params: { page: 1, limit: 1 },
-            headers,
-          }),
+          axios.get(
+            `${import.meta.env.VITE_PUBLIC_API_URL}/v1/categories/getall`,
+            {
+              params: { page: 1, limit: 1, level: 'category' },
+              headers,
+            }
+          ),
+          axios.get(
+            `${import.meta.env.VITE_PUBLIC_API_URL}/v1/subcategories/getall`,
+            {
+              params: { page: 1, limit: 1 },
+              headers,
+            }
+          ),
         ])
 
         setBackendTotals((prev) => ({
           ...prev,
           categories: Number(
-            categoriesRes.data?.pagination?.total ?? categoriesRes.data?.data?.length ?? 0
+            categoriesRes.data?.pagination?.total ??
+              categoriesRes.data?.data?.length ??
+              0
           ),
           subcategories: Number(
             subcategoriesRes.data?.pagination?.total ??
@@ -162,10 +171,10 @@ export function Category() {
         </div>
       </Header>
 
-      <Main className='relative flex flex-1 flex-col gap-5 overflow-x-clip pb-10 font-manrope sm:gap-6'>
+      <Main className='font-manrope relative flex flex-1 flex-col gap-5 overflow-x-clip pb-10 sm:gap-6'>
         <div className='pointer-events-none absolute inset-0 -z-10 overflow-hidden'>
-          <div className='absolute -left-24 -top-24 h-72 w-72 rounded-full bg-cyan-300/20 blur-3xl' />
-          <div className='absolute -right-20 top-10 h-96 w-96 rounded-full bg-indigo-300/15 blur-3xl' />
+          <div className='absolute -top-24 -left-24 h-72 w-72 rounded-full bg-cyan-300/20 blur-3xl' />
+          <div className='absolute top-10 -right-20 h-96 w-96 rounded-full bg-indigo-300/15 blur-3xl' />
           <div className='absolute bottom-[-7rem] left-1/3 h-80 w-80 rounded-full bg-amber-200/25 blur-3xl' />
         </div>
 
@@ -177,7 +186,7 @@ export function Category() {
         >
           <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
             <div>
-              <div className='mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700'>
+              <div className='mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/85 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-cyan-700 uppercase'>
                 <Sparkles className='h-3.5 w-3.5' />
                 Catalog Console
               </div>
@@ -192,13 +201,15 @@ export function Category() {
             <div className='flex flex-wrap items-end justify-end gap-2'>
               <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
                 <div className='rounded-xl border border-white/80 bg-white/80 px-3 py-2'>
-                  <div className='text-[11px] uppercase tracking-[0.12em] text-slate-500'>
+                  <div className='text-[11px] tracking-[0.12em] text-slate-500 uppercase'>
                     Main Categories
                   </div>
-                  <div className='text-lg font-bold text-slate-900'>{mainCategoryTotal}</div>
+                  <div className='text-lg font-bold text-slate-900'>
+                    {mainCategoryTotal}
+                  </div>
                 </div>
                 <div className='rounded-xl border border-white/80 bg-white/80 px-3 py-2'>
-                  <div className='text-[11px] uppercase tracking-[0.12em] text-slate-500'>
+                  <div className='text-[11px] tracking-[0.12em] text-slate-500 uppercase'>
                     Categories
                   </div>
                   <div className='text-lg font-bold text-slate-900'>
@@ -206,16 +217,20 @@ export function Category() {
                   </div>
                 </div>
                 <div className='rounded-xl border border-white/80 bg-white/80 px-3 py-2'>
-                  <div className='text-[11px] uppercase tracking-[0.12em] text-slate-500'>
+                  <div className='text-[11px] tracking-[0.12em] text-slate-500 uppercase'>
                     Subcategories
                   </div>
-                  <div className='text-lg font-bold text-slate-900'>{subcategoryTotal}</div>
+                  <div className='text-lg font-bold text-slate-900'>
+                    {subcategoryTotal}
+                  </div>
                 </div>
                 <div className='rounded-xl border border-white/80 bg-white/80 px-3 py-2'>
-                  <div className='text-[11px] uppercase tracking-[0.12em] text-slate-500'>
+                  <div className='text-[11px] tracking-[0.12em] text-slate-500 uppercase'>
                     Showing
                   </div>
-                  <div className='text-lg font-bold text-slate-900'>{categories?.length || 0}</div>
+                  <div className='text-lg font-bold text-slate-900'>
+                    {categories?.length || 0}
+                  </div>
                 </div>
               </div>
               {isAdmin ? <UsersPrimaryButtons /> : null}
@@ -224,7 +239,7 @@ export function Category() {
         </motion.section>
 
         <section className='rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur-sm sm:p-5'>
-          <div className='mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-600'>
+          <div className='mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold tracking-[0.15em] text-slate-600 uppercase'>
             <ListFilter className='h-3.5 w-3.5' />
             Smart Filters
           </div>
@@ -300,11 +315,12 @@ export function Category() {
           <>
             <section className='rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm backdrop-blur-sm sm:p-4'>
               <div className='mb-3 flex flex-wrap items-center justify-between gap-2 px-1'>
-                <h3 className='text-sm font-bold uppercase tracking-[0.12em] text-slate-600'>
+                <h3 className='text-sm font-bold tracking-[0.12em] text-slate-600 uppercase'>
                   Category Table
                 </h3>
                 <div className='text-xs text-slate-500'>
-                  Click a main row action to open categories, then subcategories.
+                  Click a main row action to open categories, then
+                  subcategories.
                 </div>
               </div>
               <div className='max-h-[70vh] min-h-[560px] overflow-auto'>
@@ -331,4 +347,23 @@ export function Category() {
       {isAdmin ? <UsersDialogs /> : null}
     </UsersProvider>
   )
+}
+
+export function Category() {
+  const navigate = useNavigate()
+  const role = String(
+    useSelector((state: RootState) => state.auth?.user?.role || '')
+  ).toLowerCase()
+
+  useEffect(() => {
+    if (role === 'vendor') {
+      void navigate({ to: '/products', replace: true })
+    }
+  }, [navigate, role])
+
+  if (role === 'vendor') {
+    return null
+  }
+
+  return <AdminCategoryPage />
 }

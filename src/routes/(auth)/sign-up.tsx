@@ -1,6 +1,24 @@
+import { useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { SignUp } from '@/features/auth/sign-up'
+
+const VENDOR_REGISTRATION_URL =
+  import.meta.env.VITE_VENDOR_REGISTRATION_URL ||
+  'http://localhost:3000/vendor/registration'
 
 export const Route = createFileRoute('/(auth)/sign-up')({
-  component: SignUp,
+  component: SignUpRedirect,
 })
+
+function SignUpRedirect() {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.location.replace(VENDOR_REGISTRATION_URL)
+    }
+  }, [])
+
+  return (
+    <div className='flex min-h-screen items-center justify-center text-sm text-muted-foreground'>
+      Redirecting to vendor registration...
+    </div>
+  )
+}

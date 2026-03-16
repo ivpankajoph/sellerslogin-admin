@@ -1,17 +1,15 @@
+import { useEffect, useMemo, useState } from 'react'
 import { getRouteApi } from '@tanstack/react-router'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { Header } from '@/components/layout/header'
+import { useSelector } from 'react-redux'
+import api from '@/lib/axios'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
+import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
 import { UsersDialogs } from './components/users-dialogs'
 import { UsersProvider } from './components/users-provider'
 import { UsersTable } from './components/users-table'
-import { useEffect, useState } from 'react'
-import api from '@/lib/axios'
-
-import { useSelector } from 'react-redux'
 import { type User } from './data/schema'
 
 const route = getRouteApi('/_authenticated/users/')
@@ -24,85 +22,218 @@ export function Users() {
   const [data, setData] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [filterValue, setFilterValue] = useState(String(search.username || ''))
+  const [statsOpen, setStatsOpen] = useState(false)
+
+  const fetchUsers = async () => {
+    if (!token) return
+    setLoading(true)
+    setError(null)
+    try {
+      const isVendor = role === 'vendor'
+      const endpoint = isVendor ? '/vendor/customers' : '/users/getall'
+      const res = await api.get(endpoint)
+
+      const users = isVendor
+        ? (res.data?.customers ?? [])
+        : (res.data?.users ?? [])
+      const mapped: User[] = users.map((user: any) => {
+        const name = String(user?.name || '').trim()
+        const nameParts = name.split(/\s+/).filter(Boolean)
+        const firstName = nameParts[0] || ''
+        const lastName = nameParts.slice(1).join(' ')
+        const email = String(user?.email || '')
+        const username = email ? email.split('@')[0] : firstName || 'user'
+        const status = user?.is_active ? 'active' : 'inactive'
+        const roleValue =
+          user?.source === 'template'
+            ? 'template_customer'
+            : user?.role || 'customer'
+
+        return {
+          id: String(user?._id || user?.id || ''),
+          firstName,
+          lastName,
+          username,
+          email,
+          phoneNumber: String(user?.phone || ''),
+          status,
+          role: roleValue,
+          createdAt: user?.createdAt || new Date().toISOString(),
+          updatedAt: user?.updatedAt || new Date().toISOString(),
+        }
+      })
+
+      setData(mapped)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to load users')
+      setData([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      if (!token) return
-      setLoading(true)
-      setError(null)
-      try {
-        const isVendor = role === 'vendor'
-        const endpoint = isVendor ? '/vendor/customers' : '/users/getall'
-        const res = await api.get(endpoint)
+    setFilterValue(String(search.username || ''))
+  }, [search.username])
 
-        const users = isVendor ? res.data?.customers ?? [] : res.data?.users ?? []
-        const mapped: User[] = users.map((user: any) => {
-          const name = String(user?.name || '').trim()
-          const nameParts = name.split(/\s+/).filter(Boolean)
-          const firstName = nameParts[0] || ''
-          const lastName = nameParts.slice(1).join(' ')
-          const email = String(user?.email || '')
-          const username = email ? email.split('@')[0] : firstName || 'user'
-          const status = user?.is_active ? 'active' : 'inactive'
-          const roleValue = user?.source === 'template' ? 'template_customer' : (user?.role || 'customer')
-
-          return {
-            id: String(user?._id || user?.id || ''),
-            firstName,
-            lastName,
-            username,
-            email,
-            phoneNumber: String(user?.phone || ''),
-            status,
-            role: roleValue,
-            createdAt: user?.createdAt || new Date().toISOString(),
-            updatedAt: user?.updatedAt || new Date().toISOString(),
-          }
-        })
-
-        setData(mapped)
-      } catch (err: any) {
-        setError(err?.response?.data?.message || 'Failed to load users')
-        setData([])
-      } finally {
-        setLoading(false)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const current = String(search.username || '')
+      if (filterValue === current) {
+        return
       }
-    }
+      navigate({
+        search: (prev) => ({
+          ...prev,
+          username: filterValue,
+          page: 1,
+        }),
+      })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [filterValue, navigate, search.username])
 
+  useEffect(() => {
     fetchUsers()
   }, [token, role])
 
+  const activeUsers = useMemo(
+    () => data.filter((user) => user.status === 'active').length,
+    [data]
+  )
+  const inactiveUsers = useMemo(
+    () => data.filter((user) => user.status !== 'active').length,
+    [data]
+  )
+  const templateCustomers = useMemo(
+    () => data.filter((user) => user.role === 'template_customer').length,
+    [data]
+  )
+  const directCustomers = useMemo(
+    () => data.filter((user) => user.role === 'customer').length,
+    [data]
+  )
+  const adminUsers = useMemo(
+    () =>
+      data.filter((user) => ['admin', 'superadmin'].includes(String(user.role)))
+        .length,
+    [data]
+  )
+  const uniqueRoles = useMemo(
+    () =>
+      new Set(data.map((user) => String(user.role || '')).filter(Boolean)).size,
+    [data]
+  )
+
+  const statsItems =
+    role === 'vendor'
+      ? [
+          {
+            label: 'Total Customers',
+            value: data.length,
+            helper: 'Customers in this list.',
+          },
+          { label: 'Active', value: activeUsers, helper: 'Marked as active.' },
+          {
+            label: 'Inactive',
+            value: inactiveUsers,
+            helper: 'Need attention or follow-up.',
+          },
+          {
+            label: 'Template Customers',
+            value: templateCustomers,
+            helper: 'Bought via template storefronts.',
+          },
+          {
+            label: 'Direct Customers',
+            value: directCustomers,
+            helper: 'Bought from the main storefront.',
+          },
+          {
+            label: 'Roles Present',
+            value: uniqueRoles,
+            helper: 'Distinct role types in current data.',
+          },
+        ]
+      : [
+          {
+            label: 'Total Users',
+            value: data.length,
+            helper: 'Users returned by the current source.',
+          },
+          {
+            label: 'Active',
+            value: activeUsers,
+            helper: 'Users currently active.',
+          },
+          {
+            label: 'Inactive',
+            value: inactiveUsers,
+            helper: 'Users marked inactive.',
+          },
+          {
+            label: 'Customers',
+            value: directCustomers,
+            helper: 'Standard customer accounts.',
+          },
+          {
+            label: 'Template Customers',
+            value: templateCustomers,
+            helper: 'Template storefront customers.',
+          },
+          {
+            label: 'Admins',
+            value: adminUsers,
+            helper: 'Admin and superadmin accounts.',
+          },
+        ]
+
   return (
     <UsersProvider>
-      <Header fixed>
-        <Search />
-        <div className='ms-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ConfigDrawer />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <TablePageHeader
+        title={role === 'vendor' ? 'Customer List' : 'User List'}
+      >
+        <Input
+          value={filterValue}
+          onChange={(event) => setFilterValue(event.target.value)}
+          placeholder='Filter users...'
+          className='h-10 w-64 shrink-0'
+        />
+        <Button
+          variant='outline'
+          className='shrink-0'
+          onClick={() => setStatsOpen(true)}
+        >
+          Statistics
+        </Button>
+        <Button
+          variant='outline'
+          className='shrink-0'
+          onClick={fetchUsers}
+          disabled={loading}
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </Button>
+      </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
-        <div className='flex flex-wrap items-end justify-between gap-2'>
-          <div>
-            <h2 className='text-2xl font-bold tracking-tight'>
-              {role === 'vendor' ? 'Customer List' : 'User List'}
-            </h2>
-            <p className='text-muted-foreground'>
-              {role === 'vendor'
-                ? 'Customers who bought your products.'
-                : 'Manage your users and their roles here.'}
-            </p>
-            {loading && (
-              <p className='text-sm text-muted-foreground'>Loading users...</p>
-            )}
-            {error && <p className='text-sm text-red-500'>{error}</p>}
-          </div>
+        <div className='flex flex-col gap-2'>
+          {loading && (
+            <p className='text-muted-foreground text-sm'>Loading users...</p>
+          )}
+          {error && <p className='text-sm text-red-500'>{error}</p>}
         </div>
         <UsersTable data={data} search={search} navigate={navigate} />
       </Main>
 
+      <StatisticsDialog
+        open={statsOpen}
+        onOpenChange={setStatsOpen}
+        title={role === 'vendor' ? 'Customer statistics' : 'User statistics'}
+        description='Summary for the current list.'
+        items={statsItems}
+      />
       <UsersDialogs />
     </UsersProvider>
   )

@@ -27,7 +27,13 @@ export const Route = createRootRouteWithContext<{
 
     useEffect(() => {
       const currentPath = routerState.location.pathname
-      if (!token && currentPath !== '/sign-in') {
+      const publicPaths = new Set([
+        '/sign-in',
+        '/forgot-password',
+        '/reset-password',
+        '/sign-up',
+      ])
+      if (!token && !publicPaths.has(currentPath)) {
         navigate({ to: '/sign-in' })
       }
     }, [navigate, routerState.location.pathname, token])

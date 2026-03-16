@@ -80,7 +80,7 @@ export function AnalyticsSourceProvider({
     }
     return [
       { value: "all", label: "All Storefronts" },
-      { value: "ophmart", label: "Ophmate Storefront" },
+      { value: "ophmart", label: "SellersLogin Storefront" },
       { value: "template", label: "Vendor Templates" },
     ];
   }, [role]);

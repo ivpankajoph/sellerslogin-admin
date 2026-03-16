@@ -134,7 +134,7 @@ export function AnalyticsAppSidebar() {
                         data-testid="link-nav-storefront"
                       >
                         <Store className="h-4 w-4" />
-                        <span>Ophmate Storefront</span>
+                        <span>SellersLogin Storefront</span>
                       </a>
                     ) : (
                       <span className="flex items-center gap-2 text-muted-foreground">

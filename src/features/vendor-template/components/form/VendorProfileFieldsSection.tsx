@@ -9,7 +9,7 @@ type VendorProfileFieldsSectionProps = {
 }
 
 const CORE_FIELDS: Array<{ key: string; label: string; placeholder: string }> = [
-  { key: 'name', label: 'Store Name', placeholder: 'Ophmate Store' },
+  { key: 'name', label: 'Store Name', placeholder: 'SellersLogin Store' },
   { key: 'registrar_name', label: 'Registrar Name', placeholder: 'Registrar name' },
   { key: 'business_name', label: 'Business Name', placeholder: 'Business name' },
   { key: 'email', label: 'Email', placeholder: 'support@yourstore.com' },

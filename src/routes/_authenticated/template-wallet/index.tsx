@@ -1,9 +1,19 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
+import { createFileRoute } from '@tanstack/react-router'
+import type { RootState } from '@/store'
+import { useSelector } from 'react-redux'
 import api from '@/lib/axios'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { formatINR } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -11,11 +21,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useSelector } from 'react-redux'
-import type { RootState } from '@/store'
-import axios from 'axios'
-import { formatINR } from '@/lib/currency'
-
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { ServerPagination } from '@/components/data-table/server-pagination'
+import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
+import { TablePageHeader } from '@/components/data-table/table-page-header'
+import { TableShell } from '@/components/data-table/table-shell'
+import { Main } from '@/components/layout/main'
 
 type Wallet = {
   _id: string
@@ -64,6 +82,17 @@ type VendorWalletResponse = {
   transactions: Transaction[]
 }
 
+const FALLBACK_IMAGE =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+      <rect width="120" height="120" fill="#f1f5f9"/>
+      <rect x="18" y="18" width="84" height="84" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="2"/>
+      <path d="M34 78l18-22 14 16 10-12 20 18" fill="none" stroke="#94a3b8" stroke-width="4"/>
+      <circle cx="46" cy="46" r="6" fill="#94a3b8"/>
+    </svg>`
+  )
+
 export const Route = createFileRoute('/_authenticated/template-wallet/')({
   component: TemplateWalletPage,
 })
@@ -73,23 +102,34 @@ function TemplateWalletPage() {
   const isVendor = role === 'vendor'
   const token = useSelector((state: RootState) => state.auth?.token)
   const authUser = useSelector((state: RootState) => state.auth?.user)
-  const vendorId = useMemo(() => authUser?._id || authUser?.id || '', [authUser])
+  const vendorId = useMemo(
+    () => authUser?._id || authUser?.id || '',
+    [authUser]
+  )
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [summary, setSummary] = useState<AdminWalletResponse['summary'] | null>(null)
+  const [summary, setSummary] = useState<AdminWalletResponse['summary'] | null>(
+    null
+  )
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
   const [vendors, setVendors] = useState<any[]>([])
   const [templates, setTemplates] = useState<any[]>([])
   const [selectedVendor, setSelectedVendor] = useState<string>('all')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const fetchWallet = async () => {
     try {
       setLoading(true)
       const res = await api.get('/wallet/template')
       const data = res.data as AdminWalletResponse | VendorWalletResponse
-      setSummary(!isVendor ? (data as AdminWalletResponse).summary || null : null)
+      setSummary(
+        !isVendor ? (data as AdminWalletResponse).summary || null : null
+      )
       setTransactions(data.transactions || [])
       if (!selectedId && data.transactions?.length) {
         setSelectedId(data.transactions[0]._id)
@@ -122,9 +162,12 @@ function TemplateWalletPage() {
         return
       }
       try {
-        const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/vendors/getall`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        })
+        const res = await axios.get(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/vendors/getall`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          }
+        )
         setVendors(res.data?.vendors || res.data?.data || [])
       } catch {
         setVendors([])
@@ -141,9 +184,12 @@ function TemplateWalletPage() {
         return
       }
       try {
-        const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
-          params: { vendor_id: selectedVendor },
-        })
+        const res = await axios.get(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`,
+          {
+            params: { vendor_id: selectedVendor },
+          }
+        )
         setTemplates(res.data?.data || [])
       } catch {
         setTemplates([])
@@ -153,6 +199,7 @@ function TemplateWalletPage() {
   }, [selectedVendor])
 
   const formatMoney = (value?: number) => formatINR(value)
+
   const sourceFiltered = useMemo(
     () =>
       transactions.filter(
@@ -166,7 +213,7 @@ function TemplateWalletPage() {
     return sourceFiltered.filter(
       (tx) => String(tx.meta?.vendor_id || '') === selectedVendor
     )
-  }, [sourceFiltered, selectedVendor])
+  }, [selectedVendor, sourceFiltered])
 
   const templateFiltered = useMemo(() => {
     if (selectedTemplate === 'all') return vendorFiltered
@@ -175,7 +222,7 @@ function TemplateWalletPage() {
       const templateKey = String(tx.meta?.template_key || '')
       return templateId === selectedTemplate || templateKey === selectedTemplate
     })
-  }, [vendorFiltered, selectedTemplate])
+  }, [selectedTemplate, vendorFiltered])
 
   const filtered = useMemo(() => {
     if (!search.trim()) return templateFiltered
@@ -186,16 +233,29 @@ function TemplateWalletPage() {
         tx.meta?.vendor_id,
         tx.meta?.source,
         tx.meta?.product_name,
+        tx.meta?.template_name,
+        tx.meta?.template_key,
       ]
         .filter(Boolean)
-        .some((val) => String(val).toLowerCase().includes(query)),
+        .some((value) => String(value).toLowerCase().includes(query))
     )
   }, [search, templateFiltered])
 
-  const selectedTx = useMemo(
-    () => filtered.find((tx) => tx._id === selectedId) || null,
-    [filtered, selectedId],
-  )
+  const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1)
+  const paginatedTransactions = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, selectedVendor, selectedTemplate, pageSize])
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, totalPages])
 
   useEffect(() => {
     if (!filtered.length) {
@@ -206,6 +266,11 @@ function TemplateWalletPage() {
       setSelectedId(filtered[0]._id)
     }
   }, [filtered, selectedId])
+
+  const selectedTx = useMemo(
+    () => filtered.find((tx) => tx._id === selectedId) || null,
+    [filtered, selectedId]
+  )
 
   const derivedBalance = useMemo(() => {
     return templateFiltered.reduce((sum, tx) => {
@@ -225,7 +290,7 @@ function TemplateWalletPage() {
       0
     )
     return { commissionTotal, vendorPayoutTotal }
-  }, [selectedVendor, selectedTemplate, summary, templateFiltered])
+  }, [selectedTemplate, selectedVendor, summary, templateFiltered])
 
   const vendorOptions = useMemo(() => {
     if (isVendor && vendorId) {
@@ -250,9 +315,7 @@ function TemplateWalletPage() {
       }
     })
     const idsFromTx = new Set(
-      transactions
-        .map((tx) => String(tx.meta?.vendor_id || ''))
-        .filter(Boolean)
+      transactions.map((tx) => String(tx.meta?.vendor_id || '')).filter(Boolean)
     )
     const combinedIds = new Set([...byId.keys(), ...idsFromTx])
     return Array.from(combinedIds).map((id) => {
@@ -267,7 +330,15 @@ function TemplateWalletPage() {
           `Vendor ${id.slice(0, 6)}`,
       }
     })
-  }, [authUser, isVendor, vendorId, vendors, transactions])
+  }, [authUser, isVendor, transactions, vendorId, vendors])
+
+  const vendorLabelMap = useMemo(() => {
+    const map = new Map<string, string>()
+    vendorOptions.forEach((option) => {
+      map.set(option.id, option.label)
+    })
+    return map
+  }, [vendorOptions])
 
   const templateOptions = useMemo(() => {
     return templates.map((template) => ({
@@ -282,29 +353,69 @@ function TemplateWalletPage() {
     }))
   }, [templates])
 
+  const statsItems = [
+    {
+      label: 'Wallet Balance',
+      value: formatMoney(derivedBalance),
+      helper: 'Balance for the selected vendor and template scope.',
+    },
+    {
+      label: 'Visible Transactions',
+      value: filtered.length,
+      helper: 'Transactions matching the current table filters.',
+    },
+    {
+      label: 'Credits',
+      value: filtered.filter((tx) => tx.direction === 'credit').length,
+      helper: 'Transactions that credited the wallet.',
+    },
+    {
+      label: 'Debits',
+      value: filtered.filter((tx) => tx.direction === 'debit').length,
+      helper: 'Transactions that debited the wallet.',
+    },
+    {
+      label: 'Total Commission',
+      value: formatMoney(derivedSummary?.commissionTotal),
+      helper: 'Commission across the selected template scope.',
+    },
+    {
+      label: 'Vendor Payouts',
+      value: formatMoney(derivedSummary?.vendorPayoutTotal),
+      helper: 'Vendor payouts across the selected template scope.',
+    },
+    {
+      label: 'Visible Credit Value',
+      value: formatMoney(
+        filtered
+          .filter((tx) => tx.direction === 'credit')
+          .reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
+      ),
+      helper: 'Total credited in the current table result.',
+    },
+  ]
+
+  const openDetails = (tx: Transaction) => {
+    setSelectedId(tx._id)
+    setDetailsOpen(true)
+  }
+
   return (
-    <div className='space-y-6'>
-      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-        <div>
-          <h1 className='text-2xl font-semibold text-slate-900'>Template Wallet</h1>
-          <p className='text-sm text-muted-foreground'>
-            Track commissions and payouts from vendor template storefront orders.
-          </p>
-        </div>
-        <div className='flex flex-wrap items-center gap-2'>
+    <>
+      <TablePageHeader title='Template Wallet'>
+        {!isVendor && (
           <Select
             value={selectedVendor}
             onValueChange={(value) => {
               setSelectedVendor(value)
               setSelectedTemplate('all')
             }}
-            disabled={isVendor}
           >
-            <SelectTrigger className='h-10 w-52'>
+            <SelectTrigger className='h-10 w-52 shrink-0'>
               <SelectValue placeholder='All vendors' />
             </SelectTrigger>
             <SelectContent>
-              {!isVendor && <SelectItem value='all'>All vendors</SelectItem>}
+              <SelectItem value='all'>All vendors</SelectItem>
               {vendorOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
                   {option.label}
@@ -312,208 +423,302 @@ function TemplateWalletPage() {
               ))}
             </SelectContent>
           </Select>
-
-          <Select
-            value={selectedTemplate}
-            onValueChange={setSelectedTemplate}
-            disabled={selectedVendor === 'all'}
-          >
-            <SelectTrigger className='h-10 w-52'>
-              <SelectValue placeholder='All templates' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>All templates</SelectItem>
-              {templateOptions.map((option) => (
-                <SelectItem key={option.id || option.key} value={option.id || option.key}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder='Search order or vendor'
-            className='w-64'
-          />
-          <Button onClick={fetchWallet} disabled={loading}>
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </Button>
-        </div>
-      </div>
-
-      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Wallet balance</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>
-            {formatMoney(derivedBalance)}
-          </CardContent>
-        </Card>
-        {!isVendor && (
-          <>
-            <Card>
-              <CardHeader className='pb-2'>
-                <CardTitle className='text-sm text-muted-foreground'>Total commission</CardTitle>
-              </CardHeader>
-              <CardContent className='text-2xl font-semibold'>
-                {formatMoney(derivedSummary?.commissionTotal)}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className='pb-2'>
-                <CardTitle className='text-sm text-muted-foreground'>Vendor payouts</CardTitle>
-              </CardHeader>
-              <CardContent className='text-2xl font-semibold'>
-                {formatMoney(derivedSummary?.vendorPayoutTotal)}
-              </CardContent>
-            </Card>
-          </>
         )}
-      </div>
 
-      <div className='grid gap-6 xl:grid-cols-[360px_1fr]'>
-        <Card className='h-fit'>
-          <CardHeader>
-            <CardTitle className='text-base'>Transaction history</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading && <p className='text-sm text-muted-foreground'>Loading transactions...</p>}
-            {!loading && filtered.length === 0 && (
-              <p className='text-sm text-muted-foreground'>No transactions found.</p>
-            )}
-            <div className='space-y-3 max-h-[560px] overflow-y-auto pr-2'>
-              {filtered.map((tx) => (
-                <button
-                  key={tx._id}
-                  onClick={() => setSelectedId(tx._id)}
-                  className={`w-full rounded-lg border p-3 text-left transition ${
-                    selectedId === tx._id
-                      ? 'border-slate-900 bg-slate-50'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
-                  }`}
-                >
-                  <div className='flex items-center justify-between gap-3'>
-                    <div>
-                      <p className='text-sm font-semibold text-slate-900'>
-                        {tx.meta?.order_number ? `#${tx.meta.order_number}` : 'Order credit'}
-                      </p>
-                      <p className='text-xs text-muted-foreground'>
-                        {tx.meta?.source || 'template-storefront'} •{' '}
-                        {new Date(tx.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className='text-right'>
-                      <p className='text-sm font-semibold text-emerald-600'>
-                        +{formatMoney(tx.amount)}
-                      </p>
-                      <p className='text-xs text-muted-foreground'>
-                        Bal: {formatMoney(tx.balance_after)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className='mt-2 text-xs text-muted-foreground'>
-                    {tx.meta?.product_name || 'Product'} •{' '}
-                    {tx.meta?.commission_percent
-                      ? `Commission ${tx.meta.commission_percent}%`
-                      : 'Wallet credit'}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <Select
+          value={selectedTemplate}
+          onValueChange={setSelectedTemplate}
+          disabled={selectedVendor === 'all'}
+        >
+          <SelectTrigger className='h-10 w-52 shrink-0'>
+            <SelectValue placeholder='All templates' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>All templates</SelectItem>
+            {templateOptions.map((option) => (
+              <SelectItem
+                key={option.id || option.key}
+                value={option.id || option.key}
+              >
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className='text-base'>Transaction details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!selectedTx ? (
-              <p className='text-sm text-muted-foreground'>Select a transaction to view details.</p>
-            ) : (
-              <div className='space-y-5'>
-                <div className='flex flex-wrap items-center justify-between gap-3'>
-                  <div>
-                    <p className='text-xs text-muted-foreground'>Order number</p>
-                    <p className='text-sm font-semibold text-slate-900'>
-                      {selectedTx.meta?.order_number
-                        ? `#${selectedTx.meta.order_number}`
-                        : 'Order credit'}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>
-                      {selectedTx.meta?.source || 'template-storefront'} •{' '}
-                      {new Date(selectedTx.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className='text-right'>
-                    <p className='text-xs text-muted-foreground'>Amount credited</p>
-                    <p className='text-lg font-semibold text-emerald-600'>
-                      +{formatMoney(selectedTx.amount)}
-                    </p>
-                  </div>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={
+            isVendor ? 'Search order or product' : 'Search order or vendor'
+          }
+          className='h-10 w-64 shrink-0'
+        />
+        <Button
+          variant='outline'
+          className='shrink-0'
+          onClick={() => setStatsOpen(true)}
+        >
+          Statistics
+        </Button>
+        <Button className='shrink-0' onClick={fetchWallet} disabled={loading}>
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </Button>
+      </TablePageHeader>
+
+      <Main className='flex flex-1 flex-col gap-6'>
+        <TableShell
+          className='flex-1'
+          title='Transaction history'
+          footer={
+            <ServerPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={filtered.length}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 50]}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              disabled={loading}
+            />
+          }
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className='min-w-[170px]'>Order</TableHead>
+                {!isVendor && (
+                  <TableHead className='min-w-[170px]'>Vendor</TableHead>
+                )}
+                <TableHead className='min-w-[180px]'>Template</TableHead>
+                <TableHead className='min-w-[220px]'>Product</TableHead>
+                <TableHead className='min-w-[140px]'>Amount</TableHead>
+                <TableHead className='min-w-[140px]'>Balance After</TableHead>
+                <TableHead className='min-w-[160px]'>Created</TableHead>
+                <TableHead className='text-right'>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && paginatedTransactions.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={isVendor ? 7 : 8}
+                    className='h-24 text-center'
+                  >
+                    Loading transactions...
+                  </TableCell>
+                </TableRow>
+              ) : paginatedTransactions.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={isVendor ? 7 : 8}
+                    className='text-muted-foreground h-24 text-center'
+                  >
+                    No transactions found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedTransactions.map((tx) => {
+                  const isDebit = tx.direction === 'debit'
+                  const vendorLabel = vendorLabelMap.get(
+                    String(tx.meta?.vendor_id || '')
+                  )
+                  const templateLabel =
+                    tx.meta?.template_name ||
+                    tx.meta?.template_key ||
+                    'Template'
+                  return (
+                    <TableRow key={tx._id}>
+                      <TableCell>
+                        <div className='text-sm font-medium'>
+                          {tx.meta?.order_number
+                            ? `#${tx.meta.order_number}`
+                            : 'Order credit'}
+                        </div>
+                        <div className='text-muted-foreground text-xs'>
+                          {tx.meta?.source || 'template-storefront'}
+                        </div>
+                      </TableCell>
+                      {!isVendor && (
+                        <TableCell className='text-muted-foreground text-sm'>
+                          {vendorLabel || tx.meta?.vendor_id || 'Vendor'}
+                        </TableCell>
+                      )}
+                      <TableCell className='text-muted-foreground text-sm'>
+                        {templateLabel}
+                      </TableCell>
+                      <TableCell>
+                        <div className='text-sm font-medium'>
+                          {tx.meta?.product_name || 'Product'}
+                        </div>
+                        <div className='text-muted-foreground text-xs'>
+                          {tx.meta?.commission_percent
+                            ? `Commission ${tx.meta.commission_percent}%`
+                            : 'Wallet entry'}
+                        </div>
+                      </TableCell>
+                      <TableCell
+                        className={`text-sm font-semibold ${isDebit ? 'text-rose-600' : 'text-emerald-600'}`}
+                      >
+                        {isDebit ? '-' : '+'}
+                        {formatMoney(tx.amount)}
+                      </TableCell>
+                      <TableCell className='text-muted-foreground text-sm'>
+                        {formatMoney(tx.balance_after)}
+                      </TableCell>
+                      <TableCell className='text-muted-foreground text-sm'>
+                        {new Date(tx.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className='text-right'>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          onClick={() => openDetails(tx)}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableShell>
+      </Main>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className='max-h-[92vh] w-[min(96vw,960px)] overflow-y-auto rounded-none'>
+          <DialogHeader className='text-left'>
+            <DialogTitle>Transaction details</DialogTitle>
+            <DialogDescription>
+              Review product, template, commission, and payout details.
+            </DialogDescription>
+          </DialogHeader>
+          {!selectedTx ? (
+            <p className='text-muted-foreground text-sm'>
+              No transaction selected.
+            </p>
+          ) : (
+            <div className='space-y-5'>
+              <div className='flex flex-wrap items-center justify-between gap-3'>
+                <div>
+                  <p className='text-muted-foreground text-xs'>Order number</p>
+                  <p className='text-sm font-semibold text-slate-900'>
+                    {selectedTx.meta?.order_number
+                      ? `#${selectedTx.meta.order_number}`
+                      : 'Order credit'}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    {selectedTx.meta?.source || 'template-storefront'} •{' '}
+                    {new Date(selectedTx.createdAt).toLocaleString()}
+                  </p>
                 </div>
-
-                <div className='flex items-start gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4'>
-                  <div className='h-20 w-20 overflow-hidden rounded-lg bg-white'>
-                    <img
-                      src={
-                        selectedTx.meta?.image_url ||
-                        'https://images.unsplash.com/photo-1614594975525-e45190c55d0b?w=200&q=80'
-                      }
-                      alt={selectedTx.meta?.product_name || 'Product'}
-                      className='h-full w-full object-cover'
-                    />
-                  </div>
-                  <div className='min-w-0 flex-1'>
-                    <p className='text-sm font-semibold text-slate-900'>
-                      {selectedTx.meta?.product_name || 'Product'}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>
-                      Qty: {selectedTx.meta?.quantity || 0}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>
-                      Unit price: {formatMoney(selectedTx.meta?.unit_price)}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>
-                      Item total: {formatMoney(selectedTx.meta?.total_price)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className='grid gap-3 md:grid-cols-2'>
-                  <div className='rounded-lg border border-slate-200 p-3 text-sm'>
-                    <p className='text-xs text-muted-foreground'>Gross amount</p>
-                    <p className='font-semibold text-slate-900'>
-                      {formatMoney(selectedTx.meta?.gross_amount)}
-                    </p>
-                  </div>
-                  <div className='rounded-lg border border-slate-200 p-3 text-sm'>
-                    <p className='text-xs text-muted-foreground'>Commission</p>
-                    <p className='font-semibold text-slate-900'>
-                      {selectedTx.meta?.commission_percent ?? 0}% •{' '}
-                      {formatMoney(selectedTx.meta?.commission_amount)}
-                    </p>
-                  </div>
-                  <div className='rounded-lg border border-slate-200 p-3 text-sm'>
-                    <p className='text-xs text-muted-foreground'>Vendor payout</p>
-                    <p className='font-semibold text-slate-900'>
-                      {formatMoney(selectedTx.meta?.net_amount)}
-                    </p>
-                  </div>
-                  <div className='rounded-lg border border-slate-200 p-3 text-sm'>
-                    <p className='text-xs text-muted-foreground'>Balance after</p>
-                    <p className='font-semibold text-slate-900'>
-                      {formatMoney(selectedTx.balance_after)}
-                    </p>
-                  </div>
+                <div className='text-right'>
+                  <p className='text-muted-foreground text-xs'>
+                    {selectedTx.direction === 'debit'
+                      ? 'Amount debited'
+                      : 'Amount credited'}
+                  </p>
+                  <p
+                    className={`text-lg font-semibold ${
+                      selectedTx.direction === 'debit'
+                        ? 'text-rose-600'
+                        : 'text-emerald-600'
+                    }`}
+                  >
+                    {selectedTx.direction === 'debit' ? '-' : '+'}
+                    {formatMoney(selectedTx.amount)}
+                  </p>
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+
+              <div className='grid gap-4 md:grid-cols-2'>
+                {!isVendor && (
+                  <div className='rounded-none border p-3 text-sm'>
+                    <p className='text-muted-foreground text-xs'>Vendor</p>
+                    <p className='mt-1 font-semibold text-slate-900'>
+                      {vendorLabelMap.get(
+                        String(selectedTx.meta?.vendor_id || '')
+                      ) ||
+                        selectedTx.meta?.vendor_id ||
+                        'Vendor'}
+                    </p>
+                  </div>
+                )}
+                <div className='rounded-none border p-3 text-sm'>
+                  <p className='text-muted-foreground text-xs'>Template</p>
+                  <p className='mt-1 font-semibold text-slate-900'>
+                    {selectedTx.meta?.template_name ||
+                      selectedTx.meta?.template_key ||
+                      'Template'}
+                  </p>
+                </div>
+              </div>
+
+              <div className='flex items-start gap-4 rounded-none border border-slate-200 bg-slate-50 p-4'>
+                <div className='h-20 w-20 overflow-hidden rounded-none bg-white'>
+                  <img
+                    src={selectedTx.meta?.image_url || FALLBACK_IMAGE}
+                    alt={selectedTx.meta?.product_name || 'Product'}
+                    className='h-full w-full object-cover'
+                  />
+                </div>
+                <div className='min-w-0 flex-1'>
+                  <p className='text-sm font-semibold text-slate-900'>
+                    {selectedTx.meta?.product_name || 'Product'}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    Qty: {selectedTx.meta?.quantity || 0}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    Unit price: {formatMoney(selectedTx.meta?.unit_price)}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    Item total: {formatMoney(selectedTx.meta?.total_price)}
+                  </p>
+                </div>
+              </div>
+
+              <div className='grid gap-3 md:grid-cols-2'>
+                <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                  <p className='text-muted-foreground text-xs'>Gross amount</p>
+                  <p className='font-semibold text-slate-900'>
+                    {formatMoney(selectedTx.meta?.gross_amount)}
+                  </p>
+                </div>
+                <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                  <p className='text-muted-foreground text-xs'>Commission</p>
+                  <p className='font-semibold text-slate-900'>
+                    {selectedTx.meta?.commission_percent ?? 0}% •{' '}
+                    {formatMoney(selectedTx.meta?.commission_amount)}
+                  </p>
+                </div>
+                <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                  <p className='text-muted-foreground text-xs'>Vendor payout</p>
+                  <p className='font-semibold text-slate-900'>
+                    {formatMoney(selectedTx.meta?.net_amount)}
+                  </p>
+                </div>
+                <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                  <p className='text-muted-foreground text-xs'>Balance after</p>
+                  <p className='font-semibold text-slate-900'>
+                    {formatMoney(selectedTx.balance_after)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <StatisticsDialog
+        open={statsOpen}
+        onOpenChange={setStatsOpen}
+        title='Template wallet statistics'
+        description='Summary for the current wallet filters.'
+        items={statsItems}
+      />
+    </>
   )
 }

@@ -1,17 +1,48 @@
-﻿import { useEffect, useMemo, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { useSelector } from 'react-redux'
+import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import api from '@/lib/axios'
+import { format } from 'date-fns'
+import { createFileRoute } from '@tanstack/react-router'
 import type { RootState } from '@/store'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
+import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
+import api from '@/lib/axios'
 import { formatINR } from '@/lib/currency'
 import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { ServerPagination } from '@/components/data-table/server-pagination'
+import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
+import { TablePageHeader } from '@/components/data-table/table-page-header'
+import { TableShell } from '@/components/data-table/table-shell'
+import { Main } from '@/components/layout/main'
 
+export const Route = createFileRoute('/_authenticated/template-orders/')({
+  component: TemplateOrdersPage,
+})
 
 type OrderSummary = {
   totalOrders: number
@@ -32,7 +63,7 @@ type OrderItem = {
   unit_price?: number
 }
 
-type TemplateOrder = {
+type Order = {
   _id: string
   order_number?: string
   status?: string
@@ -43,6 +74,16 @@ type TemplateOrder = {
   payment_method?: string
   payment_status?: string
   createdAt?: string
+  template_id?: string
+  template_key?: string
+  template_name?: string
+  vendor_id?: {
+    name?: string
+    email?: string
+    phone?: string
+    businessName?: string
+    storeName?: string
+  }
   delivery_provider?: string
   borzo?: {
     order_id?: number
@@ -52,10 +93,6 @@ type TemplateOrder = {
     courier?: { name?: string; phone?: string }
     updated_at?: string
   }
-  template_id?: string
-  template_key?: string
-  template_name?: string
-  vendor_id?: { _id?: string; name?: string; email?: string; phone?: string; businessName?: string; storeName?: string }
   user_id?: { name?: string; email?: string; phone?: string }
   shipping_address?: {
     full_name?: string
@@ -70,30 +107,52 @@ type TemplateOrder = {
   items: OrderItem[]
 }
 
-export const Route = createFileRoute('/_authenticated/template-orders/')({
-  component: TemplateOrdersReport,
-})
+type TemplateOption = {
+  id: string
+  name: string
+  key?: string
+}
 
-function TemplateOrdersReport() {
+const DEFAULT_PAGE_SIZE = 10
+
+function TemplateOrdersPage() {
   const BORZO_QUOTE_DEBOUNCE_MS = 600
-  const [orders, setOrders] = useState<TemplateOrder[]>([])
+  const user = useSelector((state: RootState) => state.auth?.user)
+  const role = String(user?.role || '').toLowerCase()
+  const isVendor = role === 'vendor'
+  const vendorId = String(user?._id || user?.id || '')
+  const { isProviderVisible } = useVendorIntegrations()
+  const canUseBorzo = !isVendor || isProviderVisible('borzo')
+
+  const [orders, setOrders] = useState<Order[]>([])
   const [summary, setSummary] = useState<OrderSummary | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [templates, setTemplates] = useState<TemplateOption[]>([])
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE)
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
-  const [vendorFilter, setVendorFilter] = useState('all')
   const [templateFilter, setTemplateFilter] = useState('all')
-  const [vendors, setVendors] = useState<Array<{ _id?: string; name?: string; business_name?: string; businessName?: string; storeName?: string; email?: string }>>([])
-  const [templates, setTemplates] = useState<Array<{ _id?: string; template_key?: string; template_name?: string; name?: string }>>([])
-  const [templatesLoading, setTemplatesLoading] = useState(false)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const filtersRef = useRef({
+    status: 'all',
+    template: 'all',
+    search: '',
+    limit: DEFAULT_PAGE_SIZE,
+  })
+
   const [borzoActionLoading, setBorzoActionLoading] = useState(false)
   const [borzoQuoteLoading, setBorzoQuoteLoading] = useState(false)
   const [borzoError, setBorzoError] = useState('')
-  const [borzoQuote, setBorzoQuote] = useState<{ amount?: number; warnings?: string[] } | null>(null)
+  const [borzoQuote, setBorzoQuote] = useState<{
+    amount?: number
+    warnings?: string[]
+  } | null>(null)
   const [pickupOverride, setPickupOverride] = useState({
     name: '',
     phone: '',
@@ -108,112 +167,90 @@ function TemplateOrdersReport() {
     latitude: '',
     longitude: '',
   })
-  const role = useSelector((state: RootState) => state.auth?.user?.role)
-  const token = useSelector((state: RootState) => state.auth?.token)
-  const vendorId = useSelector(
-    (state: RootState) => (state.auth?.user as any)?.id || (state.auth?.user as any)?._id || '',
-  )
-  const isVendor = role === 'vendor'
-  const { isProviderVisible } = useVendorIntegrations()
-  const canUseBorzo = !isVendor || isProviderVisible('borzo')
 
-  const getTemplateLabel = (order?: TemplateOrder | null) =>
-    order?.template_name || order?.template_key || order?.template_id || ''
+  const totalPages = Math.max(Math.ceil(total / limit), 1)
 
-  const fetchOrders = async () => {
-    try {
-      setLoading(true)
-      setError('')
-      const res = await api.get('/template-orders', {
-        params: {
-          page,
-          limit: 20,
-          search: search || undefined,
-          status: status === 'all' ? undefined : status,
-          vendor_id: vendorFilter === 'all' ? undefined : vendorFilter,
-          template_id: templateFilter === 'all' ? undefined : templateFilter,
-        },
-      })
-      const data = res.data || {}
-      setOrders(data.orders || [])
-      setSummary(data.summary || null)
-      setTotal(data.total || 0)
-      if (!selectedId && data.orders?.length) {
-        setSelectedId(data.orders[0]._id)
-      }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load template orders')
-    } finally {
-      setLoading(false)
-    }
+  const formatMoney = (value?: number) => formatINR(value)
+
+  const FALLBACK_IMAGE =
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+        <rect width="120" height="120" fill="#f1f5f9"/>
+        <rect x="18" y="18" width="84" height="84" fill="#e2e8f0" stroke="#cbd5f5" stroke-width="2"/>
+        <path d="M34 78l18-22 14 16 10-12 20 18" fill="none" stroke="#94a3b8" stroke-width="4"/>
+        <circle cx="46" cy="46" r="6" fill="#94a3b8"/>
+      </svg>`
+    )
+
+  const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value)
+
+  const resolveBaseUrl = () => {
+    const explicit = String(
+      import.meta.env.VITE_PUBLIC_API_URL_BANNERS || ''
+    ).trim()
+    if (explicit) return explicit.replace(/\/$/, '')
+    const api = String(import.meta.env.VITE_PUBLIC_API_URL || '').trim()
+    if (!api) return ''
+    return api
+      .replace(/\/v1$/, '')
+      .replace(/\/api$/, '')
+      .replace(/\/$/, '')
   }
 
-  useEffect(() => {
-    fetchOrders()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, status, vendorFilter, templateFilter])
-
-  useEffect(() => {
-    if (isVendor) return
-    const fetchVendors = async () => {
-      try {
-        const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/vendors/getall`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        })
-        setVendors(res.data?.vendors || res.data?.data || [])
-      } catch {
-        setVendors([])
-      }
+  const resolveImageUrl = (value?: string) => {
+    if (!value) return FALLBACK_IMAGE
+    const trimmed = String(value).trim()
+    if (!trimmed) return FALLBACK_IMAGE
+    if (trimmed.startsWith('data:') || trimmed.startsWith('blob:'))
+      return trimmed
+    if (trimmed.startsWith('//')) return `https:${trimmed}`
+    if (isAbsoluteUrl(trimmed)) return trimmed
+    if (/^(localhost:|127\.0\.0\.1|\\d+\\.\\d+\\.\\d+\\.\\d+)/.test(trimmed)) {
+      return `http://${trimmed}`
     }
-    fetchVendors()
-  }, [isVendor, token])
-
-  useEffect(() => {
-    const templateVendorId = isVendor ? String(vendorId || '') : vendorFilter
-
-    if (!templateVendorId || templateVendorId === 'all') {
-      setTemplates([])
-      setTemplateFilter('all')
-      return
+    if (
+      trimmed.startsWith('ik.imagekit.io') ||
+      trimmed.startsWith('imagekit.io')
+    ) {
+      return `https://${trimmed}`
     }
+    const base = resolveBaseUrl()
+    if (!base) return trimmed
+    const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+    return `${base}${normalized}`
+  }
 
-    const fetchTemplates = async () => {
-      try {
-        setTemplatesLoading(true)
-        const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
-          params: { vendor_id: templateVendorId },
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        })
-        setTemplates(res.data?.data || [])
-      } catch {
-        setTemplates([])
-      } finally {
-        setTemplatesLoading(false)
-      }
+  const statusBadge = (value?: string) => {
+    const key = value || 'pending'
+    const map: Record<string, string> = {
+      pending: 'bg-amber-100 text-amber-700',
+      confirmed: 'bg-blue-100 text-blue-700',
+      shipped: 'bg-indigo-100 text-indigo-700',
+      delivered: 'bg-emerald-100 text-emerald-700',
+      failed: 'bg-rose-100 text-rose-700',
+      cancelled: 'bg-rose-100 text-rose-700',
     }
-    fetchTemplates()
-  }, [isVendor, vendorFilter, vendorId, token])
+    return (
+      <Badge
+        variant='outline'
+        className={map[key] || 'bg-slate-100 text-slate-700'}
+      >
+        {key}
+      </Badge>
+    )
+  }
 
-  useEffect(() => {
-    if (!orders.length) {
-      setSelectedId(null)
-      return
-    }
-    if (!orders.some((order) => order._id === selectedId)) {
-      setSelectedId(orders[0]._id)
-    }
-  }, [orders, selectedId])
-
-  const selectedOrder = useMemo(
-    () => orders.find((order) => order._id === selectedId) || null,
-    [orders, selectedId],
-  )
-
-  const emptyOverride = { name: '', phone: '', address: '', latitude: '', longitude: '' }
-
-  const buildAddressString = (address?: TemplateOrder['shipping_address']) => {
+  const buildAddressString = (address?: Order['shipping_address']) => {
     if (!address) return ''
-    return [address.line1, address.line2, address.city, address.state, address.pincode, address.country]
+    return [
+      address.line1,
+      address.line2,
+      address.city,
+      address.state,
+      address.pincode,
+      address.country,
+    ]
       .filter((value) => value && String(value).trim().length)
       .join(', ')
   }
@@ -229,13 +266,120 @@ function TemplateOrdersReport() {
     }
   }
 
+  const loadOrders = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await api.get('/template-orders', {
+        params: {
+          page,
+          limit,
+          search: debouncedSearch || undefined,
+          status: status === 'all' ? undefined : status,
+          template_id: templateFilter === 'all' ? undefined : templateFilter,
+        },
+      })
+      const data = res.data || {}
+      setOrders(data.orders || [])
+      setSummary(data.summary || null)
+      setTotal(Number(data.total || 0))
+      if (
+        page > Math.max(Math.ceil((Number(data.total || 0) || 0) / limit), 1)
+      ) {
+        setPage(1)
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to load orders')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim())
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    const nextFilters = {
+      status,
+      template: templateFilter,
+      search: debouncedSearch,
+      limit,
+    }
+    const filtersChanged =
+      nextFilters.status !== filtersRef.current.status ||
+      nextFilters.template !== filtersRef.current.template ||
+      nextFilters.search !== filtersRef.current.search ||
+      nextFilters.limit !== filtersRef.current.limit
+
+    if (filtersChanged) {
+      filtersRef.current = nextFilters
+      if (page !== 1) {
+        setPage(1)
+        return
+      }
+    }
+
+    loadOrders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, status, templateFilter, debouncedSearch, limit])
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (!isVendor || !vendorId) {
+        setTemplates([])
+        return
+      }
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`,
+          {
+            params: { vendor_id: vendorId },
+          }
+        )
+        const data = res.data?.data || []
+        const options = data.map((template: any) => ({
+          id: String(template?._id || template?.id || ''),
+          key: template?.template_key || template?.key,
+          name:
+            template?.template_name ||
+            template?.name ||
+            template?.business_name ||
+            template?.template_key ||
+            template?.key ||
+            'Template',
+        }))
+        setTemplates(options.filter((item: TemplateOption) => item.id))
+      } catch {
+        setTemplates([])
+      }
+    }
+
+    fetchTemplates()
+  }, [isVendor, vendorId])
+
   useEffect(() => {
     setBorzoError('')
     setBorzoQuote(null)
 
     if (!selectedOrder) {
-      setPickupOverride(emptyOverride)
-      setDropoffOverride(emptyOverride)
+      setPickupOverride({
+        name: '',
+        phone: '',
+        address: '',
+        latitude: '',
+        longitude: '',
+      })
+      setDropoffOverride({
+        name: '',
+        phone: '',
+        address: '',
+        latitude: '',
+        longitude: '',
+      })
       return
     }
 
@@ -253,63 +397,40 @@ function TemplateOrdersReport() {
         }
       : null
 
-    setPickupOverride(pickupFromPayload || emptyOverride)
-    setDropoffOverride(dropoffFromPayload || dropoffFromShipping || emptyOverride)
-  }, [selectedOrder?._id])
-
-  const formatMoney = (value?: number) => formatINR(value)
-
-  const formatAttrs = (attrs?: Record<string, string>) => {
-    if (!attrs) return ''
-    return Object.values(attrs)
-      .filter((value) => value)
-      .join(' / ')
-  }
-
-  const statusBadge = (value?: string) => {
-    const key = value || 'pending'
-    const map: Record<string, string> = {
-      pending: 'bg-amber-100 text-amber-700',
-      confirmed: 'bg-blue-100 text-blue-700',
-      shipped: 'bg-indigo-100 text-indigo-700',
-      delivered: 'bg-emerald-100 text-emerald-700',
-      failed: 'bg-rose-100 text-rose-700',
-      cancelled: 'bg-rose-100 text-rose-700',
-    }
-    return (
-      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${map[key] || 'bg-slate-100 text-slate-700'}`}>
-        {key}
-      </span>
+    setPickupOverride(
+      pickupFromPayload || {
+        name: '',
+        phone: '',
+        address: '',
+        latitude: '',
+        longitude: '',
+      }
     )
-  }
-
-  const totalOrders = summary?.totalOrders || total || orders.length
-  const totalRevenue = summary?.totalRevenue || orders.reduce((acc, o) => acc + (o.total || 0), 0)
-  const statusFallback = orders.reduce<Record<string, number>>((acc, order) => {
-    const key = (order.status || 'unknown').toLowerCase()
-    acc[key] = (acc[key] || 0) + 1
-    return acc
-  }, {})
-  const paidCount = summary?.paymentStatusCounts?.paid || 0
-  const failedCount = summary?.paymentStatusCounts?.failed || 0
-  const paidRevenue = summary?.paidRevenue || 0
-  const pendingCount = summary?.statusCounts?.pending ?? statusFallback.pending ?? 0
-  const deliveredCount = summary?.statusCounts?.delivered ?? statusFallback.delivered ?? 0
-  const pageCount = Math.max(Math.ceil(total / 20), 1)
+    setDropoffOverride(
+      dropoffFromPayload ||
+        dropoffFromShipping || {
+          name: '',
+          phone: '',
+          address: '',
+          latitude: '',
+          longitude: '',
+        }
+    )
+  }, [selectedOrder?._id])
 
   const hasActiveBorzo =
     Boolean(selectedOrder?.borzo?.order_id) &&
     !['canceled', 'cancelled', 'failed'].includes(
-      String(selectedOrder?.borzo?.status || '').toLowerCase(),
+      String(selectedOrder?.borzo?.status || '').toLowerCase()
     )
   const borzoBusy = borzoActionLoading || borzoQuoteLoading
 
   const buildBorzoPayload = () => {
-    const hasPickupOverride = Object.values(pickupOverride).some((value) =>
-      String(value || '').trim().length,
+    const hasPickupOverride = Object.values(pickupOverride).some(
+      (value) => String(value || '').trim().length
     )
-    const hasDropoffOverride = Object.values(dropoffOverride).some((value) =>
-      String(value || '').trim().length,
+    const hasDropoffOverride = Object.values(dropoffOverride).some(
+      (value) => String(value || '').trim().length
     )
     return {
       ...(hasPickupOverride ? { pickup: pickupOverride } : {}),
@@ -331,8 +452,11 @@ function TemplateOrdersReport() {
       setBorzoActionLoading(true)
       setBorzoError('')
       const payload = buildBorzoPayload()
-      await api.post(`/template-orders/${selectedOrder._id}/borzo/create`, payload)
-      await fetchOrders()
+      await api.post(
+        `/template-orders/${selectedOrder._id}/borzo/create`,
+        payload
+      )
+      await loadOrders()
       toast.success('Borzo delivery created.')
     } catch (err: any) {
       const details = err?.response?.data?.details
@@ -346,13 +470,15 @@ function TemplateOrdersReport() {
   }
 
   const handleCalculateBorzo = async () => {
-    if (!selectedOrder?._id) return
-    if (!canUseBorzo) return
+    if (!selectedOrder?._id || !canUseBorzo) return
     try {
       setBorzoQuoteLoading(true)
       setBorzoError('')
       const payload = buildBorzoPayload()
-      const res = await api.post(`/template-orders/${selectedOrder._id}/borzo/calculate`, payload)
+      const res = await api.post(
+        `/template-orders/${selectedOrder._id}/borzo/calculate`,
+        payload
+      )
       const amount = Number(res?.data?.response?.order?.payment_amount || 0)
       const warnings = res?.data?.response?.warnings || []
       setBorzoQuote({ amount: Number.isFinite(amount) ? amount : 0, warnings })
@@ -376,7 +502,7 @@ function TemplateOrdersReport() {
       setBorzoActionLoading(true)
       setBorzoError('')
       await api.post(`/template-orders/${selectedOrder._id}/borzo/cancel`)
-      await fetchOrders()
+      await loadOrders()
       toast.success('Borzo delivery cancelled.')
     } catch (err: any) {
       const details = err?.response?.data?.details
@@ -393,8 +519,7 @@ function TemplateOrdersReport() {
     if (!selectedOrder?._id) return
     if (!canUseBorzo) return
     if (hasActiveBorzo) return
-    if (borzoActionLoading) return
-    if (borzoQuoteLoading) return
+    if (borzoActionLoading || borzoQuoteLoading) return
     const timer = setTimeout(() => {
       handleCalculateBorzo()
     }, BORZO_QUOTE_DEBOUNCE_MS)
@@ -402,542 +527,660 @@ function TemplateOrdersReport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedOrder?._id, pickupOverride, dropoffOverride, canUseBorzo])
 
+  const openDetails = (order: Order) => {
+    setSelectedOrder(order)
+    setDetailsOpen(true)
+  }
+
+  const totalOrders = summary?.totalOrders || total || orders.length
+  const totalRevenue =
+    summary?.totalRevenue ||
+    orders.reduce((acc, order) => acc + (order.total || 0), 0)
+  const paidCount = summary?.paymentStatusCounts?.paid || 0
+  const failedCount = summary?.paymentStatusCounts?.failed || 0
+  const paidRevenue = summary?.paidRevenue || 0
+  const statsItems = [
+    {
+      label: 'Total Orders',
+      value: totalOrders,
+      helper: 'Orders returned for the current filters.',
+    },
+    {
+      label: 'Total Revenue',
+      value: formatMoney(totalRevenue),
+      helper: 'Gross value across the visible result set.',
+    },
+    {
+      label: 'Pending',
+      value: summary?.statusCounts?.pending || 0,
+      helper: 'Orders waiting for action.',
+    },
+    {
+      label: 'Delivered',
+      value: summary?.statusCounts?.delivered || 0,
+      helper: 'Orders marked delivered.',
+    },
+    {
+      label: 'Payments Paid',
+      value: paidCount,
+      helper: 'Orders with successful payment.',
+    },
+    {
+      label: 'Payments Failed',
+      value: failedCount,
+      helper: 'Orders with failed payment attempts.',
+    },
+    {
+      label: 'Paid Revenue',
+      value: formatMoney(paidRevenue),
+      helper: 'Revenue collected from paid orders.',
+    },
+  ]
+
   return (
-    <div className='space-y-6'>
-      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-        <div>
-          <h1 className='text-2xl font-semibold text-slate-900'>Order - Template Data</h1>
-          <p className='text-sm text-muted-foreground'>
-            {isVendor ? 'Your storefront order history' : 'All storefront orders across vendors'}
-          </p>
-        </div>
-        <div className='flex flex-wrap items-center gap-2'>
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setPage(1)
-                fetchOrders()
-              }
-            }}
-            placeholder='Search order number or customer'
-            className='w-64'
-          />
-          {!isVendor && (
-            <select
-              value={vendorFilter}
-              onChange={(e) => {
-                setVendorFilter(e.target.value)
-                setPage(1)
-              }}
-              className='h-10 min-w-[180px] rounded-md border border-input bg-background px-3 text-sm'
-            >
-              <option value='all'>All vendors</option>
-              {vendors.map((vendor) => (
-                <option key={vendor._id} value={vendor._id || ''}>
-                  {vendor.name || vendor.business_name || vendor.businessName || vendor.storeName || vendor.email || vendor._id}
-                </option>
-              ))}
-            </select>
-          )}
-          {(isVendor || vendorFilter !== 'all') && (
-            <select
-              value={templateFilter}
-              onChange={(e) => {
-                setTemplateFilter(e.target.value)
-                setPage(1)
-              }}
-              className='h-10 min-w-[190px] rounded-md border border-input bg-background px-3 text-sm'
-              disabled={(isVendor ? !vendorId : vendorFilter === 'all') || templatesLoading}
-            >
-              <option value='all'>
-                {isVendor
-                  ? templatesLoading
-                    ? 'Loading templates...'
-                    : 'All templates'
-                  : vendorFilter === 'all'
-                    ? 'Select vendor first'
-                    : templatesLoading
-                      ? 'Loading templates...'
-                      : 'All templates'}
-              </option>
-              {templates.map((template) => (
-                <option key={template._id} value={template._id || ''}>
-                  {template.template_name || template.template_key || template.name || template._id}
-                </option>
-              ))}
-            </select>
-          )}
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value)
-              setPage(1)
-            }}
-            className='h-10 rounded-md border border-input bg-background px-3 text-sm'
-          >
-            <option value='all'>All status</option>
-            <option value='pending'>Pending</option>
-            <option value='confirmed'>Confirmed</option>
-            <option value='shipped'>Shipped</option>
-            <option value='delivered'>Delivered</option>
-            <option value='failed'>Failed</option>
-            <option value='cancelled'>Cancelled</option>
-          </select>
-          <Button onClick={() => fetchOrders()} disabled={loading}>
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </Button>
-        </div>
-      </div>
+    <>
+      <TablePageHeader title='Order - Template Data'>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder='Search order number or customer'
+          className='h-10 w-64 shrink-0'
+        />
+        <Select value={templateFilter} onValueChange={setTemplateFilter}>
+          <SelectTrigger className='w-44 shrink-0'>
+            <SelectValue placeholder='All templates' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>All templates</SelectItem>
+            {templates.map((template) => (
+              <SelectItem key={template.id} value={template.id}>
+                {template.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className='w-36 shrink-0'>
+            <SelectValue placeholder='All status' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>All status</SelectItem>
+            <SelectItem value='pending'>Pending</SelectItem>
+            <SelectItem value='confirmed'>Confirmed</SelectItem>
+            <SelectItem value='shipped'>Shipped</SelectItem>
+            <SelectItem value='delivered'>Delivered</SelectItem>
+            <SelectItem value='failed'>Failed</SelectItem>
+            <SelectItem value='cancelled'>Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant='outline'
+          className='shrink-0'
+          onClick={() => setStatsOpen(true)}
+        >
+          Statistics
+        </Button>
+        <Button className='shrink-0' onClick={loadOrders} disabled={loading}>
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </Button>
+      </TablePageHeader>
 
-      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Total Orders</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{totalOrders}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Total Revenue</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{formatMoney(totalRevenue)}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Pending</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>
-            {pendingCount}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Delivered</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>
-            {deliveredCount}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Payments Paid</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{paidCount}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Payments Failed</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{failedCount}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-sm text-muted-foreground'>Paid Revenue</CardTitle>
-          </CardHeader>
-          <CardContent className='text-2xl font-semibold'>{formatMoney(paidRevenue)}</CardContent>
-        </Card>
-      </div>
-
-      <div className='grid gap-6 xl:grid-cols-[360px_1fr]'>
-        <Card className='h-fit border-slate-200/70 shadow-sm'>
-          <CardHeader className='pb-3'>
-            <CardTitle className='text-base'>Order list</CardTitle>
-          </CardHeader>
-          <CardContent className='space-y-3'>
-            {loading && <p className='text-sm text-muted-foreground'>Loading orders...</p>}
-            {!loading && error && <p className='text-sm text-rose-600'>{error}</p>}
-            {!loading && !error && orders.length === 0 && (
-              <p className='text-sm text-muted-foreground'>No orders found.</p>
-            )}
-            <div className='space-y-3 max-h-[520px] overflow-y-auto pr-2'>
-              {orders.map((order) => (
-                <button
-                  key={order._id}
-                  onClick={() => setSelectedId(order._id)}
-                  className={`w-full rounded-xl border p-3 text-left transition ${
-                    selectedId === order._id
-                      ? 'border-slate-900 bg-slate-50'
-                      : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className='flex items-center justify-between'>
-                    <span className='text-sm font-semibold'>#{order.order_number}</span>
-                    {statusBadge(order.status)}
-                  </div>
-                  <div className='mt-2 text-xs text-muted-foreground'>
-                    {(order.user_id?.name || order.shipping_address?.full_name || 'Customer')}
-                    {order.user_id?.email ? ` | ${order.user_id.email}` : ''}
-                  </div>
-                  {!isVendor && order.vendor_id && (
-                    <div className='mt-2 text-xs text-slate-500'>
-                      Vendor: {order.vendor_id?.name || order.vendor_id?.businessName || order.vendor_id?.storeName || order.vendor_id?._id}
-                    </div>
-                  )}
-                  {getTemplateLabel(order) && (
-                    <div className='mt-1 text-xs text-slate-500'>
-                      Template: {getTemplateLabel(order)}
-                    </div>
-                  )}
-                  <div className='mt-2 flex items-center justify-between text-sm font-semibold'>
-                    <span>{order.items?.length || 0} items</span>
-                    <span>{formatMoney(order.total)}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-            {pageCount > 1 && (
-              <div className='flex items-center justify-between pt-2 text-sm'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                  disabled={page <= 1 || loading}
-                >
-                  Previous
-                </Button>
-                <span className='text-xs text-muted-foreground'>
-                  Page {page} of {pageCount}
-                </span>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => setPage((prev) => Math.min(prev + 1, pageCount))}
-                  disabled={page >= pageCount || loading}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className='border-slate-200/70 shadow-sm'>
-          <CardHeader>
-            <CardTitle className='text-base'>Order details</CardTitle>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            {!selectedOrder ? (
-              <p className='text-sm text-muted-foreground'>Select an order to view details.</p>
-            ) : (
-              <>
-                <div className='flex flex-wrap items-center justify-between gap-3 text-sm'>
-                  <div>
-                    <p className='text-xs text-muted-foreground'>Order number</p>
-                    <p className='font-semibold'>#{selectedOrder.order_number}</p>
-                  </div>
-                  <div>
-                    <p className='text-xs text-muted-foreground'>Status</p>
-                    <div>{statusBadge(selectedOrder.status)}</div>
-                  </div>
-                  <div>
-                    <p className='text-xs text-muted-foreground'>Created</p>
-                    <p className='font-semibold'>
-                      {selectedOrder.createdAt
-                        ? new Date(selectedOrder.createdAt).toLocaleString()
-                        : 'N/A'}
-                    </p>
-                  </div>
-                  <div className='flex flex-wrap items-center gap-2'>
-                    <Button
-                      size='sm'
-                      disabled={loading || selectedOrder.status === 'delivered'}
-                      onClick={async () => {
-                        if (!selectedOrder?._id) return
-                        try {
-                          setLoading(true)
-                          await api.put(`/template-orders/${selectedOrder._id}/status`, {
-                            status: 'delivered',
-                          })
-                          await fetchOrders()
-                        } finally {
-                          setLoading(false)
-                        }
-                      }}
-                    >
-                      Mark delivered
-                    </Button>
-                    <Button
-                      size='sm'
-                      variant='outline'
-                      disabled={loading || selectedOrder.status === 'failed'}
-                      onClick={async () => {
-                        if (!selectedOrder?._id) return
-                        try {
-                          setLoading(true)
-                          await api.put(`/template-orders/${selectedOrder._id}/status`, {
-                            status: 'failed',
-                          })
-                          await fetchOrders()
-                        } finally {
-                          setLoading(false)
-                        }
-                      }}
-                    >
-                      Mark failed
-                    </Button>
-                  </div>
-                  {!isVendor && selectedOrder.vendor_id && (
-                    <div>
-                      <p className='text-xs text-muted-foreground'>Vendor</p>
-                      <p className='font-semibold'>
-                        {selectedOrder.vendor_id?.name ||
-                          selectedOrder.vendor_id?.businessName ||
-                          selectedOrder.vendor_id?.storeName ||
-                          selectedOrder.vendor_id?._id}
-                      </p>
-                    </div>
-                  )}
-                  {getTemplateLabel(selectedOrder) && (
-                    <div>
-                      <p className='text-xs text-muted-foreground'>Template</p>
-                      <p className='font-semibold'>
-                        {getTemplateLabel(selectedOrder)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div className='space-y-3'>
-                  <p className='text-sm font-semibold'>Items</p>
-                  <div className='max-h-[360px] space-y-3 overflow-y-auto pr-2'>
-                    {selectedOrder.items.map((item) => {
-                      const vendorId = selectedOrder.vendor_id?._id || ''
-                      const productHref = item.product_id && vendorId
-                        ? `/template/${vendorId}/product/${item.product_id}`
-                        : '#'
-                      return (
-                        <a
-                          key={item.product_id || item._id}
-                          href={productHref}
-                          className='flex gap-3 rounded-lg border p-3 transition hover:border-slate-300'
-                        >
-                          <div className='h-14 w-14 overflow-hidden rounded-md bg-slate-100'>
-                            <img
-                              src={item.image_url || '/placeholder.png'}
-                              alt={item.product_name || 'Product'}
-                              className='h-full w-full object-cover'
-                            />
-                          </div>
-                          <div className='flex flex-1 items-start justify-between gap-3'>
-                            <div className='min-w-0'>
-                              <p className='text-sm font-semibold text-slate-900 line-clamp-2'>
-                                {item.product_name}
-                              </p>
-                              <p className='text-xs text-muted-foreground'>
-                                {formatAttrs(item.variant_attributes) || 'Default variant'}
-                              </p>
-                              <p className='text-xs text-muted-foreground'>Qty: {item.quantity}</p>
-                            </div>
-                            <div className='text-sm font-semibold whitespace-nowrap'>
-                              {formatMoney(item.total_price)}
-                            </div>
-                          </div>
-                        </a>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className='grid gap-4 md:grid-cols-2'>
-                  <div className='space-y-2 rounded-lg border p-3'>
-                    <p className='text-sm font-semibold'>Customer</p>
-                    <p className='text-sm'>
-                      {selectedOrder.user_id?.name || selectedOrder.shipping_address?.full_name}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>{selectedOrder.user_id?.email}</p>
-                    <p className='text-xs text-muted-foreground'>{selectedOrder.shipping_address?.phone}</p>
-                  </div>
-                  <div className='space-y-2 rounded-lg border p-3'>
-                    <p className='text-sm font-semibold'>Shipping address</p>
-                    <p className='text-sm'>
-                      {selectedOrder.shipping_address?.line1}
-                      {selectedOrder.shipping_address?.line2
-                        ? `, ${selectedOrder.shipping_address?.line2}`
-                        : ''}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>
-                      {selectedOrder.shipping_address?.city}, {selectedOrder.shipping_address?.state}{' '}
-                      {selectedOrder.shipping_address?.pincode}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>
-                      {selectedOrder.shipping_address?.country || 'India'}
-                    </p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className='grid gap-2 text-sm'>
-                  <div className='flex justify-between'>
-                    <span className='text-muted-foreground'>Payment</span>
-                    <span className='font-semibold'>
-                      {selectedOrder.payment_method || 'cod'} ({selectedOrder.payment_status || 'pending'})
-                    </span>
-                  </div>
-                  <div className='flex justify-between'>
-                    <span className='text-muted-foreground'>Subtotal</span>
-                    <span className='font-semibold'>{formatMoney(selectedOrder.subtotal)}</span>
-                  </div>
-                  <div className='flex justify-between'>
-                    <span className='text-muted-foreground'>Shipping</span>
-                    <span className='font-semibold'>{formatMoney(selectedOrder.shipping_fee)}</span>
-                  </div>
-                  <div className='flex justify-between'>
-                    <span className='text-muted-foreground'>Discount</span>
-                    <span className='font-semibold'>-{formatMoney(selectedOrder.discount)}</span>
-                  </div>
-                  <div className='flex justify-between text-base font-semibold'>
-                    <span>Total</span>
-                    <span>{formatMoney(selectedOrder.total)}</span>
-                  </div>
-                </div>
-
-                {canUseBorzo && (
-                  <>
-                    <Separator />
-
-                    <div className='space-y-4 rounded-2xl border p-4'>
-                      <div className='flex flex-wrap items-center justify-between gap-3'>
-                        <div>
-                          <p className='text-sm font-semibold text-slate-900'>Borzo delivery</p>
-                          <p className='text-xs text-slate-600'>
-                            {selectedOrder.borzo?.order_id
-                              ? `Order ID ${selectedOrder.borzo.order_id} | ${selectedOrder.borzo.status || 'created'}`
-                              : 'No Borzo delivery created yet.'}
-                          </p>
-                          {hasActiveBorzo && (
-                            <p className='text-xs font-semibold text-amber-600'>
-                              A Borzo delivery is already active for this order.
-                            </p>
-                          )}
-                        </div>
-                        {selectedOrder.borzo?.tracking_url && (
-                          <a
-                            href={selectedOrder.borzo.tracking_url}
-                            target='_blank'
-                            rel='noreferrer'
-                            className='text-xs font-semibold text-indigo-700 underline'
-                          >
-                            Tracking
-                          </a>
-                        )}
-                      </div>
-
-                      {borzoError && (
-                        <p className='text-xs text-rose-600'>{borzoError}</p>
-                      )}
-
-                      <div className='grid gap-3 lg:grid-cols-2'>
-                        <div className='grid gap-2 rounded-xl border p-3'>
-                          <p className='text-xs font-semibold text-slate-700'>Pickup address override (optional)</p>
-                          <Input
-                            placeholder='Pickup name'
-                            value={pickupOverride.name}
-                            onChange={(e) => setPickupOverride((prev) => ({ ...prev, name: e.target.value }))}
-                          />
-                          <Input
-                            placeholder='Pickup phone'
-                            value={pickupOverride.phone}
-                            onChange={(e) => setPickupOverride((prev) => ({ ...prev, phone: e.target.value }))}
-                          />
-                          <Input
-                            placeholder='Pickup address'
-                            value={pickupOverride.address}
-                            onChange={(e) => setPickupOverride((prev) => ({ ...prev, address: e.target.value }))}
-                          />
-                          <div className='grid gap-2 sm:grid-cols-2'>
-                            <Input
-                              placeholder='Pickup latitude'
-                              value={pickupOverride.latitude}
-                              onChange={(e) => setPickupOverride((prev) => ({ ...prev, latitude: e.target.value }))}
-                            />
-                            <Input
-                              placeholder='Pickup longitude'
-                              value={pickupOverride.longitude}
-                              onChange={(e) => setPickupOverride((prev) => ({ ...prev, longitude: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-
-                        <div className='grid gap-2 rounded-xl border p-3'>
-                          <p className='text-xs font-semibold text-slate-700'>Drop-off override (optional)</p>
-                          <Input
-                            placeholder='Drop-off name'
-                            value={dropoffOverride.name}
-                            onChange={(e) => setDropoffOverride((prev) => ({ ...prev, name: e.target.value }))}
-                          />
-                          <Input
-                            placeholder='Drop-off phone'
-                            value={dropoffOverride.phone}
-                            onChange={(e) => setDropoffOverride((prev) => ({ ...prev, phone: e.target.value }))}
-                          />
-                          <Input
-                            placeholder='Drop-off address'
-                            value={dropoffOverride.address}
-                            onChange={(e) => setDropoffOverride((prev) => ({ ...prev, address: e.target.value }))}
-                          />
-                          <div className='grid gap-2 sm:grid-cols-2'>
-                            <Input
-                              placeholder='Drop-off latitude'
-                              value={dropoffOverride.latitude}
-                              onChange={(e) => setDropoffOverride((prev) => ({ ...prev, latitude: e.target.value }))}
-                            />
-                            <Input
-                              placeholder='Drop-off longitude'
-                              value={dropoffOverride.longitude}
-                              onChange={(e) => setDropoffOverride((prev) => ({ ...prev, longitude: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className='flex flex-wrap items-center gap-2'>
-                        <Button
-                          size='sm'
-                          onClick={handleCreateBorzo}
-                          disabled={borzoBusy || hasActiveBorzo}
-                        >
-                          {borzoActionLoading ? 'Creating...' : hasActiveBorzo ? 'Already created' : 'Create Borzo delivery'}
-                        </Button>
-                        <Button
-                          size='sm'
-                          variant='outline'
-                          onClick={handleCancelBorzo}
-                          disabled={borzoBusy || !selectedOrder.borzo?.order_id}
-                        >
-                          {borzoActionLoading ? 'Canceling...' : 'Cancel Borzo delivery'}
-                        </Button>
-                      </div>
-                      <div className='flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600'>
-                        <span>{borzoQuoteLoading ? 'Updating quote...' : 'Auto-quote updates as you type.'}</span>
-                        {borzoQuote && (
-                          <span className='font-semibold text-slate-900'>
-                            Quote:{' '}
-                            {formatINR(borzoQuote.amount, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                            {borzoQuote.warnings?.length ? ` | ${borzoQuote.warnings.join(', ')}` : ''}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </>
+      <Main className='flex flex-1 flex-col gap-6'>
+        <TableShell
+          className='flex-1'
+          title='Order list'
+          footer={
+            <ServerPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={total}
+              pageSize={limit}
+              pageSizeOptions={[10, 20, 50]}
+              onPageChange={setPage}
+              onPageSizeChange={(value) => setLimit(value)}
+              disabled={loading}
+            />
+          }
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className='min-w-[170px]'>Order</TableHead>
+                <TableHead className='min-w-[200px]'>Customer</TableHead>
+                {!isVendor && (
+                  <TableHead className='min-w-[180px]'>Vendor</TableHead>
                 )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+                <TableHead>Status</TableHead>
+                <TableHead className='min-w-[140px]'>Template</TableHead>
+                <TableHead className='min-w-[120px]'>Items</TableHead>
+                <TableHead className='min-w-[140px]'>Total</TableHead>
+                <TableHead className='min-w-[160px]'>Created</TableHead>
+                <TableHead className='text-right'>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && orders.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={isVendor ? 8 : 9}
+                    className='h-24 text-center'
+                  >
+                    Loading orders...
+                  </TableCell>
+                </TableRow>
+              ) : orders.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={isVendor ? 8 : 9}
+                    className='text-muted-foreground h-24 text-center'
+                  >
+                    {error || 'No orders found.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                orders.map((order) => (
+                  <TableRow key={order._id}>
+                    <TableCell>
+                      <div className='text-sm font-medium'>
+                        #{order.order_number}
+                      </div>
+                      <div className='text-muted-foreground text-xs'>
+                        {order.payment_method || 'cod'} (
+                        {order.payment_status || 'pending'})
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className='text-sm font-medium'>
+                        {order.user_id?.name ||
+                          order.shipping_address?.full_name ||
+                          'Customer'}
+                      </div>
+                      <div className='text-muted-foreground text-xs'>
+                        {order.user_id?.email ||
+                          order.shipping_address?.phone ||
+                          'N/A'}
+                      </div>
+                    </TableCell>
+                    {!isVendor && (
+                      <TableCell>
+                        <div className='text-sm font-medium'>
+                          {order.vendor_id?.businessName ||
+                            order.vendor_id?.storeName ||
+                            order.vendor_id?.name ||
+                            'Vendor'}
+                        </div>
+                        <div className='text-muted-foreground text-xs'>
+                          {order.vendor_id?.email ||
+                            order.vendor_id?.phone ||
+                            'N/A'}
+                        </div>
+                      </TableCell>
+                    )}
+                    <TableCell>{statusBadge(order.status)}</TableCell>
+                    <TableCell className='text-muted-foreground text-sm'>
+                      {order.template_name || order.template_key || 'Template'}
+                    </TableCell>
+                    <TableCell className='text-muted-foreground text-sm'>
+                      {order.items?.length || 0} items
+                    </TableCell>
+                    <TableCell className='text-sm font-semibold'>
+                      {formatMoney(order.total)}
+                    </TableCell>
+                    <TableCell className='text-muted-foreground text-sm'>
+                      {order.createdAt
+                        ? format(new Date(order.createdAt), 'MMM dd, yyyy')
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell className='text-right'>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={() => openDetails(order)}
+                      >
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableShell>
+      </Main>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className='max-h-[92vh] w-[min(96vw,1000px)] overflow-y-auto overscroll-contain rounded-none'>
+          <DialogHeader className='text-left'>
+            <DialogTitle>Order details</DialogTitle>
+            <DialogDescription>
+              Review items, customer details, and delivery actions.
+            </DialogDescription>
+          </DialogHeader>
+          {!selectedOrder ? (
+            <p className='text-muted-foreground text-sm'>No order selected.</p>
+          ) : (
+            <div className='space-y-6'>
+              <div className='flex flex-wrap items-center justify-between gap-3 text-sm'>
+                <div>
+                  <p className='text-muted-foreground text-xs'>Order number</p>
+                  <p className='font-semibold'>#{selectedOrder.order_number}</p>
+                </div>
+                <div>
+                  <p className='text-muted-foreground text-xs'>Status</p>
+                  <div>{statusBadge(selectedOrder.status)}</div>
+                </div>
+                <div>
+                  <p className='text-muted-foreground text-xs'>Created</p>
+                  <p className='font-semibold'>
+                    {selectedOrder.createdAt
+                      ? new Date(selectedOrder.createdAt).toLocaleString()
+                      : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className='text-muted-foreground text-xs'>Template</p>
+                  <p className='font-semibold'>
+                    {selectedOrder.template_name ||
+                      selectedOrder.template_key ||
+                      'Template'}
+                  </p>
+                </div>
+                <div className='flex flex-wrap items-center gap-2'>
+                  <Button
+                    size='sm'
+                    disabled={loading || selectedOrder.status === 'delivered'}
+                    onClick={async () => {
+                      if (!selectedOrder?._id) return
+                      try {
+                        setLoading(true)
+                        await api.put(
+                          `/template-orders/${selectedOrder._id}/status`,
+                          {
+                            status: 'delivered',
+                          }
+                        )
+                        await loadOrders()
+                        setSelectedOrder({
+                          ...selectedOrder,
+                          status: 'delivered',
+                        })
+                      } finally {
+                        setLoading(false)
+                      }
+                    }}
+                  >
+                    Mark delivered
+                  </Button>
+                  <Button
+                    size='sm'
+                    variant='outline'
+                    disabled={loading || selectedOrder.status === 'failed'}
+                    onClick={async () => {
+                      if (!selectedOrder?._id) return
+                      try {
+                        setLoading(true)
+                        await api.put(
+                          `/template-orders/${selectedOrder._id}/status`,
+                          {
+                            status: 'failed',
+                          }
+                        )
+                        await loadOrders()
+                        setSelectedOrder({ ...selectedOrder, status: 'failed' })
+                      } finally {
+                        setLoading(false)
+                      }
+                    }}
+                  >
+                    Mark failed
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className='space-y-3'>
+                <p className='text-sm font-semibold'>Items</p>
+                <div className='max-h-[320px] space-y-3 overflow-y-auto pr-2'>
+                  {selectedOrder.items.map((item) => (
+                    <div
+                      key={item.product_id || item._id}
+                      className='flex gap-3 rounded-none border p-3'
+                    >
+                      <div className='h-14 w-14 overflow-hidden rounded-none bg-slate-100'>
+                        <img
+                          src={resolveImageUrl(item.image_url)}
+                          alt={item.product_name || 'Product'}
+                          className='h-full w-full object-cover'
+                          onError={(event) => {
+                            const target = event.currentTarget
+                            if (target.dataset.fallbackApplied) return
+                            target.dataset.fallbackApplied = 'true'
+                            target.src = FALLBACK_IMAGE
+                          }}
+                        />
+                      </div>
+                      <div className='flex flex-1 items-start justify-between gap-3'>
+                        <div className='min-w-0'>
+                          <p className='line-clamp-2 text-sm font-semibold text-slate-900'>
+                            {item.product_name}
+                          </p>
+                          <p className='text-muted-foreground text-xs'>
+                            {Object.values(item.variant_attributes || {}).join(
+                              ' / '
+                            )}
+                          </p>
+                          <p className='text-muted-foreground text-xs'>
+                            Qty: {item.quantity}
+                          </p>
+                        </div>
+                        <div className='text-sm font-semibold whitespace-nowrap'>
+                          {formatMoney(item.total_price)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className='grid gap-4 md:grid-cols-2'>
+                <div className='space-y-2 rounded-none border p-3'>
+                  <p className='text-sm font-semibold'>Customer</p>
+                  <p className='text-sm'>
+                    {selectedOrder.user_id?.name ||
+                      selectedOrder.shipping_address?.full_name}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    {selectedOrder.user_id?.email}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    {selectedOrder.shipping_address?.phone}
+                  </p>
+                </div>
+                <div className='space-y-2 rounded-none border p-3'>
+                  <p className='text-sm font-semibold'>Shipping address</p>
+                  <p className='text-sm'>
+                    {selectedOrder.shipping_address?.line1}
+                    {selectedOrder.shipping_address?.line2
+                      ? `, ${selectedOrder.shipping_address?.line2}`
+                      : ''}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    {selectedOrder.shipping_address?.city},{' '}
+                    {selectedOrder.shipping_address?.state}{' '}
+                    {selectedOrder.shipping_address?.pincode}
+                  </p>
+                  <p className='text-muted-foreground text-xs'>
+                    {selectedOrder.shipping_address?.country || 'India'}
+                  </p>
+                </div>
+                {!isVendor && selectedOrder.vendor_id && (
+                  <div className='space-y-2 rounded-none border p-3'>
+                    <p className='text-sm font-semibold'>Vendor</p>
+                    <p className='text-sm'>
+                      {selectedOrder.vendor_id?.businessName ||
+                        selectedOrder.vendor_id?.storeName ||
+                        selectedOrder.vendor_id?.name}
+                    </p>
+                    <p className='text-muted-foreground text-xs'>
+                      {selectedOrder.vendor_id?.email}
+                    </p>
+                    <p className='text-muted-foreground text-xs'>
+                      {selectedOrder.vendor_id?.phone}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className='grid gap-2 text-sm'>
+                <div className='flex justify-between'>
+                  <span className='text-muted-foreground'>Payment</span>
+                  <span className='font-semibold'>
+                    {selectedOrder.payment_method || 'cod'} (
+                    {selectedOrder.payment_status || 'pending'})
+                  </span>
+                </div>
+                <div className='flex justify-between'>
+                  <span className='text-muted-foreground'>Items total</span>
+                  <span className='font-semibold'>
+                    {formatMoney(selectedOrder.subtotal)}
+                  </span>
+                </div>
+                <div className='flex justify-between'>
+                  <span className='text-muted-foreground'>Shipping</span>
+                  <span className='font-semibold'>
+                    {formatMoney(selectedOrder.shipping_fee)}
+                  </span>
+                </div>
+                <div className='flex justify-between'>
+                  <span className='text-muted-foreground'>Discount</span>
+                  <span className='font-semibold'>
+                    -{formatMoney(selectedOrder.discount)}
+                  </span>
+                </div>
+                <div className='flex justify-between text-base font-semibold'>
+                  <span>Total</span>
+                  <span>{formatMoney(selectedOrder.total)}</span>
+                </div>
+              </div>
+
+              {canUseBorzo && (
+                <>
+                  <Separator />
+
+                  <div className='space-y-4 rounded-none border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 shadow-sm'>
+                    <div className='flex flex-wrap items-center justify-between gap-3'>
+                      <div>
+                        <p className='text-sm font-semibold text-slate-900'>
+                          Borzo delivery
+                        </p>
+                        <p className='text-xs text-slate-600'>
+                          {selectedOrder.borzo?.order_id
+                            ? `Order ID ${selectedOrder.borzo.order_id} | ${selectedOrder.borzo.status || 'created'}`
+                            : 'No Borzo delivery created yet.'}
+                        </p>
+                        {hasActiveBorzo && (
+                          <p className='text-xs font-semibold text-amber-600'>
+                            A Borzo delivery is already active for this order.
+                          </p>
+                        )}
+                      </div>
+                      {selectedOrder.borzo?.tracking_url && (
+                        <a
+                          href={selectedOrder.borzo.tracking_url}
+                          target='_blank'
+                          rel='noreferrer'
+                          className='text-xs font-semibold text-indigo-700 underline'
+                        >
+                          Tracking
+                        </a>
+                      )}
+                    </div>
+
+                    {borzoError && (
+                      <p className='text-xs text-rose-600'>{borzoError}</p>
+                    )}
+
+                    <div className='grid gap-3 lg:grid-cols-2'>
+                      <div className='grid gap-2 rounded-none border border-white/80 bg-white/80 p-3 shadow-sm'>
+                        <p className='text-xs font-semibold text-slate-700'>
+                          Pickup address override (optional)
+                        </p>
+                        <Input
+                          placeholder='Pickup name'
+                          value={pickupOverride.name}
+                          onChange={(e) =>
+                            setPickupOverride((prev) => ({
+                              ...prev,
+                              name: e.target.value,
+                            }))
+                          }
+                        />
+                        <Input
+                          placeholder='Pickup phone'
+                          value={pickupOverride.phone}
+                          onChange={(e) =>
+                            setPickupOverride((prev) => ({
+                              ...prev,
+                              phone: e.target.value,
+                            }))
+                          }
+                        />
+                        <Input
+                          placeholder='Pickup address'
+                          value={pickupOverride.address}
+                          onChange={(e) =>
+                            setPickupOverride((prev) => ({
+                              ...prev,
+                              address: e.target.value,
+                            }))
+                          }
+                        />
+                        <div className='grid gap-2 sm:grid-cols-2'>
+                          <Input
+                            placeholder='Pickup latitude'
+                            value={pickupOverride.latitude}
+                            onChange={(e) =>
+                              setPickupOverride((prev) => ({
+                                ...prev,
+                                latitude: e.target.value,
+                              }))
+                            }
+                          />
+                          <Input
+                            placeholder='Pickup longitude'
+                            value={pickupOverride.longitude}
+                            onChange={(e) =>
+                              setPickupOverride((prev) => ({
+                                ...prev,
+                                longitude: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className='grid gap-2 rounded-none border border-white/80 bg-white/80 p-3 shadow-sm'>
+                        <p className='text-xs font-semibold text-slate-700'>
+                          Drop-off override (optional)
+                        </p>
+                        <Input
+                          placeholder='Drop-off name'
+                          value={dropoffOverride.name}
+                          onChange={(e) =>
+                            setDropoffOverride((prev) => ({
+                              ...prev,
+                              name: e.target.value,
+                            }))
+                          }
+                        />
+                        <Input
+                          placeholder='Drop-off phone'
+                          value={dropoffOverride.phone}
+                          onChange={(e) =>
+                            setDropoffOverride((prev) => ({
+                              ...prev,
+                              phone: e.target.value,
+                            }))
+                          }
+                        />
+                        <Input
+                          placeholder='Drop-off address'
+                          value={dropoffOverride.address}
+                          onChange={(e) =>
+                            setDropoffOverride((prev) => ({
+                              ...prev,
+                              address: e.target.value,
+                            }))
+                          }
+                        />
+                        <div className='grid gap-2 sm:grid-cols-2'>
+                          <Input
+                            placeholder='Drop-off latitude'
+                            value={dropoffOverride.latitude}
+                            onChange={(e) =>
+                              setDropoffOverride((prev) => ({
+                                ...prev,
+                                latitude: e.target.value,
+                              }))
+                            }
+                          />
+                          <Input
+                            placeholder='Drop-off longitude'
+                            value={dropoffOverride.longitude}
+                            onChange={(e) =>
+                              setDropoffOverride((prev) => ({
+                                ...prev,
+                                longitude: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <Button
+                        size='sm'
+                        onClick={handleCreateBorzo}
+                        disabled={borzoBusy || hasActiveBorzo}
+                        className='bg-gradient-to-r from-indigo-600 to-sky-600 text-white shadow-sm hover:from-indigo-500 hover:to-sky-500'
+                      >
+                        {borzoActionLoading
+                          ? 'Creating...'
+                          : hasActiveBorzo
+                            ? 'Already created'
+                            : 'Create Borzo delivery'}
+                      </Button>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        onClick={handleCancelBorzo}
+                        disabled={borzoBusy || !selectedOrder.borzo?.order_id}
+                        className='border-indigo-200 text-indigo-700 hover:bg-indigo-50'
+                      >
+                        {borzoActionLoading
+                          ? 'Canceling...'
+                          : 'Cancel Borzo delivery'}
+                      </Button>
+                    </div>
+                    <div className='flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600'>
+                      <span>
+                        {borzoQuoteLoading
+                          ? 'Updating quote...'
+                          : 'Auto-quote updates as you type.'}
+                      </span>
+                      {borzoQuote && (
+                        <span className='font-semibold text-slate-900'>
+                          Quote:{' '}
+                          {formatINR(borzoQuote.amount, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                          {borzoQuote.warnings?.length
+                            ? ` | ${borzoQuote.warnings.join(', ')}`
+                            : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <StatisticsDialog
+        open={statsOpen}
+        onOpenChange={setStatsOpen}
+        title='Order statistics'
+        description='Summary for the current filters.'
+        items={statsItems}
+      />
+    </>
   )
 }

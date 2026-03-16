@@ -1,30 +1,30 @@
 import {
-  LayoutDashboard,
+  Globe,
   HelpCircle,
-  Users,
-  ShieldCheck,
+  KeyRound,
+  LayoutDashboard,
   LayoutTemplate,
-  ShoppingCart,
   Map,
-  Truck,
+  MapPinned,
   PlugZap,
   SearchCheck,
-  Info,
-  KeyRound,
-  MapPinned,
+  ShieldCheck,
+  ShoppingCart,
   Star,
-  Globe,
+  Truck,
+  Users,
 } from 'lucide-react'
+import type { SidebarData } from '../types'
 
 export const ROLES = {
   ADMIN: 'admin',
   VENDOR: 'vendor',
 } as const
 
-export const sidebarData: any = {
+export const sidebarData: Pick<SidebarData, 'navGroups'> = {
   navGroups: [
     {
-      title: 'General',
+      title: 'Overview',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
@@ -37,19 +37,13 @@ export const sidebarData: any = {
           title: 'Users',
           url: '/users',
           icon: Users,
-          roles: [ROLES.ADMIN, ROLES.VENDOR], // admin only
+          roles: [ROLES.ADMIN],
         },
         {
-          title: 'Customer Queries',
-          url: '/customer-queries',
-          icon: HelpCircle,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-        },
-        {
-          title: 'Customer Reviews',
-          url: '/customer-reviews',
-          icon: Star,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          title: 'Customers',
+          url: '/users',
+          icon: Users,
+          roles: [ROLES.VENDOR],
         },
         {
           title: 'Analytics',
@@ -58,12 +52,24 @@ export const sidebarData: any = {
           roles: [ROLES.ADMIN],
         },
         {
+          title: 'Storefront Analytics',
+          url: '/analytics',
+          icon: LayoutDashboard,
+          roles: [ROLES.VENDOR],
+        },
+      ],
+    },
+    {
+      title: 'Sales',
+      roles: [ROLES.ADMIN, ROLES.VENDOR],
+      items: [
+        {
           title: 'Orders',
           icon: ShoppingCart,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
             {
-              title: 'Ophmate Orders',
+              title: 'SellersLogin Orders',
               url: '/order',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
@@ -80,7 +86,7 @@ export const sidebarData: any = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
             {
-              title: 'Ophmate Wallet',
+              title: 'SellersLogin Wallet',
               url: '/wallet',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
@@ -92,45 +98,109 @@ export const sidebarData: any = {
           ],
         },
         {
+          title: 'Delivery Tracking',
+          url: '/borzo-report',
+          icon: Truck,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          requiresIntegration: 'borzo',
+        },
+        {
           title: 'Delivery Charges',
           url: '/delivery-charges',
           icon: Truck,
           roles: [ROLES.ADMIN],
         },
+      ],
+    },
+    {
+      title: 'Catalog',
+      roles: [ROLES.ADMIN, ROLES.VENDOR],
+      items: [
         {
-          title: 'SEO Manager',
-          icon: SearchCheck,
-          roles: [ROLES.ADMIN],
+          title: 'Products',
+          icon: ShieldCheck,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
             {
-              title: 'SEO Rules',
-              url: '/seo',
+              title: 'Show Products',
+              url: '/products',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Create Product',
+              url: '/products/create-products',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'All Admin Products',
+              url: '/products/admin-products',
               roles: [ROLES.ADMIN],
             },
             {
-              title: 'Entity SEO',
-              url: '/seo/entities',
-              roles: [ROLES.ADMIN],
+              title: 'Inventory Management',
+              url: '/inventory-management',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
             },
           ],
         },
         {
-          title: 'Storefront Analytics',
-          url: '/analytics',
-          icon: LayoutDashboard,
-          roles: [ROLES.VENDOR],
+          title: 'Categories',
+          icon: ShieldCheck,
+          roles: [ROLES.ADMIN],
+          items: [
+            {
+              title: 'Show Categories',
+              url: '/category',
+              roles: [ROLES.ADMIN],
+            },
+            {
+              title: 'Specification Keys',
+              url: '/specification-keys',
+              icon: KeyRound,
+              roles: [ROLES.ADMIN],
+            },
+            {
+              title: 'Commission Rules',
+              url: '/commission',
+              roles: [ROLES.ADMIN],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      title: 'Vendor Management',
+      roles: [ROLES.ADMIN],
+      items: [
+        {
+          title: 'Vendors',
+          url: '/vendor',
+          icon: Users,
+          roles: [ROLES.ADMIN],
+        },
+      ],
+    },
+    {
+      title: 'Storefront',
+      roles: [ROLES.ADMIN, ROLES.VENDOR],
+      items: [
+        {
+          title: 'Template Catalog',
+          url: '/template-catalog',
+          icon: LayoutTemplate,
+          roles: [ROLES.ADMIN],
         },
         {
-          title: 'Profile',
-          url: '/profile',
-          icon: Users,
+          title: 'Template Workspace',
+          url: '/template-workspace',
+          icon: LayoutTemplate,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
-          title: 'About',
-          url: '/vendor-about',
-          icon: Info,
-          roles: [ROLES.VENDOR],
+          title: 'Manage Cities',
+          url: '/cities',
+          icon: MapPinned,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
           title: 'Get Domain',
@@ -139,17 +209,43 @@ export const sidebarData: any = {
           roles: [ROLES.VENDOR],
         },
         {
-          title: 'Delivery Tracking',
-          url: '/borzo-report',
-          icon: Truck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-          requiresIntegration: 'borzo',
+          title: 'Website Pages',
+          icon: LayoutTemplate,
+          roles: [ROLES.VENDOR],
+          items: [
+            {
+              title: 'Homepage',
+              url: '/vendor-template',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'About Page',
+              url: '/vendor-template-about',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Contact Page',
+              url: '/vendor-template-contact',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Social + FAQs',
+              url: '/vendor-template-other',
+              roles: [ROLES.VENDOR],
+            },
+            {
+              title: 'Custom Pages',
+              url: '/vendor-template-pages',
+              roles: [ROLES.VENDOR],
+            },
+          ],
         },
       ],
     },
     {
-      title: 'Sellerslogin Toolkit',
+      title: 'Toolkit & Apps',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
+      useToolkitInstallFilter: true,
       items: [
         {
           title: 'Toolkit Store',
@@ -202,159 +298,45 @@ export const sidebarData: any = {
         },
       ],
     },
-
     {
-      title: 'Category',
-      roles: [ROLES.ADMIN, ROLES.VENDOR],
-      items: [
-        {
-          title: 'All Categories',
-          icon: ShieldCheck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-          items: [
-            {
-              title: 'Show Categories',
-              url: '/category',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
-            },
-            {
-              title: 'Specification Keys',
-              url: '/specification-keys',
-              icon: KeyRound,
-              roles: [ROLES.ADMIN],
-            },
-            {
-              title: 'Commission Rules',
-              url: '/commission',
-              roles: [ROLES.ADMIN],
-            },
-          ],
-        },
-      ],
-    },
-
-    {
-      title: 'Products',
-      roles: [ROLES.ADMIN, ROLES.VENDOR],
-      items: [
-        {
-          title: 'All Products',
-          icon: ShieldCheck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-          items: [
-            {
-              title: 'Show Products',
-              url: '/products',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Create Products',
-              url: '/products/create-products',
-              roles: [ROLES.VENDOR], // admin only
-            },
-            {
-              title: 'All Admin Products',
-              url: '/products/admin-products',
-              roles: [ROLES.ADMIN], // admin only
-            },
-            {
-              title: 'Inventory Management',
-              url: '/inventory-management',
-              roles: [ROLES.ADMIN, ROLES.VENDOR], // admin only
-            },
-          ],
-        },
-      ],
-    },
-
-    {
-      title: 'Vendors',
+      title: 'Marketing & SEO',
       roles: [ROLES.ADMIN],
       items: [
         {
-          title: 'All Vendors',
-          icon: ShieldCheck,
+          title: 'SEO Manager',
+          icon: SearchCheck,
           roles: [ROLES.ADMIN],
           items: [
             {
-              title: 'Show Vendors',
-              url: '/vendor',
+              title: 'SEO Rules',
+              url: '/seo',
+              roles: [ROLES.ADMIN],
+            },
+            {
+              title: 'Entity SEO',
+              url: '/seo/entities',
               roles: [ROLES.ADMIN],
             },
           ],
         },
       ],
     },
-
     {
-      title: 'Template Admin',
+      title: 'Support',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
-          title: 'All Templates',
-          url: '/template-catalog',
-          icon: LayoutTemplate,
-          roles: [ROLES.ADMIN],
-        },
-        {
-          title: 'Template Workspace',
-          url: '/template-workspace',
-          icon: LayoutTemplate,
+          title: 'Customer Queries',
+          url: '/customer-queries',
+          icon: HelpCircle,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
-          title: 'Manage Cities',
-          url: '/cities',
-          icon: MapPinned,
+          title: 'Customer Reviews',
+          url: '/customer-reviews',
+          icon: Star,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
-      ],
-    },
-
-    {
-      title: 'Template',
-      roles: [ROLES.VENDOR],
-      items: [
-        {
-          title: 'Create Template',
-          icon: ShieldCheck,
-          roles: [ROLES.VENDOR],
-          items: [
-            {
-              title: 'Create Your Template',
-              url: '/vendor-template',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Edit About Page',
-              url: '/vendor-template-about',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Edit Contact Page',
-              url: '/vendor-template-contact',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Edit Social + FAQs',
-              url: '/vendor-template-other',
-              roles: [ROLES.VENDOR],
-            },
-            {
-              title: 'Custom Pages',
-              url: '/vendor-template-pages',
-              roles: [ROLES.VENDOR],
-            },
-
-          ],
-        },
-      ],
-    },
-
-    {
-      title: 'Other',
-      roles: [ROLES.ADMIN, ROLES.VENDOR],
-      items: [
         {
           title: 'Help Center',
           url: '/help-center',

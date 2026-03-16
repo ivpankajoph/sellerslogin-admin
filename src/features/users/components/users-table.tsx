@@ -22,10 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { DataTablePagination, DataTableToolbar } from '@/components/data-table'
-import { roles } from '../data/data'
+import { DataTablePagination } from '@/components/data-table'
 import { type User } from '../data/schema'
-import { DataTableBulkActions } from './data-table-bulk-actions'
 import { usersColumns as columns } from './users-columns'
 
 type DataTableProps = {
@@ -36,7 +34,6 @@ type DataTableProps = {
 
 export function UsersTable({ data, search, navigate }: DataTableProps) {
   // Local UI-only states
-  const [rowSelection, setRowSelection] = useState({})
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [sorting, setSorting] = useState<SortingState>([])
   const routerNavigate = useNavigate()
@@ -60,8 +57,6 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
     columnFilters: [
       // username per-column text filter
       { columnId: 'username', searchKey: 'username', type: 'string' },
-      { columnId: 'status', searchKey: 'status', type: 'array' },
-      { columnId: 'role', searchKey: 'role', type: 'array' },
     ],
   })
 
@@ -72,14 +67,11 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
     state: {
       sorting,
       pagination,
-      rowSelection,
       columnFilters,
       columnVisibility,
     },
-    enableRowSelection: true,
     onPaginationChange,
     onColumnFiltersChange,
-    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     getPaginationRowModel: getPaginationRowModel(),
@@ -93,32 +85,6 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
   useEffect(() => {
     ensurePageInRange(table.getPageCount())
   }, [table, ensurePageInRange])
-
-  const statusOptions = Array.from(
-    new Set(data.map((user) => user.status).filter(Boolean))
-  )
-    .sort()
-    .map((status) => ({
-      label: status.charAt(0).toUpperCase() + status.slice(1),
-      value: status,
-    }))
-
-  const roleOptions = Array.from(
-    new Set(data.map((user) => user.role).filter(Boolean))
-  )
-    .sort()
-    .map((roleValue) => {
-      const match = roles.find((role) => role.value === roleValue)
-      return {
-        label:
-          match?.label ||
-          roleValue
-            .split('_')
-            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-            .join(' '),
-        value: roleValue,
-      }
-    })
 
   const handleRowClick = (
     event: React.MouseEvent<HTMLTableRowElement>,
@@ -142,23 +108,6 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
         'flex flex-1 flex-col gap-4'
       )}
     >
-      <DataTableToolbar
-        table={table}
-        searchPlaceholder='Filter users...'
-        searchKey='username'
-        filters={[
-          {
-            columnId: 'status',
-            title: 'Status',
-            options: statusOptions,
-          },
-          {
-            columnId: 'role',
-            title: 'Role',
-            options: roleOptions,
-          },
-        ]}
-      />
       <div className='overflow-hidden rounded-md border'>
         <Table>
           <TableHeader>
@@ -227,7 +176,6 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
         </Table>
       </div>
       <DataTablePagination table={table} className='mt-auto' />
-      <DataTableBulkActions table={table} />
     </div>
   )
 }

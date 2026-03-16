@@ -42,7 +42,7 @@ const APP_SOURCES: AppSource[] = ['ophmate_frontend', 'vendor_template_frontend'
 const PROVIDERS: DeliveryProvider[] = ['none', 'borzo', 'delhivery']
 
 const APP_LABELS: Record<AppSource, string> = {
-  ophmate_frontend: 'Ophmate Frontend',
+  ophmate_frontend: 'SellersLogin Frontend',
   vendor_template_frontend: 'Vendor Template Frontend',
 }
 

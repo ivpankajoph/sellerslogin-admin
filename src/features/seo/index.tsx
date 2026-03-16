@@ -78,7 +78,7 @@ type InventoryPage = {
 }
 
 const APP_LABELS: Record<SeoAppSource, string> = {
-  ophmate_frontend: 'Ophmate Frontend',
+  ophmate_frontend: 'SellersLogin Frontend',
   vendor_template_frontend: 'Vendor Template Frontend',
 }
 
@@ -468,7 +468,7 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
                     <SelectValue placeholder='Select app source' />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='ophmate_frontend'>Ophmate Frontend</SelectItem>
+                    <SelectItem value='ophmate_frontend'>SellersLogin Frontend</SelectItem>
                     <SelectItem value='vendor_template_frontend'>
                       Vendor Template Frontend
                     </SelectItem>
@@ -741,7 +741,7 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value='all'>All dynamic pages</SelectItem>
-                  <SelectItem value='ophmate_product'>Ophmate product pages</SelectItem>
+                  <SelectItem value='ophmate_product'>SellersLogin product pages</SelectItem>
                   <SelectItem value='vendor_catalog'>Vendor catalog pages</SelectItem>
                   <SelectItem value='template_home'>Template home pages</SelectItem>
                   <SelectItem value='template_product'>Template product pages</SelectItem>
@@ -794,7 +794,7 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
                           <div className='mt-1 flex items-center gap-2'>
                             <Badge variant='outline' className='text-xs'>
                               <TypeIcon className='mr-1 h-3 w-3' />
-                              {page.app_source === 'ophmate_frontend' ? 'Ophmate' : 'Template'}
+                              {page.app_source === 'ophmate_frontend' ? 'SellersLogin' : 'Template'}
                             </Badge>
                             <Badge variant={configured ? 'default' : 'secondary'}>
                               {configured ? 'SEO configured' : 'SEO missing'}
