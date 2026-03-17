@@ -24,6 +24,18 @@ export type PreviewCitySelection = {
   label: string
 }
 
+const readStoredTemplatePreviewCity = () => {
+  if (typeof window === 'undefined') return ''
+  try {
+    const rawValue = window.localStorage.getItem(PREVIEW_CITY_STORAGE_KEY)
+    return rawValue ? normalizeCitySlug(rawValue) : ''
+  } catch {
+    return ''
+  }
+}
+
+export const peekStoredTemplatePreviewCity = () => readStoredTemplatePreviewCity()
+
 export const resolvePreviewCityFromVendorProfile = (
   vendorProfile?: Record<string, unknown> | null,
   fallbackCitySlug?: string
@@ -39,9 +51,12 @@ export const resolvePreviewCityFromVendorProfile = (
       (profile as Record<string, unknown>)?.defaultCitySlug ||
       ''
   ).trim()
+  const storedSlug = readStoredTemplatePreviewCity()
 
-  const resolvedSlug = normalizeCitySlug(rawSlug || rawName || fallbackCitySlug || 'all')
-  const resolvedLabel = rawName || toCityLabel(resolvedSlug)
+  const resolvedSlug = normalizeCitySlug(
+    storedSlug || rawSlug || rawName || fallbackCitySlug || 'all'
+  )
+  const resolvedLabel = storedSlug ? toCityLabel(storedSlug) : rawName || toCityLabel(resolvedSlug)
 
   return {
     slug: resolvedSlug,
@@ -56,12 +71,7 @@ export const STOREFRONT_URL = trimTrailingSlash(
 )
 
 export const getStoredTemplatePreviewCity = () => {
-  if (typeof window === 'undefined') return 'all'
-  try {
-    return normalizeCitySlug(window.localStorage.getItem(PREVIEW_CITY_STORAGE_KEY) || 'all')
-  } catch {
-    return 'all'
-  }
+  return readStoredTemplatePreviewCity() || 'all'
 }
 
 export const setStoredTemplatePreviewCity = (citySlug: string) => {

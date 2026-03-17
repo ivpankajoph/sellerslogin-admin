@@ -21,17 +21,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { generateSpecifications, generateWithAI } from './aiHelpers'
+import { generateWithAI } from './aiHelpers'
 import { deleteFromCloudinary, uploadToCloudinary } from './cloudinary'
 import Step1BasicInfo from './components/Step1BasicInfo'
-import Step3Specifications from './components/Step3Specifications'
 import Step4SEO from './components/Step4SEO'
 import Step5Variants from './components/Step5Variants'
 import Step6FAQs from './components/Step6FAQs'
+import { fieldConfig } from './helpers/SpecificationsData'
 import {
   type ImageUpload,
   type ProductFormData,
-  SPECIFICATION_TEMPLATES,
   type Variant,
 } from './types/type'
 
@@ -40,18 +39,65 @@ import {
 // Specification templates by category
 
 const PRODUCT_CREATE_DRAFT_STORAGE_PREFIX = 'product_create_draft'
-const PRODUCT_CREATE_DRAFT_VERSION = 2
+const PRODUCT_CREATE_DRAFT_VERSION = 3
 const PRODUCT_CREATE_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const PRODUCT_CREATE_STEP_COUNT = 3
 
-const createSpecificationRecord = (keys: string[]) =>
-  keys.reduce<Record<string, string>>((acc, key) => {
-    const normalizedKey = toTrimmedText(key)
-    if (normalizedKey) {
-      acc[normalizedKey] = ''
-    }
-    return acc
-  }, {})
+const VARIANT_KEY_CONTEXT_FALLBACKS: Array<{
+  patterns: RegExp[]
+  configKeys?: string[]
+  keys?: string[]
+}> = [
+  {
+    patterns: [/mobile/i, /smartphone/i, /phone/i],
+    configKeys: ['Smartphones'],
+    keys: ['Color', 'RAM', 'Storage'],
+  },
+  {
+    patterns: [/accessor/i, /cover/i, /case/i, /charger/i, /cable/i, /power bank/i],
+    keys: ['Color', 'Compatibility', 'Type'],
+  },
+  {
+    patterns: [/laptop/i, /notebook/i, /desktop/i, /computer/i],
+    configKeys: ['Laptops'],
+    keys: ['RAM', 'Storage', 'Processor'],
+  },
+  {
+    patterns: [/headphone/i, /earbud/i, /speaker/i, /audio/i],
+    configKeys: ['Headphones', 'Electronics'],
+    keys: ['Color', 'Connectivity'],
+  },
+  {
+    patterns: [/watch/i],
+    configKeys: ['Watches'],
+    keys: ['Dial Color', 'Band Material'],
+  },
+  {
+    patterns: [/t-?shirt/i, /shirt/i, /cloth/i, /apparel/i, /fashion/i],
+    configKeys: ['T-Shirts'],
+    keys: ['Color', 'Size', 'Fabric', 'Fit'],
+  },
+  {
+    patterns: [/dress/i, /kurta/i, /top/i, /ethnic/i],
+    configKeys: ["Women's Dresses"],
+    keys: ['Color', 'Size', 'Fabric'],
+  },
+  {
+    patterns: [/shoe/i, /footwear/i, /sneaker/i, /sandal/i],
+    configKeys: ["Men's Shoes"],
+    keys: ['Color', 'Size'],
+  },
+  {
+    patterns: [/beauty/i, /skin/i, /cosmetic/i, /makeup/i],
+    configKeys: ['Beauty & Skincare'],
+    keys: ['Shade', 'Size'],
+  },
+  {
+    patterns: [/electronics?/i, /gadget/i, /device/i],
+    configKeys: ['Electronics'],
+    keys: ['Color', 'Connectivity', 'Model'],
+  },
+]
 
 const createInitialFormData = (): ProductFormData => ({
   mainCategory: '',
@@ -60,11 +106,11 @@ const createInitialFormData = (): ProductFormData => ({
   productCategories: [],
   productSubCategories: [],
   availableCities: [],
+  websiteIds: [],
   brand: '',
   shortDescription: '',
   description: '',
   defaultImages: [],
-  specifications: [createSpecificationRecord(SPECIFICATION_TEMPLATES.default)],
   isAvailable: true,
   metaTitle: '',
   metaDescription: '',
@@ -80,8 +126,18 @@ type ProductCreateDraft = {
   selectedMainCategoryId: string
   selectedCategoryIds: string[]
   currentStep: number
-  specificationKeys: string[]
+  variantAttributeKeys: string[]
   metaKeywordInput: string
+}
+
+type WebsiteCard = {
+  _id: string
+  template_key?: string
+  template_name?: string
+  name?: string
+  business_name?: string
+  previewImage?: string
+  createdAt?: string
 }
 
 const buildProductCreateDraftStorageKey = (vendorId: string) =>
@@ -133,6 +189,31 @@ const sanitizeStringRecord = (value: unknown): Record<string, string> => {
   }, {})
 }
 
+const collectFieldConfigKeys = (configKey: string) =>
+  Array.isArray(fieldConfig?.[configKey])
+    ? fieldConfig[configKey]
+        .map((field) => toTrimmedText(field?.label || field?.name))
+        .filter(Boolean)
+        .slice(0, 8)
+    : []
+
+const getFallbackVariantKeysFromContext = (contextNames: string[]) => {
+  const normalizedContext = sanitizeStringList(contextNames).join(' ')
+  if (!normalizedContext) return []
+
+  const matchedKeys = VARIANT_KEY_CONTEXT_FALLBACKS.flatMap((entry) => {
+    const isMatch = entry.patterns.some((pattern) => pattern.test(normalizedContext))
+    if (!isMatch) return []
+
+    return [
+      ...(entry.keys || []),
+      ...(entry.configKeys || []).flatMap(collectFieldConfigKeys),
+    ]
+  })
+
+  return sanitizeStringList(matchedKeys)
+}
+
 const sanitizeFaqs = (value: unknown) => {
   if (!Array.isArray(value)) return []
 
@@ -165,9 +246,6 @@ const sanitizeVariant = (value: unknown): Variant => {
 
 const sanitizeProductFormData = (value: unknown): ProductFormData => {
   const raw = isRecord(value) ? value : {}
-  const specifications = Array.isArray(raw.specifications)
-    ? raw.specifications.map((item) => sanitizeStringRecord(item))
-    : []
 
   return {
     ...createInitialFormData(),
@@ -177,11 +255,11 @@ const sanitizeProductFormData = (value: unknown): ProductFormData => {
     productCategories: sanitizeStringList(raw.productCategories),
     productSubCategories: sanitizeStringList(raw.productSubCategories),
     availableCities: sanitizeStringList(raw.availableCities),
+    websiteIds: sanitizeStringList(raw.websiteIds),
     brand: toText(raw.brand),
     shortDescription: toText(raw.shortDescription),
     description: toText(raw.description),
     defaultImages: sanitizeImageUploads(raw.defaultImages),
-    specifications: specifications.length ? specifications : [{}],
     isAvailable: raw.isAvailable !== false,
     metaTitle: toText(raw.metaTitle),
     metaDescription: toText(raw.metaDescription),
@@ -229,7 +307,9 @@ const sanitizeProductCreateDraft = (value: unknown): ProductCreateDraft | null =
     selectedMainCategoryId: toTrimmedText(value.selectedMainCategoryId),
     selectedCategoryIds: sanitizeStringList(value.selectedCategoryIds),
     currentStep: clampProductCreateStep(value.currentStep),
-    specificationKeys: sanitizeStringList(value.specificationKeys),
+    variantAttributeKeys: sanitizeStringList(
+      value.variantAttributeKeys ?? value.specificationKeys
+    ),
     metaKeywordInput: toText(value.metaKeywordInput),
   }
 }
@@ -242,7 +322,9 @@ const ProductCreateForm: React.FC = () => {
   const draftStorageKey = vendorId
     ? buildProductCreateDraftStorageKey(vendorId)
     : ''
-  const restoredSpecificationKeysRef = useRef<string[] | null>(null)
+  const restoredVariantAttributeKeysRef = useRef<string[] | null>(null)
+  const lastAutoAppliedVariantKeyContextRef = useRef('')
+  const lastGeneratedVariantSuggestionContextRef = useRef('')
   const formTopRef = useRef<HTMLDivElement | null>(null)
 
   // Form state
@@ -251,39 +333,41 @@ const ProductCreateForm: React.FC = () => {
   const [mainCategories, setMainCategories] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [cities, setCities] = useState<any[]>([])
+  const [websites, setWebsites] = useState<WebsiteCard[]>([])
   const [isMainCategoryLoading, setIsMainCategoryLoading] = useState(false)
   const [isCategoryLoading, setIsCategoryLoading] = useState(false)
+  const [isWebsiteLoading, setIsWebsiteLoading] = useState(false)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [selectedMainCategoryId, setSelectedMainCategoryId] = useState('')
   const [filteredSubcategories, setFilteredSubcategories] = useState<any[]>([])
-  const [specificationKeys, setSpecificationKeys] = useState<string[]>([])
+  const [variantAttributeKeys, setVariantAttributeKeys] = useState<string[]>([])
+  const [recommendedVariantKeys, setRecommendedVariantKeys] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState<any>({
     metaTitle: false,
     metaDescription: false,
     metaKeywords: false,
-    specifications: false,
+    variantKeys: false,
     faqs: false,
   })
   const [currentStep, setCurrentStep] = useState(1)
   const [metaKeywordInput, setMetaKeywordInput] = useState('')
-  const [variantOptionKeyInput, setVariantOptionKeyInput] = useState('')
   const [isDraftHydrated, setIsDraftHydrated] = useState(false)
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
   const [successDialogMessage, setSuccessDialogMessage] = useState('')
 
   const resetDraftState = () => {
-    restoredSpecificationKeysRef.current = null
+    restoredVariantAttributeKeysRef.current = null
     setFormData(createInitialFormData())
     setSelectedMainCategoryId('')
     setSelectedCategoryIds([])
     setCategories([])
     setFilteredSubcategories([])
-    setSpecificationKeys([])
+    setVariantAttributeKeys([])
+    setRecommendedVariantKeys([])
     setCurrentStep(1)
     setMetaKeywordInput('')
-    setVariantOptionKeyInput('')
   }
 
   const clearDraftStorage = () => {
@@ -324,8 +408,8 @@ const ProductCreateForm: React.FC = () => {
         return
       }
 
-      restoredSpecificationKeysRef.current = parsedDraft.specificationKeys.length
-        ? parsedDraft.specificationKeys
+      restoredVariantAttributeKeysRef.current = parsedDraft.variantAttributeKeys.length
+        ? parsedDraft.variantAttributeKeys
         : null
 
       setFormData(parsedDraft.formData)
@@ -338,13 +422,12 @@ const ProductCreateForm: React.FC = () => {
           : parsedDraft.formData.productCategories
       )
       setCurrentStep(parsedDraft.currentStep)
-      setSpecificationKeys(
-        parsedDraft.specificationKeys.length
-          ? parsedDraft.specificationKeys
+      setVariantAttributeKeys(
+        parsedDraft.variantAttributeKeys.length
+          ? parsedDraft.variantAttributeKeys
           : []
       )
       setMetaKeywordInput(parsedDraft.metaKeywordInput)
-      setVariantOptionKeyInput('')
       setDraftSavedAt(parsedDraft.savedAt)
     } catch {
       clearDraftStorage()
@@ -360,15 +443,6 @@ const ProductCreateForm: React.FC = () => {
     }
 
     const timeoutId = window.setTimeout(() => {
-      const specificationKeysToPersist = Array.from(
-        new Set([
-          ...sanitizeStringList(specificationKeys),
-          ...Object.keys(formData.specifications?.[0] || {})
-            .map((key) => toTrimmedText(key))
-            .filter(Boolean),
-        ])
-      )
-
       const draftToPersist: ProductCreateDraft = {
         version: PRODUCT_CREATE_DRAFT_VERSION,
         savedAt: Date.now(),
@@ -378,7 +452,7 @@ const ProductCreateForm: React.FC = () => {
           ? selectedCategoryIds
           : sanitizeStringList(formData.productCategories),
         currentStep: clampProductCreateStep(currentStep),
-        specificationKeys: specificationKeysToPersist,
+        variantAttributeKeys: sanitizeStringList(variantAttributeKeys),
         metaKeywordInput,
       }
 
@@ -399,8 +473,7 @@ const ProductCreateForm: React.FC = () => {
     metaKeywordInput,
     selectedCategoryIds,
     selectedMainCategoryId,
-    specificationKeys,
-    variantOptionKeyInput,
+    variantAttributeKeys,
     vendorId,
   ])
 
@@ -418,6 +491,32 @@ const ProductCreateForm: React.FC = () => {
       return new Date(draftSavedAt).toLocaleString()
     }
   }, [draftSavedAt])
+
+  const selectedMainCategoryName = useMemo(() => {
+    const current = mainCategories.find(
+      (category: any) => String(category?._id) === String(selectedMainCategoryId)
+    )
+    return String(current?.name || '').trim()
+  }, [mainCategories, selectedMainCategoryId])
+
+  const selectedCategoryNames = useMemo(
+    () =>
+      categories
+        .filter((category: any) => selectedCategoryIds.includes(String(category?._id || '')))
+        .map((category: any) => String(category?.name || '').trim())
+        .filter(Boolean),
+    [categories, selectedCategoryIds]
+  )
+
+  const allVariantAttributeKeys = useMemo(
+    () =>
+      sanitizeStringList(
+        formData.variants.flatMap((variant) =>
+          Object.keys(variant.variantAttributes || {})
+        )
+      ),
+    [formData.variants]
+  )
 
   const goToStep = (stepIndex: number) => {
     setCurrentStep(clampProductCreateStep(stepIndex))
@@ -478,6 +577,39 @@ const ProductCreateForm: React.FC = () => {
     loadCities()
   }, [loadCities])
 
+  const loadWebsites = useCallback(async () => {
+    if (!vendorId || !AUTH_TOKEN) {
+      setWebsites([])
+      return []
+    }
+
+    setIsWebsiteLoading(true)
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${AUTH_TOKEN}`,
+          },
+        }
+      )
+      if (!res.ok) throw new Error('Failed to fetch websites')
+      const json = await res.json()
+      const nextWebsites = Array.isArray(json?.data) ? json.data : []
+      setWebsites(nextWebsites)
+      return nextWebsites
+    } catch {
+      setWebsites([])
+      return []
+    } finally {
+      setIsWebsiteLoading(false)
+    }
+  }, [AUTH_TOKEN, vendorId])
+
+  useEffect(() => {
+    loadWebsites()
+  }, [loadWebsites])
+
   useEffect(() => {
     if (!isDraftHydrated) return
 
@@ -500,6 +632,34 @@ const ProductCreateForm: React.FC = () => {
       }
     })
   }, [cities, isDraftHydrated])
+
+  useEffect(() => {
+    if (!isDraftHydrated) return
+
+    const visibleWebsiteIds = new Set(
+      websites
+        .map((website) => String(website?._id || '').trim())
+        .filter(Boolean)
+    )
+
+    setFormData((prev: ProductFormData) => {
+      const nextWebsiteIds = sanitizeStringList(prev.websiteIds).filter((websiteId) =>
+        visibleWebsiteIds.has(websiteId)
+      )
+
+      if (
+        nextWebsiteIds.length === prev.websiteIds.length &&
+        nextWebsiteIds.every((websiteId, index) => websiteId === prev.websiteIds[index])
+      ) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        websiteIds: nextWebsiteIds,
+      }
+    })
+  }, [isDraftHydrated, websites])
 
   useEffect(() => {
     if (!isDraftHydrated) return
@@ -756,70 +916,120 @@ const ProductCreateForm: React.FC = () => {
     }))
   }
 
-  const syncVariantsWithOptionKeys = useCallback((keys: string[]) => {
-    const normalizedKeys = sanitizeStringList(keys)
+  const syncVariantWithOptionKeys = useCallback(
+    (variantIndex: number, keys: string[]) => {
+      const normalizedKeys = sanitizeStringList(keys)
 
-    setFormData((prev: ProductFormData) => ({
-      ...prev,
-      variants: prev.variants.map((variant) => ({
-        ...variant,
-        variantAttributes: normalizedKeys.reduce<Record<string, string>>((acc, key) => {
-          acc[key] = String(variant.variantAttributes?.[key] || '')
-          return acc
-        }, {}),
-      })),
-      specifications:
-        prev.specifications?.length && Object.keys(prev.specifications[0] || {}).length
-          ? prev.specifications
-          : [createSpecificationRecord(SPECIFICATION_TEMPLATES.default)],
-    }))
-  }, [])
+      setFormData((prev: ProductFormData) => {
+        const variants = [...prev.variants]
+        const targetVariant = variants[variantIndex]
+        if (!targetVariant) return prev
+
+        variants[variantIndex] = {
+          ...targetVariant,
+          variantAttributes: normalizedKeys.reduce<Record<string, string>>((acc, key) => {
+            acc[key] = String(targetVariant.variantAttributes?.[key] || '')
+            return acc
+          }, {}),
+        }
+
+        return {
+          ...prev,
+          variants,
+        }
+      })
+    },
+    []
+  )
 
   useEffect(() => {
-    const applySpecificationKeys = (keys: string[]) => {
-      const normalizedKeys = sanitizeStringList(keys)
-      setSpecificationKeys(normalizedKeys)
-      syncVariantsWithOptionKeys(normalizedKeys)
-    }
-
     if (!isDraftHydrated) return
 
+    const restoredKeys = sanitizeStringList(
+      restoredVariantAttributeKeysRef.current || []
+    )
+
     if (!selectedMainCategoryId) {
-      restoredSpecificationKeysRef.current = null
-      applySpecificationKeys([])
+      restoredVariantAttributeKeysRef.current = null
+      lastAutoAppliedVariantKeyContextRef.current = ''
+      setRecommendedVariantKeys([])
+      setVariantAttributeKeys([])
       return
     }
 
-    const fetchSpecificationKeys = async () => {
+    if (restoredKeys.length) {
+      setVariantAttributeKeys(restoredKeys)
+      lastAutoAppliedVariantKeyContextRef.current = [
+        selectedMainCategoryId,
+        ...selectedCategoryIds,
+      ]
+        .filter(Boolean)
+        .join('|')
+      restoredVariantAttributeKeysRef.current = null
+      return
+    }
+
+    setVariantAttributeKeys([])
+  }, [isDraftHydrated, selectedMainCategoryId, selectedCategoryIds])
+
+  useEffect(() => {
+    if (!isDraftHydrated) return
+
+    const fallbackKeys = getFallbackVariantKeysFromContext([
+      selectedMainCategoryName,
+      ...selectedCategoryNames,
+    ])
+    const variantKeyContextSignature = [
+      selectedMainCategoryId,
+      ...selectedCategoryIds,
+    ]
+      .filter(Boolean)
+      .join('|')
+    const shouldAutoApplyRecommendedKeys =
+      Boolean(variantKeyContextSignature) &&
+      !variantAttributeKeys.length &&
+      lastAutoAppliedVariantKeyContextRef.current !== variantKeyContextSignature
+
+    if (!selectedMainCategoryId) {
+      setRecommendedVariantKeys(fallbackKeys)
+      return
+    }
+
+    const fetchRecommendedVariantKeys = async () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_PUBLIC_API_URL}/v1/specification-keys/main-category/${selectedMainCategoryId}`
         )
 
-        if (!res.ok) throw new Error('Failed to fetch specification keys')
+        if (!res.ok) throw new Error('Failed to fetch variant keys')
         const json = await res.json()
         const apiKeys = Array.isArray(json?.data?.keys) ? json.data.keys : []
-        const nextKeys = apiKeys.length ? apiKeys : []
-        const restoredSpecificationKeys = restoredSpecificationKeysRef.current
-        const mergedKeys = restoredSpecificationKeys?.length
-          ? Array.from(new Set([...nextKeys, ...restoredSpecificationKeys]))
-          : nextKeys
+        const nextRecommendedKeys = sanitizeStringList([...apiKeys, ...fallbackKeys])
+        setRecommendedVariantKeys(nextRecommendedKeys)
 
-        applySpecificationKeys(mergedKeys)
-      } catch (err) {
-        const restoredSpecificationKeys = restoredSpecificationKeysRef.current
-        const fallbackKeys = restoredSpecificationKeys?.length
-          ? Array.from(new Set(restoredSpecificationKeys))
-          : []
+        if (shouldAutoApplyRecommendedKeys) {
+          setVariantAttributeKeys(nextRecommendedKeys)
+          lastAutoAppliedVariantKeyContextRef.current = variantKeyContextSignature
+        }
+      } catch {
+        setRecommendedVariantKeys(fallbackKeys)
 
-        applySpecificationKeys(fallbackKeys)
-      } finally {
-        restoredSpecificationKeysRef.current = null
+        if (shouldAutoApplyRecommendedKeys) {
+          setVariantAttributeKeys(fallbackKeys)
+          lastAutoAppliedVariantKeyContextRef.current = variantKeyContextSignature
+        }
       }
     }
 
-    fetchSpecificationKeys()
-  }, [isDraftHydrated, selectedMainCategoryId, syncVariantsWithOptionKeys])
+    fetchRecommendedVariantKeys()
+  }, [
+    isDraftHydrated,
+    selectedCategoryIds,
+    selectedCategoryNames,
+    selectedMainCategoryId,
+    selectedMainCategoryName,
+    variantAttributeKeys.length,
+  ])
 
   // --- AI Handlers ---
   const generateShortDesc = () =>
@@ -837,6 +1047,62 @@ const ProductCreateForm: React.FC = () => {
       setAiLoading,
       setFormData
     )
+
+  const handleGenerateVariantKeySuggestions = async (_variantIndex: number) => {
+    const categoryContext = [...selectedCategoryNames, selectedMainCategoryName]
+      .filter(Boolean)
+      .join(', ')
+    const suggestionContextSignature = [
+      selectedMainCategoryId,
+      ...selectedCategoryIds,
+      toTrimmedText(formData.productName),
+    ]
+      .filter(Boolean)
+      .join('|')
+
+    if (!categoryContext) {
+      return
+    }
+
+    if (
+      suggestionContextSignature &&
+      lastGeneratedVariantSuggestionContextRef.current === suggestionContextSignature
+    ) {
+      return
+    }
+
+    setAiLoading((prev: any) => ({ ...prev, variantKeys: true }))
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-specification-keys`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category: categoryContext,
+            productName: formData.productName,
+          }),
+        }
+      )
+
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !Array.isArray(json?.data)) {
+        throw new Error(json?.message || 'Failed to generate variant keys')
+      }
+
+      const nextRecommendedKeys = sanitizeStringList([
+        ...recommendedVariantKeys,
+        ...json.data,
+      ])
+
+      setRecommendedVariantKeys(nextRecommendedKeys)
+      lastGeneratedVariantSuggestionContextRef.current = suggestionContextSignature
+    } catch (error: any) {
+      return
+    } finally {
+      setAiLoading((prev: any) => ({ ...prev, variantKeys: false }))
+    }
+  }
 
 
 
@@ -860,14 +1126,14 @@ const ProductCreateForm: React.FC = () => {
 
   const handleAddVariant = () => {
     setFormData((prev: ProductFormData) => ({
-      ...prev,
-      variants: [
-        ...prev.variants,
-        {
-          variantAttributes: specificationKeys.reduce<Record<string, string>>(
-            (acc, key) => {
-              acc[key] = ''
-              return acc
+        ...prev,
+        variants: [
+          ...prev.variants,
+          {
+            variantAttributes: variantAttributeKeys.reduce<Record<string, string>>(
+              (acc, key) => {
+                acc[key] = ''
+                return acc
             },
             {}
           ),
@@ -1004,20 +1270,39 @@ const ProductCreateForm: React.FC = () => {
     setFormData((prev: ProductFormData) => ({ ...prev, variants: newVariants }))
   }
 
-  const handleAddVariantOptionKey = () => {
-    const normalizedKey = toTrimmedText(variantOptionKeyInput)
-    if (!normalizedKey || specificationKeys.includes(normalizedKey)) return
+  const handleAddVariantOptionKey = (variantIndex: number, keyToAdd: string) => {
+    const normalizedKey = toTrimmedText(keyToAdd)
+    if (!normalizedKey) return
 
-    const nextKeys = [...specificationKeys, normalizedKey]
-    setSpecificationKeys(nextKeys)
-    syncVariantsWithOptionKeys(nextKeys)
-    setVariantOptionKeyInput('')
+    const currentVariantKeys = sanitizeStringList(
+      Object.keys(formData.variants[variantIndex]?.variantAttributes || {})
+    )
+    if (currentVariantKeys.includes(normalizedKey)) return
+
+    syncVariantWithOptionKeys(variantIndex, [...currentVariantKeys, normalizedKey])
   }
 
-  const handleRemoveVariantOptionKey = (keyToRemove: string) => {
-    const nextKeys = specificationKeys.filter((key) => key !== keyToRemove)
-    setSpecificationKeys(nextKeys)
-    syncVariantsWithOptionKeys(nextKeys)
+  const handleAddSuggestedVariantKey = (variantIndex: number, keyToAdd: string) => {
+    const normalizedKey = toTrimmedText(keyToAdd)
+    if (!normalizedKey) return
+
+    const currentVariantKeys = sanitizeStringList(
+      Object.keys(formData.variants[variantIndex]?.variantAttributes || {})
+    )
+    if (currentVariantKeys.includes(normalizedKey)) return
+
+    syncVariantWithOptionKeys(variantIndex, [...currentVariantKeys, normalizedKey])
+  }
+
+  const handleRemoveVariantOptionKey = (
+    variantIndex: number,
+    keyToRemove: string
+  ) => {
+    const currentVariantKeys = sanitizeStringList(
+      Object.keys(formData.variants[variantIndex]?.variantAttributes || {})
+    )
+    const nextKeys = currentVariantKeys.filter((key) => key !== keyToRemove)
+    syncVariantWithOptionKeys(variantIndex, nextKeys)
   }
 
   // --- FAQ Handlers ---
@@ -1050,19 +1335,6 @@ const ProductCreateForm: React.FC = () => {
 
     setLoading(true)
     try {
-      // Validate specifications format
-      if (
-        !formData.specifications[0] ||
-        typeof formData.specifications[0] !== 'object' ||
-        Array.isArray(formData.specifications[0])
-      ) {
-        toast.error(
-          'Invalid specifications format detected. Open the Specifications step and generate or fix the fields first.'
-        )
-        goToStep(2)
-        return
-      }
-
       const autoAvailableCityIds = cities
         .map((city: any) => String(city?._id || '').trim())
         .filter(Boolean)
@@ -1073,7 +1345,7 @@ const ProductCreateForm: React.FC = () => {
         productCategory: selectedCategoryIds[0] || '',
         productCategories: selectedCategoryIds,
         availableCities: autoAvailableCityIds,
-        specifications: formData.specifications[0],
+        websiteIds: sanitizeStringList(formData.websiteIds),
         variants: formData.variants.map((v) => ({
           ...v,
           actualPrice: !v.actualPrice ? 0 : Number(v.actualPrice),
@@ -1151,65 +1423,38 @@ const ProductCreateForm: React.FC = () => {
         )
       case 2:
         return (
-          <>
-            <Step3Specifications
-              variantAttributeKeys={specificationKeys}
-              specifications={formData.specifications}
-              isAvailable={formData.isAvailable}
-              aiLoading={aiLoading.specifications}
-              onToggleAvailable={() =>
-                setFormData((prev: ProductFormData) => ({
-                  ...prev,
-                  isAvailable: !prev.isAvailable,
-                }))
-              }
-              onSpecChange={(key, val) => {
-                const specs = [...formData.specifications]
-                specs[0] = { ...specs[0], [key]: val }
-                setFormData((prev: ProductFormData) => ({ ...prev, specifications: specs }))
-              }}
-              onGenerate={() =>
-                generateSpecifications(
-                  formData,
-                  selectedCategoryIds,
-                  categories,
-                  Object.keys(formData.specifications?.[0] || {}),
-                  setAiLoading,
-                  setFormData
-                )
-              }
-              onAddKey={(newKey) => {
-                const normalizedKey = toTrimmedText(newKey)
-                if (!normalizedKey) return
-
-                setFormData((prev: ProductFormData) => {
-                  const specs = [...prev.specifications]
-                  const existingSpecs = specs[0] || {}
-                  if (normalizedKey in existingSpecs) return prev
-
-                  specs[0] = { ...existingSpecs, [normalizedKey]: '' }
-                  return { ...prev, specifications: specs }
-                })
-              }}
-            />
-            <div className="mt-8">
-              <Step5Variants
-                variants={formData.variants}
-                attributeKeys={specificationKeys}
-                newAttributeKey={variantOptionKeyInput}
-                onNewAttributeKeyChange={setVariantOptionKeyInput}
-                onAddAttributeKey={handleAddVariantOptionKey}
-                onRemoveAttributeKey={handleRemoveVariantOptionKey}
-                onAddVariant={handleAddVariant}
-                onRemoveVariant={handleRemoveVariant}
-                onVariantFieldChange={handleVariantFieldChange}
-                onVariantAttributeChange={handleVariantAttributeChange}
-                onVariantImageUpload={handleVariantImageUpload}
-                onVariantImageDrop={handleVariantImageDrop}
-                onVariantImageDelete={handleVariantImageDelete}
-              />
-            </div>
-          </>
+          <Step5Variants
+            variants={formData.variants}
+            recommendedAttributeKeys={recommendedVariantKeys}
+            websiteOptions={websites}
+            selectedWebsiteIds={formData.websiteIds}
+            isWebsiteLoading={isWebsiteLoading}
+            isAvailable={formData.isAvailable}
+            aiLoading={aiLoading.variantKeys}
+            onAddAttributeKey={handleAddVariantOptionKey}
+            onAddSuggestedAttributeKey={handleAddSuggestedVariantKey}
+            onRemoveAttributeKey={handleRemoveVariantOptionKey}
+            onToggleAvailable={() =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                isAvailable: !prev.isAvailable,
+              }))
+            }
+            onSelectedWebsiteIdsChange={(websiteIds) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                websiteIds,
+              }))
+            }
+            onGenerateSuggestedKeys={handleGenerateVariantKeySuggestions}
+            onAddVariant={handleAddVariant}
+            onRemoveVariant={handleRemoveVariant}
+            onVariantFieldChange={handleVariantFieldChange}
+            onVariantAttributeChange={handleVariantAttributeChange}
+            onVariantImageUpload={handleVariantImageUpload}
+            onVariantImageDrop={handleVariantImageDrop}
+            onVariantImageDelete={handleVariantImageDelete}
+          />
         )
       case 3:
         return (
@@ -1274,12 +1519,7 @@ const ProductCreateForm: React.FC = () => {
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         field: 'metaKeywords',
-                        context: `Product: ${formData.productName}, Description: ${formData.shortDescription}, Categories: ${categories
-                          .filter((category: any) =>
-                            selectedCategoryIds.includes(category._id)
-                          )
-                          .map((category: any) => category.name)
-                          .join(', ')}`
+                        context: `Product: ${formData.productName}, Description: ${formData.shortDescription}, Categories: ${selectedCategoryNames.join(', ')}`
                       }),
                     }
                   )
@@ -1308,7 +1548,16 @@ const ProductCreateForm: React.FC = () => {
                 onGenerate={async () => {
                   setAiLoading((prev: any) => ({ ...prev, faqs: true }))
                   try {
-                    const context = `Product: ${formData.productName}, Description: ${formData.shortDescription}, Specifications: ${Object.entries(formData.specifications[0]).map(([k, v]) => `${k}: ${v}`).join(', ')}`
+                    const variantContext = formData.variants
+                      .map((variant) =>
+                        Object.entries(variant.variantAttributes || {})
+                          .filter(([, value]) => String(value || '').trim())
+                          .map(([key, value]) => `${key}: ${value}`)
+                          .join(', ')
+                      )
+                      .filter(Boolean)
+                      .join(' | ')
+                    const context = `Product: ${formData.productName}, Description: ${formData.shortDescription}, Categories: ${selectedCategoryNames.join(', ') || selectedMainCategoryName}, Variant keys: ${allVariantAttributeKeys.join(', ')}, Variant values: ${variantContext}`
                     const res = await fetch(
                       `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
                       {
@@ -1353,7 +1602,7 @@ const ProductCreateForm: React.FC = () => {
       icon: PackagePlus,
     },
     {
-      title: 'Specs & Variants',
+      title: 'Variants & Visibility',
       icon: Layers3,
     },
     {

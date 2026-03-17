@@ -22,6 +22,7 @@ import { sidebarData } from './data/sidebar-data'
 import { NavGroup } from './nav-group'
 import type { NavCollapsible, NavGroup as SidebarNavGroup, NavItem } from './types'
 import { NavUser } from './nav-user'
+import { normalizeVendorPageAccess } from '@/features/team-access/access-config'
 
 const hasChildren = (item: NavItem): item is NavCollapsible =>
   'items' in item && Array.isArray(item.items)
@@ -33,6 +34,10 @@ export function AppSidebar() {
   const user = useSelector((state: RootState) => state.auth.user)
   const userType = user?.role
   const effectiveRole = userType === 'superadmin' ? 'admin' : userType
+  const isVendorTeamUser =
+    effectiveRole === 'vendor' &&
+    String(user?.account_type || '').toLowerCase() === 'vendor_user'
+  const pageAccess = normalizeVendorPageAccess(user?.page_access)
   const installedToolkitProviders = getInstalledProviderIds(data)
   const installedToolkitCount = installedToolkitProviders.length
   const canShowByIntegration = (provider?: string) => {
@@ -43,6 +48,11 @@ export function AppSidebar() {
     if (!provider) return true
     if (effectiveRole !== 'vendor') return true
     return installedToolkitProviders.includes(provider as IntegrationProviderId)
+  }
+  const canShowByPageAccess = (pageKey?: string) => {
+    if (!isVendorTeamUser) return true
+    if (!pageKey) return true
+    return pageAccess.has(pageKey as never)
   }
 
   const filteredNavGroups = sidebarData.navGroups
@@ -56,6 +66,7 @@ export function AppSidebar() {
         .filter(
           (item) =>
             (!item.roles || item.roles.includes(effectiveRole)) &&
+            canShowByPageAccess(item.pageKey) &&
             (group.useToolkitInstallFilter
               ? canShowByToolkitInstall(item.requiresIntegration)
               : canShowByIntegration(item.requiresIntegration)),
@@ -78,6 +89,7 @@ export function AppSidebar() {
             items: item.items.filter(
               (subItem) =>
                 (!subItem.roles || subItem.roles.includes(effectiveRole)) &&
+                canShowByPageAccess(subItem.pageKey) &&
                 (group.useToolkitInstallFilter
                   ? canShowByToolkitInstall(subItem.requiresIntegration)
                   : canShowByIntegration(subItem.requiresIntegration))

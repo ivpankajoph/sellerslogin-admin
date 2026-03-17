@@ -5,6 +5,8 @@
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Link } from '@tanstack/react-router'
 import { Overview } from './overview'
 import { RecentSales } from './recent-sales'
 import { useEffect, useMemo, useState } from 'react'
@@ -39,6 +41,16 @@ type Category = {
   _id: string
   name: string
   slug: string
+}
+
+type DashboardCard = {
+  title: string
+  value: string | number
+  subtitle: string
+  icon: typeof ShoppingBag
+  className: string
+  ctaLabel?: string
+  ctaTo?: '/products/create-products'
 }
 
 const VendorDashboard = () => {
@@ -306,7 +318,7 @@ const VendorDashboard = () => {
     })
   }, [products, categoryMap])
 
-  const adminCards = [
+  const adminCards: DashboardCard[] = [
     {
       title: 'Inventory Value',
       value: `₹${metrics.inventoryValue.toLocaleString()}`,
@@ -379,7 +391,7 @@ const VendorDashboard = () => {
     },
   ]
 
-  const vendorCards = [
+  const vendorCards: DashboardCard[] = [
     {
       title: 'Inventory Value',
       value: `₹${metrics.inventoryValue.toLocaleString()}`,
@@ -393,6 +405,8 @@ const VendorDashboard = () => {
       subtitle: 'Active catalog items',
       icon: ShoppingBag,
       className: 'from-emerald-50 via-white to-emerald-100 text-emerald-900',
+      ctaLabel: 'Add Product',
+      ctaTo: '/products/create-products' as const,
     },
     {
       title: 'Variants',
@@ -454,6 +468,16 @@ const VendorDashboard = () => {
               <CardContent>
                 <div className='text-2xl font-bold'>{card.value}</div>
                 <p className='text-xs opacity-70'>{card.subtitle}</p>
+                {'ctaLabel' in card && card.ctaLabel && card.ctaTo ? (
+                  <Button
+                    asChild
+                    size='sm'
+                    variant='secondary'
+                    className='mt-3 h-8 bg-white/85 text-emerald-900 hover:bg-white'
+                  >
+                    <Link to={card.ctaTo}>{card.ctaLabel}</Link>
+                  </Button>
+                ) : null}
               </CardContent>
             </Card>
           )

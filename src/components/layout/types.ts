@@ -19,6 +19,7 @@ type BaseNavItem = {
   icon?: React.ElementType
   roles?: ("admin" | "vendor")[]
   requiresIntegration?: IntegrationProviderId
+  pageKey?: string
 }
 
 type NavLink = BaseNavItem & {

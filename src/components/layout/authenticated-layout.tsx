@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { Outlet, useLocation, useRouterState } from '@tanstack/react-router'
+import {
+  Outlet,
+  useLocation,
+  useNavigate,
+  useRouterState,
+} from '@tanstack/react-router'
+import { useSelector } from 'react-redux'
 import { getCookie } from '@/lib/cookies'
+import api from '@/lib/axios'
 import { cn } from '@/lib/utils'
 import { LayoutProvider } from '@/context/layout-provider'
 import { SearchProvider } from '@/context/search-provider'
@@ -8,6 +15,13 @@ import { VendorIntegrationsProvider } from '@/context/vendor-integrations-provid
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { SkipToMain } from '@/components/skip-to-main'
+import {
+  canAccessVendorPath,
+  getFirstAccessibleVendorRoute,
+  normalizeVendorPageAccess,
+  resolveVendorPageAccessKey,
+} from '@/features/team-access/access-config'
+import { getStoredActiveWebsiteId } from '@/features/vendor-template/components/websiteStudioStorage'
 
 type AuthenticatedLayoutProps = {
   children?: React.ReactNode
@@ -49,8 +63,11 @@ import { CreatePasswordModal } from '@/components/auth/create-password-modal'
 
 export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const defaultOpen = getCookie('sidebar_state') !== 'false'
+  const navigate = useNavigate()
   const pathname = useLocation({ select: (location) => location.pathname })
+  const authUser = useSelector((state: any) => state.auth?.user || null)
   const contentViewportRef = useRef<HTMLDivElement | null>(null)
+  const lastLoggedPathRef = useRef('')
   const [loaderRect, setLoaderRect] = useState<LoaderViewportRect | null>(null)
   const isNavigating = useRouterState({
     select: (state) =>
@@ -63,6 +80,43 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const isAnalytics = pathname.startsWith('/analytics')
   const content = children ?? <Outlet />
   const showNavigationLoader = isNavigating
+  const isVendorTeamUser =
+    String(authUser?.role || '').toLowerCase() === 'vendor' &&
+    String(authUser?.account_type || '').toLowerCase() === 'vendor_user'
+  const vendorPageAccess = normalizeVendorPageAccess(authUser?.page_access)
+  const vendorId = String(
+    authUser?.vendor_id || authUser?.id || authUser?._id || ''
+  ).trim()
+
+  useEffect(() => {
+    if (!isVendorTeamUser) return
+    if (pathname === '/profile') return
+    if (canAccessVendorPath(pathname, vendorPageAccess)) return
+
+    void navigate({
+      to: getFirstAccessibleVendorRoute(vendorPageAccess),
+      replace: true,
+    })
+  }, [isVendorTeamUser, navigate, pathname, vendorPageAccess])
+
+  useEffect(() => {
+    if (!isVendorTeamUser || !pathname) return
+    if (!canAccessVendorPath(pathname, vendorPageAccess)) return
+
+    const pageKey = resolveVendorPageAccessKey(pathname)
+    const websiteId = vendorId ? getStoredActiveWebsiteId(vendorId) : ''
+    const logKey = `${pathname}|${pageKey || ''}|${websiteId || ''}`
+
+    if (lastLoggedPathRef.current === logKey) return
+    lastLoggedPathRef.current = logKey
+
+    void api.post('/team-users/activity', {
+      action: 'page_view',
+      path: pathname,
+      page_key: pageKey || '',
+      website_id: pageKey === 'my_websites' ? websiteId : '',
+    })
+  }, [isVendorTeamUser, pathname, vendorId, vendorPageAccess])
 
   useEffect(() => {
     if (!showNavigationLoader) {

@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from '@tanstack/react-router'
 import {
+  Building2,
   CheckCircle2,
   ExternalLink,
   Globe,
   LayoutTemplate,
   Loader2,
+  MapPinned,
+  Package2,
   PencilLine,
   Plus,
   RefreshCw,
@@ -26,7 +29,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
+import {
+  getVendorTemplatePreviewUrl,
+  peekStoredTemplatePreviewCity,
+  setStoredTemplatePreviewCity,
+} from '@/lib/storefront-url'
 import { cn } from '@/lib/utils'
 import { type AppDispatch } from '@/store'
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
@@ -36,6 +43,13 @@ import {
   getStoredActiveWebsiteId,
   setStoredActiveWebsiteId,
 } from '@/features/vendor-template/components/websiteStudioStorage'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 type TemplateCatalogItem = {
   key: string
@@ -54,11 +68,57 @@ type WebsiteCard = {
   createdAt?: string
 }
 
+type CityRow = {
+  _id: string
+  name: string
+  slug: string
+  state?: string
+  country?: string
+  isActive?: boolean
+}
+
+type VendorProduct = {
+  _id: string
+  productName?: string
+  isAvailable?: boolean
+  availableCities?: unknown[]
+  websiteIds?: unknown[]
+}
+
+type WorkspaceEditorPage = 'home' | 'about' | 'contact' | 'pages' | 'other'
+
 const cardClass =
   'group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-md'
 const REQUEST_TIMEOUT_MS = 10000
 const LIVE_PREVIEW_SCALE = 0.25
 const LIVE_PREVIEW_DIMENSION = `${100 / LIVE_PREVIEW_SCALE}%`
+
+const extractIdList = (values: unknown) => {
+  if (!Array.isArray(values)) return []
+  return values
+    .map((value) => {
+      if (!value) return ''
+      if (typeof value === 'string') return value
+      if (typeof value === 'object') {
+        if ('_id' in value && value._id) return String(value._id)
+        if (typeof (value as { toString?: () => string }).toString === 'function') {
+          return String((value as { toString: () => string }).toString())
+        }
+      }
+      return String(value)
+    })
+    .filter(Boolean)
+}
+
+const formatCityLabel = (slug?: string) => {
+  const normalized = String(slug || '').trim().toLowerCase()
+  if (!normalized || normalized === 'all') return 'All Cities'
+  return normalized
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
 
 const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   {
@@ -204,12 +264,15 @@ export default function TemplateWorkspace() {
   )
 
   const [websites, setWebsites] = useState<WebsiteCard[]>([])
+  const [cities, setCities] = useState<CityRow[]>([])
+  const [products, setProducts] = useState<VendorProduct[]>([])
   const [templateCatalog, setTemplateCatalog] = useState<TemplateCatalogItem[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('')
   const [websiteName, setWebsiteName] = useState('')
+  const [selectedCitySlug, setSelectedCitySlug] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<WebsiteCard | null>(null)
   const [deletingWebsiteId, setDeletingWebsiteId] = useState<string | null>(null)
 
@@ -229,10 +292,61 @@ export default function TemplateWorkspace() {
     [availableTemplates]
   )
 
+  const cityOptions = useMemo(() => {
+    const activeCities = cities
+      .filter((city) => city?.isActive !== false)
+      .sort((a, b) =>
+        String(a?.name || '').localeCompare(String(b?.name || ''), undefined, {
+          sensitivity: 'base',
+        })
+      )
+      .map((city) => ({
+        value: city.slug,
+        label: city.name || formatCityLabel(city.slug),
+      }))
+
+    const options = [{ value: 'all', label: 'All Cities' }, ...activeCities]
+    if (
+      selectedCitySlug &&
+      !options.some((option) => option.value === selectedCitySlug)
+    ) {
+      options.push({
+        value: selectedCitySlug,
+        label: formatCityLabel(selectedCitySlug),
+      })
+    }
+    return options
+  }, [cities, selectedCitySlug])
+
+  const selectedCityOption = useMemo(
+    () =>
+      cityOptions.find((option) => option.value === selectedCitySlug) || {
+        value: 'all',
+        label: 'All Cities',
+      },
+    [cityOptions, selectedCitySlug]
+  )
+
+  const selectedCityId = useMemo(
+    () =>
+      cities.find((city) => String(city.slug || '').trim() === selectedCitySlug)?._id || '',
+    [cities, selectedCitySlug]
+  )
+
+  const visibleProductsCount = useMemo(() => {
+    if (selectedCitySlug === 'all') return products.length
+    if (!selectedCityId) return 0
+    return products.filter((product) =>
+      extractIdList(product.availableCities).includes(selectedCityId)
+    ).length
+  }, [products, selectedCityId, selectedCitySlug])
+
   const loadWorkspace = async () => {
     if (!vendorId) {
       setLoading(false)
       setWebsites([])
+      setCities([])
+      setProducts([])
       setTemplateCatalog([])
       setSelectedTemplateKey('')
       return
@@ -245,10 +359,13 @@ export default function TemplateWorkspace() {
         timeout: REQUEST_TIMEOUT_MS,
       }
 
-      const [catalogResponse, websitesResponse] = await Promise.allSettled([
+      const [catalogResponse, websitesResponse, citiesResponse, productsResponse] =
+        await Promise.allSettled([
         axios.get(`${BASE_URL}/v1/templates/catalog`, requestConfig),
         axios.get(`${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`, requestConfig),
-      ])
+        axios.get(`${BASE_URL}/v1/cities?includeInactive=true`, requestConfig),
+        axios.get(`${BASE_URL}/v1/products/vendor/${vendorId}`, requestConfig),
+        ])
 
       const fetchedCatalog =
         catalogResponse.status === 'fulfilled' &&
@@ -261,9 +378,21 @@ export default function TemplateWorkspace() {
         Array.isArray(websitesResponse.value.data?.data)
           ? (websitesResponse.value.data.data as WebsiteCard[])
           : []
+      const nextCities =
+        citiesResponse.status === 'fulfilled' &&
+        Array.isArray(citiesResponse.value.data?.data)
+          ? (citiesResponse.value.data.data as CityRow[])
+          : []
+      const nextProducts =
+        productsResponse.status === 'fulfilled' &&
+        Array.isArray(productsResponse.value.data?.products)
+          ? (productsResponse.value.data.products as VendorProduct[])
+          : []
 
       setTemplateCatalog(nextCatalog)
       setWebsites(nextWebsites)
+      setCities(nextCities)
+      setProducts(nextProducts)
       setSelectedTemplateKey((current) => {
         if (current && nextCatalog.some((template) => template.key === current)) {
           return current
@@ -273,11 +402,31 @@ export default function TemplateWorkspace() {
 
       if (websitesResponse.status === 'rejected') {
         const failure = websitesResponse.reason
+        if (failure?.response?.status !== 404) {
+          toast.error(
+            failure?.response?.data?.message ||
+              failure?.message ||
+              'Some website data could not be loaded'
+          )
+        }
+      }
+      if (citiesResponse.status === 'rejected') {
+        const failure = citiesResponse.reason
         toast.error(
           failure?.response?.data?.message ||
             failure?.message ||
-            'Some website data could not be loaded'
+            'City options could not be loaded'
         )
+      }
+      if (productsResponse.status === 'rejected') {
+        const failure = productsResponse.reason
+        if (failure?.response?.status !== 404) {
+          toast.error(
+            failure?.response?.data?.message ||
+              failure?.message ||
+              'Product visibility data could not be loaded'
+          )
+        }
       }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to load websites')
@@ -295,6 +444,18 @@ export default function TemplateWorkspace() {
     void dispatch(fetchVendorProfile())
   }, [dispatch, token, vendorId, vendorProfile])
 
+  useEffect(() => {
+    setSelectedCitySlug((current) => {
+      if (current) return current
+      return peekStoredTemplatePreviewCity() || vendorDefaultCitySlug || 'all'
+    })
+  }, [vendorDefaultCitySlug])
+
+  useEffect(() => {
+    if (!selectedCitySlug) return
+    setStoredTemplatePreviewCity(selectedCitySlug)
+  }, [selectedCitySlug])
+
   const openCreateDialog = () => {
     setWebsiteName('')
     setSelectedTemplateKey(
@@ -303,7 +464,7 @@ export default function TemplateWorkspace() {
     setDialogOpen(true)
   }
 
-  const handleEditWebsite = (website: WebsiteCard) => {
+  const openWebsiteEditor = (website: WebsiteCard, page: WorkspaceEditorPage = 'home') => {
     const templateKey = String(website.template_key || '').trim()
     if (!vendorId || !templateKey) {
       toast.error('Website template could not be opened')
@@ -312,9 +473,50 @@ export default function TemplateWorkspace() {
 
     setStoredActiveWebsiteId(vendorId, website._id)
     setStoredEditingTemplateKey(vendorId, templateKey)
-    void navigate({
-      to: '/vendor-template/$templateKey',
-      params: { templateKey },
+    setStoredTemplatePreviewCity(selectedCitySlug || vendorDefaultCitySlug || 'all')
+
+    if (page === 'home') {
+      void navigate({
+        to: '/vendor-template/$templateKey',
+        params: { templateKey },
+      })
+      return
+    }
+
+    if (page === 'about') {
+      void navigate({ to: '/vendor-template-about' })
+      return
+    }
+
+    if (page === 'contact') {
+      void navigate({ to: '/vendor-template-contact' })
+      return
+    }
+
+    if (page === 'pages') {
+      void navigate({ to: '/vendor-template-pages' })
+      return
+    }
+
+    void navigate({ to: '/vendor-template-other' })
+  }
+
+  const handleEditWebsite = (website: WebsiteCard) => {
+    openWebsiteEditor(website, 'home')
+  }
+
+  const getVisibleProductsForWebsite = (websiteId: string) => {
+    return products.filter((product) => {
+      if (product.isAvailable === false) return false
+
+      const websiteIds = extractIdList(product.websiteIds)
+      const matchesWebsite = !websiteIds.length || websiteIds.includes(websiteId)
+      if (!matchesWebsite) return false
+
+      if (selectedCitySlug === 'all') return true
+      if (!selectedCityId) return false
+
+      return extractIdList(product.availableCities).includes(selectedCityId)
     })
   }
 
@@ -428,7 +630,7 @@ export default function TemplateWorkspace() {
 
   return (
     <>
-      <TablePageHeader title='My Websites'>
+      <TablePageHeader title='Template Workspace'>
         <Button
           type='button'
           variant='outline'
@@ -450,7 +652,7 @@ export default function TemplateWorkspace() {
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-6'>
-        <section className='grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(180px,0.5fr)_minmax(180px,0.5fr)]'>
+        <section className='grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(220px,0.6fr)_minmax(220px,0.6fr)_minmax(240px,0.8fr)]'>
           <div className='rounded-2xl border border-border bg-card p-6 shadow-sm'>
             <p className='text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground'>
               Workspace
@@ -483,13 +685,39 @@ export default function TemplateWorkspace() {
             </p>
             <p className='mt-2 text-sm text-muted-foreground'>Starting layouts ready for new websites.</p>
           </div>
+
+          <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
+            <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+              <MapPinned className='h-3.5 w-3.5' />
+              Preview City
+            </div>
+            <Select value={selectedCitySlug || 'all'} onValueChange={setSelectedCitySlug}>
+              <SelectTrigger className='mt-3 h-11 w-full rounded-xl'>
+                <SelectValue placeholder='Select city' />
+              </SelectTrigger>
+              <SelectContent>
+                {cityOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className='mt-3 text-sm text-muted-foreground'>
+              Preview URLs and page editors will open for {selectedCityOption.label}.
+            </p>
+            <div className='mt-3 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground'>
+              <Package2 className='h-3.5 w-3.5' />
+              {visibleProductsCount} products visible
+            </div>
+          </div>
         </section>
 
         <section className='space-y-4'>
           <div>
             <h2 className='text-2xl font-semibold tracking-tight text-foreground'>Created Websites</h2>
             <p className='text-sm text-muted-foreground'>
-              Preview, edit, or remove any website from here.
+              Preview, edit, and review city-specific product visibility from here.
             </p>
           </div>
 
@@ -507,10 +735,15 @@ export default function TemplateWorkspace() {
                 const previewUrl = getVendorTemplatePreviewUrl(
                   vendorId,
                   templateKey,
-                  vendorDefaultCitySlug,
+                  selectedCitySlug || vendorDefaultCitySlug,
                   website._id
                 )
                 const thumbnail = website.previewImage || websiteTemplate?.previewImage || ''
+                const visibleProducts = getVisibleProductsForWebsite(website._id)
+                const visibleProductLabels = visibleProducts
+                  .slice(0, 4)
+                  .map((product) => String(product.productName || 'Untitled Product').trim())
+                  .filter(Boolean)
 
                 return (
                   <article key={website._id} className={cardClass}>
@@ -552,9 +785,44 @@ export default function TemplateWorkspace() {
                           <Globe className='h-3.5 w-3.5' />
                           Preview URL
                         </div>
+                        <div className='mt-2 inline-flex items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground'>
+                          <Building2 className='h-3 w-3' />
+                          {selectedCityOption.label}
+                        </div>
                         <p className='mt-2 break-all text-sm leading-6 text-foreground'>
                           {previewUrl || 'Preview not available'}
                         </p>
+                      </div>
+
+                      <div className='rounded-2xl border border-border bg-background/70 p-3'>
+                        <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                          <Package2 className='h-3.5 w-3.5' />
+                          Visible Products
+                        </div>
+                        <p className='mt-2 text-sm font-medium text-foreground'>
+                          {visibleProducts.length} products in {selectedCityOption.label}
+                        </p>
+                        {visibleProductLabels.length ? (
+                          <div className='mt-3 flex flex-wrap gap-2'>
+                            {visibleProductLabels.map((label) => (
+                              <span
+                                key={`${website._id}-${label}`}
+                                className='inline-flex max-w-full items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground'
+                              >
+                                <span className='truncate'>{label}</span>
+                              </span>
+                            ))}
+                            {visibleProducts.length > visibleProductLabels.length ? (
+                              <span className='inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground'>
+                                +{visibleProducts.length - visibleProductLabels.length} more
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <p className='mt-2 text-sm text-muted-foreground'>
+                            No products mapped to this website for {selectedCityOption.label}.
+                          </p>
+                        )}
                       </div>
 
                       <div className='mt-auto grid gap-3 sm:grid-cols-2'>
@@ -585,6 +853,40 @@ export default function TemplateWorkspace() {
                             Preview Unavailable
                           </Button>
                         )}
+                      </div>
+
+                      <div className='space-y-2'>
+                        <div className='flex items-center justify-between gap-2'>
+                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                            Edit Pages
+                          </p>
+                          <span className='text-xs text-muted-foreground'>
+                            {selectedCityOption.label}
+                          </span>
+                        </div>
+                        <div className='flex flex-wrap gap-2'>
+                          {[
+                            ['Home', 'home'],
+                            ['About', 'about'],
+                            ['Contact', 'contact'],
+                            ['Pages', 'pages'],
+                            ['Social + FAQ', 'other'],
+                          ].map(([label, page]) => (
+                            <Button
+                              key={`${website._id}-${page}`}
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              className='h-9 rounded-full'
+                              onClick={() =>
+                                openWebsiteEditor(website, page as WorkspaceEditorPage)
+                              }
+                            >
+                              <PencilLine className='h-3.5 w-3.5' />
+                              {label}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </article>

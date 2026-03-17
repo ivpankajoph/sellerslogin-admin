@@ -36,6 +36,7 @@ import {
   studioCardClass,
   studioInputClass,
   studioSubtleCardClass,
+  studioTextareaClass,
 } from './studio-ui'
 
 type SelectOption = {
@@ -362,7 +363,6 @@ const Step1BasicInfo: React.FC<Props> = ({
   onCreateCategory,
   onCreateSubcategory,
 }) => {
-  const [subCategorySearch, setSubCategorySearch] = useState('')
   const [showMainCategoryCreator, setShowMainCategoryCreator] = useState(false)
   const [showCategoryCreator, setShowCategoryCreator] = useState(false)
   const [showSubCategoryCreator, setShowSubCategoryCreator] = useState(false)
@@ -373,10 +373,6 @@ const Step1BasicInfo: React.FC<Props> = ({
   const [isCreatingMainCategory, setIsCreatingMainCategory] = useState(false)
   const [isCreatingCategory, setIsCreatingCategory] = useState(false)
   const [isCreatingSubCategory, setIsCreatingSubCategory] = useState(false)
-
-  useEffect(() => {
-    setSubCategorySearch('')
-  }, [selectedCategoryIds.join('|')])
 
   useEffect(() => {
     setNewSubCategoryCategoryId((current) =>
@@ -419,19 +415,25 @@ const Step1BasicInfo: React.FC<Props> = ({
     [categories]
   )
 
-  const visibleSubcategories = useMemo(() => {
-    if (!subCategorySearch.trim()) return filteredSubcategories
-    const search = subCategorySearch.trim().toLowerCase()
-    return filteredSubcategories.filter((sub: any) => {
-      const categoryLabel =
-        sub.categoryName ||
-        categoryNameById[String(sub.category_id)] ||
-        String(sub.category_id || '')
-      return `${sub.name || ''} ${sub.slug || ''} ${categoryLabel}`
-        .toLowerCase()
-        .includes(search)
-    })
-  }, [filteredSubcategories, subCategorySearch, categoryNameById])
+  const subCategoryOptions = useMemo(
+    () =>
+      filteredSubcategories
+        .map((sub: any) => {
+          const categoryLabel =
+            sub.categoryName ||
+            categoryNameById[String(sub.category_id)] ||
+            'Unknown Category'
+
+          return {
+            value: sub._id,
+            label: `${sub.name} (${categoryLabel})`,
+          }
+        })
+        .sort((a: SelectOption, b: SelectOption) =>
+          a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+        ),
+    [categoryNameById, filteredSubcategories]
+  )
 
   const selectedCategoryLabels = useMemo(() => {
     const map = new Map(categoryOptions.map((option) => [option.value, option.label]))
@@ -555,8 +557,7 @@ const Step1BasicInfo: React.FC<Props> = ({
                 <div>
                   <StudioFieldLabel
                     label='Brand'
-                    required
-                    help='Add the brand buyers should see on the listing.'
+                    help='Optional. Add the brand only if it matters for buyers or cataloging.'
                   />
                   <input
                     type='text'
@@ -568,8 +569,7 @@ const Step1BasicInfo: React.FC<Props> = ({
                       }))
                     }
                     className={studioInputClass}
-                    placeholder='Example: Dust Filter India'
-                    required
+                    placeholder='Optional brand name'
                   />
                 </div>
               </div>
@@ -743,22 +743,33 @@ const Step1BasicInfo: React.FC<Props> = ({
           label='Subcategories'
           help='Use subcategories to narrow down product placement only when they genuinely apply.'
         />
-        <Input
-          value={subCategorySearch}
-          onChange={(event) => setSubCategorySearch(event.target.value)}
+        <SearchableMultiSelect
+          values={formData.productSubCategories}
+          onChange={(values) =>
+            setFormData((prev: any) => ({
+              ...prev,
+              productSubCategories: values,
+            }))
+          }
+          options={subCategoryOptions}
           placeholder={
             selectedCategoryIds.length
-              ? 'Search subcategories...'
+              ? 'Select one or more subcategories'
               : 'Select categories first'
           }
           disabled={!selectedCategoryIds.length}
-          className='mb-3 h-11 rounded-xl border-border bg-background'
+          searchPlaceholder='Search subcategories...'
+          emptyLabel={
+            selectedCategoryIds.length
+              ? 'No subcategories found.'
+              : 'Select categories first.'
+          }
         />
         <button
           type='button'
           onClick={() => setShowSubCategoryCreator((prev) => !prev)}
           disabled={!selectedCategoryIds.length}
-          className='mb-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800 disabled:cursor-not-allowed disabled:text-muted-foreground'
+          className='mt-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800 disabled:cursor-not-allowed disabled:text-muted-foreground'
         >
           <Plus className='h-3.5 w-3.5' />
           Can&apos;t find it? Create subcategory
@@ -812,52 +823,6 @@ const Step1BasicInfo: React.FC<Props> = ({
             </div>
           </div>
         ) : null}
-
-        <div className='max-h-64 space-y-2 overflow-y-auto rounded-2xl bg-background/40 p-3'>
-          {!selectedCategoryIds.length ? (
-            <p className='text-sm text-muted-foreground'>
-              Select categories to see subcategories.
-            </p>
-          ) : visibleSubcategories.length === 0 ? (
-            <p className='text-sm text-muted-foreground'>No subcategories found.</p>
-          ) : (
-            visibleSubcategories.map((sub: any) => {
-              const categoryLabel =
-                sub.categoryName ||
-                categoryNameById[String(sub.category_id)] ||
-                'Unknown Category'
-
-              return (
-                <label
-                  key={sub._id}
-                  className='flex cursor-pointer items-center justify-between gap-3 rounded-2xl bg-card/70 px-4 py-3 transition hover:bg-secondary/60'
-                >
-                  <span className='flex items-center gap-2'>
-                    <input
-                      type='checkbox'
-                      checked={formData.productSubCategories.includes(sub._id)}
-                      onChange={(event) => {
-                        setFormData((prev: any) => ({
-                          ...prev,
-                          productSubCategories: event.target.checked
-                            ? [...prev.productSubCategories, sub._id]
-                            : prev.productSubCategories.filter(
-                                (id: string) => id !== sub._id
-                              ),
-                        }))
-                      }}
-                      className='h-4 w-4 rounded text-cyan-600 focus:ring-cyan-500'
-                    />
-                    <span className='text-sm font-medium text-foreground'>{sub.name}</span>
-                  </span>
-                  <span className='text-xs font-medium text-muted-foreground'>
-                    {categoryLabel}
-                  </span>
-                </label>
-              )
-            })
-          )}
-        </div>
       </div>
 
       <div className={studioCardClass}>
@@ -885,19 +850,17 @@ const Step1BasicInfo: React.FC<Props> = ({
             </button>
           }
         />
-        <RichTextEditor
+        <textarea
+          rows={4}
           value={formData.shortDescription}
-          onChange={(nextValue) =>
+          onChange={(event) =>
             setFormData((prev: any) => ({
               ...prev,
-              shortDescription: nextValue,
+              shortDescription: event.target.value,
             }))
           }
-          placeholder='Write a concise buyer-facing summary. This appears near the product title and should quickly explain what the product is for.'
-          minHeight='min-h-[180px]'
-          className='mt-3'
-          allowImages={false}
-          allowVideo={false}
+          placeholder='Write a concise buyer-facing summary. This should quickly explain what the product is for.'
+          className={studioTextareaClass}
         />
       </div>
 

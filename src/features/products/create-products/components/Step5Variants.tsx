@@ -1,7 +1,33 @@
-import React, { useState } from 'react'
-import { Layers3, Loader2, Package2, Plus, Tag, Trash2, Upload, X } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import {
+  Check,
+  ChevronsUpDown,
+  Layers3,
+  Loader2,
+  Package2,
+  Plus,
+  Tag,
+  ToggleLeft,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
 import type { Variant } from '../types/type'
 import {
   StudioFieldLabel,
@@ -10,13 +36,28 @@ import {
   studioSubtleCardClass,
 } from './studio-ui'
 
+type WebsiteOption = {
+  _id: string
+  template_key?: string
+  template_name?: string
+  name?: string
+  business_name?: string
+}
+
 interface Props {
   variants: Variant[]
-  attributeKeys: string[]
-  newAttributeKey: string
-  onNewAttributeKeyChange: (value: string) => void
-  onAddAttributeKey: () => void
-  onRemoveAttributeKey: (key: string) => void
+  recommendedAttributeKeys: string[]
+  websiteOptions: WebsiteOption[]
+  selectedWebsiteIds: string[]
+  isWebsiteLoading: boolean
+  isAvailable: boolean
+  aiLoading: boolean
+  onAddAttributeKey: (variantIndex: number, key: string) => void
+  onAddSuggestedAttributeKey: (variantIndex: number, key: string) => void
+  onRemoveAttributeKey: (variantIndex: number, key: string) => void
+  onToggleAvailable: () => void
+  onSelectedWebsiteIdsChange: (websiteIds: string[]) => void
+  onGenerateSuggestedKeys: (variantIndex: number) => void
   onAddVariant: () => void
   onRemoveVariant: (index: number) => void
   onVariantFieldChange: (
@@ -37,16 +78,140 @@ interface Props {
   onVariantImageDelete: (variantIndex: number, imageIndex: number) => void
 }
 
-const optionChipClass =
-  'inline-flex items-center gap-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300'
+type SelectOption = {
+  value: string
+  label: string
+}
+
+const normalizeSearchText = (value: string) =>
+  String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+
+const filterOptions = (options: SelectOption[], search: string) => {
+  const normalizedSearch = normalizeSearchText(search)
+  if (!normalizedSearch) return options
+
+  return options.filter((option) => {
+    const normalizedLabel = normalizeSearchText(option.label)
+    const normalizedValue = normalizeSearchText(option.value)
+    return (
+      normalizedLabel.includes(normalizedSearch) ||
+      normalizedValue.includes(normalizedSearch)
+    )
+  })
+}
+
+const WebsiteMultiSelect: React.FC<{
+  values: string[]
+  options: SelectOption[]
+  loading: boolean
+  onChange: (values: string[]) => void
+}> = ({ values, options, loading, onChange }) => {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const selectedLabels = useMemo(() => {
+    const optionMap = new Map(options.map((option) => [option.value, option.label]))
+    return values.map((value) => optionMap.get(value)).filter(Boolean) as string[]
+  }, [options, values])
+
+  const visibleOptions = useMemo(
+    () => filterOptions(options, search),
+    [options, search]
+  )
+
+  const buttonText = useMemo(() => {
+    if (loading) return 'Loading websites...'
+    if (!selectedLabels.length) return 'All websites'
+    if (selectedLabels.length <= 2) return selectedLabels.join(', ')
+    return `${selectedLabels[0]}, ${selectedLabels[1]} +${selectedLabels.length - 2} more`
+  }, [loading, selectedLabels])
+
+  const toggleValue = (value: string) => {
+    if (values.includes(value)) {
+      onChange(values.filter((item) => item !== value))
+      return
+    }
+
+    onChange([...values, value])
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen)
+        if (!nextOpen) setSearch('')
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type='button'
+          variant='outline'
+          role='combobox'
+          aria-expanded={open}
+          className={cn(
+            'h-11 w-full justify-between rounded-xl border-border bg-background text-left text-foreground shadow-sm hover:bg-secondary',
+            !selectedLabels.length && 'text-muted-foreground'
+          )}
+        >
+          <span className='truncate'>{buttonText}</span>
+          <ChevronsUpDown className='h-4 w-4 shrink-0 opacity-50' />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className='w-[--radix-popover-trigger-width] p-0' align='start'>
+        <Command shouldFilter={false}>
+          <CommandInput
+            value={search}
+            onValueChange={setSearch}
+            placeholder='Search websites...'
+          />
+          <CommandList className='max-h-72'>
+            <CommandEmpty>No websites found.</CommandEmpty>
+            <CommandGroup>
+              {visibleOptions.map((option) => {
+                const checked = values.includes(option.value)
+                return (
+                  <CommandItem
+                    key={option.value}
+                    value={`${option.label} ${option.value}`}
+                    onSelect={() => toggleValue(option.value)}
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        checked ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                    {option.label}
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 const Step5Variants: React.FC<Props> = ({
   variants,
-  attributeKeys,
-  newAttributeKey,
-  onNewAttributeKeyChange,
+  recommendedAttributeKeys,
+  websiteOptions,
+  selectedWebsiteIds,
+  isWebsiteLoading,
+  isAvailable,
+  aiLoading,
   onAddAttributeKey,
+  onAddSuggestedAttributeKey,
   onRemoveAttributeKey,
+  onToggleAvailable,
+  onSelectedWebsiteIdsChange,
+  onGenerateSuggestedKeys,
   onAddVariant,
   onRemoveVariant,
   onVariantFieldChange,
@@ -56,79 +221,148 @@ const Step5Variants: React.FC<Props> = ({
   onVariantImageDelete,
 }) => {
   const [dragOverVariantIndex, setDragOverVariantIndex] = useState<number | null>(null)
+  const [variantCustomKeyInputs, setVariantCustomKeyInputs] = useState<
+    Record<number, string>
+  >({})
+  const [variantCustomInputOpen, setVariantCustomInputOpen] = useState<
+    Record<number, boolean>
+  >({})
+  const [variantOptionPickerOpen, setVariantOptionPickerOpen] = useState<
+    Record<number, boolean>
+  >({})
+  const [variantOptionSearch, setVariantOptionSearch] = useState<Record<number, string>>({})
+
+  const websiteSelectOptions = useMemo(
+    () =>
+      websiteOptions.map((website) => ({
+        value: website._id,
+        label:
+          website.name ||
+          website.business_name ||
+          website.template_name ||
+          website.template_key ||
+          'Untitled website',
+      })),
+    [websiteOptions]
+  )
+
+  const handleAddVariantClick = () => {
+    onAddVariant()
+  }
+
+  const getVariantKeys = (variant: Variant) =>
+    Object.keys(variant.variantAttributes || {})
+      .map((key) => String(key || '').trim())
+      .filter(Boolean)
+
+  useEffect(() => {
+    const pruneStateEntries = <T extends string | boolean>(
+      state: Record<number, T>
+    ): Record<number, T> =>
+      Object.fromEntries(
+        Object.entries(state).filter(([key]) => Number(key) < variants.length)
+      ) as Record<number, T>
+
+    setVariantCustomKeyInputs((prev) => pruneStateEntries(prev))
+    setVariantCustomInputOpen((prev) => pruneStateEntries(prev))
+    setVariantOptionPickerOpen((prev) => pruneStateEntries(prev))
+    setVariantOptionSearch((prev) => pruneStateEntries(prev))
+  }, [variants.length])
+
+  const handleRecommendedKeySelect = (variantIndex: number, key: string) => {
+    onAddSuggestedAttributeKey(variantIndex, key)
+    setVariantOptionPickerOpen((prev) => ({ ...prev, [variantIndex]: false }))
+    setVariantOptionSearch((prev) => ({ ...prev, [variantIndex]: '' }))
+  }
+
+  const handleOptionPickerOpenChange = (variantIndex: number, open: boolean) => {
+    setVariantOptionPickerOpen((prev) => ({
+      ...prev,
+      [variantIndex]: open,
+    }))
+
+    if (open) {
+      onGenerateSuggestedKeys(variantIndex)
+      return
+    }
+
+    setVariantOptionSearch((prev) => ({
+      ...prev,
+      [variantIndex]: '',
+    }))
+  }
+
+  const handleCustomKeySubmit = (variantIndex: number) => {
+    const normalizedKey = String(variantCustomKeyInputs[variantIndex] || '').trim()
+    if (!normalizedKey) return
+
+    onAddAttributeKey(variantIndex, normalizedKey)
+    setVariantCustomKeyInputs((prev) => ({ ...prev, [variantIndex]: '' }))
+    setVariantCustomInputOpen((prev) => ({ ...prev, [variantIndex]: false }))
+  }
 
   return (
     <div className='space-y-6'>
       <div className={studioCardClass}>
         <div className='flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-start lg:justify-between'>
-          <div className='flex items-center gap-2 text-base font-semibold text-foreground'>
-            <Layers3 className='h-4 w-4 text-cyan-600' />
-            Variants
-          </div>
-          <Button
-            type='button'
-            onClick={onAddVariant}
-            className='h-11 rounded-xl bg-cyan-600 px-5 text-white hover:bg-cyan-700'
-          >
-            <Plus className='mr-2 h-4 w-4' />
-            Add Variant
-          </Button>
-        </div>
-
-        <div className='mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]'>
-          <div className={studioSubtleCardClass}>
-            <StudioFieldLabel label='Option keys' />
-            {attributeKeys.length ? (
-              <div className='flex flex-wrap gap-2'>
-                {attributeKeys.map((key) => (
-                  <span key={key} className={optionChipClass}>
-                    <Tag className='h-3.5 w-3.5' />
-                    {key}
-                    <button
-                      type='button'
-                      onClick={() => onRemoveAttributeKey(key)}
-                      className='rounded-full p-0.5 text-current transition hover:bg-background/70'
-                      aria-label={`Remove ${key}`}
-                    >
-                      <X className='h-3 w-3' />
-                    </button>
-                  </span>
-                ))}
+            <div>
+              <div className='flex items-center gap-2 text-base font-semibold text-foreground'>
+                <Layers3 className='h-4 w-4 text-cyan-600' />
+                Variants and visibility
               </div>
-            ) : null}
-
-            <div className='mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]'>
-              <input
-                type='text'
-                value={newAttributeKey}
-                onChange={(event) => onNewAttributeKeyChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    onAddAttributeKey()
-                  }
-                }}
-                placeholder='e.g. color, size, finish'
-                className={studioInputClass}
-              />
-              <Button
-                type='button'
-                onClick={onAddAttributeKey}
-                className='h-11 rounded-xl border border-border bg-card px-5 text-foreground hover:bg-secondary'
-              >
-                <Plus className='mr-2 h-4 w-4' />
-                Add Key
-              </Button>
+              <p className='mt-2 max-w-2xl text-sm leading-6 text-muted-foreground'>
+                Set product visibility, then manage each variant card separately for option
+                values, pricing, stock, and images.
+              </p>
             </div>
           </div>
 
-          <div className={studioSubtleCardClass}>
-            <StudioFieldLabel label='Count' />
-            <div className='flex flex-wrap gap-2'>
-              <span className={optionChipClass}>{variants.length} variants</span>
-              {attributeKeys.length ? (
-                <span className={optionChipClass}>{attributeKeys.length} keys</span>
-              ) : null}
+        <div className='mt-5 grid gap-4 xl:grid-cols-2'>
+          <div className='space-y-4'>
+            <div className={studioSubtleCardClass}>
+              <StudioFieldLabel
+                label='Availability'
+                help='Turn this off if the product should stay hidden even after approval.'
+              />
+              <div className='flex items-center justify-between gap-4 rounded-2xl bg-background/50 px-4 py-3'>
+                <div>
+                  <div className='text-sm font-medium text-foreground'>
+                    {isAvailable ? 'Visible' : 'Hidden'}
+                  </div>
+                  <p className='text-xs text-muted-foreground'>
+                    Product-level availability for the listing.
+                  </p>
+                </div>
+                <div className='flex items-center gap-3'>
+                  <ToggleLeft className='h-4 w-4 text-emerald-600' />
+                  <Switch checked={isAvailable} onCheckedChange={onToggleAvailable} />
+                </div>
+              </div>
+            </div>
+
+            <div className={studioSubtleCardClass}>
+              <StudioFieldLabel
+                label='Show on websites'
+                help='Pick only the vendor websites where this product should appear. Leave empty to keep it available across all websites.'
+              />
+              {websiteSelectOptions.length ? (
+                <>
+                  <WebsiteMultiSelect
+                    values={selectedWebsiteIds}
+                    options={websiteSelectOptions}
+                    loading={isWebsiteLoading}
+                    onChange={onSelectedWebsiteIdsChange}
+                  />
+                  <p className='mt-3 text-xs leading-5 text-muted-foreground'>
+                    Multi-select supported. This only controls storefront website visibility.
+                  </p>
+                </>
+              ) : (
+                <div className='rounded-2xl bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
+                  No vendor websites found yet. Create a website first if you want to limit product
+                  visibility by storefront.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -137,22 +371,40 @@ const Step5Variants: React.FC<Props> = ({
       {variants.length === 0 ? (
         <div className={studioCardClass}>
           <h3 className='text-base font-semibold text-foreground'>No variants yet</h3>
-          <Button
-            type='button'
-            onClick={onAddVariant}
-            className='mt-4 h-11 rounded-xl bg-cyan-600 px-5 text-white hover:bg-cyan-700'
-          >
-            <Plus className='mr-2 h-4 w-4' />
-            Create First Variant
-          </Button>
+          <p className='mt-2 text-sm text-muted-foreground'>
+            Add the first variant to start filling option values, pricing, stock, and
+            variant images. Extra keys from category selection will appear inside the
+            variant card automatically.
+          </p>
+          <span className='mt-4 inline-flex'>
+            <Button
+              type='button'
+              onClick={handleAddVariantClick}
+              className='h-11 rounded-xl bg-cyan-600 px-5 text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-700 hover:shadow-md disabled:opacity-60'
+            >
+              <Plus className='mr-2 h-4 w-4' />
+              Add Variant
+            </Button>
+          </span>
         </div>
       ) : (
         <div className='space-y-5'>
           {variants.map((variant, variantIndex) => {
-            const summary = attributeKeys
+            const variantKeys = getVariantKeys(variant)
+            const summary = variantKeys
               .map((key) => variant.variantAttributes[key])
               .filter(Boolean)
               .join(' / ')
+            const recommendedOptions = filterOptions(
+              recommendedAttributeKeys
+                .map((key) => ({
+                  value: key,
+                  label: key,
+                }))
+                .filter((option) => !variantKeys.includes(option.value)),
+              variantOptionSearch[variantIndex] || ''
+            )
+            const isCustomInputVisible = Boolean(variantCustomInputOpen[variantIndex])
 
             return (
               <article key={variantIndex} className={studioCardClass}>
@@ -181,6 +433,15 @@ const Step5Variants: React.FC<Props> = ({
                     <Button
                       type='button'
                       variant='outline'
+                      onClick={handleAddVariantClick}
+                      className='h-11 rounded-xl border-cyan-500/20 bg-cyan-500/10 px-4 text-cyan-700 hover:bg-cyan-500/15 hover:text-cyan-800'
+                    >
+                      <Plus className='mr-2 h-4 w-4' />
+                      Add Variant
+                    </Button>
+                    <Button
+                      type='button'
+                      variant='outline'
                       onClick={() => onRemoveVariant(variantIndex)}
                       className='h-11 rounded-xl border-red-500/25 bg-red-500/10 px-4 text-red-600 hover:bg-red-500/15 hover:text-red-700'
                     >
@@ -193,15 +454,182 @@ const Step5Variants: React.FC<Props> = ({
                 <div className='grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]'>
                   <div className='space-y-4'>
                     <section className={studioSubtleCardClass}>
-                      <div className='mb-4 flex items-center gap-2 text-sm font-semibold text-foreground'>
-                        <Tag className='h-4 w-4 text-cyan-600' />
-                        Option values
+                      <div className='mb-4 flex flex-col gap-3 border-b border-border/60 pb-4 xl:flex-row xl:items-start xl:justify-between'>
+                        <div className='flex items-center gap-2 text-sm font-semibold text-foreground'>
+                          <Tag className='h-4 w-4 text-cyan-600' />
+                          Option values
+                        </div>
+                        <div className='flex flex-wrap items-center gap-2'>
+                          <Popover
+                            open={Boolean(variantOptionPickerOpen[variantIndex])}
+                            onOpenChange={(open) =>
+                              handleOptionPickerOpenChange(variantIndex, open)
+                            }
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                type='button'
+                                variant='outline'
+                                className='h-10 rounded-xl border-border bg-background px-4'
+                              >
+                                <Plus className='mr-2 h-4 w-4' />
+                                Add option
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className='w-[340px] p-0' align='start'>
+                              <Command shouldFilter={false}>
+                                <CommandInput
+                                  value={variantOptionSearch[variantIndex] || ''}
+                                  onValueChange={(value) =>
+                                    setVariantOptionSearch((prev) => ({
+                                      ...prev,
+                                      [variantIndex]: value,
+                                    }))
+                                  }
+                                  placeholder='Search suggested keys...'
+                                />
+                                <CommandList className='max-h-72'>
+                                  {!aiLoading && recommendedOptions.length === 0 ? (
+                                    <div className='px-4 py-6 text-center text-sm text-muted-foreground'>
+                                      No matching keys. Use the custom option button below.
+                                    </div>
+                                  ) : null}
+                                  <CommandGroup
+                                    heading={
+                                      aiLoading ? 'Loading suggestions' : 'Suggested options'
+                                    }
+                                  >
+                                    {aiLoading ? (
+                                      <div className='flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground'>
+                                        <Loader2 className='h-4 w-4 animate-spin' />
+                                        Fetching category and AI suggestions...
+                                      </div>
+                                    ) : null}
+                                    {recommendedOptions.map((option) => (
+                                      <CommandItem
+                                        key={`${variantIndex}-${option.value}`}
+                                        value={`${option.label} ${option.value}`}
+                                        onSelect={() =>
+                                          handleRecommendedKeySelect(
+                                            variantIndex,
+                                            option.value
+                                          )
+                                        }
+                                      >
+                                        <Tag className='mr-2 h-4 w-4 text-cyan-600' />
+                                        {option.label}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                              <div className='border-t border-border/60 p-2'>
+                                <Button
+                                  type='button'
+                                  variant='ghost'
+                                  onClick={() => {
+                                    handleOptionPickerOpenChange(variantIndex, false)
+                                    setVariantCustomInputOpen((prev) => ({
+                                      ...prev,
+                                      [variantIndex]: true,
+                                    }))
+                                  }}
+                                  className='h-10 w-full justify-start rounded-xl px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
+                                >
+                                  <Plus className='mr-2 h-4 w-4' />
+                                  Create custom option
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            onClick={() =>
+                              setVariantCustomInputOpen((prev) => ({
+                                ...prev,
+                                [variantIndex]: !prev[variantIndex],
+                              }))
+                            }
+                            className='h-10 rounded-xl px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
+                          >
+                            <Plus className='mr-2 h-4 w-4' />
+                            Didn&apos;t find that key?
+                          </Button>
+                        </div>
                       </div>
-                      <div className='grid gap-4 md:grid-cols-2'>
-                        {attributeKeys.length ? (
-                          attributeKeys.map((key) => (
-                            <div key={key}>
-                              <StudioFieldLabel label={key} />
+
+                      {isCustomInputVisible ? (
+                        <div className='mb-4 rounded-2xl border border-dashed border-cyan-500/30 bg-cyan-500/5 p-4'>
+                          <div className='flex items-center justify-between gap-3'>
+                            <StudioFieldLabel label='Create custom option' className='mb-0' />
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              onClick={() =>
+                                setVariantCustomInputOpen((prev) => ({
+                                  ...prev,
+                                  [variantIndex]: false,
+                                }))
+                              }
+                              className='h-auto rounded-lg px-2 text-xs font-semibold text-muted-foreground hover:bg-transparent hover:text-foreground'
+                            >
+                              <X className='mr-1 h-3.5 w-3.5' />
+                              Hide
+                            </Button>
+                          </div>
+                            <div className='mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]'>
+                              <input
+                                type='text'
+                              value={variantCustomKeyInputs[variantIndex] || ''}
+                              onChange={(event) =>
+                                setVariantCustomKeyInputs((prev) => ({
+                                  ...prev,
+                                  [variantIndex]: event.target.value,
+                                }))
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault()
+                                  handleCustomKeySubmit(variantIndex)
+                                }
+                              }}
+                              placeholder='Add custom key, e.g. color, material, finish'
+                              className={studioInputClass}
+                            />
+                            <Button
+                              type='button'
+                              onClick={() => handleCustomKeySubmit(variantIndex)}
+                              className='h-11 rounded-xl border border-border bg-card px-5 text-foreground hover:bg-secondary'
+                            >
+                              <Plus className='mr-2 h-4 w-4' />
+                              Add Key
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className='grid gap-4 sm:grid-cols-2 2xl:grid-cols-3'>
+                        {variantKeys.length ? (
+                          variantKeys.map((key) => (
+                            <div
+                              key={`${variantIndex}-${key}`}
+                              className='flex h-full flex-col rounded-2xl border border-border/60 bg-background/50 p-4'
+                            >
+                              <StudioFieldLabel
+                                label={key}
+                                action={
+                                  <button
+                                    type='button'
+                                    onClick={() => onRemoveAttributeKey(variantIndex, key)}
+                                    className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
+                                    aria-label={`Remove ${key}`}
+                                  >
+                                    <X className='h-3.5 w-3.5' />
+                                  </button>
+                                }
+                              />
                               <input
                                 type='text'
                                 value={variant.variantAttributes[key] || ''}
@@ -218,8 +646,9 @@ const Step5Variants: React.FC<Props> = ({
                             </div>
                           ))
                         ) : (
-                          <div className='md:col-span-2 rounded-2xl bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
-                            Add option keys first.
+                          <div className='sm:col-span-2 2xl:col-span-3 rounded-2xl bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
+                            Add option dropdown se suggested keys choose karo, ya custom
+                            option button se apni key banao.
                           </div>
                         )}
                       </div>

@@ -28,16 +28,20 @@ export function ProfileDropdown() {
     vendorProfileState?.profile ||
     null
   const isVendor = String(user?.role || '').toLowerCase() === 'vendor'
+  const isVendorTeamUser =
+    isVendor && String(user?.account_type || '').toLowerCase() === 'vendor_user'
   const vendorLoading = Boolean(vendorProfileState?.loading)
   const displayName = String(
-    vendorProfile?.name ||
+    (isVendorTeamUser ? user?.name : vendorProfile?.name) ||
       user?.name ||
       user?.business_name ||
       user?.businessName ||
       user?.email ||
       ''
   ).trim()
-  const displayEmail = String(vendorProfile?.email || user?.email || '').trim()
+  const displayEmail = String(
+    (isVendorTeamUser ? user?.email : vendorProfile?.email) || user?.email || ''
+  ).trim()
   const userInitials = displayName
     .split(/[\s._-]+/)
     .filter(Boolean)
@@ -52,7 +56,7 @@ export function ProfileDropdown() {
       .slice(0, 2)
       .toUpperCase() ||
     'V'
-  const avatarCandidate = vendorProfile?.avatar || user?.avatar
+  const avatarCandidate = (isVendorTeamUser ? user?.avatar : vendorProfile?.avatar) || user?.avatar
   const avatarSrc =
     avatarCandidate && String(avatarCandidate).trim()
       ? String(avatarCandidate)

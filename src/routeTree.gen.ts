@@ -41,6 +41,8 @@ import { Route as AuthenticatedTemplateWorkspaceIndexRouteImport } from './route
 import { Route as AuthenticatedTemplateWalletIndexRouteImport } from './routes/_authenticated/template-wallet/index'
 import { Route as AuthenticatedTemplateOrdersIndexRouteImport } from './routes/_authenticated/template-orders/index'
 import { Route as AuthenticatedTemplateCatalogIndexRouteImport } from './routes/_authenticated/template-catalog/index'
+import { Route as AuthenticatedTeamAccessIndexRouteImport } from './routes/_authenticated/team-access/index'
+import { Route as AuthenticatedTeamAccessAnalyticsIndexRouteImport } from './routes/_authenticated/team-access-analytics/index'
 import { Route as AuthenticatedSpecificationKeysIndexRouteImport } from './routes/_authenticated/specification-keys/index'
 import { Route as AuthenticatedSitemapsIndexRouteImport } from './routes/_authenticated/sitemaps/index'
 import { Route as AuthenticatedSeoIndexRouteImport } from './routes/_authenticated/seo/index'
@@ -249,6 +251,18 @@ const AuthenticatedTemplateCatalogIndexRoute =
   AuthenticatedTemplateCatalogIndexRouteImport.update({
     id: '/template-catalog/',
     path: '/template-catalog/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTeamAccessIndexRoute =
+  AuthenticatedTeamAccessIndexRouteImport.update({
+    id: '/team-access/',
+    path: '/team-access/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTeamAccessAnalyticsIndexRoute =
+  AuthenticatedTeamAccessAnalyticsIndexRouteImport.update({
+    id: '/team-access-analytics/',
+    path: '/team-access-analytics/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedSpecificationKeysIndexRoute =
@@ -511,6 +525,8 @@ export interface FileRoutesByFullPath {
   '/seo': typeof AuthenticatedSeoIndexRoute
   '/sitemaps': typeof AuthenticatedSitemapsIndexRoute
   '/specification-keys': typeof AuthenticatedSpecificationKeysIndexRoute
+  '/team-access-analytics': typeof AuthenticatedTeamAccessAnalyticsIndexRoute
+  '/team-access': typeof AuthenticatedTeamAccessIndexRoute
   '/template-catalog': typeof AuthenticatedTemplateCatalogIndexRoute
   '/template-orders': typeof AuthenticatedTemplateOrdersIndexRoute
   '/template-wallet': typeof AuthenticatedTemplateWalletIndexRoute
@@ -577,6 +593,8 @@ export interface FileRoutesByTo {
   '/seo': typeof AuthenticatedSeoIndexRoute
   '/sitemaps': typeof AuthenticatedSitemapsIndexRoute
   '/specification-keys': typeof AuthenticatedSpecificationKeysIndexRoute
+  '/team-access-analytics': typeof AuthenticatedTeamAccessAnalyticsIndexRoute
+  '/team-access': typeof AuthenticatedTeamAccessIndexRoute
   '/template-catalog': typeof AuthenticatedTemplateCatalogIndexRoute
   '/template-orders': typeof AuthenticatedTemplateOrdersIndexRoute
   '/template-wallet': typeof AuthenticatedTemplateWalletIndexRoute
@@ -648,6 +666,8 @@ export interface FileRoutesById {
   '/_authenticated/seo/': typeof AuthenticatedSeoIndexRoute
   '/_authenticated/sitemaps/': typeof AuthenticatedSitemapsIndexRoute
   '/_authenticated/specification-keys/': typeof AuthenticatedSpecificationKeysIndexRoute
+  '/_authenticated/team-access-analytics/': typeof AuthenticatedTeamAccessAnalyticsIndexRoute
+  '/_authenticated/team-access/': typeof AuthenticatedTeamAccessIndexRoute
   '/_authenticated/template-catalog/': typeof AuthenticatedTemplateCatalogIndexRoute
   '/_authenticated/template-orders/': typeof AuthenticatedTemplateOrdersIndexRoute
   '/_authenticated/template-wallet/': typeof AuthenticatedTemplateWalletIndexRoute
@@ -717,6 +737,8 @@ export interface FileRouteTypes {
     | '/seo'
     | '/sitemaps'
     | '/specification-keys'
+    | '/team-access-analytics'
+    | '/team-access'
     | '/template-catalog'
     | '/template-orders'
     | '/template-wallet'
@@ -783,6 +805,8 @@ export interface FileRouteTypes {
     | '/seo'
     | '/sitemaps'
     | '/specification-keys'
+    | '/team-access-analytics'
+    | '/team-access'
     | '/template-catalog'
     | '/template-orders'
     | '/template-wallet'
@@ -853,6 +877,8 @@ export interface FileRouteTypes {
     | '/_authenticated/seo/'
     | '/_authenticated/sitemaps/'
     | '/_authenticated/specification-keys/'
+    | '/_authenticated/team-access-analytics/'
+    | '/_authenticated/team-access/'
     | '/_authenticated/template-catalog/'
     | '/_authenticated/template-orders/'
     | '/_authenticated/template-wallet/'
@@ -1112,6 +1138,20 @@ declare module '@tanstack/react-router' {
       path: '/template-catalog'
       fullPath: '/template-catalog'
       preLoaderRoute: typeof AuthenticatedTemplateCatalogIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/team-access/': {
+      id: '/_authenticated/team-access/'
+      path: '/team-access'
+      fullPath: '/team-access'
+      preLoaderRoute: typeof AuthenticatedTeamAccessIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/team-access-analytics/': {
+      id: '/_authenticated/team-access-analytics/'
+      path: '/team-access-analytics'
+      fullPath: '/team-access-analytics'
+      preLoaderRoute: typeof AuthenticatedTeamAccessAnalyticsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/specification-keys/': {
@@ -1421,6 +1461,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSeoIndexRoute: typeof AuthenticatedSeoIndexRoute
   AuthenticatedSitemapsIndexRoute: typeof AuthenticatedSitemapsIndexRoute
   AuthenticatedSpecificationKeysIndexRoute: typeof AuthenticatedSpecificationKeysIndexRoute
+  AuthenticatedTeamAccessAnalyticsIndexRoute: typeof AuthenticatedTeamAccessAnalyticsIndexRoute
+  AuthenticatedTeamAccessIndexRoute: typeof AuthenticatedTeamAccessIndexRoute
   AuthenticatedTemplateCatalogIndexRoute: typeof AuthenticatedTemplateCatalogIndexRoute
   AuthenticatedTemplateOrdersIndexRoute: typeof AuthenticatedTemplateOrdersIndexRoute
   AuthenticatedTemplateWalletIndexRoute: typeof AuthenticatedTemplateWalletIndexRoute
@@ -1477,6 +1519,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSitemapsIndexRoute: AuthenticatedSitemapsIndexRoute,
   AuthenticatedSpecificationKeysIndexRoute:
     AuthenticatedSpecificationKeysIndexRoute,
+  AuthenticatedTeamAccessAnalyticsIndexRoute:
+    AuthenticatedTeamAccessAnalyticsIndexRoute,
+  AuthenticatedTeamAccessIndexRoute: AuthenticatedTeamAccessIndexRoute,
   AuthenticatedTemplateCatalogIndexRoute:
     AuthenticatedTemplateCatalogIndexRoute,
   AuthenticatedTemplateOrdersIndexRoute: AuthenticatedTemplateOrdersIndexRoute,
