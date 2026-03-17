@@ -443,7 +443,7 @@ export default function ProfilePage() {
     }
   }
 
-  const isPasswordValid = (password) => {
+  const isPasswordValid = (password: any) => {
     const hasMinLength = password.length >= 8;
     const hasUpper = /[A-Z]/.test(password);
     const hasNumber = /[0-9]/.test(password);

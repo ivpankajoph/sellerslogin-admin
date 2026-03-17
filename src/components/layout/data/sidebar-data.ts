@@ -210,11 +210,11 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           pageKey: 'my_websites',
         },
         {
-          title: 'Template Workspace',
-          url: '/template-workspace',
-          icon: LayoutTemplate,
+          title: 'Location Workspace',
+          url: '/location-workspace',
+          icon: MapPinned,
           roles: [ROLES.VENDOR],
-          pageKey: 'my_websites',
+          pageKey: 'location_workspace',
         },
         {
           title: 'Manage Cities',

@@ -1,5 +1,6 @@
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
 const PREVIEW_CITY_STORAGE_KEY = 'template_preview_city_slug'
+const normalizePathIdentifier = (value?: string) => String(value || '').trim().replace(/^\/+|\/+$/g, '')
 
 const normalizeCitySlug = (value?: string) => {
   const slug = String(value || '')
@@ -84,8 +85,9 @@ export const setStoredTemplatePreviewCity = (citySlug: string) => {
 }
 
 export const getVendorTemplateBaseUrl = (vendorId?: string) => {
-  if (!vendorId || !STOREFRONT_URL) return undefined
-  return `${STOREFRONT_URL}/template/${vendorId}`
+  const normalizedVendorId = normalizePathIdentifier(vendorId)
+  if (!normalizedVendorId || !STOREFRONT_URL) return undefined
+  return `${STOREFRONT_URL}/template/${encodeURIComponent(normalizedVendorId)}`
 }
 
 export const getVendorTemplatePageUrl = (
@@ -98,15 +100,16 @@ export const getVendorTemplatePageUrl = (
   if (!base) return undefined
 
   const finalCity = normalizeCitySlug(citySlug || getStoredTemplatePreviewCity())
-  const search = websiteId
-    ? `?website=${encodeURIComponent(String(websiteId).trim())}`
+  const normalizedWebsiteId = normalizePathIdentifier(websiteId)
+  const websitePath = normalizedWebsiteId
+    ? `/website/${encodeURIComponent(normalizedWebsiteId)}`
     : ''
 
   if (templateKey) {
-    return `${base}/preview/${encodeURIComponent(templateKey)}/${encodeURIComponent(finalCity)}${search}`
+    return `${base}/preview/${encodeURIComponent(templateKey)}/${encodeURIComponent(finalCity)}${websitePath}`
   }
 
-  return `${base}/${encodeURIComponent(finalCity)}${search}`
+  return `${base}/${encodeURIComponent(finalCity)}${websitePath}`
 }
 
 export const getVendorTemplatePreviewUrl = (
@@ -116,4 +119,17 @@ export const getVendorTemplatePreviewUrl = (
   websiteId?: string
 ) => {
   return getVendorTemplatePageUrl(vendorId, citySlug, templateKey, websiteId)
+}
+
+export const getVendorTemplateProductUrl = (
+  vendorId?: string,
+  productId?: string,
+  citySlug?: string,
+  websiteId?: string,
+  templateKey?: string
+) => {
+  const base = getVendorTemplatePageUrl(vendorId, citySlug, templateKey, websiteId)
+  const normalizedProductId = normalizePathIdentifier(productId)
+  if (!base || !normalizedProductId) return undefined
+  return `${base}/product/${encodeURIComponent(normalizedProductId)}`
 }

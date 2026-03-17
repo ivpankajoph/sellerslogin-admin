@@ -64,6 +64,7 @@ type WebsiteCard = {
   template_name?: string
   name?: string
   business_name?: string
+  website_slug?: string
   previewImage?: string
   createdAt?: string
 }
@@ -119,6 +120,13 @@ const formatCityLabel = (slug?: string) => {
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
 }
+
+const normalizeCitySlugValue = (value?: string) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 
 const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   {
@@ -251,6 +259,9 @@ export default function TemplateWorkspace() {
       ''
   ).trim()
   const token = useSelector((state: any) => state.auth?.token)
+  const vendorPublicIdentifier = String(
+    vendorProfile?.username || authUser?.username || vendorId || ''
+  ).trim()
   const vendorName = String(
     vendorProfile?.name ||
       vendorProfile?.business_name ||
@@ -262,6 +273,13 @@ export default function TemplateWorkspace() {
   const vendorDefaultCitySlug = String(
     vendorProfile?.default_city_slug || authUser?.default_city_slug || 'all'
   )
+  const vendorDefaultCityName = String(
+    vendorProfile?.default_city_name ||
+      authUser?.default_city_name ||
+      vendorProfile?.city ||
+      authUser?.city ||
+      ''
+  ).trim()
 
   const [websites, setWebsites] = useState<WebsiteCard[]>([])
   const [cities, setCities] = useState<CityRow[]>([])
@@ -273,6 +291,7 @@ export default function TemplateWorkspace() {
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('')
   const [websiteName, setWebsiteName] = useState('')
   const [selectedCitySlug, setSelectedCitySlug] = useState('')
+  const [previewCityTouched, setPreviewCityTouched] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<WebsiteCard | null>(null)
   const [deletingWebsiteId, setDeletingWebsiteId] = useState<string | null>(null)
 
@@ -332,6 +351,26 @@ export default function TemplateWorkspace() {
       cities.find((city) => String(city.slug || '').trim() === selectedCitySlug)?._id || '',
     [cities, selectedCitySlug]
   )
+
+  const effectiveDefaultCitySlug = useMemo(() => {
+    const normalizedDefaultSlug = normalizeCitySlugValue(vendorDefaultCitySlug)
+    const normalizedDefaultName = normalizeCitySlugValue(vendorDefaultCityName)
+    if (normalizedDefaultSlug && normalizedDefaultSlug !== 'all') {
+      return normalizedDefaultSlug
+    }
+    if (!normalizedDefaultName) {
+      return normalizedDefaultSlug || 'all'
+    }
+
+    const matchedCity = cities.find((city) => {
+      return (
+        normalizeCitySlugValue(city.slug) === normalizedDefaultName ||
+        normalizeCitySlugValue(city.name) === normalizedDefaultName
+      )
+    })
+
+    return normalizeCitySlugValue(matchedCity?.slug || vendorDefaultCityName) || 'all'
+  }, [cities, vendorDefaultCityName, vendorDefaultCitySlug])
 
   const visibleProductsCount = useMemo(() => {
     if (selectedCitySlug === 'all') return products.length
@@ -440,16 +479,28 @@ export default function TemplateWorkspace() {
   }, [vendorId, token])
 
   useEffect(() => {
-    if (!token || vendorId || vendorProfile) return
+    if (!token || vendorProfile) return
     void dispatch(fetchVendorProfile())
-  }, [dispatch, token, vendorId, vendorProfile])
+  }, [dispatch, token, vendorProfile])
 
   useEffect(() => {
-    setSelectedCitySlug((current) => {
-      if (current) return current
-      return peekStoredTemplatePreviewCity() || vendorDefaultCitySlug || 'all'
-    })
-  }, [vendorDefaultCitySlug])
+    if (previewCityTouched) return
+
+    const normalizedDefaultSlug = normalizeCitySlugValue(effectiveDefaultCitySlug)
+    const normalizedStoredSlug = normalizeCitySlugValue(peekStoredTemplatePreviewCity())
+    const nextCitySlug =
+      (normalizedDefaultSlug && normalizedDefaultSlug !== 'all'
+        ? normalizedDefaultSlug
+        : '') ||
+      (normalizedStoredSlug && normalizedStoredSlug !== 'all'
+        ? normalizedStoredSlug
+        : '') ||
+      normalizedDefaultSlug ||
+      normalizedStoredSlug ||
+      'all'
+
+    setSelectedCitySlug(nextCitySlug)
+  }, [effectiveDefaultCitySlug, previewCityTouched])
 
   useEffect(() => {
     if (!selectedCitySlug) return
@@ -473,7 +524,9 @@ export default function TemplateWorkspace() {
 
     setStoredActiveWebsiteId(vendorId, website._id)
     setStoredEditingTemplateKey(vendorId, templateKey)
-    setStoredTemplatePreviewCity(selectedCitySlug || vendorDefaultCitySlug || 'all')
+    setStoredTemplatePreviewCity(
+      selectedCitySlug || effectiveDefaultCitySlug || vendorDefaultCitySlug || 'all'
+    )
 
     if (page === 'home') {
       void navigate({
@@ -630,7 +683,7 @@ export default function TemplateWorkspace() {
 
   return (
     <>
-      <TablePageHeader title='Template Workspace'>
+      <TablePageHeader title='My Websites'>
         <Button
           type='button'
           variant='outline'
@@ -691,7 +744,13 @@ export default function TemplateWorkspace() {
               <MapPinned className='h-3.5 w-3.5' />
               Preview City
             </div>
-            <Select value={selectedCitySlug || 'all'} onValueChange={setSelectedCitySlug}>
+            <Select
+              value={selectedCitySlug || 'all'}
+              onValueChange={(value) => {
+                setPreviewCityTouched(true)
+                setSelectedCitySlug(value)
+              }}
+            >
               <SelectTrigger className='mt-3 h-11 w-full rounded-xl'>
                 <SelectValue placeholder='Select city' />
               </SelectTrigger>
@@ -733,10 +792,10 @@ export default function TemplateWorkspace() {
                 const templateKey = String(website.template_key || '').trim()
                 const websiteTemplate = templateByKey.get(templateKey)
                 const previewUrl = getVendorTemplatePreviewUrl(
-                  vendorId,
+                  vendorPublicIdentifier || vendorId,
                   templateKey,
-                  selectedCitySlug || vendorDefaultCitySlug,
-                  website._id
+                  selectedCitySlug || effectiveDefaultCitySlug || vendorDefaultCitySlug,
+                  website.website_slug || website._id
                 )
                 const thumbnail = website.previewImage || websiteTemplate?.previewImage || ''
                 const visibleProducts = getVisibleProductsForWebsite(website._id)
@@ -957,9 +1016,9 @@ export default function TemplateWorkspace() {
                     {availableTemplates.map((template) => {
                       const isSelected = selectedTemplateKey === template.key
                       const previewUrl = getVendorTemplatePreviewUrl(
-                        vendorId,
+                        vendorPublicIdentifier || vendorId,
                         template.key,
-                        vendorDefaultCitySlug
+                        effectiveDefaultCitySlug || vendorDefaultCitySlug
                       )
                       return (
                         <button

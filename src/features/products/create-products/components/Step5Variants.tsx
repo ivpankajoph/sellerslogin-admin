@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   Check,
   ChevronsUpDown,
+  CircleHelp,
+  Copy,
   Layers3,
   Loader2,
   Package2,
@@ -27,10 +29,26 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import type { Variant } from '../types/type'
 import {
   StudioFieldLabel,
+  StudioInfo,
   studioCardClass,
   studioInputClass,
   studioSubtleCardClass,
@@ -47,18 +65,21 @@ type WebsiteOption = {
 interface Props {
   variants: Variant[]
   recommendedAttributeKeys: string[]
+  variantKeySuggestions: string[]
+  variantKeyContextLabel: string
   websiteOptions: WebsiteOption[]
   selectedWebsiteIds: string[]
   isWebsiteLoading: boolean
   isAvailable: boolean
   aiLoading: boolean
   onAddAttributeKey: (variantIndex: number, key: string) => void
-  onAddSuggestedAttributeKey: (variantIndex: number, key: string) => void
+  onAddSuggestedAttributeKeys: (variantIndex: number, keys: string[]) => void
   onRemoveAttributeKey: (variantIndex: number, key: string) => void
   onToggleAvailable: () => void
   onSelectedWebsiteIdsChange: (websiteIds: string[]) => void
   onGenerateSuggestedKeys: (variantIndex: number) => void
-  onAddVariant: () => void
+  onAddVariant: (keys: string[]) => void
+  onCopyFromPreviousVariant: (index: number) => void
   onRemoveVariant: (index: number) => void
   onVariantFieldChange: (
     index: number,
@@ -82,6 +103,9 @@ type SelectOption = {
   value: string
   label: string
 }
+
+const sanitizeKeyList = (values: string[]) =>
+  Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)))
 
 const normalizeSearchText = (value: string) =>
   String(value || '')
@@ -201,18 +225,21 @@ const WebsiteMultiSelect: React.FC<{
 const Step5Variants: React.FC<Props> = ({
   variants,
   recommendedAttributeKeys,
+  variantKeySuggestions,
+  variantKeyContextLabel,
   websiteOptions,
   selectedWebsiteIds,
   isWebsiteLoading,
   isAvailable,
   aiLoading,
   onAddAttributeKey,
-  onAddSuggestedAttributeKey,
+  onAddSuggestedAttributeKeys,
   onRemoveAttributeKey,
   onToggleAvailable,
   onSelectedWebsiteIdsChange,
   onGenerateSuggestedKeys,
   onAddVariant,
+  onCopyFromPreviousVariant,
   onRemoveVariant,
   onVariantFieldChange,
   onVariantAttributeChange,
@@ -231,6 +258,12 @@ const Step5Variants: React.FC<Props> = ({
     Record<number, boolean>
   >({})
   const [variantOptionSearch, setVariantOptionSearch] = useState<Record<number, string>>({})
+  const [variantOptionSelections, setVariantOptionSelections] = useState<
+    Record<number, string[]>
+  >({})
+  const [addVariantDialogOpen, setAddVariantDialogOpen] = useState(false)
+  const [selectedSuggestedVariantKey, setSelectedSuggestedVariantKey] = useState('')
+  const [newVariantCustomKey, setNewVariantCustomKey] = useState('')
 
   const websiteSelectOptions = useMemo(
     () =>
@@ -246,8 +279,16 @@ const Step5Variants: React.FC<Props> = ({
     [websiteOptions]
   )
 
+  const suggestedVariantKeys = useMemo(
+    () => sanitizeKeyList(variantKeySuggestions).slice(0, 2),
+    [variantKeySuggestions]
+  )
+
   const handleAddVariantClick = () => {
-    onAddVariant()
+    setSelectedSuggestedVariantKey((currentValue) =>
+      currentValue || suggestedVariantKeys[0] || ''
+    )
+    setAddVariantDialogOpen(true)
   }
 
   const getVariantKeys = (variant: Variant) =>
@@ -255,10 +296,25 @@ const Step5Variants: React.FC<Props> = ({
       .map((key) => String(key || '').trim())
       .filter(Boolean)
 
+  const closeAddVariantDialog = () => {
+    setAddVariantDialogOpen(false)
+    setSelectedSuggestedVariantKey('')
+    setNewVariantCustomKey('')
+  }
+
+  const handleAddVariantWithKeys = (keys: string[]) => {
+    const normalizedKeys = sanitizeKeyList(keys)
+    if (!normalizedKeys.length) return
+    onAddVariant(normalizedKeys)
+    closeAddVariantDialog()
+  }
+
+  const handleAddVariantWithCustomKey = () => {
+    handleAddVariantWithKeys([newVariantCustomKey])
+  }
+
   useEffect(() => {
-    const pruneStateEntries = <T extends string | boolean>(
-      state: Record<number, T>
-    ): Record<number, T> =>
+    const pruneStateEntries = <T,>(state: Record<number, T>): Record<number, T> =>
       Object.fromEntries(
         Object.entries(state).filter(([key]) => Number(key) < variants.length)
       ) as Record<number, T>
@@ -267,10 +323,33 @@ const Step5Variants: React.FC<Props> = ({
     setVariantCustomInputOpen((prev) => pruneStateEntries(prev))
     setVariantOptionPickerOpen((prev) => pruneStateEntries(prev))
     setVariantOptionSearch((prev) => pruneStateEntries(prev))
+    setVariantOptionSelections((prev) => pruneStateEntries(prev))
   }, [variants.length])
 
-  const handleRecommendedKeySelect = (variantIndex: number, key: string) => {
-    onAddSuggestedAttributeKey(variantIndex, key)
+  const toggleRecommendedKeySelection = (variantIndex: number, key: string) => {
+    setVariantOptionSelections((prev) => {
+      const currentSelections = prev[variantIndex] || []
+      const nextSelections = currentSelections.includes(key)
+        ? currentSelections.filter((selectedKey) => selectedKey !== key)
+        : [...currentSelections, key]
+
+      return {
+        ...prev,
+        [variantIndex]: nextSelections,
+      }
+    })
+  }
+
+  const handleAddSelectedRecommendedKeys = (variantIndex: number) => {
+    const selectedKeys = sanitizeKeyList(variantOptionSelections[variantIndex] || [])
+    if (!selectedKeys.length) return
+
+    onAddSuggestedAttributeKeys(variantIndex, selectedKeys)
+
+    setVariantOptionSelections((prev) => ({
+      ...prev,
+      [variantIndex]: [],
+    }))
     setVariantOptionPickerOpen((prev) => ({ ...prev, [variantIndex]: false }))
     setVariantOptionSearch((prev) => ({ ...prev, [variantIndex]: '' }))
   }
@@ -282,10 +361,18 @@ const Step5Variants: React.FC<Props> = ({
     }))
 
     if (open) {
+      setVariantOptionSelections((prev) => ({
+        ...prev,
+        [variantIndex]: [],
+      }))
       onGenerateSuggestedKeys(variantIndex)
       return
     }
 
+    setVariantOptionSelections((prev) => ({
+      ...prev,
+      [variantIndex]: [],
+    }))
     setVariantOptionSearch((prev) => ({
       ...prev,
       [variantIndex]: '',
@@ -372,15 +459,15 @@ const Step5Variants: React.FC<Props> = ({
         <div className={studioCardClass}>
           <h3 className='text-base font-semibold text-foreground'>No variants yet</h3>
           <p className='mt-2 text-sm text-muted-foreground'>
-            Add the first variant to start filling option values, pricing, stock, and
-            variant images. Extra keys from category selection will appear inside the
-            variant card automatically.
+            Add the first variant to start with a key like Size, Color, or Lens Power.
+            You can also create a custom key and keep adding more product details
+            inside each variant card.
           </p>
           <span className='mt-4 inline-flex'>
             <Button
               type='button'
               onClick={handleAddVariantClick}
-              className='h-11 rounded-xl bg-cyan-600 px-5 text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-700 hover:shadow-md disabled:opacity-60'
+              className='h-11 bg-cyan-600 px-5 text-white hover:bg-cyan-700'
             >
               <Plus className='mr-2 h-4 w-4' />
               Add Variant
@@ -405,21 +492,32 @@ const Step5Variants: React.FC<Props> = ({
               variantOptionSearch[variantIndex] || ''
             )
             const isCustomInputVisible = Boolean(variantCustomInputOpen[variantIndex])
+            const selectedRecommendedKeys = variantOptionSelections[variantIndex] || []
+            const primaryVariantKey = variantKeys[0] || ''
+            const variantTitle = primaryVariantKey
+              ? `${primaryVariantKey} variant`
+              : `Variant ${variantIndex + 1}`
+            const variantSubtitle = summary
+              ? summary
+              : primaryVariantKey
+                ? `Set ${primaryVariantKey.toLowerCase()} details, pricing, stock, and images.`
+                : 'Choose product details, then set pricing, stock, and images.'
 
             return (
               <article key={variantIndex} className={studioCardClass}>
                 <div className='mb-5 flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-start lg:justify-between'>
                   <div>
-                    <div className='mb-2 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300'>
-                      Variant {variantIndex + 1}
+                    <div className='mb-2 inline-flex items-center gap-2 border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300'>
+                      {variantTitle}
                     </div>
-                    <h3 className='text-xl font-semibold text-foreground'>
-                      {summary || 'Unnamed option set'}
-                    </h3>
+                    <p className='text-sm text-muted-foreground'>
+                      Variant {variantIndex + 1}
+                      {variantSubtitle ? ` • ${variantSubtitle}` : ''}
+                    </p>
                   </div>
 
                   <div className='flex flex-wrap items-center gap-3'>
-                    <div className='flex items-center gap-2 rounded-full bg-background/60 px-3 py-2'>
+                    <div className='flex items-center gap-2 bg-background/60 px-3 py-2'>
                       <Switch
                         checked={variant.isActive}
                         onCheckedChange={(checked) =>
@@ -433,8 +531,18 @@ const Step5Variants: React.FC<Props> = ({
                     <Button
                       type='button'
                       variant='outline'
+                      onClick={() => onCopyFromPreviousVariant(variantIndex)}
+                      disabled={variantIndex === 0}
+                      className='h-11 border-amber-500/25 bg-amber-500/10 px-4 text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 disabled:border-border disabled:bg-background disabled:text-muted-foreground'
+                    >
+                      <Copy className='mr-2 h-4 w-4' />
+                      Copy Above
+                    </Button>
+                    <Button
+                      type='button'
+                      variant='outline'
                       onClick={handleAddVariantClick}
-                      className='h-11 rounded-xl border-cyan-500/20 bg-cyan-500/10 px-4 text-cyan-700 hover:bg-cyan-500/15 hover:text-cyan-800'
+                      className='h-11 border-cyan-500/20 bg-cyan-500/10 px-4 text-cyan-700 hover:bg-cyan-500/15 hover:text-cyan-800'
                     >
                       <Plus className='mr-2 h-4 w-4' />
                       Add Variant
@@ -443,7 +551,7 @@ const Step5Variants: React.FC<Props> = ({
                       type='button'
                       variant='outline'
                       onClick={() => onRemoveVariant(variantIndex)}
-                      className='h-11 rounded-xl border-red-500/25 bg-red-500/10 px-4 text-red-600 hover:bg-red-500/15 hover:text-red-700'
+                      className='h-11 border-red-500/25 bg-red-500/10 px-4 text-red-600 hover:bg-red-500/15 hover:text-red-700'
                     >
                       <Trash2 className='mr-2 h-4 w-4' />
                       Remove
@@ -457,7 +565,10 @@ const Step5Variants: React.FC<Props> = ({
                       <div className='mb-4 flex flex-col gap-3 border-b border-border/60 pb-4 xl:flex-row xl:items-start xl:justify-between'>
                         <div className='flex items-center gap-2 text-sm font-semibold text-foreground'>
                           <Tag className='h-4 w-4 text-cyan-600' />
-                          Option values
+                          Product details
+                          <StudioInfo
+                            content='Use suggested or custom keys like Size, Color, Lens Power, Fabric, or Material to make each variant easier to understand.'
+                          />
                         </div>
                         <div className='flex flex-wrap items-center gap-2'>
                           <Popover
@@ -470,10 +581,10 @@ const Step5Variants: React.FC<Props> = ({
                               <Button
                                 type='button'
                                 variant='outline'
-                                className='h-10 rounded-xl border-border bg-background px-4'
+                                className='h-10 border-border bg-background px-4'
                               >
                                 <Plus className='mr-2 h-4 w-4' />
-                                Add option
+                                Add detail
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className='w-[340px] p-0' align='start'>
@@ -491,12 +602,12 @@ const Step5Variants: React.FC<Props> = ({
                                 <CommandList className='max-h-72'>
                                   {!aiLoading && recommendedOptions.length === 0 ? (
                                     <div className='px-4 py-6 text-center text-sm text-muted-foreground'>
-                                      No matching keys. Use the custom option button below.
+                                      No matching keys. Use the custom detail button below.
                                     </div>
                                   ) : null}
                                   <CommandGroup
                                     heading={
-                                      aiLoading ? 'Loading suggestions' : 'Suggested options'
+                                      aiLoading ? 'Loading suggestions' : 'Suggested details'
                                     }
                                   >
                                     {aiLoading ? (
@@ -510,20 +621,42 @@ const Step5Variants: React.FC<Props> = ({
                                         key={`${variantIndex}-${option.value}`}
                                         value={`${option.label} ${option.value}`}
                                         onSelect={() =>
-                                          handleRecommendedKeySelect(
+                                          toggleRecommendedKeySelection(
                                             variantIndex,
                                             option.value
                                           )
                                         }
                                       >
-                                        <Tag className='mr-2 h-4 w-4 text-cyan-600' />
+                                        <Check
+                                          className={cn(
+                                            'mr-2 h-4 w-4',
+                                            selectedRecommendedKeys.includes(option.value)
+                                              ? 'opacity-100'
+                                              : 'opacity-0'
+                                          )}
+                                        />
                                         {option.label}
                                       </CommandItem>
                                     ))}
                                   </CommandGroup>
                                 </CommandList>
                               </Command>
-                              <div className='border-t border-border/60 p-2'>
+                              <div className='grid gap-2 border-t border-border/60 p-2'>
+                                <Button
+                                  type='button'
+                                  variant='outline'
+                                  onClick={() =>
+                                    handleAddSelectedRecommendedKeys(variantIndex)
+                                  }
+                                  disabled={!selectedRecommendedKeys.length}
+                                  className='h-10 w-full justify-start px-3'
+                                >
+                                  <Plus className='mr-2 h-4 w-4' />
+                                  Add selected details
+                                  {selectedRecommendedKeys.length
+                                    ? ` (${selectedRecommendedKeys.length})`
+                                    : ''}
+                                </Button>
                                 <Button
                                   type='button'
                                   variant='ghost'
@@ -534,10 +667,10 @@ const Step5Variants: React.FC<Props> = ({
                                       [variantIndex]: true,
                                     }))
                                   }}
-                                  className='h-10 w-full justify-start rounded-xl px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
+                                  className='h-10 w-full justify-start px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
                                 >
                                   <Plus className='mr-2 h-4 w-4' />
-                                  Create custom option
+                                  Create custom detail
                                 </Button>
                               </div>
                             </PopoverContent>
@@ -552,18 +685,18 @@ const Step5Variants: React.FC<Props> = ({
                                 [variantIndex]: !prev[variantIndex],
                               }))
                             }
-                            className='h-10 rounded-xl px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
+                            className='h-10 px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
                           >
                             <Plus className='mr-2 h-4 w-4' />
-                            Didn&apos;t find that key?
+                            Add custom detail
                           </Button>
                         </div>
                       </div>
 
                       {isCustomInputVisible ? (
-                        <div className='mb-4 rounded-2xl border border-dashed border-cyan-500/30 bg-cyan-500/5 p-4'>
+                        <div className='mb-4 border border-dashed border-cyan-500/30 bg-cyan-500/5 p-4'>
                           <div className='flex items-center justify-between gap-3'>
-                            <StudioFieldLabel label='Create custom option' className='mb-0' />
+                            <StudioFieldLabel label='Create custom detail' className='mb-0' />
                             <Button
                               type='button'
                               variant='ghost'
@@ -573,7 +706,7 @@ const Step5Variants: React.FC<Props> = ({
                                   [variantIndex]: false,
                                 }))
                               }
-                              className='h-auto rounded-lg px-2 text-xs font-semibold text-muted-foreground hover:bg-transparent hover:text-foreground'
+                              className='h-auto px-2 text-xs font-semibold text-muted-foreground hover:bg-transparent hover:text-foreground'
                             >
                               <X className='mr-1 h-3.5 w-3.5' />
                               Hide
@@ -595,16 +728,16 @@ const Step5Variants: React.FC<Props> = ({
                                   handleCustomKeySubmit(variantIndex)
                                 }
                               }}
-                              placeholder='Add custom key, e.g. color, material, finish'
+                              placeholder='Add custom detail, e.g. color, material, finish'
                               className={studioInputClass}
                             />
                             <Button
                               type='button'
                               onClick={() => handleCustomKeySubmit(variantIndex)}
-                              className='h-11 rounded-xl border border-border bg-card px-5 text-foreground hover:bg-secondary'
+                              className='h-11 border border-border bg-card px-5 text-foreground hover:bg-secondary'
                             >
                               <Plus className='mr-2 h-4 w-4' />
-                              Add Key
+                              Add Detail
                             </Button>
                           </div>
                         </div>
@@ -615,7 +748,7 @@ const Step5Variants: React.FC<Props> = ({
                           variantKeys.map((key) => (
                             <div
                               key={`${variantIndex}-${key}`}
-                              className='flex h-full flex-col rounded-2xl border border-border/60 bg-background/50 p-4'
+                              className='flex h-full flex-col border border-border/60 bg-background/50 p-4'
                             >
                               <StudioFieldLabel
                                 label={key}
@@ -623,7 +756,7 @@ const Step5Variants: React.FC<Props> = ({
                                   <button
                                     type='button'
                                     onClick={() => onRemoveAttributeKey(variantIndex, key)}
-                                    className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
+                                    className='inline-flex h-7 w-7 items-center justify-center border border-border bg-background text-muted-foreground transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
                                     aria-label={`Remove ${key}`}
                                   >
                                     <X className='h-3.5 w-3.5' />
@@ -646,9 +779,9 @@ const Step5Variants: React.FC<Props> = ({
                             </div>
                           ))
                         ) : (
-                          <div className='sm:col-span-2 2xl:col-span-3 rounded-2xl bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
-                            Add option dropdown se suggested keys choose karo, ya custom
-                            option button se apni key banao.
+                          <div className='sm:col-span-2 2xl:col-span-3 bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
+                            Add detail dropdown se suggested keys choose karo, ya custom
+                            detail button se apni key banao.
                           </div>
                         )}
                       </div>
@@ -811,6 +944,115 @@ const Step5Variants: React.FC<Props> = ({
           })}
         </div>
       )}
+
+      <Dialog
+        open={addVariantDialogOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setAddVariantDialogOpen(true)
+            return
+          }
+
+          closeAddVariantDialog()
+        }}
+      >
+        <DialogContent className='sm:max-w-[560px]'>
+          <DialogHeader>
+            <DialogTitle className='flex items-center gap-2'>
+              <CircleHelp className='h-5 w-5 text-cyan-600' />
+              Choose variant key
+            </DialogTitle>
+            <DialogDescription>
+              {variantKeyContextLabel
+                ? `Based on ${variantKeyContextLabel}, start this variant with one common key.`
+                : 'Start this variant with one common key so product variants are easier to understand.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='space-y-4'>
+            <div className='space-y-3'>
+              <StudioFieldLabel
+                label='Suggested keys'
+                help='These quick picks come from the selected category and the current product context.'
+                className='mb-0'
+              />
+              {suggestedVariantKeys.length ? (
+                <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]'>
+                  <Select
+                    value={selectedSuggestedVariantKey}
+                    onValueChange={setSelectedSuggestedVariantKey}
+                  >
+                    <SelectTrigger className='h-11 w-full'>
+                      <SelectValue placeholder='Select suggested key' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suggestedVariantKeys.map((key) => (
+                        <SelectItem key={key} value={key}>
+                          {key}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={() =>
+                      handleAddVariantWithKeys([selectedSuggestedVariantKey])
+                    }
+                    disabled={!selectedSuggestedVariantKey}
+                  >
+                    <Plus className='h-4 w-4' />
+                    Add Variant
+                  </Button>
+                </div>
+              ) : (
+                <div className='border border-dashed border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
+                  No direct suggestions available for this category yet. Add a custom key below.
+                </div>
+              )}
+            </div>
+
+            <div className='space-y-3'>
+              <StudioFieldLabel
+                label='Custom key'
+                help='Use your own label like Lens Power, Finish, Capacity, or Material.'
+                className='mb-0'
+              />
+              <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]'>
+                <input
+                  type='text'
+                  value={newVariantCustomKey}
+                  onChange={(event) => setNewVariantCustomKey(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      handleAddVariantWithCustomKey()
+                    }
+                  }}
+                  placeholder='Enter custom variant key'
+                  className={studioInputClass}
+                />
+                <Button
+                  type='button'
+                  variant='outline'
+                  onClick={handleAddVariantWithCustomKey}
+                  disabled={!String(newVariantCustomKey || '').trim()}
+                >
+                  <Plus className='h-4 w-4' />
+                  Add Variant
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type='button' variant='outline' onClick={closeAddVariantDialog}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

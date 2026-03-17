@@ -473,7 +473,7 @@ const VendorDashboard = () => {
                     asChild
                     size='sm'
                     variant='secondary'
-                    className='mt-3 h-8 bg-white/85 text-emerald-900 hover:bg-white'
+                    className='mt-3 h-8 bg-white/85 text-emerald-900'
                   >
                     <Link to={card.ctaTo}>{card.ctaLabel}</Link>
                   </Button>

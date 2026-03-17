@@ -10,7 +10,7 @@ import {
   PackagePlus,
   Search,
 } from 'lucide-react'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import { generateWithAI } from './aiHelpers'
 import { deleteFromCloudinary, uploadToCloudinary } from './cloudinary'
 import Step1BasicInfo from './components/Step1BasicInfo'
@@ -43,59 +44,357 @@ const PRODUCT_CREATE_DRAFT_VERSION = 3
 const PRODUCT_CREATE_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const PRODUCT_CREATE_STEP_COUNT = 3
 
-const VARIANT_KEY_CONTEXT_FALLBACKS: Array<{
+type VariantContextRule = {
   patterns: RegExp[]
   configKeys?: string[]
-  keys?: string[]
-}> = [
+  fallbackKeys?: string[]
+  variantKeys?: string[]
+  detailKeys?: string[]
+  allowedDetailKeyPatterns?: RegExp[]
+}
+
+const GENERIC_VARIANT_KEY_PATTERNS = [
+  /color/i,
+  /colour/i,
+  /shade/i,
+  /size/i,
+  /storage/i,
+  /ram/i,
+  /memory/i,
+  /capacity/i,
+  /pack/i,
+  /weight/i,
+  /volume/i,
+  /material/i,
+  /fabric/i,
+  /fit/i,
+  /style/i,
+  /pattern/i,
+  /type/i,
+  /flavo[u]?r/i,
+  /scent/i,
+  /fragrance/i,
+  /connectivity/i,
+  /compatib/i,
+  /power/i,
+  /length/i,
+  /width/i,
+  /height/i,
+  /diameter/i,
+  /lens/i,
+  /frame/i,
+  /curve/i,
+  /coating/i,
+  /shape/i,
+  /display/i,
+  /screen/i,
+  /resolution/i,
+  /processor/i,
+  /band material/i,
+  /dial color/i,
+  /case size/i,
+]
+
+const VARIANT_KEY_CONTEXT_RULES: VariantContextRule[] = [
   {
-    patterns: [/mobile/i, /smartphone/i, /phone/i],
-    configKeys: ['Smartphones'],
-    keys: ['Color', 'RAM', 'Storage'],
+    patterns: [/contact lens/i, /contact lenses/i],
+    fallbackKeys: ['Lens Power', 'Base Curve', 'Diameter'],
+    variantKeys: ['Lens Power', 'Base Curve', 'Diameter'],
+    detailKeys: ['Lens Power', 'Base Curve', 'Diameter', 'Pack Size', 'Wear Duration'],
+    allowedDetailKeyPatterns: [
+      /lens/i,
+      /power/i,
+      /curve/i,
+      /diameter/i,
+      /pack/i,
+      /wear/i,
+      /material/i,
+      /water/i,
+      /uv/i,
+      /color/i,
+      /colour/i,
+      /type/i,
+    ],
   },
   {
-    patterns: [/accessor/i, /cover/i, /case/i, /charger/i, /cable/i, /power bank/i],
-    keys: ['Color', 'Compatibility', 'Type'],
+    patterns: [/power lens/i, /optical lens/i, /reading lens/i, /prescription lens/i],
+    fallbackKeys: ['Lens Power', 'Lens Type', 'Diameter'],
+    variantKeys: ['Lens Power', 'Lens Type', 'Diameter'],
+    detailKeys: ['Lens Power', 'Lens Type', 'Diameter', 'Lens Material', 'Coating'],
+    allowedDetailKeyPatterns: [
+      /lens/i,
+      /power/i,
+      /diameter/i,
+      /coating/i,
+      /material/i,
+      /index/i,
+      /shape/i,
+      /tint/i,
+      /uv/i,
+      /type/i,
+    ],
   },
   {
-    patterns: [/laptop/i, /notebook/i, /desktop/i, /computer/i],
-    configKeys: ['Laptops'],
-    keys: ['RAM', 'Storage', 'Processor'],
+    patterns: [
+      /eyewear/i,
+      /sunglass/i,
+      /spectacle/i,
+      /glasses/i,
+      /frame/i,
+      /\bglass\b/i,
+      /optical/i,
+      /goggles/i,
+    ],
+    fallbackKeys: ['Frame Color', 'Frame Size', 'Lens Color'],
+    variantKeys: ['Frame Color', 'Frame Size', 'Lens Color'],
+    detailKeys: [
+      'Frame Color',
+      'Frame Size',
+      'Lens Color',
+      'Frame Material',
+      'Lens Type',
+      'Shape',
+    ],
+    allowedDetailKeyPatterns: [
+      /frame/i,
+      /lens/i,
+      /color/i,
+      /colour/i,
+      /size/i,
+      /shape/i,
+      /material/i,
+      /type/i,
+      /coating/i,
+      /width/i,
+    ],
   },
   {
-    patterns: [/headphone/i, /earbud/i, /speaker/i, /audio/i],
-    configKeys: ['Headphones', 'Electronics'],
-    keys: ['Color', 'Connectivity'],
-  },
-  {
-    patterns: [/watch/i],
-    configKeys: ['Watches'],
-    keys: ['Dial Color', 'Band Material'],
-  },
-  {
-    patterns: [/t-?shirt/i, /shirt/i, /cloth/i, /apparel/i, /fashion/i],
+    patterns: [/t-?shirt/i, /\bshirt\b/i, /cloth/i, /apparel/i, /fashion/i],
     configKeys: ['T-Shirts'],
-    keys: ['Color', 'Size', 'Fabric', 'Fit'],
+    fallbackKeys: ['Size', 'Color', 'Fabric', 'Fit'],
+    variantKeys: ['Size', 'Color', 'Fabric'],
+    detailKeys: ['Size', 'Color', 'Fabric', 'Fit', 'Pattern', 'Sleeve Length'],
+    allowedDetailKeyPatterns: [
+      /size/i,
+      /color/i,
+      /colour/i,
+      /fabric/i,
+      /fit/i,
+      /pattern/i,
+      /style/i,
+      /sleeve/i,
+      /neck/i,
+      /waist/i,
+      /length/i,
+      /material/i,
+    ],
   },
   {
-    patterns: [/dress/i, /kurta/i, /top/i, /ethnic/i],
+    patterns: [/dress/i, /kurta/i, /\btop\b/i, /ethnic/i],
     configKeys: ["Women's Dresses"],
-    keys: ['Color', 'Size', 'Fabric'],
+    fallbackKeys: ['Size', 'Color', 'Fabric'],
+    variantKeys: ['Size', 'Color', 'Fabric'],
+    detailKeys: ['Size', 'Color', 'Fabric', 'Pattern', 'Sleeve Length'],
+    allowedDetailKeyPatterns: [
+      /size/i,
+      /color/i,
+      /colour/i,
+      /fabric/i,
+      /pattern/i,
+      /fit/i,
+      /style/i,
+      /sleeve/i,
+      /neck/i,
+      /length/i,
+      /material/i,
+    ],
   },
   {
     patterns: [/shoe/i, /footwear/i, /sneaker/i, /sandal/i],
     configKeys: ["Men's Shoes"],
-    keys: ['Color', 'Size'],
+    fallbackKeys: ['Size', 'Color', 'Material'],
+    variantKeys: ['Size', 'Color', 'Material'],
+    detailKeys: ['Size', 'Color', 'Material', 'Sole Material', 'Pattern'],
+    allowedDetailKeyPatterns: [
+      /size/i,
+      /color/i,
+      /colour/i,
+      /material/i,
+      /pattern/i,
+      /sole/i,
+      /width/i,
+      /fit/i,
+      /style/i,
+    ],
+  },
+  {
+    patterns: [/watch/i],
+    configKeys: ['Watches'],
+    fallbackKeys: ['Dial Color', 'Band Material', 'Case Size'],
+    variantKeys: ['Dial Color', 'Band Material', 'Case Size'],
+    detailKeys: ['Dial Color', 'Band Material', 'Case Size', 'Case Material', 'Strap Color'],
+    allowedDetailKeyPatterns: [
+      /dial/i,
+      /band/i,
+      /strap/i,
+      /case/i,
+      /color/i,
+      /colour/i,
+      /size/i,
+      /material/i,
+      /type/i,
+    ],
+  },
+  {
+    patterns: [/mobile/i, /smartphone/i, /phone/i],
+    configKeys: ['Smartphones'],
+    fallbackKeys: ['RAM', 'Storage', 'Color'],
+    variantKeys: ['RAM', 'Storage', 'Color'],
+    detailKeys: ['RAM', 'Storage', 'Color', 'Display Size', 'Battery Capacity'],
+    allowedDetailKeyPatterns: [
+      /ram/i,
+      /storage/i,
+      /memory/i,
+      /color/i,
+      /colour/i,
+      /display/i,
+      /screen/i,
+      /battery/i,
+      /processor/i,
+      /camera/i,
+      /network/i,
+      /connectivity/i,
+    ],
+  },
+  {
+    patterns: [/laptop/i, /notebook/i, /desktop/i, /computer/i],
+    configKeys: ['Laptops'],
+    fallbackKeys: ['RAM', 'Storage', 'Processor'],
+    variantKeys: ['RAM', 'Storage', 'Processor'],
+    detailKeys: ['RAM', 'Storage', 'Processor', 'Display Size', 'Graphics'],
+    allowedDetailKeyPatterns: [
+      /ram/i,
+      /storage/i,
+      /memory/i,
+      /processor/i,
+      /display/i,
+      /screen/i,
+      /graphics/i,
+      /refresh/i,
+      /resolution/i,
+      /battery/i,
+      /ports?/i,
+      /connectivity/i,
+      /color/i,
+      /colour/i,
+    ],
+  },
+  {
+    patterns: [/tablet/i],
+    fallbackKeys: ['Storage', 'Color', 'Connectivity'],
+    variantKeys: ['Storage', 'Color', 'Connectivity'],
+    detailKeys: ['Storage', 'Color', 'Connectivity', 'Display Size', 'RAM'],
+    allowedDetailKeyPatterns: [
+      /storage/i,
+      /ram/i,
+      /memory/i,
+      /display/i,
+      /screen/i,
+      /connectivity/i,
+      /network/i,
+      /color/i,
+      /colour/i,
+      /battery/i,
+    ],
+  },
+  {
+    patterns: [/television/i, /\btv\b/i, /monitor/i, /display/i],
+    fallbackKeys: ['Display Size', 'Screen Resolution', 'Screen Type'],
+    variantKeys: ['Display Size', 'Screen Resolution', 'Screen Type'],
+    detailKeys: ['Display Size', 'Screen Resolution', 'Screen Type', 'Refresh Rate', 'Connectivity'],
+    allowedDetailKeyPatterns: [
+      /display/i,
+      /screen/i,
+      /resolution/i,
+      /refresh/i,
+      /hd/i,
+      /panel/i,
+      /color/i,
+      /colour/i,
+      /connectivity/i,
+      /ports?/i,
+    ],
+  },
+  {
+    patterns: [/headphone/i, /earbud/i, /speaker/i, /audio/i],
+    configKeys: ['Headphones', 'Electronics'],
+    fallbackKeys: ['Color', 'Connectivity', 'Type'],
+    variantKeys: ['Color', 'Connectivity', 'Type'],
+    detailKeys: ['Color', 'Connectivity', 'Type', 'Battery Life', 'Water Resistance'],
+    allowedDetailKeyPatterns: [
+      /color/i,
+      /colour/i,
+      /connectivity/i,
+      /type/i,
+      /battery/i,
+      /noise/i,
+      /water/i,
+      /size/i,
+      /material/i,
+    ],
+  },
+  {
+    patterns: [/accessor/i, /cover/i, /case/i, /charger/i, /cable/i, /power bank/i],
+    fallbackKeys: ['Compatibility', 'Color', 'Type'],
+    variantKeys: ['Compatibility', 'Color', 'Type'],
+    detailKeys: ['Compatibility', 'Color', 'Type', 'Length', 'Capacity'],
+    allowedDetailKeyPatterns: [
+      /compatib/i,
+      /color/i,
+      /colour/i,
+      /type/i,
+      /length/i,
+      /capacity/i,
+      /power/i,
+      /connector/i,
+      /material/i,
+    ],
   },
   {
     patterns: [/beauty/i, /skin/i, /cosmetic/i, /makeup/i],
     configKeys: ['Beauty & Skincare'],
-    keys: ['Shade', 'Size'],
+    fallbackKeys: ['Shade', 'Size', 'Finish'],
+    variantKeys: ['Shade', 'Size', 'Finish'],
+    detailKeys: ['Shade', 'Size', 'Finish', 'Skin Type', 'Volume'],
+    allowedDetailKeyPatterns: [
+      /shade/i,
+      /finish/i,
+      /size/i,
+      /volume/i,
+      /weight/i,
+      /skin/i,
+      /tone/i,
+      /color/i,
+      /colour/i,
+      /type/i,
+    ],
   },
   {
     patterns: [/electronics?/i, /gadget/i, /device/i],
     configKeys: ['Electronics'],
-    keys: ['Color', 'Connectivity', 'Model'],
+    fallbackKeys: ['Color', 'Connectivity', 'Capacity'],
+    variantKeys: ['Color', 'Connectivity', 'Capacity'],
+    detailKeys: ['Color', 'Connectivity', 'Capacity', 'Type', 'Power Source'],
+    allowedDetailKeyPatterns: [
+      /color/i,
+      /colour/i,
+      /connectivity/i,
+      /capacity/i,
+      /type/i,
+      /power/i,
+      /size/i,
+      /model/i,
+    ],
   },
 ]
 
@@ -151,6 +450,133 @@ const toText = (value: unknown) =>
 
 const toTrimmedText = (value: unknown) => toText(value).trim()
 
+const normalizeCitySlug = (value: unknown) =>
+  toTrimmedText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'all'
+
+const formatCityLabel = (value: string) =>
+  value
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+
+const includesTextIgnoreCase = (source: string, target: string) =>
+  Boolean(target) && source.toLowerCase().includes(target.toLowerCase())
+
+const ensureSentenceEnding = (value: string) => {
+  const text = toTrimmedText(value)
+  if (!text) return ''
+  return /[.!?]$/.test(text) ? text : `${text}.`
+}
+
+const buildMetaProductLabel = (productName: string, brand: string) => {
+  const trimmedProductName = toTrimmedText(productName)
+  const trimmedBrand = toTrimmedText(brand)
+
+  if (trimmedProductName && trimmedBrand) {
+    return includesTextIgnoreCase(trimmedProductName, trimmedBrand)
+      ? trimmedProductName
+      : `${trimmedBrand} ${trimmedProductName}`
+  }
+
+  return trimmedProductName || trimmedBrand
+}
+
+const buildDefaultMetaTitle = ({
+  brand,
+  productName,
+  categoryLabel,
+  cityLabel,
+}: {
+  brand: string
+  productName: string
+  categoryLabel: string
+  cityLabel: string
+}) => {
+  const productLabel = buildMetaProductLabel(productName, brand)
+  const normalizedCategoryLabel = toTrimmedText(categoryLabel)
+  const normalizedCityLabel = toTrimmedText(cityLabel)
+  const titleParts = sanitizeStringList([
+    productLabel,
+    normalizedCategoryLabel &&
+    !includesTextIgnoreCase(productLabel, normalizedCategoryLabel)
+      ? normalizedCategoryLabel
+      : '',
+    normalizedCityLabel &&
+    !includesTextIgnoreCase(productLabel, normalizedCityLabel)
+      ? normalizedCityLabel
+      : '',
+  ])
+
+  return titleParts.join(' | ') || 'Product Overview'
+}
+
+const ensureMetaTitleIncludesCity = (title: string, cityLabel: string) => {
+  const normalizedTitle = toTrimmedText(title)
+  const normalizedCityLabel = toTrimmedText(cityLabel)
+
+  if (!normalizedTitle || !normalizedCityLabel) return normalizedTitle
+  if (includesTextIgnoreCase(normalizedTitle, normalizedCityLabel)) {
+    return normalizedTitle
+  }
+
+  return `${normalizedTitle} | ${normalizedCityLabel}`
+}
+
+const ensureMetaDescriptionIncludesCity = (
+  description: string,
+  cityLabel: string
+) => {
+  const normalizedDescription = toTrimmedText(description)
+  const normalizedCityLabel = toTrimmedText(cityLabel)
+
+  if (!normalizedDescription || !normalizedCityLabel) return normalizedDescription
+  if (includesTextIgnoreCase(normalizedDescription, normalizedCityLabel)) {
+    return ensureSentenceEnding(normalizedDescription)
+  }
+
+  return `${ensureSentenceEnding(normalizedDescription)} Available in ${normalizedCityLabel}.`
+}
+
+const buildDefaultMetaDescription = ({
+  brand,
+  productName,
+  shortDescription,
+  description,
+  categoryLabel,
+  cityLabel,
+}: {
+  brand: string
+  productName: string
+  shortDescription: string
+  description: string
+  categoryLabel: string
+  cityLabel: string
+}) => {
+  const shortCopy = ensureMetaDescriptionIncludesCity(shortDescription, cityLabel)
+  if (shortCopy) return shortCopy
+
+  const descriptionCopy = ensureMetaDescriptionIncludesCity(description, cityLabel)
+  if (descriptionCopy) return descriptionCopy
+
+  const productLabel = buildMetaProductLabel(productName, brand) || 'this product'
+  const normalizedCategoryLabel = toTrimmedText(categoryLabel)
+  const normalizedCityLabel = toTrimmedText(cityLabel)
+  const categorySuffix =
+    normalizedCategoryLabel && !includesTextIgnoreCase(productLabel, normalizedCategoryLabel)
+      ? ` in ${normalizedCategoryLabel}`
+      : ''
+  const citySuffix =
+    normalizedCityLabel && !includesTextIgnoreCase(productLabel, normalizedCityLabel)
+      ? ` in ${normalizedCityLabel}`
+      : ''
+
+  return `Explore ${productLabel}${categorySuffix}${citySuffix}. Check pricing, variants, stock availability, and key product details.`
+}
+
 const sanitizeStringList = (value: unknown) =>
   Array.isArray(value)
     ? Array.from(
@@ -197,21 +623,83 @@ const collectFieldConfigKeys = (configKey: string) =>
         .slice(0, 8)
     : []
 
-const getFallbackVariantKeysFromContext = (contextNames: string[]) => {
+const filterKeysByPatterns = (keys: string[], patterns: RegExp[]) => {
+  if (!patterns.length) return sanitizeStringList(keys)
+
+  return sanitizeStringList(
+    keys.filter((key) => patterns.some((pattern) => pattern.test(String(key || ''))))
+  )
+}
+
+const getVariantContextRule = (contextNames: string[]) => {
   const normalizedContext = sanitizeStringList(contextNames).join(' ')
-  if (!normalizedContext) return []
+  if (!normalizedContext) return null
 
-  const matchedKeys = VARIANT_KEY_CONTEXT_FALLBACKS.flatMap((entry) => {
-    const isMatch = entry.patterns.some((pattern) => pattern.test(normalizedContext))
-    if (!isMatch) return []
+  return (
+    VARIANT_KEY_CONTEXT_RULES.find((rule) =>
+      rule.patterns.some((pattern) => pattern.test(normalizedContext))
+    ) || null
+  )
+}
 
-    return [
-      ...(entry.keys || []),
-      ...(entry.configKeys || []).flatMap(collectFieldConfigKeys),
-    ]
-  })
+const getFallbackVariantKeysFromContext = (contextNames: string[]) => {
+  const matchedRule = getVariantContextRule(contextNames)
+  if (!matchedRule) return []
 
-  return sanitizeStringList(matchedKeys)
+  const scopedConfigKeys = filterKeysByPatterns(
+    (matchedRule.configKeys || []).flatMap(collectFieldConfigKeys),
+    matchedRule.allowedDetailKeyPatterns || GENERIC_VARIANT_KEY_PATTERNS
+  )
+
+  return sanitizeStringList([
+    ...(matchedRule.fallbackKeys || []),
+    ...scopedConfigKeys,
+  ])
+}
+
+const isGenericVariantLikeKey = (key: string) =>
+  GENERIC_VARIANT_KEY_PATTERNS.some((pattern) => pattern.test(String(key || '')))
+
+const buildRecommendedVariantKeysForContext = (
+  apiKeys: string[],
+  contextNames: string[]
+) => {
+  const matchedRule = getVariantContextRule(contextNames)
+  const fallbackKeys = getFallbackVariantKeysFromContext(contextNames)
+
+  if (matchedRule) {
+    const scopedApiKeys = filterKeysByPatterns(
+      apiKeys,
+      matchedRule.allowedDetailKeyPatterns || GENERIC_VARIANT_KEY_PATTERNS
+    )
+
+    return sanitizeStringList([
+      ...(matchedRule.detailKeys || []),
+      ...fallbackKeys,
+      ...scopedApiKeys,
+    ])
+  }
+
+  return sanitizeStringList([
+    ...fallbackKeys,
+    ...apiKeys.filter(isGenericVariantLikeKey),
+  ])
+}
+
+const getSuggestedVariantKeysForContext = (
+  recommendedKeys: string[],
+  contextNames: string[]
+) => {
+  const matchedRule = getVariantContextRule(contextNames)
+
+  if (matchedRule?.variantKeys?.length) {
+    return sanitizeStringList([...matchedRule.variantKeys, ...recommendedKeys])
+  }
+
+  return sanitizeStringList([
+    ...getFallbackVariantKeysFromContext(contextNames),
+    ...recommendedKeys.filter(isGenericVariantLikeKey),
+  ])
 }
 
 const sanitizeFaqs = (value: unknown) => {
@@ -316,14 +804,24 @@ const sanitizeProductCreateDraft = (value: unknown): ProductCreateDraft | null =
 
 const ProductCreateForm: React.FC = () => {
   // Redux state (auth)
+  const dispatch = useDispatch<any>()
   const AUTH_TOKEN = useSelector((state: any) => state.auth?.token || '')
   const authUser = useSelector((state: any) => state.auth?.user || null)
+  const vendorProfile = useSelector(
+    (state: any) =>
+      state.vendorprofile?.profile?.vendor ||
+      state.vendorprofile?.profile?.data ||
+      state.vendorprofile?.profile ||
+      null
+  )
   const vendorId = String(authUser?.id || authUser?._id || '')
   const draftStorageKey = vendorId
     ? buildProductCreateDraftStorageKey(vendorId)
     : ''
   const restoredVariantAttributeKeysRef = useRef<string[] | null>(null)
   const lastAutoAppliedVariantKeyContextRef = useRef('')
+  const lastAutoAppliedMetaTitleRef = useRef('')
+  const lastAutoAppliedMetaDescriptionRef = useRef('')
   const lastGeneratedVariantSuggestionContextRef = useRef('')
   const formTopRef = useRef<HTMLDivElement | null>(null)
 
@@ -492,6 +990,11 @@ const ProductCreateForm: React.FC = () => {
     }
   }, [draftSavedAt])
 
+  useEffect(() => {
+    if (!AUTH_TOKEN || vendorProfile) return
+    void dispatch(fetchVendorProfile())
+  }, [AUTH_TOKEN, dispatch, vendorProfile])
+
   const selectedMainCategoryName = useMemo(() => {
     const current = mainCategories.find(
       (category: any) => String(category?._id) === String(selectedMainCategoryId)
@@ -508,6 +1011,47 @@ const ProductCreateForm: React.FC = () => {
     [categories, selectedCategoryIds]
   )
 
+  const selectedSubcategoryNames = useMemo(
+    () =>
+      filteredSubcategories
+        .filter((subcategory: any) =>
+          formData.productSubCategories.includes(String(subcategory?._id || ''))
+        )
+        .map((subcategory: any) => String(subcategory?.name || '').trim())
+        .filter(Boolean),
+    [filteredSubcategories, formData.productSubCategories]
+  )
+
+  const variantContextNames = useMemo(
+    () =>
+      sanitizeStringList([
+        selectedMainCategoryName,
+        ...selectedCategoryNames,
+        ...selectedSubcategoryNames,
+        toTrimmedText(formData.productName),
+      ]),
+    [
+      formData.productName,
+      selectedCategoryNames,
+      selectedMainCategoryName,
+      selectedSubcategoryNames,
+    ]
+  )
+
+  const addVariantKeySuggestions = useMemo(
+    () => getSuggestedVariantKeysForContext(recommendedVariantKeys, variantContextNames).slice(0, 2),
+    [recommendedVariantKeys, variantContextNames]
+  )
+
+  const variantKeyContextLabel = useMemo(
+    () =>
+      variantContextNames[1] ||
+      variantContextNames[0] ||
+      toTrimmedText(formData.productName) ||
+      'this product',
+    [formData.productName, variantContextNames]
+  )
+
   const allVariantAttributeKeys = useMemo(
     () =>
       sanitizeStringList(
@@ -516,6 +1060,98 @@ const ProductCreateForm: React.FC = () => {
         )
       ),
     [formData.variants]
+  )
+
+  const primarySeoCategoryLabel = useMemo(
+    () =>
+      selectedSubcategoryNames[0] ||
+      selectedCategoryNames[0] ||
+      selectedMainCategoryName ||
+      toTrimmedText(formData.productCategory),
+    [
+      formData.productCategory,
+      selectedCategoryNames,
+      selectedMainCategoryName,
+      selectedSubcategoryNames,
+    ]
+  )
+
+  const seoDefaultCityLabel = useMemo(() => {
+    const defaultCitySlug = normalizeCitySlug(
+      vendorProfile?.default_city_slug ||
+        vendorProfile?.defaultCitySlug ||
+        authUser?.default_city_slug ||
+        authUser?.defaultCitySlug
+    )
+    const defaultCityName = toTrimmedText(
+      vendorProfile?.default_city_name ||
+        vendorProfile?.defaultCityName ||
+        authUser?.default_city_name ||
+        authUser?.defaultCityName
+    )
+    const registrationCity = toTrimmedText(vendorProfile?.city || authUser?.city)
+    const candidateCityName =
+      defaultCitySlug !== 'all'
+        ? defaultCityName || formatCityLabel(defaultCitySlug)
+        : !defaultCityName && registrationCity
+          ? registrationCity
+          : ''
+
+    const matchedCity =
+      cities.find((city: any) => {
+        const cityName = toTrimmedText(city?.name)
+        const citySlug = normalizeCitySlug(city?.slug || city?.name)
+
+        return Boolean(
+          city?.isActive !== false &&
+            ((defaultCitySlug !== 'all' && citySlug === defaultCitySlug) ||
+              (candidateCityName &&
+                cityName.localeCompare(candidateCityName, undefined, {
+                  sensitivity: 'base',
+                }) === 0))
+        )
+      }) || null
+
+    return toTrimmedText(matchedCity?.name || candidateCityName)
+  }, [
+    authUser?.city,
+    authUser?.defaultCityName,
+    authUser?.defaultCitySlug,
+    authUser?.default_city_name,
+    authUser?.default_city_slug,
+    cities,
+    vendorProfile,
+  ])
+
+  const defaultMetaTitle = useMemo(
+    () =>
+      buildDefaultMetaTitle({
+        brand: formData.brand,
+        productName: formData.productName,
+        categoryLabel: primarySeoCategoryLabel,
+        cityLabel: seoDefaultCityLabel,
+      }),
+    [formData.brand, formData.productName, primarySeoCategoryLabel, seoDefaultCityLabel]
+  )
+
+  const defaultMetaDescription = useMemo(
+    () =>
+      buildDefaultMetaDescription({
+        brand: formData.brand,
+        productName: formData.productName,
+        shortDescription: formData.shortDescription,
+        description: formData.description,
+        categoryLabel: primarySeoCategoryLabel,
+        cityLabel: seoDefaultCityLabel,
+      }),
+    [
+      formData.brand,
+      formData.description,
+      formData.productName,
+      formData.shortDescription,
+      primarySeoCategoryLabel,
+      seoDefaultCityLabel,
+    ]
   )
 
   const goToStep = (stepIndex: number) => {
@@ -975,13 +1611,18 @@ const ProductCreateForm: React.FC = () => {
   useEffect(() => {
     if (!isDraftHydrated) return
 
-    const fallbackKeys = getFallbackVariantKeysFromContext([
+    const suggestionContextNames = [
       selectedMainCategoryName,
       ...selectedCategoryNames,
-    ])
+      ...selectedSubcategoryNames,
+      toTrimmedText(formData.productName),
+    ]
+    const fallbackKeys = buildRecommendedVariantKeysForContext([], suggestionContextNames)
     const variantKeyContextSignature = [
       selectedMainCategoryId,
       ...selectedCategoryIds,
+      ...formData.productSubCategories,
+      toTrimmedText(formData.productName),
     ]
       .filter(Boolean)
       .join('|')
@@ -1004,7 +1645,10 @@ const ProductCreateForm: React.FC = () => {
         if (!res.ok) throw new Error('Failed to fetch variant keys')
         const json = await res.json()
         const apiKeys = Array.isArray(json?.data?.keys) ? json.data.keys : []
-        const nextRecommendedKeys = sanitizeStringList([...apiKeys, ...fallbackKeys])
+        const nextRecommendedKeys = buildRecommendedVariantKeysForContext(
+          apiKeys,
+          suggestionContextNames
+        )
         setRecommendedVariantKeys(nextRecommendedKeys)
 
         if (shouldAutoApplyRecommendedKeys) {
@@ -1023,13 +1667,67 @@ const ProductCreateForm: React.FC = () => {
 
     fetchRecommendedVariantKeys()
   }, [
+    formData.productName,
+    formData.productSubCategories,
     isDraftHydrated,
     selectedCategoryIds,
     selectedCategoryNames,
     selectedMainCategoryId,
     selectedMainCategoryName,
+    selectedSubcategoryNames,
     variantAttributeKeys.length,
   ])
+
+  useEffect(() => {
+    if (!isDraftHydrated || !defaultMetaTitle) return
+
+    setFormData((prev: ProductFormData) => {
+      const currentMetaTitle = toTrimmedText(prev.metaTitle)
+      const lastAutoAppliedTitle = lastAutoAppliedMetaTitleRef.current
+
+      if (currentMetaTitle && currentMetaTitle !== lastAutoAppliedTitle) {
+        return prev
+      }
+
+      if (currentMetaTitle === defaultMetaTitle) {
+        lastAutoAppliedMetaTitleRef.current = defaultMetaTitle
+        return prev
+      }
+
+      lastAutoAppliedMetaTitleRef.current = defaultMetaTitle
+      return {
+        ...prev,
+        metaTitle: defaultMetaTitle,
+      }
+    })
+  }, [defaultMetaTitle, isDraftHydrated])
+
+  useEffect(() => {
+    if (!isDraftHydrated || !defaultMetaDescription) return
+
+    setFormData((prev: ProductFormData) => {
+      const currentMetaDescription = toTrimmedText(prev.metaDescription)
+      const lastAutoAppliedDescription = lastAutoAppliedMetaDescriptionRef.current
+
+      if (
+        currentMetaDescription &&
+        currentMetaDescription !== lastAutoAppliedDescription
+      ) {
+        return prev
+      }
+
+      if (currentMetaDescription === defaultMetaDescription) {
+        lastAutoAppliedMetaDescriptionRef.current = defaultMetaDescription
+        return prev
+      }
+
+      lastAutoAppliedMetaDescriptionRef.current = defaultMetaDescription
+      return {
+        ...prev,
+        metaDescription: defaultMetaDescription,
+      }
+    })
+  }, [defaultMetaDescription, isDraftHydrated])
 
   // --- AI Handlers ---
   const generateShortDesc = () =>
@@ -1048,13 +1746,140 @@ const ProductCreateForm: React.FC = () => {
       setFormData
     )
 
+  const handleGenerateMetaTitle = async () => {
+    setAiLoading((prev: any) => ({ ...prev, metaTitle: true }))
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            field: 'metaTitle',
+            context: `Product: ${formData.productName}, Brand: ${formData.brand}, Categories: ${[
+              primarySeoCategoryLabel,
+              ...selectedCategoryNames,
+              ...selectedSubcategoryNames,
+              selectedMainCategoryName,
+            ]
+              .filter(Boolean)
+              .join(', ')}, Default city: ${seoDefaultCityLabel || 'N/A'}`,
+          }),
+        }
+      )
+
+      const data = await res.json().catch(() => null)
+      const nextMetaTitle = ensureMetaTitleIncludesCity(
+        toTrimmedText(data?.data),
+        seoDefaultCityLabel
+      )
+
+      if (!res.ok || !data?.success || !nextMetaTitle) {
+        throw new Error('Failed to generate meta title')
+      }
+
+      setFormData((prev: ProductFormData) => ({
+        ...prev,
+        metaTitle: nextMetaTitle,
+      }))
+    } catch {
+      const currentMetaTitle = toTrimmedText(formData.metaTitle)
+      const shouldApplyFallback =
+        !currentMetaTitle ||
+        currentMetaTitle === lastAutoAppliedMetaTitleRef.current
+
+      if (shouldApplyFallback) {
+        lastAutoAppliedMetaTitleRef.current = defaultMetaTitle
+        setFormData((prev: ProductFormData) => ({
+          ...prev,
+          metaTitle: defaultMetaTitle,
+        }))
+      }
+
+      toast.error(
+        shouldApplyFallback
+          ? 'AI failed. Default meta title applied.'
+          : 'AI failed. Existing meta title kept.'
+      )
+    } finally {
+      setAiLoading((prev: any) => ({ ...prev, metaTitle: false }))
+    }
+  }
+
+  const handleGenerateMetaDescription = async () => {
+    setAiLoading((prev: any) => ({ ...prev, metaDescription: true }))
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            field: 'metaDescription',
+            context: `Product: ${formData.productName}, Brand: ${formData.brand}, Short description: ${formData.shortDescription}, Description: ${formData.description}, Categories: ${[
+              primarySeoCategoryLabel,
+              ...selectedCategoryNames,
+              ...selectedSubcategoryNames,
+              selectedMainCategoryName,
+            ]
+              .filter(Boolean)
+              .join(', ')}, Default city: ${seoDefaultCityLabel || 'N/A'}`,
+          }),
+        }
+      )
+
+      const data = await res.json().catch(() => null)
+      const nextMetaDescription = ensureMetaDescriptionIncludesCity(
+        toTrimmedText(data?.data),
+        seoDefaultCityLabel
+      )
+
+      if (!res.ok || !data?.success || !nextMetaDescription) {
+        throw new Error('Failed to generate meta description')
+      }
+
+      setFormData((prev: ProductFormData) => ({
+        ...prev,
+        metaDescription: nextMetaDescription,
+      }))
+    } catch {
+      const currentMetaDescription = toTrimmedText(formData.metaDescription)
+      const shouldApplyFallback =
+        !currentMetaDescription ||
+        currentMetaDescription === lastAutoAppliedMetaDescriptionRef.current
+
+      if (shouldApplyFallback) {
+        lastAutoAppliedMetaDescriptionRef.current = defaultMetaDescription
+        setFormData((prev: ProductFormData) => ({
+          ...prev,
+          metaDescription: defaultMetaDescription,
+        }))
+      }
+
+      toast.error(
+        shouldApplyFallback
+          ? 'AI failed. Default meta description applied.'
+          : 'AI failed. Existing meta description kept.'
+      )
+    } finally {
+      setAiLoading((prev: any) => ({ ...prev, metaDescription: false }))
+    }
+  }
+
   const handleGenerateVariantKeySuggestions = async (_variantIndex: number) => {
-    const categoryContext = [...selectedCategoryNames, selectedMainCategoryName]
+    const categoryContext = [
+      ...selectedCategoryNames,
+      ...selectedSubcategoryNames,
+      selectedMainCategoryName,
+    ]
       .filter(Boolean)
       .join(', ')
     const suggestionContextSignature = [
       selectedMainCategoryId,
       ...selectedCategoryIds,
+      ...formData.productSubCategories,
       toTrimmedText(formData.productName),
     ]
       .filter(Boolean)
@@ -1090,10 +1915,10 @@ const ProductCreateForm: React.FC = () => {
         throw new Error(json?.message || 'Failed to generate variant keys')
       }
 
-      const nextRecommendedKeys = sanitizeStringList([
-        ...recommendedVariantKeys,
-        ...json.data,
-      ])
+      const nextRecommendedKeys = buildRecommendedVariantKeysForContext(
+        [...recommendedVariantKeys, ...json.data],
+        variantContextNames
+      )
 
       setRecommendedVariantKeys(nextRecommendedKeys)
       lastGeneratedVariantSuggestionContextRef.current = suggestionContextSignature
@@ -1124,13 +1949,20 @@ const ProductCreateForm: React.FC = () => {
     }
   }, [formData.variants.length])
 
-  const handleAddVariant = () => {
+  const handleAddVariant = (selectedKeys: string[]) => {
+    const initialKeys = sanitizeStringList(
+      selectedKeys.length ? selectedKeys : variantAttributeKeys
+    )
+
+    if (!initialKeys.length) return
+
+    setVariantAttributeKeys((prev) => sanitizeStringList([...prev, ...initialKeys]))
     setFormData((prev: ProductFormData) => ({
         ...prev,
         variants: [
           ...prev.variants,
           {
-            variantAttributes: variantAttributeKeys.reduce<Record<string, string>>(
+            variantAttributes: initialKeys.reduce<Record<string, string>>(
               (acc, key) => {
                 acc[key] = ''
                 return acc
@@ -1151,6 +1983,60 @@ const ProductCreateForm: React.FC = () => {
     const newVariants = [...formData.variants]
     newVariants.splice(index, 1)
     setFormData((prev: ProductFormData) => ({ ...prev, variants: newVariants }))
+  }
+
+  const handleCopyVariantFromPrevious = (variantIndex: number) => {
+    if (variantIndex <= 0) return
+
+    const sourceVariant = formData.variants[variantIndex - 1]
+    if (!sourceVariant) return
+
+    const sourceKeys = sanitizeStringList(
+      Object.keys(sourceVariant.variantAttributes || {})
+    )
+
+    setVariantAttributeKeys((prev) =>
+      sanitizeStringList([...prev, ...sourceKeys])
+    )
+
+    setFormData((prev: ProductFormData) => {
+      const variants = [...prev.variants]
+      const targetVariant = variants[variantIndex]
+      const previousVariant = variants[variantIndex - 1]
+
+      if (!targetVariant || !previousVariant) return prev
+
+      const targetAttributes = sanitizeStringRecord(targetVariant.variantAttributes)
+      const previousAttributes = sanitizeStringRecord(previousVariant.variantAttributes)
+      const targetKeys = sanitizeStringList(Object.keys(targetAttributes))
+      const previousKeys = sanitizeStringList(Object.keys(previousAttributes))
+      const protectedVariantKey = targetKeys[0] || ''
+      const nextAttributeKeys = sanitizeStringList([...targetKeys, ...previousKeys])
+
+      variants[variantIndex] = {
+        ...targetVariant,
+        variantAttributes: nextAttributeKeys.reduce<Record<string, string>>(
+          (acc, key) => {
+            if (key === protectedVariantKey) {
+              acc[key] = toText(targetAttributes[key] || '')
+              return acc
+            }
+
+            acc[key] = toText(previousAttributes[key] ?? targetAttributes[key] ?? '')
+            return acc
+          },
+          {}
+        ),
+        actualPrice: previousVariant.actualPrice,
+        finalPrice: previousVariant.finalPrice,
+        stockQuantity: previousVariant.stockQuantity,
+        isActive: previousVariant.isActive,
+      }
+
+      return { ...prev, variants }
+    })
+
+    toast.success('Copied details from the variant above')
   }
 
   const handleVariantFieldChange = (
@@ -1270,28 +2156,48 @@ const ProductCreateForm: React.FC = () => {
     setFormData((prev: ProductFormData) => ({ ...prev, variants: newVariants }))
   }
 
+  const mergeVariantOptionKeys = useCallback(
+    (variantIndex: number, keysToAdd: string[]) => {
+      const normalizedKeys = sanitizeStringList(keysToAdd)
+      if (!normalizedKeys.length) return
+
+      setFormData((prev: ProductFormData) => {
+        const variants = [...prev.variants]
+        const targetVariant = variants[variantIndex]
+        if (!targetVariant) return prev
+
+        const currentVariantKeys = sanitizeStringList(
+          Object.keys(targetVariant.variantAttributes || {})
+        )
+        const nextKeys = sanitizeStringList([...currentVariantKeys, ...normalizedKeys])
+
+        if (nextKeys.length === currentVariantKeys.length) {
+          return prev
+        }
+
+        variants[variantIndex] = {
+          ...targetVariant,
+          variantAttributes: nextKeys.reduce<Record<string, string>>((acc, key) => {
+            acc[key] = String(targetVariant.variantAttributes?.[key] || '')
+            return acc
+          }, {}),
+        }
+
+        return { ...prev, variants }
+      })
+    },
+    []
+  )
+
   const handleAddVariantOptionKey = (variantIndex: number, keyToAdd: string) => {
-    const normalizedKey = toTrimmedText(keyToAdd)
-    if (!normalizedKey) return
-
-    const currentVariantKeys = sanitizeStringList(
-      Object.keys(formData.variants[variantIndex]?.variantAttributes || {})
-    )
-    if (currentVariantKeys.includes(normalizedKey)) return
-
-    syncVariantWithOptionKeys(variantIndex, [...currentVariantKeys, normalizedKey])
+    mergeVariantOptionKeys(variantIndex, [keyToAdd])
   }
 
-  const handleAddSuggestedVariantKey = (variantIndex: number, keyToAdd: string) => {
-    const normalizedKey = toTrimmedText(keyToAdd)
-    if (!normalizedKey) return
-
-    const currentVariantKeys = sanitizeStringList(
-      Object.keys(formData.variants[variantIndex]?.variantAttributes || {})
-    )
-    if (currentVariantKeys.includes(normalizedKey)) return
-
-    syncVariantWithOptionKeys(variantIndex, [...currentVariantKeys, normalizedKey])
+  const handleAddSuggestedVariantKeys = (
+    variantIndex: number,
+    keysToAdd: string[]
+  ) => {
+    mergeVariantOptionKeys(variantIndex, keysToAdd)
   }
 
   const handleRemoveVariantOptionKey = (
@@ -1426,13 +2332,15 @@ const ProductCreateForm: React.FC = () => {
           <Step5Variants
             variants={formData.variants}
             recommendedAttributeKeys={recommendedVariantKeys}
+            variantKeySuggestions={addVariantKeySuggestions}
+            variantKeyContextLabel={variantKeyContextLabel}
             websiteOptions={websites}
             selectedWebsiteIds={formData.websiteIds}
             isWebsiteLoading={isWebsiteLoading}
             isAvailable={formData.isAvailable}
             aiLoading={aiLoading.variantKeys}
             onAddAttributeKey={handleAddVariantOptionKey}
-            onAddSuggestedAttributeKey={handleAddSuggestedVariantKey}
+            onAddSuggestedAttributeKeys={handleAddSuggestedVariantKeys}
             onRemoveAttributeKey={handleRemoveVariantOptionKey}
             onToggleAvailable={() =>
               setFormData((prev: ProductFormData) => ({
@@ -1448,6 +2356,7 @@ const ProductCreateForm: React.FC = () => {
             }
             onGenerateSuggestedKeys={handleGenerateVariantKeySuggestions}
             onAddVariant={handleAddVariant}
+            onCopyFromPreviousVariant={handleCopyVariantFromPrevious}
             onRemoveVariant={handleRemoveVariant}
             onVariantFieldChange={handleVariantFieldChange}
             onVariantAttributeChange={handleVariantAttributeChange}
@@ -1494,20 +2403,10 @@ const ProductCreateForm: React.FC = () => {
                 }))
               }}
               onGenerateTitle={() =>
-                generateWithAI(
-                  'metaTitle',
-                  `Product: ${formData.productName}`,
-                  setAiLoading,
-                  setFormData
-                )
+                handleGenerateMetaTitle()
               }
               onGenerateDesc={() =>
-                generateWithAI(
-                  'metaDescription',
-                  `Product: ${formData.productName}, ${formData.shortDescription}`,
-                  setAiLoading,
-                  setFormData
-                )
+                handleGenerateMetaDescription()
               }
               onGenerateKeywords={async () => {
                 setAiLoading((prev: any) => ({ ...prev, metaKeywords: true }))

@@ -1,13 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { RootState } from '@/store'
-import { Globe2, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
-import { useSelector } from 'react-redux'
+import type { AppDispatch, RootState } from '@/store'
+import {
+  Check,
+  ChevronsUpDown,
+  Globe2,
+  Info,
+  Loader2,
+  MapPin,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -31,10 +47,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { ServerPagination } from '@/components/data-table/server-pagination'
 import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { TableShell } from '@/components/data-table/table-shell'
 import { Main } from '@/components/layout/main'
+import { setUser } from '@/store/slices/authSlice'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 
 type CityRow = {
   _id: string
@@ -49,10 +72,26 @@ type CityRow = {
   createdAt?: string
 }
 
-type CountryConfig = {
+type CountryOption = {
   code: string
   name: string
-  states: string[]
+  dialCode?: string
+  flagUrl?: string
+  states?: string[]
+}
+
+type CountryMeta = {
+  code: string
+  flag: string
+  flagUrl: string
+  name: string
+}
+
+type MultiSelectOption = {
+  value: string
+  label: string
+  flag?: string
+  meta?: string
 }
 
 const API_BASE = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(
@@ -60,7 +99,7 @@ const API_BASE = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(
   ''
 )
 
-const COUNTRY_CONFIGS: CountryConfig[] = [
+const FALLBACK_COUNTRY_CONFIGS: CountryOption[] = [
   {
     code: 'IN',
     name: 'India',
@@ -225,6 +264,12 @@ const normalizeText = (value: unknown) => String(value || '').trim()
 const normalizeSearchValue = (value: unknown) =>
   normalizeText(value).toLowerCase().replace(/\s+/g, ' ')
 
+const normalizeCitySlug = (value: unknown) =>
+  normalizeText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
 const toTitleCase = (value: string) =>
   value
     .trimStart()
@@ -242,6 +287,12 @@ const uniqueStrings = (values: string[]) =>
     new Set(values.map((value) => normalizeText(value)).filter(Boolean))
   )
 
+const buildFallbackFlagUrl = (countryCode?: string) => {
+  const code = normalizeText(countryCode).toLowerCase()
+  if (!code) return ''
+  return `https://flagcdn.com/w20/${code}.png`
+}
+
 const getFlagEmoji = (countryCode?: string) => {
   const code = normalizeText(countryCode).toUpperCase()
   if (code.length !== 2) return ''
@@ -250,23 +301,114 @@ const getFlagEmoji = (countryCode?: string) => {
   )
 }
 
-const getCountryConfig = (countryName?: string) => {
+const mergeCountryOption = (
+  current: CountryOption | undefined,
+  next: CountryOption
+): CountryOption => ({
+  code: normalizeText(next.code) || current?.code || '',
+  dialCode: normalizeText(next.dialCode) || current?.dialCode || '',
+  flagUrl: normalizeText(next.flagUrl) || current?.flagUrl || '',
+  name: normalizeText(next.name) || current?.name || '',
+  states:
+    next.states && next.states.length
+      ? uniqueStrings(next.states).sort((a, b) => a.localeCompare(b))
+      : current?.states || [],
+})
+
+const buildCountryLookup = (countries: CountryOption[]) => {
+  const lookup = new Map<string, CountryOption>()
+
+  countries.forEach((country) => {
+    const normalizedCountry = normalizeSearchValue(country.name)
+    if (!normalizedCountry) return
+
+    const current = lookup.get(normalizedCountry)
+    lookup.set(normalizedCountry, mergeCountryOption(current, country))
+  })
+
+  return lookup
+}
+
+const getFallbackCountryConfig = (countryName?: string) => {
   const normalizedCountry = normalizeSearchValue(countryName)
   return (
-    COUNTRY_CONFIGS.find(
+    FALLBACK_COUNTRY_CONFIGS.find(
       (country) => normalizeSearchValue(country.name) === normalizedCountry
     ) || null
   )
 }
 
-const getCountryMeta = (countryName?: string) => {
-  const config = getCountryConfig(countryName)
+const getCountryConfig = (
+  countryName?: string,
+  countryLookup?: Map<string, CountryOption>
+) => {
+  const normalizedCountry = normalizeSearchValue(countryName)
+  if (!normalizedCountry) return null
+  return (
+    countryLookup?.get(normalizedCountry) ||
+    getFallbackCountryConfig(countryName) ||
+    null
+  )
+}
+
+const getCountryMeta = (
+  countryName?: string,
+  countryLookup?: Map<string, CountryOption>
+): CountryMeta => {
+  const config = getCountryConfig(countryName, countryLookup)
   const name = normalizeText(countryName) || config?.name || 'Unknown'
+  const code = config?.code || ''
+
   return {
     name,
-    code: config?.code || '',
-    flag: getFlagEmoji(config?.code),
+    code,
+    flag: getFlagEmoji(code),
+    flagUrl: normalizeText(config?.flagUrl) || buildFallbackFlagUrl(code),
   }
+}
+
+const getCountryStateOptions = (
+  countryName?: string,
+  countryLookup?: Map<string, CountryOption>,
+  statesByCountry: Record<string, string[]> = {}
+) => {
+  const normalizedCountry = normalizeSearchValue(countryName)
+  const cachedStates = normalizedCountry
+    ? statesByCountry[normalizedCountry] || []
+    : []
+  const configStates = getCountryConfig(countryName, countryLookup)?.states || []
+
+  return uniqueStrings([...cachedStates, ...configStates]).sort((a, b) =>
+    a.localeCompare(b)
+  )
+}
+
+const CountryFlag = ({
+  country,
+  className,
+}: {
+  country: CountryMeta
+  className?: string
+}) => {
+  if (country.flagUrl) {
+    return (
+      <img
+        src={country.flagUrl}
+        alt=''
+        className={cn('h-4 w-6 rounded-sm border border-slate-200 object-cover', className)}
+      />
+    )
+  }
+
+  if (country.flag) {
+    return (
+      <span className={cn('text-base leading-none', className)}>
+        {country.flag}
+      </span>
+    )
+  }
+
+  return <Globe2 className={cn('text-muted-foreground h-4 w-4', className)} />
 }
 
 const formatDate = (value?: string) => {
@@ -293,9 +435,202 @@ const canMutateCity = ({
   city.canDelete === true ||
   (isVendor && String(city.createdBy || '') === currentUserId)
 
+const filterMultiSelectOptions = (
+  options: MultiSelectOption[],
+  search: string
+) => {
+  const query = normalizeSearchValue(search)
+  if (!query) return options
+
+  return options.filter((option) =>
+    normalizeSearchValue(
+      `${option.label} ${option.value} ${option.meta || ''}`
+    ).includes(query)
+  )
+}
+
+const SearchableMultiSelect = ({
+  values,
+  options,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  emptyLabel,
+  disabled,
+  loading,
+  triggerFlag,
+}: {
+  values: string[]
+  options: MultiSelectOption[]
+  onChange: (values: string[]) => void
+  placeholder: string
+  searchPlaceholder: string
+  emptyLabel: string
+  disabled?: boolean
+  loading?: boolean
+  triggerFlag?: string
+}) => {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const visibleOptions = useMemo(
+    () => filterMultiSelectOptions(options, search),
+    [options, search]
+  )
+
+  const selectedLabels = useMemo(() => {
+    const optionMap = new Map(options.map((option) => [option.value, option.label]))
+    return values
+      .map((value) => optionMap.get(value))
+      .filter(Boolean) as string[]
+  }, [options, values])
+
+  const buttonText = useMemo(() => {
+    if (loading) return 'Loading cities...'
+    if (!selectedLabels.length) return placeholder
+    if (selectedLabels.length <= 2) return selectedLabels.join(', ')
+    return `${selectedLabels[0]}, ${selectedLabels[1]} +${selectedLabels.length - 2} more`
+  }, [loading, placeholder, selectedLabels])
+
+  const toggleValue = (value: string) => {
+    if (values.includes(value)) {
+      onChange(values.filter((item) => item !== value))
+      return
+    }
+
+    onChange(uniqueStrings([...values, value]).sort((a, b) => a.localeCompare(b)))
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen)
+        if (!nextOpen) setSearch('')
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          type='button'
+          role='combobox'
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            'flex h-11 w-full items-center justify-between rounded-md border bg-background px-3 text-left text-sm shadow-sm transition-none disabled:cursor-not-allowed disabled:opacity-60',
+            !selectedLabels.length && 'text-muted-foreground'
+          )}
+        >
+          <span className='flex min-w-0 items-center gap-2'>
+            {triggerFlag ? (
+              <span className='shrink-0 text-base leading-none'>{triggerFlag}</span>
+            ) : null}
+            <span className='truncate'>{buttonText}</span>
+          </span>
+          <ChevronsUpDown className='h-4 w-4 shrink-0 opacity-50' />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className='w-[--radix-popover-trigger-width] p-0' align='start'>
+        <div className='border-b p-2'>
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={searchPlaceholder}
+            className='h-10 rounded-md'
+          />
+        </div>
+
+        <div
+          className='max-h-72 overflow-y-auto overscroll-contain'
+          onWheelCapture={(event) => {
+            event.stopPropagation()
+          }}
+        >
+          {loading ? (
+            <div className='text-muted-foreground flex items-center gap-2 px-3 py-3 text-sm'>
+              <Loader2 className='h-4 w-4 animate-spin' />
+              Loading cities...
+            </div>
+          ) : null}
+
+          {!loading && !visibleOptions.length ? (
+            <div className='text-muted-foreground px-3 py-3 text-sm'>
+              {emptyLabel}
+            </div>
+          ) : null}
+
+          {visibleOptions.map((option, index) => {
+            const checked = values.includes(option.value)
+
+            return (
+              <button
+                key={option.value}
+                type='button'
+                onClick={() => toggleValue(option.value)}
+                className={cn(
+                  'flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-none',
+                  index !== visibleOptions.length - 1 && 'border-b',
+                  checked && 'bg-muted/20'
+                )}
+              >
+                <span className='flex h-4 w-4 items-center justify-center rounded-sm border'>
+                  <Check
+                    className={cn('h-3.5 w-3.5', checked ? 'opacity-100' : 'opacity-0')}
+                  />
+                </span>
+                {option.flag ? (
+                  <span className='shrink-0 text-base leading-none'>{option.flag}</span>
+                ) : null}
+                <div className='min-w-0'>
+                  <div className='truncate'>{option.label}</div>
+                  {option.meta ? (
+                    <div className='text-muted-foreground text-xs'>{option.meta}</div>
+                  ) : null}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className='flex items-center justify-between gap-2 border-t px-2 py-2'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={() =>
+                onChange(
+                  uniqueStrings([
+                    ...values,
+                    ...visibleOptions.map((option) => option.value),
+                  ]).sort((a, b) => a.localeCompare(b))
+                )
+              }
+              disabled={!visibleOptions.length}
+            >
+              Select all shown
+            </Button>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={() => onChange([])}
+              disabled={!values.length}
+            >
+              Clear
+            </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 export default function CitiesPage() {
+  const dispatch = useDispatch<AppDispatch>()
   const token = useSelector((state: RootState) => state.auth?.token || '')
   const authUser = useSelector((state: RootState) => state.auth?.user || null)
+  const vendorProfile = useSelector((state: RootState) => {
+    const profile = (state as any).vendorprofile?.profile
+    return profile?.vendor || profile?.data || profile || null
+  })
   const role = normalizeRole(authUser?.role)
   const isAdmin = role === 'admin' || role === 'superadmin'
   const isVendor = role === 'vendor'
@@ -316,18 +651,128 @@ export default function CitiesPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingCity, setEditingCity] = useState<CityRow | null>(null)
   const [form, setForm] = useState(DEFAULT_FORM)
+  const [defaultCitySavingId, setDefaultCitySavingId] = useState<string | null>(null)
+  const [countries, setCountries] = useState<CountryOption[]>([])
+  const [countriesLoading, setCountriesLoading] = useState(false)
+  const [countriesError, setCountriesError] = useState('')
+  const [statesByCountry, setStatesByCountry] = useState<Record<string, string[]>>({})
+  const [statesLoading, setStatesLoading] = useState(false)
+  const [statesError, setStatesError] = useState('')
   const [discoveredCities, setDiscoveredCities] = useState<string[]>([])
-  const [discoveredSearch, setDiscoveredSearch] = useState('')
-  const [selectedSuggestedCity, setSelectedSuggestedCity] = useState('')
   const [queuedCities, setQueuedCities] = useState<string[]>([])
   const [loadingStateCities, setLoadingStateCities] = useState(false)
+
+  const vendorRegistrationCountry =
+    normalizeText(vendorProfile?.country || authUser?.country) || 'India'
+  const vendorRegistrationState = normalizeText(
+    vendorProfile?.state || authUser?.state
+  )
+  const vendorRegistrationCity = toTitleCase(
+    normalizeText(vendorProfile?.city || authUser?.city)
+  )
+  const vendorDefaultCitySlug = normalizeCitySlug(
+    vendorProfile?.default_city_slug ||
+      vendorProfile?.defaultCitySlug ||
+      authUser?.default_city_slug ||
+      authUser?.defaultCitySlug
+  )
+  const vendorDefaultCityName = normalizeText(
+    vendorProfile?.default_city_name ||
+      vendorProfile?.defaultCityName ||
+      authUser?.default_city_name ||
+      authUser?.defaultCityName
+  )
+
+  const activeCities = useMemo(
+    () =>
+      [...cities]
+        .filter((city) => city?.isActive !== false)
+        .sort((left, right) =>
+          String(left?.name || '').localeCompare(String(right?.name || ''), undefined, {
+            sensitivity: 'base',
+          })
+        ),
+    [cities]
+  )
+
+  const defaultCityMeta = useMemo(() => {
+    const defaultSlug =
+      vendorDefaultCitySlug && vendorDefaultCitySlug !== 'all'
+        ? vendorDefaultCitySlug
+        : normalizeCitySlug(vendorRegistrationCity)
+    const defaultName = vendorDefaultCityName || vendorRegistrationCity
+
+    const matchedCity =
+      activeCities.find((city) => {
+        const citySlug = normalizeCitySlug(city.slug || city.name)
+        return Boolean(
+          (defaultSlug && citySlug === defaultSlug) ||
+            (defaultName &&
+              normalizeSearchValue(city.name) === normalizeSearchValue(defaultName))
+        )
+      }) || null
+
+    if (matchedCity) {
+      return {
+        id: normalizeText(matchedCity._id),
+        name: matchedCity.name,
+        state: matchedCity.state || '',
+        country: matchedCity.country || vendorRegistrationCountry,
+      }
+    }
+
+    if (vendorRegistrationCity) {
+      return {
+        id: '',
+        name: vendorRegistrationCity,
+        state: vendorRegistrationState,
+        country: vendorRegistrationCountry,
+      }
+    }
+
+    if (vendorDefaultCitySlug === 'all') {
+      return {
+        id: '',
+        name: 'All Cities',
+        state: '',
+        country: '',
+      }
+    }
+
+    return {
+      id: '',
+      name: vendorDefaultCityName || '',
+      state: vendorRegistrationState,
+      country: vendorRegistrationCountry,
+    }
+  }, [
+    activeCities,
+    vendorDefaultCityName,
+    vendorDefaultCitySlug,
+    vendorRegistrationCity,
+    vendorRegistrationCountry,
+    vendorRegistrationState,
+  ])
+
+  const currentDefaultCityId = normalizeText(defaultCityMeta.id)
+
+  useEffect(() => {
+    if (!isVendor || vendorProfile) return
+    void dispatch(fetchVendorProfile())
+  }, [dispatch, isVendor, vendorProfile])
+
+  const defaultCityLabel = useMemo(() => {
+    if (defaultCityMeta.name === 'All Cities') return defaultCityMeta.name
+    return [defaultCityMeta.name, defaultCityMeta.state, defaultCityMeta.country]
+      .filter(Boolean)
+      .join(', ')
+  }, [defaultCityMeta])
 
   const resetSheetState = useCallback(() => {
     setEditingCity(null)
     setForm(DEFAULT_FORM)
+    setStatesError('')
     setDiscoveredCities([])
-    setDiscoveredSearch('')
-    setSelectedSuggestedCity('')
     setQueuedCities([])
   }, [])
 
@@ -366,6 +811,46 @@ export default function CitiesPage() {
     }
   }, [token])
 
+  const loadCountries = useCallback(async () => {
+    if (!token) {
+      setCountries([])
+      setCountriesLoading(false)
+      return
+    }
+
+    setCountriesLoading(true)
+    setCountriesError('')
+    try {
+      const response = await fetch(`${API_BASE}/v1/cities/countries`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const body = await response.json()
+      if (!response.ok || body?.success === false) {
+        throw new Error(
+          body?.message || `Failed to load countries (HTTP ${response.status})`
+        )
+      }
+
+      setCountries(
+        Array.isArray(body?.data)
+          ? body.data.map((country: CountryOption) => ({
+              code: normalizeText(country?.code),
+              dialCode: normalizeText(country?.dialCode),
+              flagUrl: normalizeText(country?.flagUrl),
+              name: normalizeText(country?.name),
+            }))
+          : []
+      )
+    } catch (fetchError: any) {
+      setCountries([])
+      setCountriesError(fetchError?.message || 'Failed to load countries')
+    } finally {
+      setCountriesLoading(false)
+    }
+  }, [token])
+
   const loadStateCities = useCallback(
     async (stateName: string, countryName: string) => {
       const safeState = normalizeText(stateName)
@@ -373,7 +858,6 @@ export default function CitiesPage() {
 
       if (!safeState || !token) {
         setDiscoveredCities([])
-        setSelectedSuggestedCity('')
         return
       }
 
@@ -402,12 +886,8 @@ export default function CitiesPage() {
         ).sort((a, b) => a.localeCompare(b))
 
         setDiscoveredCities(options)
-        setSelectedSuggestedCity((current) =>
-          options.includes(current) ? current : ''
-        )
       } catch (fetchError: any) {
         setDiscoveredCities([])
-        setSelectedSuggestedCity('')
         toast.error(
           fetchError?.message || 'Failed to fetch cities for selected state'
         )
@@ -424,30 +904,149 @@ export default function CitiesPage() {
   }, [canAccess, loadCities])
 
   useEffect(() => {
+    if (!canAccess) return
+    loadCountries()
+  }, [canAccess, loadCountries])
+
+  useEffect(() => {
+    if (!sheetOpen || !token) {
+      setStatesLoading(false)
+      return
+    }
+
+    const safeCountry = normalizeText(form.country) || DEFAULT_FORM.country
+    const countryKey = normalizeSearchValue(safeCountry)
+    if (!countryKey) {
+      setStatesLoading(false)
+      setStatesError('')
+      return
+    }
+
+    if (Object.prototype.hasOwnProperty.call(statesByCountry, countryKey)) {
+      setStatesError('')
+      setStatesLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    let isMounted = true
+
+    const loadCountryStates = async () => {
+      setStatesLoading(true)
+      setStatesError('')
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/v1/cities/states?country=${encodeURIComponent(safeCountry)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          }
+        )
+        const body = await response.json()
+        if (!response.ok || body?.success === false) {
+          throw new Error(
+            body?.message || `Failed to load states (HTTP ${response.status})`
+          )
+        }
+
+        if (!isMounted || controller.signal.aborted) return
+
+        const nextStates = uniqueStrings(
+          Array.isArray(body?.states) ? body.states.map(String) : []
+        ).sort((a, b) => a.localeCompare(b))
+
+        setStatesByCountry((current) => ({
+          ...current,
+          [countryKey]: nextStates,
+        }))
+      } catch (fetchError: any) {
+        if (!isMounted || controller.signal.aborted) return
+        setStatesError(fetchError?.message || 'Failed to load states')
+      } finally {
+        if (isMounted && !controller.signal.aborted) {
+          setStatesLoading(false)
+        }
+      }
+    }
+
+    void loadCountryStates()
+
+    return () => {
+      isMounted = false
+      controller.abort()
+    }
+  }, [canAccess, form.country, sheetOpen, statesByCountry, token])
+
+  useEffect(() => {
     if (!sheetOpen || !form.state) {
       setDiscoveredCities([])
-      setSelectedSuggestedCity('')
-      setDiscoveredSearch('')
       return
     }
 
     loadStateCities(form.state, form.country)
   }, [form.country, form.state, loadStateCities, sheetOpen])
 
-  const countryOptions = useMemo(() => {
-    const countryNames = uniqueStrings([
-      ...COUNTRY_CONFIGS.map((country) => country.name),
-      ...cities.map((city) => city.country || ''),
-    ])
+  const countryLookup = useMemo(
+    () =>
+      buildCountryLookup([
+        ...FALLBACK_COUNTRY_CONFIGS,
+        ...countries,
+        ...uniqueStrings([
+          ...cities.map((city) => city.country || ''),
+          authUser?.country || '',
+          form.country,
+        ]).map((countryName) => ({
+          code: '',
+          name: countryName,
+        })),
+      ]),
+    [authUser?.country, cities, countries, form.country]
+  )
 
-    return countryNames
-      .map((countryName) => getCountryMeta(countryName))
+  const countryOptions = useMemo(() => {
+    return Array.from(countryLookup.values())
+      .map((country) => getCountryMeta(country.name, countryLookup))
       .sort((left, right) => {
         if (left.name === 'India') return -1
         if (right.name === 'India') return 1
         return left.name.localeCompare(right.name)
       })
-  }, [cities])
+  }, [countryLookup])
+
+  const formStateOptions = useMemo(() => {
+    const apiStates = getCountryStateOptions(
+      form.country,
+      countryLookup,
+      statesByCountry
+    )
+    const dynamicStates = cities
+      .filter(
+        (city) =>
+          normalizeSearchValue(city.country || 'India') ===
+          normalizeSearchValue(form.country)
+      )
+      .map((city) => city.state || '')
+
+    return uniqueStrings([...apiStates, ...dynamicStates, form.state]).sort((a, b) =>
+      a.localeCompare(b)
+    )
+  }, [cities, countryLookup, form.country, form.state, statesByCountry])
+
+  const getResolvedCountryMeta = useCallback(
+    (countryName?: string) => getCountryMeta(countryName, countryLookup),
+    [countryLookup]
+  )
+
+  const selectedFormCountry = getResolvedCountryMeta(form.country)
+
+  const selectedCountryStateOptions = useMemo(
+    () =>
+      getCountryStateOptions(form.country, countryLookup, statesByCountry),
+    [countryLookup, form.country, statesByCountry]
+  )
 
   const tableStateOptions = useMemo(() => {
     const visibleCities =
@@ -464,29 +1063,21 @@ export default function CitiesPage() {
     )
   }, [cities, countryFilter])
 
-  const formStateOptions = useMemo(() => {
-    const configStates = getCountryConfig(form.country)?.states || []
-    const dynamicStates = cities
-      .filter(
-        (city) =>
-          normalizeSearchValue(city.country || 'India') ===
-          normalizeSearchValue(form.country)
-      )
-      .map((city) => city.state || '')
+  const discoveredCityOptions = useMemo<MultiSelectOption[]>(
+    () =>
+      discoveredCities.map((cityName) => ({
+        value: cityName,
+        label: cityName,
+        flag: getResolvedCountryMeta(form.country).flag,
+        meta: form.state || form.country || '',
+      })),
+    [discoveredCities, form.country, form.state, getResolvedCountryMeta]
+  )
 
-    return uniqueStrings([...configStates, ...dynamicStates]).sort((a, b) =>
-      a.localeCompare(b)
-    )
-  }, [cities, form.country])
-
-  const filteredDiscoveredCities = useMemo(() => {
-    const query = normalizeSearchValue(discoveredSearch)
-    if (!query) return discoveredCities
-
-    return discoveredCities.filter((city) =>
-      normalizeSearchValue(city).includes(query)
-    )
-  }, [discoveredCities, discoveredSearch])
+  const selectedDiscoveredCities = useMemo(
+    () => queuedCities.filter((cityName) => discoveredCities.includes(cityName)),
+    [discoveredCities, queuedCities]
+  )
 
   const filteredCities = useMemo(() => {
     const query = normalizeSearchValue(searchTerm)
@@ -531,6 +1122,12 @@ export default function CitiesPage() {
 
   const openCreateSheet = () => {
     resetSheetState()
+    setForm({
+      name: !cities.length ? vendorRegistrationCity : '',
+      state: !cities.length ? vendorRegistrationState : '',
+      country: !cities.length ? vendorRegistrationCountry : DEFAULT_FORM.country,
+      isActive: true,
+    })
     setSheetOpen(true)
   }
 
@@ -547,9 +1144,8 @@ export default function CitiesPage() {
       country: city.country || 'India',
       isActive: city.isActive !== false,
     })
+    setStatesError('')
     setDiscoveredCities([])
-    setDiscoveredSearch('')
-    setSelectedSuggestedCity('')
     setQueuedCities([])
     setSheetOpen(true)
   }
@@ -561,9 +1157,8 @@ export default function CitiesPage() {
       state: '',
       name: editingCity ? current.name : '',
     }))
+    setStatesError('')
     setDiscoveredCities([])
-    setDiscoveredSearch('')
-    setSelectedSuggestedCity('')
     setQueuedCities([])
   }
 
@@ -573,47 +1168,52 @@ export default function CitiesPage() {
       state: nextState,
       name: editingCity ? current.name : '',
     }))
-    setDiscoveredSearch('')
-    setSelectedSuggestedCity('')
     setQueuedCities([])
   }
 
-  const handleQueueCities = () => {
+  const handleSuggestedCitiesChange = (values: string[]) => {
+    const selectedDiscoveredSet = new Set(discoveredCities)
+    setQueuedCities((current) =>
+      uniqueStrings([
+        ...current.filter((cityName) => !selectedDiscoveredSet.has(cityName)),
+        ...values,
+      ]).sort((a, b) => a.localeCompare(b))
+    )
+  }
+
+  const handleAddManualCity = () => {
     if (editingCity) return
     if (!form.state) {
       toast.error('Select a state first')
       return
     }
 
-    const nextQueued = uniqueStrings([selectedSuggestedCity, form.name])
-    if (!nextQueued.length) {
-      toast.error('Select a city or type a manual city name')
+    const manualCity = toTitleCase(normalizeText(form.name))
+    if (!manualCity) {
+      toast.error('Type a manual city name first')
       return
     }
 
     setQueuedCities((current) =>
-      uniqueStrings([...current, ...nextQueued]).sort((a, b) =>
+      uniqueStrings([...current, manualCity]).sort((a, b) =>
         a.localeCompare(b)
       )
     )
-    setSelectedSuggestedCity('')
     setForm((current) => ({ ...current, name: '' }))
   }
 
-  const handleQueueAllFiltered = () => {
+  const handleQueueAllDiscovered = () => {
     if (editingCity) return
-    if (!filteredDiscoveredCities.length) {
+    if (!discoveredCities.length) {
       toast.error('No state cities available to add')
       return
     }
 
     setQueuedCities((current) =>
-      uniqueStrings([...current, ...filteredDiscoveredCities]).sort((a, b) =>
+      uniqueStrings([...current, ...discoveredCities]).sort((a, b) =>
         a.localeCompare(b)
       )
     )
-    setSelectedSuggestedCity('')
-    setForm((current) => ({ ...current, name: '' }))
   }
 
   const handleRemoveQueuedCity = (cityName: string) => {
@@ -667,7 +1267,6 @@ export default function CitiesPage() {
       } else {
         const cityNames = uniqueStrings([
           ...queuedCities,
-          selectedSuggestedCity,
           form.name,
         ])
 
@@ -778,6 +1377,67 @@ export default function CitiesPage() {
     }
   }
 
+  const handleUpdateDefaultCity = async (city: CityRow) => {
+    if (!token) {
+      toast.error('Your session has expired. Please sign in again.')
+      return
+    }
+
+    if (!normalizeText(city?._id)) {
+      toast.error('This city cannot be used as the default location.')
+      return
+    }
+
+    if (city.isActive === false) {
+      toast.error('Only active cities can be used as the default location.')
+      return
+    }
+
+    if (normalizeText(city._id) === currentDefaultCityId) {
+      toast.message(`${city.name} is already your default city`)
+      return
+    }
+
+    setDefaultCitySavingId(city._id)
+    try {
+      const response = await fetch(`${API_BASE}/v1/vendor/profile/default-city`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          cityId: city._id,
+        }),
+      })
+
+      const body = await response.json().catch(() => null)
+      if (!response.ok || body?.success === false) {
+        throw new Error(body?.message || 'Failed to update default city')
+      }
+
+      if (body?.vendor) {
+        dispatch(
+          setUser({
+            ...(authUser || {}),
+            ...body.vendor,
+            default_city_name:
+              body?.city?.name ||
+              body?.vendor?.default_city_name ||
+              city.name,
+          })
+        )
+      }
+
+      await dispatch(fetchVendorProfile())
+      toast.success(`${city.name} is now your default city`)
+    } catch (saveError: any) {
+      toast.error(saveError?.message || 'Failed to update default city')
+    } finally {
+      setDefaultCitySavingId(null)
+    }
+  }
+
   if (!canAccess) {
     return (
       <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
@@ -788,12 +1448,40 @@ export default function CitiesPage() {
     )
   }
 
-  const selectedFormCountry = getCountryMeta(form.country)
-
   return (
     <>
       <TablePageHeader
-        title='Cities'
+        title={
+          <div className='flex flex-wrap items-center gap-2'>
+            <span>Cities</span>
+            {isVendor && defaultCityLabel ? (
+              <div className='flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700'>
+                <span className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>
+                  Default City
+                </span>
+                <span className='normal-case tracking-normal text-slate-900'>
+                  {defaultCityLabel}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type='button'
+                      className='text-slate-400 transition-colors hover:text-slate-700'
+                      aria-label='Default city info'
+                    >
+                      <Info className='h-3.5 w-3.5' />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side='bottom' className='max-w-72'>
+                    {defaultCityMeta.name === 'All Cities'
+                      ? 'Your storefront still falls back to all cities. Use the location icon in the city row to choose one active city as default.'
+                      : 'This default city starts from the location chosen during vendor registration and can be changed from the city row action anytime.'}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            ) : null}
+          </div>
+        }
         stacked
         actionsClassName='gap-2'
         showHeaderChrome={false}
@@ -810,9 +1498,7 @@ export default function CitiesPage() {
               <span className='truncate'>All countries</span>
             ) : (
               <span className='flex items-center gap-2 truncate'>
-                <span className='text-base leading-none'>
-                  {getCountryMeta(countryFilter).flag || 'Global'}
-                </span>
+                <CountryFlag country={getResolvedCountryMeta(countryFilter)} />
                 <span className='truncate'>{countryFilter}</span>
               </span>
             )}
@@ -822,7 +1508,7 @@ export default function CitiesPage() {
             {countryOptions.map((country) => (
               <SelectItem key={country.name} value={country.name}>
                 <span className='flex items-center gap-2'>
-                  <span>{country.flag || 'Global'}</span>
+                  <CountryFlag country={country} />
                   <span>{country.name}</span>
                 </span>
               </SelectItem>
@@ -847,7 +1533,10 @@ export default function CitiesPage() {
         <Button
           variant='outline'
           className='h-10 shrink-0'
-          onClick={() => loadCities()}
+          onClick={() => {
+            void loadCities()
+            void loadCountries()
+          }}
           disabled={loading}
         >
           {loading ? (
@@ -922,13 +1611,22 @@ export default function CitiesPage() {
                 </TableRow>
               ) : (
                 paginatedCities.map((city) => {
-                  const countryMeta = getCountryMeta(city.country || 'India')
+                  const countryMeta = getResolvedCountryMeta(city.country || 'India')
                   const canMutate = canMutateCity({
                     city,
                     isAdmin,
                     isVendor,
                     currentUserId,
                   })
+                  const isRowDefaultCity =
+                    isVendor &&
+                    normalizeText(city._id) === currentDefaultCityId
+                  const isSettingDefault =
+                    isVendor && defaultCitySavingId === city._id
+                  const canSetAsDefault =
+                    isVendor &&
+                    city.isActive !== false &&
+                    normalizeText(city._id) !== currentDefaultCityId
 
                   return (
                     <TableRow key={city._id}>
@@ -950,13 +1648,7 @@ export default function CitiesPage() {
                       </TableCell>
                       <TableCell>
                         <div className='flex items-center gap-2 text-sm'>
-                          {countryMeta.flag ? (
-                            <span className='text-base leading-none'>
-                              {countryMeta.flag}
-                            </span>
-                          ) : (
-                            <Globe2 className='text-muted-foreground h-4 w-4' />
-                          )}
+                          <CountryFlag country={countryMeta} />
                           <span>{countryMeta.name}</span>
                         </div>
                       </TableCell>
@@ -978,38 +1670,88 @@ export default function CitiesPage() {
                       </TableCell>
                       <TableCell className='text-right'>
                         <div className='flex justify-end gap-2'>
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            className='rounded-md'
-                            onClick={() => openEditSheet(city)}
-                            disabled={!canMutate}
-                            title={
-                              canMutate
-                                ? 'Edit city'
-                                : 'Only your cities can be edited'
-                            }
-                          >
-                            <Pencil className='h-4 w-4' />
-                          </Button>
-                          <Button
-                            variant='destructive'
-                            size='sm'
-                            className='rounded-md'
-                            onClick={() => handleDelete(city)}
-                            disabled={!canMutate || deletingId === city._id}
-                            title={
-                              canMutate
-                                ? 'Delete city'
-                                : 'Only your cities can be deleted'
-                            }
-                          >
-                            {deletingId === city._id ? (
-                              <Loader2 className='h-4 w-4 animate-spin' />
-                            ) : (
-                              <Trash2 className='h-4 w-4' />
-                            )}
-                          </Button>
+                          {isVendor ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Button
+                                    variant='outline'
+                                    size='sm'
+                                    className={cn(
+                                      'rounded-md',
+                                      isRowDefaultCity &&
+                                        'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-700'
+                                    )}
+                                    onClick={() => void handleUpdateDefaultCity(city)}
+                                    disabled={!canSetAsDefault || Boolean(defaultCitySavingId)}
+                                  >
+                                    {isSettingDefault ? (
+                                      <Loader2 className='h-4 w-4 animate-spin' />
+                                    ) : (
+                                      <MapPin className='h-4 w-4' />
+                                    )}
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side='top'>
+                                {isRowDefaultCity
+                                  ? 'Current default city'
+                                  : city.isActive === false
+                                    ? 'Only active cities can be set as default'
+                                    : 'Set as default city'}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : null}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <Button
+                                  variant='outline'
+                                  size='sm'
+                                  className='rounded-md'
+                                  onClick={() => openEditSheet(city)}
+                                  disabled={!canMutate}
+                                  title={
+                                    canMutate
+                                      ? 'Edit city'
+                                      : 'Only your cities can be edited'
+                                  }
+                                >
+                                  <Pencil className='h-4 w-4' />
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side='top'>
+                              {canMutate ? 'Edit city' : 'Only your cities can be edited'}
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <Button
+                                  variant='destructive'
+                                  size='sm'
+                                  className='rounded-md'
+                                  onClick={() => handleDelete(city)}
+                                  disabled={!canMutate || deletingId === city._id}
+                                  title={
+                                    canMutate
+                                      ? 'Delete city'
+                                      : 'Only your cities can be deleted'
+                                  }
+                                >
+                                  {deletingId === city._id ? (
+                                    <Loader2 className='h-4 w-4 animate-spin' />
+                                  ) : (
+                                    <Trash2 className='h-4 w-4' />
+                                  )}
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side='top'>
+                              {canMutate ? 'Delete city' : 'Only your cities can be deleted'}
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1034,7 +1776,7 @@ export default function CitiesPage() {
             <SheetDescription>
               {editingCity
                 ? 'Update one city from your current list.'
-                : 'Choose a country, state, and city from the dropdown or add one manually.'}
+                : 'Choose a country and state, then search and select one or more cities from the dropdown.'}
             </SheetDescription>
           </SheetHeader>
           <form
@@ -1048,13 +1790,7 @@ export default function CitiesPage() {
                     Country
                   </p>
                   <div className='mt-1 flex items-center gap-2 text-sm font-semibold'>
-                    {selectedFormCountry.flag ? (
-                      <span className='text-base leading-none'>
-                        {selectedFormCountry.flag}
-                      </span>
-                    ) : (
-                      <Globe2 className='h-4 w-4' />
-                    )}
+                    <CountryFlag country={selectedFormCountry} />
                     <span>{selectedFormCountry.name}</span>
                   </div>
                 </div>
@@ -1087,11 +1823,11 @@ export default function CitiesPage() {
                   >
                     <SelectTrigger className='h-11'>
                       <span className='flex items-center gap-2 truncate'>
-                        <span className='text-base leading-none'>
-                          {selectedFormCountry.flag || 'Global'}
-                        </span>
+                        <CountryFlag country={selectedFormCountry} />
                         <span className='truncate'>
-                          {selectedFormCountry.name}
+                          {countriesLoading && !countryOptions.length
+                            ? 'Loading countries...'
+                            : selectedFormCountry.name}
                         </span>
                       </span>
                     </SelectTrigger>
@@ -1099,13 +1835,23 @@ export default function CitiesPage() {
                       {countryOptions.map((country) => (
                         <SelectItem key={country.name} value={country.name}>
                           <span className='flex items-center gap-2'>
-                            <span>{country.flag || 'Global'}</span>
+                            <CountryFlag country={country} />
                             <span>{country.name}</span>
                           </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {countriesLoading ? (
+                    <p className='text-muted-foreground text-xs'>
+                      Loading countries and flags...
+                    </p>
+                  ) : null}
+                  {countriesError ? (
+                    <p className='text-amber-700 text-xs'>
+                      {countriesError}. Showing fallback country list.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className='space-y-2'>
@@ -1113,7 +1859,8 @@ export default function CitiesPage() {
                   <Select value={form.state} onValueChange={handleStateChange}>
                     <SelectTrigger className='h-11'>
                       <span className='truncate'>
-                        {form.state || 'Select state'}
+                        {form.state ||
+                          (statesLoading ? 'Loading states...' : 'Select state')}
                       </span>
                     </SelectTrigger>
                     <SelectContent>
@@ -1130,113 +1877,110 @@ export default function CitiesPage() {
                       )}
                     </SelectContent>
                   </Select>
+                  {statesLoading ? (
+                    <p className='text-muted-foreground text-xs'>
+                      Loading state data for {selectedFormCountry.name}...
+                    </p>
+                  ) : (
+                    <p className='text-muted-foreground text-xs'>
+                      {selectedCountryStateOptions.length
+                        ? `${selectedCountryStateOptions.length} states available`
+                        : 'No API state data available for this country yet.'}
+                    </p>
+                  )}
+                  {statesError ? (
+                    <p className='text-amber-700 text-xs'>
+                      {statesError}. Showing saved state options where available.
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
               {!editingCity ? (
                 <div className='bg-background mt-5 rounded-md border p-4 shadow-sm'>
-                  <div className='grid gap-4 sm:grid-cols-2'>
-                    <div className='space-y-2'>
+                  <div className='space-y-2'>
+                    <div className='flex items-center justify-between gap-3'>
                       <label className='text-sm font-medium'>
-                        Search available cities
+                        Cities from selected state
                       </label>
-                      <Input
-                        value={discoveredSearch}
-                        onChange={(event) =>
-                          setDiscoveredSearch(event.target.value)
-                        }
-                        placeholder={
-                          form.state
-                            ? 'Filter selected state cities'
-                            : 'Select state first'
-                        }
-                        disabled={!form.state || loadingStateCities}
-                      />
+                      <Badge variant='outline' className='rounded-md'>
+                        {selectedDiscoveredCities.length} selected
+                      </Badge>
                     </div>
-
-                    <div className='space-y-2'>
-                      <label className='text-sm font-medium'>
-                        City from selected state
-                      </label>
-                      <Select
-                        value={selectedSuggestedCity}
-                        onValueChange={setSelectedSuggestedCity}
-                      >
-                        <SelectTrigger className='h-11'>
-                          <span className='truncate'>
-                            {selectedSuggestedCity ||
-                              (loadingStateCities
-                                ? 'Loading cities...'
-                                : form.state
-                                  ? 'Select available city'
-                                  : 'Select state first')}
-                          </span>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredDiscoveredCities.length ? (
-                            filteredDiscoveredCities.map((cityName) => (
-                              <SelectItem key={cityName} value={cityName}>
-                                {cityName}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value='__placeholder' disabled>
-                              {form.state
-                                ? 'No cities found'
-                                : 'Select state first'}
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <SearchableMultiSelect
+                      values={selectedDiscoveredCities}
+                      options={discoveredCityOptions}
+                      onChange={handleSuggestedCitiesChange}
+                      placeholder={
+                        form.state
+                          ? 'Search and select cities'
+                          : 'Select state first'
+                      }
+                      searchPlaceholder={
+                        form.state
+                          ? `Search cities in ${form.state}`
+                          : 'Select state first'
+                      }
+                      emptyLabel={
+                        form.state ? 'No cities found for this state.' : 'Select state first'
+                      }
+                      disabled={!form.state}
+                      loading={loadingStateCities}
+                      triggerFlag={selectedFormCountry.flag}
+                    />
+                    <p className='text-muted-foreground text-xs'>
+                      Search inside the dropdown and select multiple cities in one go.
+                    </p>
                   </div>
 
                   <div className='mt-4 space-y-2'>
-                    <label className='text-sm font-medium'>
-                      Manual city name
-                    </label>
-                    <Input
-                      value={form.name}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          name: toTitleCase(event.target.value),
-                        }))
-                      }
-                      placeholder='Type a new city if it is not in the dropdown'
-                    />
+                    <label className='text-sm font-medium'>Manual city name</label>
+                    <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]'>
+                      <Input
+                        value={form.name}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            name: toTitleCase(event.target.value),
+                          }))
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            handleAddManualCity()
+                          }
+                        }}
+                        placeholder='Type a new city if it is not in the dropdown'
+                      />
+                      <Button
+                        type='button'
+                        variant='outline'
+                        onClick={handleAddManualCity}
+                        disabled={!normalizeText(form.name)}
+                      >
+                        <Plus className='mr-2 h-4 w-4' />
+                        Add Manual City
+                      </Button>
+                    </div>
                   </div>
 
                   <div className='mt-4 flex flex-wrap gap-2'>
                     <Button
                       type='button'
                       variant='outline'
-                      onClick={handleQueueCities}
+                      onClick={handleQueueAllDiscovered}
+                      disabled={!discoveredCities.length}
                     >
-                      <Plus className='mr-2 h-4 w-4' />
-                      Add City
-                    </Button>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      onClick={handleQueueAllFiltered}
-                      disabled={!filteredDiscoveredCities.length}
-                    >
-                      Add All Visible Cities
+                      Add All State Cities
                     </Button>
                     <Button
                       type='button'
                       variant='ghost'
                       onClick={() => {
                         setQueuedCities([])
-                        setSelectedSuggestedCity('')
                         setForm((current) => ({ ...current, name: '' }))
                       }}
-                      disabled={
-                        !queuedCities.length &&
-                        !selectedSuggestedCity &&
-                        !normalizeText(form.name)
-                      }
+                      disabled={!queuedCities.length && !normalizeText(form.name)}
                     >
                       Clear Selection
                     </Button>
@@ -1260,15 +2004,14 @@ export default function CitiesPage() {
                               className='text-xs'
                               onClick={() => handleRemoveQueuedCity(cityName)}
                             >
-                              x
+                              <X className='h-3 w-3' />
                             </button>
                           </Badge>
                         ))}
                       </div>
                     ) : (
                       <p className='text-muted-foreground mt-2 text-sm'>
-                        Add one or more cities from the dropdown or manual
-                        input.
+                        Select multiple cities from the dropdown or add custom ones manually.
                       </p>
                     )}
                   </div>
@@ -1316,54 +2059,6 @@ export default function CitiesPage() {
                 </div>
               </div>
 
-              {!editingCity && discoveredCities.length ? (
-                <div className='bg-background mt-5 rounded-md border p-4 shadow-sm'>
-                  <div className='mb-3 flex items-center justify-between gap-3'>
-                    <div>
-                      <p className='text-sm font-medium'>
-                        Available in selected state
-                      </p>
-                      <p className='text-muted-foreground text-sm'>
-                        Quick-pick cities from the discovered state list.
-                      </p>
-                    </div>
-                    <Badge variant='outline' className='rounded-md'>
-                      {filteredDiscoveredCities.length} shown
-                    </Badge>
-                  </div>
-
-                  <div className='grid gap-2 sm:grid-cols-2'>
-                    {filteredDiscoveredCities.slice(0, 12).map((cityName) => {
-                      const checked = queuedCities.includes(cityName)
-                      return (
-                        <label
-                          key={cityName}
-                          className='flex items-center gap-2 rounded-md border px-3 py-2'
-                        >
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(checkedState) => {
-                              setQueuedCities((current) =>
-                                checkedState === true
-                                  ? uniqueStrings([...current, cityName]).sort(
-                                      (a, b) => a.localeCompare(b)
-                                    )
-                                  : current.filter((item) => item !== cityName)
-                              )
-                            }}
-                          />
-                          <span className='text-sm'>{cityName}</span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                  {filteredDiscoveredCities.length > 12 ? (
-                    <p className='text-muted-foreground mt-3 text-xs'>
-                      Narrow with search to pick more cities from this state.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
 
             <SheetFooter className='border-t px-5 py-4 sm:flex-row sm:justify-end'>

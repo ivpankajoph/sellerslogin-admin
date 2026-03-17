@@ -49,6 +49,7 @@ import { Route as AuthenticatedSeoIndexRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authenticated/products/index'
 import { Route as AuthenticatedOrderIndexRouteImport } from './routes/_authenticated/order/index'
+import { Route as AuthenticatedLocationWorkspaceIndexRouteImport } from './routes/_authenticated/location-workspace/index'
 import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './routes/_authenticated/inventory-management/index'
 import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
@@ -299,6 +300,12 @@ const AuthenticatedOrderIndexRoute = AuthenticatedOrderIndexRouteImport.update({
   path: '/order/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLocationWorkspaceIndexRoute =
+  AuthenticatedLocationWorkspaceIndexRouteImport.update({
+    id: '/location-workspace/',
+    path: '/location-workspace/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInventoryManagementIndexRoute =
   AuthenticatedInventoryManagementIndexRouteImport.update({
     id: '/inventory-management/',
@@ -519,6 +526,7 @@ export interface FileRoutesByFullPath {
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
+  '/location-workspace': typeof AuthenticatedLocationWorkspaceIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
@@ -587,6 +595,7 @@ export interface FileRoutesByTo {
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
+  '/location-workspace': typeof AuthenticatedLocationWorkspaceIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
@@ -660,6 +669,7 @@ export interface FileRoutesById {
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/inventory-management/': typeof AuthenticatedInventoryManagementIndexRoute
+  '/_authenticated/location-workspace/': typeof AuthenticatedLocationWorkspaceIndexRoute
   '/_authenticated/order/': typeof AuthenticatedOrderIndexRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
@@ -731,6 +741,7 @@ export interface FileRouteTypes {
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
+    | '/location-workspace'
     | '/order'
     | '/products'
     | '/profile'
@@ -799,6 +810,7 @@ export interface FileRouteTypes {
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
+    | '/location-workspace'
     | '/order'
     | '/products'
     | '/profile'
@@ -871,6 +883,7 @@ export interface FileRouteTypes {
     | '/_authenticated/help-center/'
     | '/_authenticated/integrations/'
     | '/_authenticated/inventory-management/'
+    | '/_authenticated/location-workspace/'
     | '/_authenticated/order/'
     | '/_authenticated/products/'
     | '/_authenticated/profile/'
@@ -1196,6 +1209,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOrderIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/location-workspace/': {
+      id: '/_authenticated/location-workspace/'
+      path: '/location-workspace'
+      fullPath: '/location-workspace'
+      preLoaderRoute: typeof AuthenticatedLocationWorkspaceIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/inventory-management/': {
       id: '/_authenticated/inventory-management/'
       path: '/inventory-management'
@@ -1455,6 +1475,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
+  AuthenticatedLocationWorkspaceIndexRoute: typeof AuthenticatedLocationWorkspaceIndexRoute
   AuthenticatedOrderIndexRoute: typeof AuthenticatedOrderIndexRoute
   AuthenticatedProductsIndexRoute: typeof AuthenticatedProductsIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
@@ -1512,6 +1533,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,
   AuthenticatedInventoryManagementIndexRoute:
     AuthenticatedInventoryManagementIndexRoute,
+  AuthenticatedLocationWorkspaceIndexRoute:
+    AuthenticatedLocationWorkspaceIndexRoute,
   AuthenticatedOrderIndexRoute: AuthenticatedOrderIndexRoute,
   AuthenticatedProductsIndexRoute: AuthenticatedProductsIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
