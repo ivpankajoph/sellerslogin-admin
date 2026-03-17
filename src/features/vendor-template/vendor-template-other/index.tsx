@@ -81,7 +81,7 @@ const safeInitialData: TemplateData = {
     },
     logo: '',
     vendor_profile: {},
-    home_page: {
+    home_page: { 
       header_text: '',
       backgroundImage: '',
       header_text_small: '',

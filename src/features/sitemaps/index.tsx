@@ -664,7 +664,7 @@ export default function SitemapsPage() {
               </summary>
               <div className='mt-3'>{renderEntries(group.entries)}</div>
             </details>
-          ))}
+          ))} 
         </CardContent>
       </Card>
     </div>

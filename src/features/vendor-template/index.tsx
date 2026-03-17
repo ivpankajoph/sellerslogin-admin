@@ -59,7 +59,7 @@ export default function TemplateForm() {
     setSelectedTemplateKey,
     applyTemplateVariant,
     isUpdatingTemplate,
-  
+
     isSubmitting,
     loadedSectionOrder,
     isAdmin,
@@ -538,7 +538,7 @@ export default function TemplateForm() {
               className={cn(
                 'space-y-2',
                 selectedComponent === productsKickerPath &&
-                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
               )}
               data-editor-component={productsKickerPath}
             >
@@ -561,7 +561,7 @@ export default function TemplateForm() {
               className={cn(
                 'space-y-2',
                 selectedComponent === productsHeadingPath &&
-                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
               )}
               data-editor-component={productsHeadingPath}
             >
@@ -585,7 +585,7 @@ export default function TemplateForm() {
             className={cn(
               'space-y-2',
               selectedComponent === productsSubtitlePath &&
-                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
             )}
             data-editor-component={productsSubtitlePath}
           >
@@ -694,17 +694,17 @@ export default function TemplateForm() {
 
   return (
     <>
-         <Header fixed>
-            <Search />
-            <div className='ms-auto flex items-center space-x-4'>
-              <ThemeSwitch />
-              <ConfigDrawer />
-              <ProfileDropdown />
-            </div>
-          </Header>
+      <Header fixed>
+        <Search />
+        <div className='ms-auto flex items-center space-x-4'>
+          <ThemeSwitch />
+          <ConfigDrawer />
+          <ProfileDropdown />
+        </div>
+      </Header>
       <Toaster position='top-right' />
 
-    <TemplatePageLayout
+      <TemplatePageLayout
         title={isBuilderOpen ? (isEditingWebsite ? 'Edit Website' : 'Website Builder') : 'Choose Template'}
         description={
           isBuilderOpen
@@ -757,87 +757,87 @@ export default function TemplateForm() {
         }
         actions={
           isBuilderOpen ? (
-          <>
-            <Button
-              variant='outline'
-              onClick={() => {
-                setIsBuilderOpen(false)
-                setSelectedSection(null)
-                setSelectedComponent(null)
-                void navigate({ to: '/template-workspace' })
-              }}
-              className='rounded-full border-slate-300'
-            >
-              <ArrowLeft className='h-4 w-4' /> My Websites
-            </Button>
-            {!isEditingWebsite ? (
+            <>
               <Button
-                onClick={applyTemplateVariant}
-                disabled={isUpdatingTemplate || selectedTemplateKey === activeTemplateKey}
+                variant='outline'
+                onClick={() => {
+                  setIsBuilderOpen(false)
+                  setSelectedSection(null)
+                  setSelectedComponent(null)
+                  void navigate({ to: '/template-workspace' })
+                }}
+                className='rounded-full border-slate-300'
+              >
+                <ArrowLeft className='h-4 w-4' /> My Websites
+              </Button>
+              {!isEditingWebsite ? (
+                <Button
+                  onClick={applyTemplateVariant}
+                  disabled={isUpdatingTemplate || selectedTemplateKey === activeTemplateKey}
+                  className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
+                >
+                  {isUpdatingTemplate ? 'Applying...' : 'Set as Default'}
+                </Button>
+              ) : null}
+              <Button
+                onClick={handleSubmitWithOrder}
+                disabled={isSubmitting || uploadingPaths.size > 0}
                 className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
               >
-                {isUpdatingTemplate ? 'Applying...' : 'Set as Default'}
+                {isSubmitting ? 'Saving...' : 'Save Template'}
               </Button>
-            ) : null}
-            <Button
-              onClick={handleSubmitWithOrder}
-              disabled={isSubmitting || uploadingPaths.size > 0}
-              className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
-            >
-              {isSubmitting ? 'Saving...' : 'Save Template'}
-            </Button>
-            <Button
-              variant='outline'
-              onClick={() => setDomainOpen(true)}
-              className='rounded-full border-slate-300'
-            >
-              <Wand2 className='h-4 w-4' /> Connect Domain
-            </Button>
-            {previewBaseUrl ? (
-              <a
-                href={previewBaseUrl}
-                target='_blank'
-                rel='noopener noreferrer'
+              <Button
+                variant='outline'
+                onClick={() => setDomainOpen(true)}
+                className='rounded-full border-slate-300'
               >
-                <Button
-                  variant='outline'
-                  className='rounded-full border-slate-300'
+                <Wand2 className='h-4 w-4' /> Connect Domain
+              </Button>
+              {previewBaseUrl ? (
+                <a
+                  href={previewBaseUrl}
+                  target='_blank'
+                  rel='noopener noreferrer'
                 >
-                  <Link2 className='h-4 w-4' /> Open Preview
-                </Button>
-              </a>
-            ) : null}
-          </>
+                  <Button
+                    variant='outline'
+                    className='rounded-full border-slate-300'
+                  >
+                    <Link2 className='h-4 w-4' /> Open Preview
+                  </Button>
+                </a>
+              ) : null}
+            </>
           ) : null
         }
         preview={
           isBuilderOpen ? (
-          <TemplatePreviewPanel
-            title='Live Website Preview'
-            subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
-            baseSrc={previewBaseUrl}
-            defaultPath=''
-            pageOptions={[
-              { label: 'Home', path: '' },
-              { label: 'About', path: '/about' },
-              { label: 'Contact', path: '/contact' },
-              { label: 'Cart', path: '/cart' },
-              { label: 'Orders', path: '/orders' },
-              { label: 'Profile', path: '/profile' },
-              { label: 'Logout', path: '/login' },
-              { label: 'Category', path: '/category' },
-              { label: 'Login', path: '/login' },
-            ]}
-            onSync={handleSubmitWithOrder}
-            isSyncing={isSubmitting}
-            syncDisabled={uploadingPaths.size > 0}
-            vendorId={vendor_id}
-            page='home'
-            previewData={data}
-            sectionOrder={sectionOrder}
-            onSelectSection={handleSelectSection}
-            onInlineEdit={handleInlineEdit}
-          />
+            <TemplatePreviewPanel
+              title='Live Website Preview'
+              subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
+              baseSrc={previewBaseUrl}
+              defaultPath=''
+              pageOptions={[
+                { label: 'Home', path: '' },
+                { label: 'About', path: '/about' },
+                { label: 'Contact', path: '/contact' },
+                { label: 'Cart', path: '/cart' },
+                { label: 'Orders', path: '/orders' },
+                { label: 'Profile', path: '/profile' },
+                { label: 'Logout', path: '/login' },
+                { label: 'Category', path: '/category' },
+                { label: 'Login', path: '/login' },
+              ]}
+              onSync={handleSubmitWithOrder}
+              isSyncing={isSubmitting}
+              syncDisabled={uploadingPaths.size > 0}
+              vendorId={vendor_id}
+              page='home'
+              previewData={data}
+              sectionOrder={sectionOrder}
+              onSelectSection={handleSelectSection}
+              onInlineEdit={handleInlineEdit}
+            />
           ) : undefined
         }
       >

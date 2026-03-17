@@ -244,7 +244,7 @@ export default function ProfilePage() {
         syncLocalState((user as Record<string, unknown>) || null)
         setErrorMessage(
           error?.response?.data?.message ||
-            'Failed to load profile details. Please try again.'
+          'Failed to load profile details. Please try again.'
         )
       } finally {
         if (mounted) setLoading(false)
@@ -283,9 +283,9 @@ export default function ProfilePage() {
 
   const handlePasswordChange =
     (key: 'currentPassword' | 'newPassword' | 'confirmPassword') =>
-    (event: ChangeEvent<HTMLInputElement>) => {
-      setPasswordForm((prev) => ({ ...prev, [key]: event.target.value }))
-    }
+      (event: ChangeEvent<HTMLInputElement>) => {
+        setPasswordForm((prev) => ({ ...prev, [key]: event.target.value }))
+      }
 
   const handleAvatarSelect = (event: ChangeEvent<HTMLInputElement>) => {
     setErrorMessage('')
@@ -360,7 +360,7 @@ export default function ProfilePage() {
     } catch (error: any) {
       setErrorMessage(
         error?.response?.data?.message ||
-          'Failed to update profile. Please try again.'
+        'Failed to update profile. Please try again.'
       )
     } finally {
       setSaving(false)
@@ -436,12 +436,21 @@ export default function ProfilePage() {
     } catch (error: any) {
       setPasswordError(
         error?.response?.data?.message ||
-          'Failed to update password. Please try again.'
+        'Failed to update password. Please try again.'
       )
     } finally {
       setPasswordSaving(false)
     }
   }
+
+  const isPasswordValid = (password) => {
+    const hasMinLength = password.length >= 8;
+    const hasUpper = /[A-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    return hasMinLength && hasUpper && hasNumber && hasSpecial;
+  };
 
   return (
     <>
@@ -651,11 +660,16 @@ export default function ProfilePage() {
               <CardHeader className='pb-3'>
                 <CardTitle className='text-lg'>Security</CardTitle>
               </CardHeader>
-              <CardContent className='space-y-4'>
-                <p className='text-sm text-slate-500'>
-                  Update your password here. Use at least 7 characters.
-                </p>
+              <CardContent className='space-y-6'>
+                <div className='space-y-1'>
+                  <p className='text-sm font-medium text-slate-700'>Update your password</p>
+                  <p className='text-xs text-slate-500'>
+                    Changes will only be saved if all security requirements are met.
+                  </p>
+                </div>
+
                 <div className='grid gap-4 md:grid-cols-2'>
+                  {/* ... Current Password Input ... */}
                   <div className='space-y-2'>
                     <Label htmlFor='currentPassword'>Current Password</Label>
                     <PasswordInput
@@ -665,6 +679,8 @@ export default function ProfilePage() {
                       placeholder='Current password'
                     />
                   </div>
+
+                  {/* New Password Input */}
                   <div className='space-y-2'>
                     <Label htmlFor='newPassword'>New Password</Label>
                     <PasswordInput
@@ -674,6 +690,8 @@ export default function ProfilePage() {
                       placeholder='New password'
                     />
                   </div>
+
+                  {/* Confirm Password Input */}
                   <div className='space-y-2 md:col-span-2'>
                     <Label htmlFor='confirmPassword'>Confirm Password</Label>
                     <PasswordInput
@@ -684,27 +702,62 @@ export default function ProfilePage() {
                     />
                   </div>
                 </div>
+
+                {/* Requirement Checklist with Real-time Colors */}
+                <div className='rounded-lg bg-slate-50 p-4 border border-slate-100'>
+                  <p className='mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500'>
+                    Password Requirements:
+                  </p>
+                  <ul className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
+                    {[
+                      { label: '8+ Characters', met: passwordForm.newPassword.length >= 8 },
+                      { label: '1 Capital Letter', met: /[A-Z]/.test(passwordForm.newPassword) },
+                      { label: '1 Number', met: /[0-9]/.test(passwordForm.newPassword) },
+                      { label: '1 Special Character', met: /[!@#$%^&*]/.test(passwordForm.newPassword) },
+                    ].map((req, index) => (
+                      <li key={index} className={`flex items-center text-xs transition-colors ${req.met ? 'text-emerald-600' : 'text-slate-400'}`}>
+                        <div className={`mr-2 h-1.5 w-1.5 rounded-full ${req.met ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                        {req.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
                 <div className='flex justify-end'>
                   <Button
                     type='button'
                     onClick={handlePasswordUpdate}
-                    disabled={passwordSaving}
+                    // BUTTON IS DISABLED UNLESS VALID
+                    disabled={
+                      passwordSaving ||
+                      !isPasswordValid(passwordForm.newPassword) ||
+                      passwordForm.newPassword !== passwordForm.confirmPassword
+                    }
+                    className="bg-[#6d28d9] hover:bg-[#5b21b6] text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Check className='mr-2 h-4 w-4' />
-                    {passwordSaving ? 'Updating...' : 'Update Password'}
+                    {passwordSaving ? 'Updating...' : (
+                      <>
+                        <Check className='mr-2 h-4 w-4' />
+                        Update Password
+                      </>
+                    )}
                   </Button>
                 </div>
+
+                {/* Error/Success Messages... */}
                 {passwordError ? (
                   <div className='rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>
                     {passwordError}
                   </div>
                 ) : null}
+
                 {passwordMessage ? (
                   <div className='rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700'>
                     {passwordMessage}
                   </div>
                 ) : null}
               </CardContent>
+
             </Card>
           </div>
         </div>
