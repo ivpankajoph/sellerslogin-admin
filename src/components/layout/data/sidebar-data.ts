@@ -64,6 +64,19 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
       ],
     },
     {
+      title: 'Customer Inquiry',
+      roles: [ROLES.ADMIN, ROLES.VENDOR],
+      items: [
+        {
+          title: 'Customer Inquiry',
+          url: '/customer-queries',
+          icon: HelpCircle,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          pageKey: 'customer_queries',
+        },
+      ],
+    },
+    {
       title: 'Sales',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
@@ -321,16 +334,9 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
       ],
     },
     {
-      title: 'Support',
+      title: 'Reviews',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
-        {
-          title: 'Customer Queries',
-          url: '/customer-queries',
-          icon: HelpCircle,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-          pageKey: 'customer_queries',
-        },
         {
           title: 'Customer Reviews',
           url: '/customer-reviews',
@@ -338,6 +344,12 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           pageKey: 'customer_reviews',
         },
+      ],
+    },
+    {
+      title: 'Support',
+      roles: [ROLES.ADMIN, ROLES.VENDOR],
+      items: [
         {
           title: 'Help Center',
           url: '/help-center',

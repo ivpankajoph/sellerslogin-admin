@@ -28,6 +28,29 @@ const formSchema = z.object({
     .min(7, "Password must be at least 7 characters long"),
 });
 
+const toTrimmedString = (value: unknown) => {
+  if (typeof value === "string") return value.trim()
+  if (typeof value === "number") return String(value).trim()
+  return ""
+}
+
+const resolveVendorBusinessName = (data: any): string => {
+  const candidates = [
+    data?.business_name,
+    data?.businessName,
+    data?.company_name,
+    data?.companyName,
+    data?.vendor?.business_name,
+    data?.vendor?.businessName,
+    data?.vendor?.company_name,
+    data?.vendor?.companyName,
+    data?.vendor?.name,
+    data?.name,
+  ].map(toTrimmedString)
+
+  return candidates.find(Boolean) || ""
+}
+
 interface UserAuthFormProps extends React.HTMLAttributes<HTMLFormElement> {
   redirectTo?: string;
 }
@@ -87,9 +110,19 @@ export function UserAuthForm({
         return;
       }
 
+      const baseSuccessTitle =
+        resultAction.payload?.message || "Login successful";
+      const vendorCompanyName = isVendor
+        ? resolveVendorBusinessName(authData)
+        : "";
+      const successTitle =
+        isVendor && vendorCompanyName
+          ? `${vendorCompanyName} Login Successfully`
+          : baseSuccessTitle;
+
       await Swal.fire({
         icon: "success",
-        title: resultAction.payload?.message || "Login successful",
+        title: successTitle,
         showConfirmButton: false,
         timer: 1500,
       });
