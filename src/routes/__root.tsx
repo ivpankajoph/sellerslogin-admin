@@ -1,22 +1,24 @@
+import { useEffect, useRef } from 'react'
 import { type QueryClient } from '@tanstack/react-query'
 import {
   createRootRouteWithContext,
   Outlet,
   useRouterState,
 } from '@tanstack/react-router'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { Toaster } from '@/components/ui/sonner'
-import { useSelector } from 'react-redux'
-import { useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { NavigationProgress } from '@/components/navigation-progress'
-import api from '@/lib/axios'
+import { setUser } from '@/store/slices/authSlice'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { useDispatch, useSelector } from 'react-redux'
 import Swal from 'sweetalert2'
+import api from '@/lib/axios'
+import { Toaster } from '@/components/ui/sonner'
+import { NavigationProgress } from '@/components/navigation-progress'
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
 }>()({
   component: () => {
+    const dispatch = useDispatch()
     const navigate = useNavigate()
     const token = useSelector((state: any) => state.auth.token)
     const role = useSelector((state: any) => state.auth?.user?.role)
@@ -73,7 +75,9 @@ export const Route = createRootRouteWithContext<{
       const issuedAt = new Date(issuedAtRaw).getTime()
       if (!Number.isFinite(issuedAt)) return
 
-      const elapsedHours = Math.floor((Date.now() - issuedAt) / (60 * 60 * 1000))
+      const elapsedHours = Math.floor(
+        (Date.now() - issuedAt) / (60 * 60 * 1000)
+      )
       if (elapsedHours < 24) return
 
       const dayBucket = Math.floor(elapsedHours / 24)
@@ -82,11 +86,12 @@ export const Route = createRootRouteWithContext<{
       reminderPopupKeyRef.current = reminderKey
 
       const expiresAtRaw = authUser?.temp_password_expires_at
-      const expiresAt = expiresAtRaw ? new Date(expiresAtRaw).getTime() : Number.NaN
-      const hoursLeft =
-        Number.isFinite(expiresAt)
-          ? Math.max(0, Math.ceil((expiresAt - Date.now()) / (60 * 60 * 1000)))
-          : null
+      const expiresAt = expiresAtRaw
+        ? new Date(expiresAtRaw).getTime()
+        : Number.NaN
+      const hoursLeft = Number.isFinite(expiresAt)
+        ? Math.max(0, Math.ceil((expiresAt - Date.now()) / (60 * 60 * 1000)))
+        : null
 
       void Swal.fire({
         icon: 'warning',
@@ -126,7 +131,18 @@ export const Route = createRootRouteWithContext<{
 
       const validateSession = async () => {
         try {
-          await api.get('/profile')
+          const response = await api.get('/profile')
+          const syncedUser =
+            response?.data?.vendor ||
+            response?.data?.data ||
+            response?.data?.user ||
+            response?.data?.admin ||
+            response?.data ||
+            null
+
+          if (syncedUser) {
+            dispatch(setUser(syncedUser))
+          }
         } catch {
           if (isCancelled) return
           // Interceptor handles logout + redirect for invalid/deleted accounts.
@@ -138,14 +154,14 @@ export const Route = createRootRouteWithContext<{
       return () => {
         isCancelled = true
       }
-    }, [role, token])
+    }, [dispatch, role, token])
 
     return (
       <>
         <NavigationProgress />
         <Outlet />
         <Toaster />
-    
+
         <ReactQueryDevtools />
       </>
     )

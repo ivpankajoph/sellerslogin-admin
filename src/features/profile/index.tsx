@@ -1,13 +1,9 @@
-
-
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-
 import { type AppDispatch } from '@/store'
 import { setUser } from '@/store/slices/authSlice'
 import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import {
   Camera,
-
   Mail,
   MapPin,
   Phone,
@@ -18,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import api from '@/lib/axios'
+import { PASSWORD_REQUIREMENTS, isStrongPassword } from '@/lib/password-rules'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -53,8 +50,18 @@ const ADMIN_PROFILE_SECTIONS: EditableSection[] = [
     icon: UserRound,
     fields: [
       { key: 'name', label: 'Full Name', placeholder: 'Your name' },
-      { key: 'email', label: 'Email', placeholder: 'name@example.com', type: 'email' },
-      { key: 'phone', label: 'Phone', placeholder: '+91 9876543210', type: 'tel' },
+      {
+        key: 'email',
+        label: 'Email',
+        placeholder: 'name@example.com',
+        type: 'email',
+      },
+      {
+        key: 'phone',
+        label: 'Phone',
+        placeholder: '+91 9876543210',
+        type: 'tel',
+      },
     ],
   },
 ]
@@ -66,8 +73,16 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
     icon: Store,
     fields: [
       { key: 'name', label: 'Store Name', placeholder: 'Store name' },
-      { key: 'business_name', label: 'Business Name', placeholder: 'Registered business name' },
-      { key: 'registrar_name', label: 'Registrar Name', placeholder: 'Owner or registrar name' },
+      {
+        key: 'business_name',
+        label: 'Business Name',
+        placeholder: 'Registered business name',
+      },
+      {
+        key: 'registrar_name',
+        label: 'Registrar Name',
+        placeholder: 'Owner or registrar name',
+      },
     ],
   },
   {
@@ -75,9 +90,24 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
     description: 'Primary contact details for this account.',
     icon: MapPin,
     fields: [
-      { key: 'email', label: 'Email', placeholder: 'support@store.com', type: 'email' },
-      { key: 'phone', label: 'Phone', placeholder: '+91 9876543210', type: 'tel' },
-      { key: 'alternate_contact_phone', label: 'Alternate Phone', placeholder: '+91 9000000000', type: 'tel' },
+      {
+        key: 'email',
+        label: 'Email',
+        placeholder: 'support@store.com',
+        type: 'email',
+      },
+      {
+        key: 'phone',
+        label: 'Phone',
+        placeholder: '+91 9876543210',
+        type: 'tel',
+      },
+      {
+        key: 'alternate_contact_phone',
+        label: 'Alternate Phone',
+        placeholder: '+91 9000000000',
+        type: 'tel',
+      },
     ],
   },
   {
@@ -85,7 +115,12 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
     description: 'Business address and location.',
     icon: MapPin,
     fields: [
-      { key: 'address', label: 'Address', placeholder: 'Full business address', type: 'textarea' },
+      {
+        key: 'address',
+        label: 'Address',
+        placeholder: 'Full business address',
+        type: 'textarea',
+      },
       { key: 'city', label: 'City', placeholder: 'City' },
       { key: 'state', label: 'State', placeholder: 'State' },
       { key: 'pincode', label: 'Pincode', placeholder: '400001' },
@@ -96,8 +131,18 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
 
 // ... (Helpers: normalizeRole, extractProfile, readString, formatRoleLabel, toBoolean, toArray remain the same)
 
-const normalizeRole = (value: unknown) => String(value || '').trim().toLowerCase().replace(/[\s_-]/g, '')
-const extractProfile = (payload: any) => payload?.vendor || payload?.data || payload?.user || payload?.admin || payload || null
+const normalizeRole = (value: unknown) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]/g, '')
+const extractProfile = (payload: any) =>
+  payload?.vendor ||
+  payload?.data ||
+  payload?.user ||
+  payload?.admin ||
+  payload ||
+  null
 const readString = (value: unknown) => {
   if (Array.isArray(value)) return value.filter(Boolean).join(', ')
   if (typeof value === 'number') return String(value)
@@ -109,24 +154,40 @@ const formatRoleLabel = (value: unknown) => {
   if (normalized === 'superadmin') return 'Admin'
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
-const toBoolean = (value: unknown) => value === true || value === 1 || String(value || '').trim().toLowerCase() === 'true'
+const toBoolean = (value: unknown) =>
+  value === true ||
+  value === 1 ||
+  String(value || '')
+    .trim()
+    .toLowerCase() === 'true'
 const toArray = (value: unknown): string[] => {
-  if (Array.isArray(value)) return value.filter(Boolean).map((item) => String(item))
+  if (Array.isArray(value))
+    return value.filter(Boolean).map((item) => String(item))
   if (typeof value === 'string') {
     const trimmed = value.trim()
-    return trimmed ? trimmed.split(',').map((item) => item.trim()).filter(Boolean) : []
+    return trimmed
+      ? trimmed
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : []
   }
   return []
 }
 
 export default function ProfilePage() {
   const dispatch = useDispatch<AppDispatch>()
- 
+
   const user = useSelector((state: any) => state.auth.user)
   const isVendor = normalizeRole(user?.role) === 'vendor'
 
-  const profileSections = isVendor ? VENDOR_PROFILE_SECTIONS : ADMIN_PROFILE_SECTIONS
-  const editableFieldKeys = useMemo(() => profileSections.flatMap((s) => s.fields.map((f) => f.key)), [profileSections])
+  const profileSections = isVendor
+    ? VENDOR_PROFILE_SECTIONS
+    : ADMIN_PROFILE_SECTIONS
+  const editableFieldKeys = useMemo(
+    () => profileSections.flatMap((s) => s.fields.map((f) => f.key)),
+    [profileSections]
+  )
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null)
@@ -139,35 +200,66 @@ export default function ProfilePage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
 
-  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState('')
   const [passwordError, setPasswordError] = useState('')
 
-  const summaryFields = useMemo(() => [
-    { label: 'Business type', value: readString(profile?.business_type || form.business_type) },
-    { label: 'Established year', value: readString(profile?.established_year || form.established_year) },
-    { label: 'Annual turnover', value: readString(profile?.annual_turnover || form.annual_turnover) },
-    { label: 'Employees', value: readString(profile?.office_employees || form.office_employees) },
-    { label: 'Return policy', value: readString(profile?.return_policy || form.return_policy) },
-    { label: 'UPI ID', value: readString(profile?.upi_id) },
-  ], [profile, form])
+  const summaryFields = useMemo(
+    () => [
+      {
+        label: 'Business type',
+        value: readString(profile?.business_type || form.business_type),
+      },
+      {
+        label: 'Established year',
+        value: readString(profile?.established_year || form.established_year),
+      },
+      {
+        label: 'Annual turnover',
+        value: readString(profile?.annual_turnover || form.annual_turnover),
+      },
+      {
+        label: 'Employees',
+        value: readString(profile?.office_employees || form.office_employees),
+      },
+      {
+        label: 'Return policy',
+        value: readString(profile?.return_policy || form.return_policy),
+      },
+      { label: 'UPI ID', value: readString(profile?.upi_id) },
+    ],
+    [profile, form]
+  )
 
-  const [activeSummary, setActiveSummary] = useState(summaryFields[0]?.label ?? '')
-  const activeSummaryField = useMemo(() => summaryFields.find((f) => f.label === activeSummary) ?? summaryFields[0], [activeSummary, summaryFields])
+  const [activeSummary, setActiveSummary] = useState(
+    summaryFields[0]?.label ?? ''
+  )
+  const activeSummaryField = useMemo(
+    () =>
+      summaryFields.find((f) => f.label === activeSummary) ?? summaryFields[0],
+    [activeSummary, summaryFields]
+  )
 
-  const businessNatureChips = toArray(profile?.business_nature || form.business_nature)
+  const businessNatureChips = toArray(
+    profile?.business_nature || form.business_nature
+  )
   const categoryChips = toArray(profile?.categories || form.categories)
   const dealingAreaChips = toArray(profile?.dealing_area || form.dealing_area)
 
-
-
   const syncLocalState = (source: Record<string, unknown> | null) => {
     const nextProfile = source && typeof source === 'object' ? source : {}
-    const nextForm = editableFieldKeys.reduce<Record<string, string>>((acc, key) => {
-      acc[key] = readString(nextProfile[key] ?? user?.[key])
-      return acc
-    }, {})
+    const nextForm = editableFieldKeys.reduce<Record<string, string>>(
+      (acc, key) => {
+        acc[key] = readString(nextProfile[key] ?? user?.[key])
+        return acc
+      },
+      {}
+    )
     setProfile(nextProfile)
     setForm(nextForm)
     setAvatarPreview(readString(nextProfile.avatar || user?.avatar) || null)
@@ -186,7 +278,9 @@ export default function ProfilePage() {
           if (isVendor) void dispatch(fetchVendorProfile())
         }
       } catch (error: any) {
-        setErrorMessage(error?.response?.data?.message || 'Failed to load profile.')
+        setErrorMessage(
+          error?.response?.data?.message || 'Failed to load profile.'
+        )
       } finally {
         setLoading(false)
       }
@@ -194,14 +288,23 @@ export default function ProfilePage() {
     loadProfile()
   }, [user?.id, user?._id])
 
-  const displayName = readString(profile?.name || user?.name || user?.business_name) || 'Profile'
+  const displayName =
+    readString(profile?.name || user?.name || user?.business_name) || 'Profile'
   const displayEmail = readString(profile?.email || user?.email) || '-'
   const displayPhone = readString(profile?.phone || user?.phone) || '-'
-  const avatarInitials = displayName.split(/\s+/).map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'PR'
+  const avatarInitials =
+    displayName
+      .split(/\s+/)
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || 'PR'
 
-  const handleInputChange = (key: string) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm(prev => ({ ...prev, [key]: e.target.value }))
-  }
+  const handleInputChange =
+    (key: string) =>
+    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setForm((prev) => ({ ...prev, [key]: e.target.value }))
+    }
 
   const handleAvatarSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -218,7 +321,7 @@ export default function ProfilePage() {
     try {
       setSaving(true)
       const payload = new FormData()
-      editableFieldKeys.forEach(key => payload.append(key, form[key] || ''))
+      editableFieldKeys.forEach((key) => payload.append(key, form[key] || ''))
       if (avatarFile) payload.append('avatar', avatarFile)
 
       const res = await api.put('/profile', payload)
@@ -237,17 +340,35 @@ export default function ProfilePage() {
   }
 
   const isPasswordValid = (password: string) => {
-    return password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password) && /[!@#$%^&*]/.test(password)
+    return isStrongPassword(password)
   }
 
   const handlePasswordUpdate = async () => {
     try {
       setPasswordSaving(true)
+      setPasswordError('')
+      setPasswordMessage('')
       await api.put('/profile/password', passwordForm)
+      dispatch(
+        setUser({
+          ...user,
+          must_change_password: false,
+          temp_password_issued_at: null,
+          temp_password_expires_at: null,
+          hours_left_to_change_password: null,
+          show_password_change_reminder: false,
+        })
+      )
       setPasswordMessage('Password updated successfully.')
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      })
     } catch (error: any) {
-      setPasswordError(error?.response?.data?.message || 'Password update failed.')
+      setPasswordError(
+        error?.response?.data?.message || 'Password update failed.'
+      )
     } finally {
       setPasswordSaving(false)
     }
@@ -257,51 +378,87 @@ export default function ProfilePage() {
     <>
       <TablePageHeader title='Profile'>
         {!isEditing ? (
-          <Button onClick={() => setIsEditing(true)} variant='outline'>Edit Profile</Button>
+          <Button onClick={() => setIsEditing(true)} variant='outline'>
+            Edit Profile
+          </Button>
         ) : (
-          <div className="flex gap-2">
-            <Button onClick={() => { setIsEditing(false); syncLocalState(profile) }} variant='outline' disabled={saving}>
+          <div className='flex gap-2'>
+            <Button
+              onClick={() => {
+                setIsEditing(false)
+                syncLocalState(profile)
+              }}
+              variant='outline'
+              disabled={saving}
+            >
               <X className='mr-2 h-4 w-4' /> Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              <Save className='mr-2 h-4 w-4' /> {saving ? 'Saving...' : 'Save Changes'}
+              <Save className='mr-2 h-4 w-4' />{' '}
+              {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         )}
       </TablePageHeader>
 
       <Main className='flex flex-col gap-6 pb-8'>
-        {errorMessage && <div className='rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700'>{errorMessage}</div>}
-        {successMessage && <div className='rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700'>{successMessage}</div>}
+        {errorMessage && (
+          <div className='rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700'>
+            {errorMessage}
+          </div>
+        )}
+        {successMessage && (
+          <div className='rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700'>
+            {successMessage}
+          </div>
+        )}
 
         <div className='grid gap-6 xl:grid-cols-[320px_1fr]'>
           {/* Sidebar */}
-          <aside className='space-y-6 sticky top-24 self-start'>
+          <aside className='sticky top-24 space-y-6 self-start'>
             <Card>
-              <CardContent className='pt-6 text-center space-y-4'>
-                <div className='relative mx-auto w-24 h-24'>
+              <CardContent className='space-y-4 pt-6 text-center'>
+                <div className='relative mx-auto h-24 w-24'>
                   <Avatar className='h-24 w-24'>
                     <AvatarImage src={avatarPreview || undefined} />
                     <AvatarFallback>{avatarInitials}</AvatarFallback>
                   </Avatar>
-                  <input ref={fileInputRef} type='file' className='hidden' onChange={handleAvatarSelect} />
+                  <input
+                    ref={fileInputRef}
+                    type='file'
+                    className='hidden'
+                    onChange={handleAvatarSelect}
+                  />
                 </div>
                 <div>
                   <h2 className='text-xl font-bold'>{displayName}</h2>
                   <p className='text-sm text-slate-500'>{displayEmail}</p>
                 </div>
                 <div className='flex justify-center gap-2'>
-                  <Badge variant="outline">{formatRoleLabel(user?.role)}</Badge>
-                  {isVendor && toBoolean(profile?.is_active) && <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">Active</Badge>}
+                  <Badge variant='outline'>{formatRoleLabel(user?.role)}</Badge>
+                  {isVendor && toBoolean(profile?.is_active) && (
+                    <Badge className='border-emerald-200 bg-emerald-50 text-emerald-700'>
+                      Active
+                    </Badge>
+                  )}
                 </div>
                 {isEditing && (
-                  <Button variant='outline' size="sm" className='w-full' onClick={() => fileInputRef.current?.click()}>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    className='w-full'
+                    onClick={() => fileInputRef.current?.click()}
+                  >
                     <Camera className='mr-2 h-4 w-4' /> Change Photo
                   </Button>
                 )}
-                <div className='border-t pt-4 text-left space-y-2 text-sm'>
-                  <div className='flex items-center gap-2 text-slate-600'><Mail className='h-4 w-4' /> {displayEmail}</div>
-                  <div className='flex items-center gap-2 text-slate-600'><Phone className='h-4 w-4' /> {displayPhone}</div>
+                <div className='space-y-2 border-t pt-4 text-left text-sm'>
+                  <div className='flex items-center gap-2 text-slate-600'>
+                    <Mail className='h-4 w-4' /> {displayEmail}
+                  </div>
+                  <div className='flex items-center gap-2 text-slate-600'>
+                    <Phone className='h-4 w-4' /> {displayPhone}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -309,96 +466,232 @@ export default function ProfilePage() {
 
           {/* Main Content */}
           <div className='space-y-6 overflow-hidden'>
-            <div className='space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto pr-1'>
-            <Card>
-              <CardHeader><CardTitle>Profile Details</CardTitle></CardHeader>
-              <CardContent className='space-y-8'>
-                {loading ? <p>Loading...</p> : profileSections.map((section, idx) => (
-                  <div key={section.title} className='space-y-4'>
-                    <div className='flex items-center gap-3'>
-                      <div className='p-2 bg-slate-100 rounded-lg'><section.icon className='h-5 w-5' /></div>
-                      <div>
-                        <h3 className='font-semibold'>{section.title}</h3>
-                        <p className='text-sm text-slate-500'>{section.description}</p>
-                      </div>
-                    </div>
-                    <div className='grid gap-4 md:grid-cols-2'>
-                      {section.fields.map(field => (
-                        <div key={field.key} className={cn(field.type === 'textarea' && 'md:col-span-2')}>
-                          <Label>{field.label}</Label>
-                          {field.type === 'textarea' ? (
-                            <Textarea value={form[field.key] || ''} onChange={handleInputChange(field.key)} disabled={!isEditing} />
-                          ) : (
-                            <Input value={form[field.key] || ''} onChange={handleInputChange(field.key)} type={field.type} disabled={!isEditing} />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {idx < profileSections.length - 1 && <div className='border-b pt-4' />}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Registration Snapshot (Vendor Only) */}
-            {isVendor && (
+            <div className='max-h-[calc(100vh-200px)] space-y-6 overflow-y-auto pr-1'>
               <Card>
-                <CardHeader><CardTitle>Registration Snapshot</CardTitle></CardHeader>
-                <CardContent className='space-y-6'>
-                  <div className='grid gap-3 md:grid-cols-3'>
-                    {summaryFields.map(f => (
-                      <button key={f.label} onClick={() => setActiveSummary(f.label)} className={cn('p-3 border rounded-lg text-left transition', activeSummary === f.label ? 'border-violet-600 bg-violet-50' : 'bg-slate-50')}>
-                        <span className='text-[10px] uppercase text-slate-500 font-bold'>{f.label}</span>
-                        <div className='font-semibold truncate'>{f.value || '-'}</div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className='p-4 bg-slate-50 border border-dashed rounded-lg'>
-                    <span className='text-[10px] uppercase text-slate-500 font-bold'>Focused Insight</span>
-                    <p className='text-lg font-semibold'>{activeSummaryField?.value || 'No data'}</p>
-                  </div>
-                  <div className='grid md:grid-cols-3 gap-6'>
-                    <div><Label className='text-[10px] uppercase text-slate-500'>Business Nature</Label><div className='flex flex-wrap gap-1 mt-1'>{businessNatureChips.map(c => <Badge key={c} variant='secondary'>{c}</Badge>)}</div></div>
-                    <div><Label className='text-[10px] uppercase text-slate-500'>Categories</Label><div className='flex flex-wrap gap-1 mt-1'>{categoryChips.map(c => <Badge key={c} variant='secondary'>{c}</Badge>)}</div></div>
-                    <div><Label className='text-[10px] uppercase text-slate-500'>Countries</Label><div className='flex flex-wrap gap-1 mt-1'>{dealingAreaChips.map(c => <Badge key={c} variant='secondary'>{c}</Badge>)}</div></div>
-                  </div>
+                <CardHeader>
+                  <CardTitle>Profile Details</CardTitle>
+                </CardHeader>
+                <CardContent className='space-y-8'>
+                  {loading ? (
+                    <p>Loading...</p>
+                  ) : (
+                    profileSections.map((section, idx) => (
+                      <div key={section.title} className='space-y-4'>
+                        <div className='flex items-center gap-3'>
+                          <div className='rounded-lg bg-slate-100 p-2'>
+                            <section.icon className='h-5 w-5' />
+                          </div>
+                          <div>
+                            <h3 className='font-semibold'>{section.title}</h3>
+                            <p className='text-sm text-slate-500'>
+                              {section.description}
+                            </p>
+                          </div>
+                        </div>
+                        <div className='grid gap-4 md:grid-cols-2'>
+                          {section.fields.map((field) => (
+                            <div
+                              key={field.key}
+                              className={cn(
+                                field.type === 'textarea' && 'md:col-span-2'
+                              )}
+                            >
+                              <Label>{field.label}</Label>
+                              {field.type === 'textarea' ? (
+                                <Textarea
+                                  value={form[field.key] || ''}
+                                  onChange={handleInputChange(field.key)}
+                                  disabled={!isEditing}
+                                />
+                              ) : (
+                                <Input
+                                  value={form[field.key] || ''}
+                                  onChange={handleInputChange(field.key)}
+                                  type={field.type}
+                                  disabled={!isEditing}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {idx < profileSections.length - 1 && (
+                          <div className='border-b pt-4' />
+                        )}
+                      </div>
+                    ))
+                  )}
                 </CardContent>
               </Card>
-            )}
 
-            {/* Security Section */}
-            <Card>
-              <CardHeader><CardTitle>Security</CardTitle></CardHeader>
-              <CardContent className='space-y-4'>
-                <div className='grid gap-4 md:grid-cols-2'>
-                  <div className='space-y-2'><Label>Current Password</Label><PasswordInput value={passwordForm.currentPassword} onChange={(e) => setPasswordForm(p => ({...p, currentPassword: e.target.value}))} /></div>
-                  <div className='space-y-2'><Label>New Password</Label><PasswordInput value={passwordForm.newPassword} onChange={(e) => setPasswordForm(p => ({...p, newPassword: e.target.value}))} /></div>
-                  <div className='md:col-span-2 space-y-2'><Label>Confirm Password</Label><PasswordInput value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm(p => ({...p, confirmPassword: e.target.value}))} /></div>
-                </div>
+              {/* Registration Snapshot (Vendor Only) */}
+              {isVendor && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Registration Snapshot</CardTitle>
+                  </CardHeader>
+                  <CardContent className='space-y-6'>
+                    <div className='grid gap-3 md:grid-cols-3'>
+                      {summaryFields.map((f) => (
+                        <button
+                          key={f.label}
+                          onClick={() => setActiveSummary(f.label)}
+                          className={cn(
+                            'rounded-lg border p-3 text-left transition',
+                            activeSummary === f.label
+                              ? 'border-violet-600 bg-violet-50'
+                              : 'bg-slate-50'
+                          )}
+                        >
+                          <span className='text-[10px] font-bold text-slate-500 uppercase'>
+                            {f.label}
+                          </span>
+                          <div className='truncate font-semibold'>
+                            {f.value || '-'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className='rounded-lg border border-dashed bg-slate-50 p-4'>
+                      <span className='text-[10px] font-bold text-slate-500 uppercase'>
+                        Focused Insight
+                      </span>
+                      <p className='text-lg font-semibold'>
+                        {activeSummaryField?.value || 'No data'}
+                      </p>
+                    </div>
+                    <div className='grid gap-6 md:grid-cols-3'>
+                      <div>
+                        <Label className='text-[10px] text-slate-500 uppercase'>
+                          Business Nature
+                        </Label>
+                        <div className='mt-1 flex flex-wrap gap-1'>
+                          {businessNatureChips.map((c) => (
+                            <Badge key={c} variant='secondary'>
+                              {c}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className='text-[10px] text-slate-500 uppercase'>
+                          Categories
+                        </Label>
+                        <div className='mt-1 flex flex-wrap gap-1'>
+                          {categoryChips.map((c) => (
+                            <Badge key={c} variant='secondary'>
+                              {c}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className='text-[10px] text-slate-500 uppercase'>
+                          Countries
+                        </Label>
+                        <div className='mt-1 flex flex-wrap gap-1'>
+                          {dealingAreaChips.map((c) => (
+                            <Badge key={c} variant='secondary'>
+                              {c}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-                <div className='p-4 bg-slate-50 rounded-lg text-xs space-y-2'>
-                  <p className='font-bold text-slate-500 uppercase'>Requirements:</p>
-                  <ul className='grid grid-cols-2 gap-2'>
-                    <li className={cn(passwordForm.newPassword.length >= 8 ? 'text-emerald-600' : 'text-slate-400')}>• 8+ Characters</li>
-                    <li className={cn(/[A-Z]/.test(passwordForm.newPassword) ? 'text-emerald-600' : 'text-slate-400')}>• 1 Uppercase</li>
-                    <li className={cn(/[0-9]/.test(passwordForm.newPassword) ? 'text-emerald-600' : 'text-slate-400')}>• 1 Number</li>
-                    <li className={cn(/[!@#$%^&*]/.test(passwordForm.newPassword) ? 'text-emerald-600' : 'text-slate-400')}>• 1 Special Char</li>
-                  </ul>
-                </div>
+              {/* Security Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Security</CardTitle>
+                </CardHeader>
+                <CardContent className='space-y-4'>
+                  <div className='grid gap-4 md:grid-cols-2'>
+                    <div className='space-y-2'>
+                      <Label>Current Password</Label>
+                      <PasswordInput
+                        value={passwordForm.currentPassword}
+                        onChange={(e) =>
+                          setPasswordForm((p) => ({
+                            ...p,
+                            currentPassword: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <Label>New Password</Label>
+                      <PasswordInput
+                        value={passwordForm.newPassword}
+                        onChange={(e) =>
+                          setPasswordForm((p) => ({
+                            ...p,
+                            newPassword: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className='space-y-2 md:col-span-2'>
+                      <Label>Confirm Password</Label>
+                      <PasswordInput
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) =>
+                          setPasswordForm((p) => ({
+                            ...p,
+                            confirmPassword: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
 
-                <div className='flex justify-end'>
-                  <Button 
-                    onClick={handlePasswordUpdate} 
-                    disabled={passwordSaving || !isPasswordValid(passwordForm.newPassword) || passwordForm.newPassword !== passwordForm.confirmPassword}
-                    className="bg-violet-700 hover:bg-violet-800"
-                  >
-                    {passwordSaving ? 'Updating...' : 'Update Password'}
-                  </Button>
-                </div>
-                {passwordError && <p className='text-sm text-red-600'>{passwordError}</p>}
-                {passwordMessage && <p className='text-sm text-emerald-600'>{passwordMessage}</p>}
-              </CardContent>
-            </Card>
+                  <div className='space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm'>
+                    <p className='font-bold tracking-[0.16em] text-slate-500 uppercase'>
+                      Strong password rules
+                    </p>
+                    <ul className='grid gap-2 sm:grid-cols-2'>
+                      {PASSWORD_REQUIREMENTS.map((requirement) => (
+                        <li
+                          key={requirement.key}
+                          className={cn(
+                            'flex items-center gap-2',
+                            requirement.test(passwordForm.newPassword)
+                              ? 'text-emerald-600'
+                              : 'text-slate-500'
+                          )}
+                        >
+                          <span className='text-base leading-none'>•</span>
+                          <span>{requirement.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className='flex justify-end'>
+                    <Button
+                      onClick={handlePasswordUpdate}
+                      disabled={
+                        passwordSaving ||
+                        !isPasswordValid(passwordForm.newPassword) ||
+                        passwordForm.newPassword !==
+                          passwordForm.confirmPassword
+                      }
+                      className='bg-violet-700 hover:bg-violet-800'
+                    >
+                      {passwordSaving ? 'Updating...' : 'Update Password'}
+                    </Button>
+                  </div>
+                  {passwordError && (
+                    <p className='text-sm text-red-600'>{passwordError}</p>
+                  )}
+                  {passwordMessage && (
+                    <p className='text-sm text-emerald-600'>
+                      {passwordMessage}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
