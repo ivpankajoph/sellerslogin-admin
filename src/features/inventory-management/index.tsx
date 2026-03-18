@@ -1,11 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
+import type { ReactNode } from 'react'
 import type { RootState } from '@/store'
-import { Eye, ImageIcon, Loader2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  Boxes,
+  ImageIcon,
+  Loader2,
+  Package2,
+  PencilLine,
+  ShieldAlert,
+  Store,
+  TrendingUp,
+} from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { formatINR } from '@/lib/currency'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -21,6 +45,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { Switch } from '@/components/ui/switch'
 import {
   Table,
   TableBody,
@@ -29,11 +54,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { ServerPagination } from '@/components/data-table/server-pagination'
 import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
 import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { TableShell } from '@/components/data-table/table-shell'
 import { Main } from '@/components/layout/main'
+import { toast } from 'sonner'
 
 type ProductCategoryRef =
   | string
@@ -54,6 +81,16 @@ type ProductSubcategoryRef =
       category_id?: string | { _id?: string; id?: string; name?: string }
     }
 
+type ProductWebsiteRef =
+  | string
+  | {
+      _id?: string
+      id?: string
+      name?: string
+      website_slug?: string
+      template_name?: string
+    }
+
 type ProductVariant = {
   _id?: string
   variantSku?: string
@@ -72,12 +109,14 @@ type VendorProduct = {
   status?: string
   isAvailable?: boolean
   createdAt?: string
+  updatedAt?: string
   baseSku?: string
   defaultImages?: Array<{ url?: string }>
   mainCategory?: ProductCategoryRef
   productCategory?: ProductCategoryRef
   productCategories?: ProductCategoryRef[]
   productSubCategories?: ProductSubcategoryRef[]
+  websiteIds?: ProductWebsiteRef[]
   variants?: ProductVariant[]
 }
 
@@ -96,6 +135,32 @@ type CategoryCatalogItem = {
   }>
 }
 
+type WebsiteOption = {
+  value: string
+  label: string
+}
+
+type VendorOption = {
+  value: string
+  label: string
+}
+
+type InventoryAdjustment = {
+  _id?: string
+  productId?: string
+  variantId?: string
+  productName?: string
+  variantSku?: string
+  previousQuantity?: number
+  nextQuantity?: number
+  delta?: number
+  reason?: string
+  note?: string
+  actorName?: string
+  actorRole?: string
+  createdAt?: string
+}
+
 type NormalizedRef = {
   id: string
   name: string
@@ -106,18 +171,50 @@ type NormalizedSubcategory = NormalizedRef & {
   categoryId: string
 }
 
-type InventoryRow = {
+type CatalogLookups = {
+  categoryById: Map<string, CategoryCatalogItem>
+  categoryByName: Map<string, CategoryCatalogItem>
+  subcategoryById: Map<string, NormalizedSubcategory>
+  subcategoryByName: Map<string, NormalizedSubcategory>
+  mainCategoryById: Map<string, string>
+}
+
+type InventoryVariantRow = {
   key: string
-  id: string
-  name: string
-  slug: string
-  mainCategoryId: string
+  productId: string
+  variantId: string
+  productName: string
+  brand: string
+  statusKey: string
+  statusLabel: string
+  productVisible: boolean
+  variantActive: boolean
+  isSellable: boolean
+  createdAt: string
+  updatedAt: string
+  baseSku: string
+  variantSku: string
+  attributeSummary: string
   mainCategoryName: string
-  productCount: number
-  totalStock: number
-  lowStockProducts: number
-  products: VendorProduct[]
-  subcategories: NormalizedSubcategory[]
+  categoryName: string
+  subcategoryNames: string[]
+  configuredWebsiteIds: string[]
+  usesAllWebsites: boolean
+  websiteIds: string[]
+  websiteNames: string[]
+  imageUrl: string
+  onHand: number
+  available: number
+  unavailable: number
+  unitPrice: number
+  compareAtPrice: number
+  inventoryValue: number
+}
+
+type InventoryBadgeState = {
+  key: string
+  label: string
+  className: string
 }
 
 const API_BASE = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(
@@ -125,6 +222,13 @@ const API_BASE = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(
   ''
 )
 const FETCH_LIMIT = 100
+
+const adjustmentReasonOptions = [
+  { value: 'manual_adjustment', label: 'Manual adjustment' },
+  { value: 'restock', label: 'Restock received' },
+  { value: 'correction', label: 'Count correction' },
+  { value: 'damage', label: 'Damaged stock' },
+]
 
 const normalizeText = (value: unknown) => String(value || '').trim()
 
@@ -134,7 +238,7 @@ const normalizeSearchValue = (value: unknown) =>
 const isLikelyObjectId = (value: string) => /^[a-f0-9]{24}$/i.test(value)
 
 const toRef = (
-  value: ProductCategoryRef | ProductSubcategoryRef | undefined
+  value: ProductCategoryRef | ProductSubcategoryRef | ProductWebsiteRef | undefined
 ): NormalizedRef => {
   if (!value) return { id: '', name: '', slug: '' }
 
@@ -149,20 +253,19 @@ const toRef = (
 
   return {
     id: normalizeText(value._id || value.id),
-    name: normalizeText(value.name),
-    slug: normalizeText(value.slug),
+    name: normalizeText(
+      value.name || ('template_name' in value ? value.template_name : '')
+    ),
+    slug: normalizeText(
+      ('slug' in value ? value.slug : '') ||
+        ('website_slug' in value ? value.website_slug : '')
+    ),
   }
 }
 
-const toSubcategoryCategoryId = (value: ProductSubcategoryRef | undefined) => {
-  if (!value || typeof value === 'string') return ''
-  const raw = value.category_id
-  if (!raw) return ''
-  if (typeof raw === 'string') return normalizeText(raw)
-  return normalizeText(raw._id || raw.id)
-}
-
-const uniqueRefs = <T extends ProductCategoryRef | ProductSubcategoryRef>(
+const uniqueRefs = <
+  T extends ProductCategoryRef | ProductSubcategoryRef | ProductWebsiteRef
+>(
   items: T[] = []
 ) => {
   const seen = new Set<string>()
@@ -170,10 +273,7 @@ const uniqueRefs = <T extends ProductCategoryRef | ProductSubcategoryRef>(
   return items.filter((item) => {
     const ref = toRef(item)
     const key =
-      ref.id ||
-      ref.slug ||
-      normalizeSearchValue(ref.name) ||
-      JSON.stringify(item)
+      ref.id || ref.slug || normalizeSearchValue(ref.name) || JSON.stringify(item)
 
     if (!key || seen.has(key)) return false
     seen.add(key)
@@ -181,19 +281,18 @@ const uniqueRefs = <T extends ProductCategoryRef | ProductSubcategoryRef>(
   })
 }
 
-const getAuthHeaders = (token: string) =>
+const getAuthHeaders = (token: string) => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return headers
+}
+
+const getReadHeaders = (token: string) =>
   token ? { Authorization: `Bearer ${token}` } : undefined
-
-const getStockCount = (product: VendorProduct) =>
-  Array.isArray(product.variants)
-    ? product.variants.reduce(
-        (sum, variant) => sum + Number(variant?.stockQuantity || 0),
-        0
-      )
-    : 0
-
-const getVariantCount = (product: VendorProduct) =>
-  Array.isArray(product.variants) ? product.variants.length : 0
 
 const getVariantImageUrl = (variant?: ProductVariant) =>
   String(variant?.variantsImageUrls?.[0]?.url || '').trim()
@@ -209,45 +308,62 @@ const getPrimaryProductImageUrl = (product?: VendorProduct) => {
     : ''
 }
 
-const getPriceRange = (variants?: ProductVariant[]) => {
-  const prices = (variants || [])
-    .map((item) => Number(item?.finalPrice ?? item?.actualPrice ?? 0))
-    .filter((price) => Number.isFinite(price) && price >= 0)
+const formatVariantAttributes = (attributes?: Record<string, unknown>) => {
+  const entries = Object.entries(attributes || {}).filter(([, value]) =>
+    normalizeText(value)
+  )
 
-  if (!prices.length) return formatINR(0)
+  if (!entries.length) return 'Default variant'
 
-  const minPrice = Math.min(...prices)
-  const maxPrice = Math.max(...prices)
-
-  return minPrice === maxPrice
-    ? formatINR(minPrice)
-    : `${formatINR(minPrice)} - ${formatINR(maxPrice)}`
+  return entries
+    .map(([key, value]) => `${key}: ${normalizeText(value)}`)
+    .join(' | ')
 }
 
-const getLowStockState = (stock: number) => {
-  if (stock === 0) {
-    return {
-      label: 'Out of stock',
-      className: 'border-red-200 bg-red-50 text-red-700',
-    }
+const formatStatusLabel = (status: string, isVisible: boolean) => {
+  if (!isVisible) return 'Hidden'
+  switch (status) {
+    case 'approved':
+      return 'Verified'
+    case 'pending':
+      return 'Pending'
+    case 'rejected':
+      return 'Rejected'
+    case 'draft':
+      return 'Draft'
+    default:
+      return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Active'
   }
+}
 
-  if (stock < 10) {
-    return {
-      label: 'Low stock',
-      className: 'border-amber-200 bg-amber-50 text-amber-700',
-    }
-  }
+const getProductWebsiteIds = (product?: VendorProduct | null) =>
+  uniqueRefs(product?.websiteIds || [])
+    .map((item) => toRef(item).id)
+    .filter(Boolean)
+
+const resolveProductWebsiteVisibility = (
+  product: VendorProduct | null | undefined,
+  websiteOptions: WebsiteOption[],
+  websiteLabelById: Map<string, string>
+) => {
+  const configuredWebsiteIds = getProductWebsiteIds(product)
+  const allWebsiteIds = Array.from(
+    new Set(websiteOptions.map((website) => normalizeText(website.value)).filter(Boolean))
+  )
+  const usesAllWebsites = configuredWebsiteIds.length === 0
+  const websiteIds = usesAllWebsites ? allWebsiteIds : configuredWebsiteIds
+  const websiteNames = websiteIds.length
+    ? websiteIds.map(
+        (websiteId) => websiteLabelById.get(websiteId) || 'Unknown website'
+      )
+    : ['All websites']
 
   return {
-    label: 'Healthy stock',
-    className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    configuredWebsiteIds,
+    usesAllWebsites,
+    websiteIds,
+    websiteNames,
   }
-}
-
-const formatStatusLabel = (product: VendorProduct) => {
-  if (product.isAvailable === false) return 'Hidden'
-  return normalizeText(product.status) || 'Active'
 }
 
 const formatDate = (value?: string) => {
@@ -256,6 +372,271 @@ const formatDate = (value?: string) => {
   const parsed = Date.parse(raw)
   if (!Number.isFinite(parsed)) return raw
   return new Date(parsed).toLocaleDateString()
+}
+
+const formatDateTime = (value?: string) => {
+  const raw = normalizeText(value)
+  if (!raw) return 'N/A'
+  const parsed = Date.parse(raw)
+  if (!Number.isFinite(parsed)) return raw
+  return new Date(parsed).toLocaleString()
+}
+
+const formatReasonLabel = (value?: string) => {
+  const normalized = normalizeText(value).replace(/_/g, ' ')
+  if (!normalized) return 'Manual adjustment'
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+}
+
+const resolveVendorLabel = (vendor: any) => {
+  const primary = normalizeText(
+    vendor?.registrar_name ||
+      vendor?.business_name ||
+      vendor?.name ||
+      vendor?.username
+  )
+  const secondary = normalizeText(vendor?.email)
+  if (primary && secondary) return `${primary} - ${secondary}`
+  return primary || secondary || 'Unnamed vendor'
+}
+
+const buildCatalogLookups = (
+  categoryCatalog: CategoryCatalogItem[]
+): CatalogLookups => {
+  const categoryById = new Map<string, CategoryCatalogItem>()
+  const categoryByName = new Map<string, CategoryCatalogItem>()
+  const subcategoryById = new Map<string, NormalizedSubcategory>()
+  const subcategoryByName = new Map<string, NormalizedSubcategory>()
+  const mainCategoryById = new Map<string, string>()
+
+  categoryCatalog.forEach((category) => {
+    const categoryRef = toRef(category)
+    if (categoryRef.id) categoryById.set(categoryRef.id, category)
+    if (categoryRef.name) {
+      categoryByName.set(normalizeSearchValue(categoryRef.name), category)
+    }
+
+    const mainRef = toRef(category.mainCategory)
+    if (mainRef.id && mainRef.name) {
+      mainCategoryById.set(mainRef.id, mainRef.name)
+    }
+
+    ;(Array.isArray(category.subcategories) ? category.subcategories : []).forEach(
+      (subcategory) => {
+        const normalized: NormalizedSubcategory = {
+          ...toRef(subcategory),
+          categoryId: normalizeText(
+            typeof subcategory.category_id === 'string'
+              ? subcategory.category_id
+              : subcategory.category_id?._id || subcategory.category_id?.id
+          ),
+        }
+
+        if (normalized.id) subcategoryById.set(normalized.id, normalized)
+        if (normalized.name) {
+          subcategoryByName.set(normalizeSearchValue(normalized.name), normalized)
+        }
+      }
+    )
+  })
+
+  return {
+    categoryById,
+    categoryByName,
+    subcategoryById,
+    subcategoryByName,
+    mainCategoryById,
+  }
+}
+
+const resolveProductTaxonomy = (
+  product: VendorProduct,
+  lookups: CatalogLookups
+) => {
+  const categoryRefs = uniqueRefs([
+    ...(Array.isArray(product.productCategories) ? product.productCategories : []),
+    ...(product.productCategory ? [product.productCategory] : []),
+  ])
+  const primaryCategoryRef = toRef(categoryRefs[0])
+  const matchedCategory =
+    (primaryCategoryRef.id && lookups.categoryById.get(primaryCategoryRef.id)) ||
+    (primaryCategoryRef.name &&
+      lookups.categoryByName.get(normalizeSearchValue(primaryCategoryRef.name))) ||
+    null
+
+  const matchedCategoryRef = matchedCategory ? toRef(matchedCategory) : null
+  const mainCategoryRef = toRef(product.mainCategory)
+  const matchedMainCategoryRef = matchedCategory
+    ? toRef(matchedCategory.mainCategory)
+    : null
+
+  const subcategoryNames = uniqueRefs(product.productSubCategories || [])
+    .map((subcategory) => {
+      const ref = toRef(subcategory)
+      const matched =
+        (ref.id && lookups.subcategoryById.get(ref.id)) ||
+        (ref.name && lookups.subcategoryByName.get(normalizeSearchValue(ref.name))) ||
+        null
+
+      return matched?.name || ref.name
+    })
+    .filter(Boolean)
+
+  return {
+    categoryName:
+      matchedCategoryRef?.name || primaryCategoryRef.name || 'Unassigned category',
+    mainCategoryName:
+      lookups.mainCategoryById.get(mainCategoryRef.id) ||
+      mainCategoryRef.name ||
+      matchedMainCategoryRef?.name ||
+      'Unassigned',
+    subcategoryNames,
+  }
+}
+
+const getCatalogState = (row: InventoryVariantRow): InventoryBadgeState => {
+  if (row.statusKey && row.statusKey !== 'approved') {
+    return {
+      key: 'draft',
+      label: row.statusLabel,
+      className: 'border-amber-200 bg-amber-50 text-amber-700',
+    }
+  }
+
+  if (!row.productVisible) {
+    return {
+      key: 'hidden',
+      label: 'Hidden',
+      className: 'border-slate-200 bg-slate-50 text-slate-700',
+    }
+  }
+
+  if (!row.variantActive) {
+    return {
+      key: 'inactive',
+      label: 'Inactive variant',
+      className: 'border-slate-200 bg-slate-50 text-slate-700',
+    }
+  }
+
+  return {
+    key: 'sellable',
+    label: 'Sellable',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  }
+}
+
+const getHealthState = (row: InventoryVariantRow): InventoryBadgeState => {
+  if (row.onHand <= 0) {
+    return {
+      key: 'out',
+      label: 'Out of stock',
+      className: 'border-red-200 bg-red-50 text-red-700',
+    }
+  }
+
+  if (row.available <= 0) {
+    return {
+      key: 'unavailable',
+      label: 'Not sellable',
+      className: 'border-slate-200 bg-slate-50 text-slate-700',
+    }
+  }
+
+  if (row.available < 10) {
+    return {
+      key: 'low',
+      label: 'Low stock',
+      className: 'border-amber-200 bg-amber-50 text-amber-700',
+    }
+  }
+
+  return {
+    key: 'healthy',
+    label: 'Healthy',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  }
+}
+
+const buildInventoryVariantRows = (
+  products: VendorProduct[],
+  lookups: CatalogLookups,
+  websiteOptions: WebsiteOption[],
+  websiteLabelById: Map<string, string>
+) => {
+  const rows: InventoryVariantRow[] = []
+
+  products.forEach((product) => {
+    const {
+      categoryName,
+      mainCategoryName,
+      subcategoryNames,
+    } = resolveProductTaxonomy(product, lookups)
+    const {
+      configuredWebsiteIds,
+      usesAllWebsites,
+      websiteIds,
+      websiteNames,
+    } = resolveProductWebsiteVisibility(product, websiteOptions, websiteLabelById)
+    const imageUrl = getPrimaryProductImageUrl(product)
+    const statusKey = normalizeText(product.status).toLowerCase()
+    const productVisible = product.isAvailable !== false
+    const statusLabel = formatStatusLabel(statusKey, productVisible)
+
+    ;(Array.isArray(product.variants) ? product.variants : []).forEach(
+      (variant, index) => {
+        const variantId = normalizeText(variant?._id || `${index}`)
+        const variantActive = variant?.isActive !== false
+        const onHand = Math.max(0, Number(variant?.stockQuantity || 0))
+        const isSellable =
+          productVisible && statusKey === 'approved' && variantActive
+        const available = isSellable ? onHand : 0
+        const unavailable = Math.max(onHand - available, 0)
+        const unitPrice = Number(variant?.finalPrice ?? variant?.actualPrice ?? 0)
+        const compareAtPrice = Number(
+          variant?.actualPrice ?? variant?.finalPrice ?? 0
+        )
+
+        rows.push({
+          key: `${product._id}:${variantId}`,
+          productId: product._id,
+          variantId,
+          productName: normalizeText(product.productName) || 'Unnamed product',
+          brand: normalizeText(product.brand),
+          statusKey,
+          statusLabel,
+          productVisible,
+          variantActive,
+          isSellable,
+          createdAt: normalizeText(product.createdAt),
+          updatedAt: normalizeText(product.updatedAt || product.createdAt),
+          baseSku: normalizeText(product.baseSku),
+          variantSku: normalizeText(variant?.variantSku) || 'SKU missing',
+          attributeSummary: formatVariantAttributes(variant?.variantAttributes),
+          mainCategoryName,
+          categoryName,
+          subcategoryNames,
+          configuredWebsiteIds,
+          usesAllWebsites,
+          websiteIds,
+          websiteNames,
+          imageUrl: imageUrl || getVariantImageUrl(variant),
+          onHand,
+          available,
+          unavailable,
+          unitPrice,
+          compareAtPrice,
+          inventoryValue: onHand * unitPrice,
+        })
+      }
+    )
+  })
+
+  return rows.sort((a, b) => {
+    const productCompare = a.productName.localeCompare(b.productName)
+    if (productCompare !== 0) return productCompare
+    return a.variantSku.localeCompare(b.variantSku)
+  })
 }
 
 async function fetchVendorProducts(vendorId: string, token: string) {
@@ -267,12 +648,12 @@ async function fetchVendorProducts(vendorId: string, token: string) {
     const response = await fetch(
       `${API_BASE}/v1/products/vendor/${vendorId}?page=${page}&limit=${FETCH_LIMIT}&includeUnavailable=true`,
       {
-        headers: getAuthHeaders(token),
+        headers: getReadHeaders(token),
       }
     )
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch vendor products (${response.status})`)
+      throw new Error(`Failed to fetch vendor inventory (${response.status})`)
     }
 
     const body = await response.json()
@@ -294,7 +675,7 @@ async function fetchCategoryCatalog(token: string) {
     const response = await fetch(
       `${API_BASE}/v1/categories/getall?page=${page}&limit=${FETCH_LIMIT}`,
       {
-        headers: getAuthHeaders(token),
+        headers: getReadHeaders(token),
       }
     )
 
@@ -312,239 +693,183 @@ async function fetchCategoryCatalog(token: string) {
   return categories
 }
 
-function buildInventoryRows(
-  products: VendorProduct[],
-  categoryCatalog: CategoryCatalogItem[]
-) {
-  const categoryById = new Map<string, CategoryCatalogItem>()
-  const categoryByName = new Map<string, CategoryCatalogItem>()
-  const subcategoryById = new Map<string, NormalizedSubcategory>()
-  const subcategoryByName = new Map<string, NormalizedSubcategory>()
-  const mainCategoryNameById = new Map<string, string>()
+async function fetchVendorOptions() {
+  const response = await fetch(`${API_BASE}/v1/vendors/getall`)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch vendors (${response.status})`)
+  }
 
-  categoryCatalog.forEach((category) => {
-    const categoryRef = toRef(category)
-    if (categoryRef.id) categoryById.set(categoryRef.id, category)
-    if (categoryRef.name) {
-      categoryByName.set(normalizeSearchValue(categoryRef.name), category)
-    }
+  const body = await response.json()
+  const vendors = Array.isArray(body?.vendors) ? body.vendors : []
 
-    const mainRef = toRef(category.mainCategory)
-    if (mainRef.id && mainRef.name) {
-      mainCategoryNameById.set(mainRef.id, mainRef.name)
-    }
-
-    ;(Array.isArray(category.subcategories)
-      ? category.subcategories
-      : []
-    ).forEach((subcategory) => {
-      const normalized: NormalizedSubcategory = {
-        ...toRef(subcategory),
-        categoryId:
-          normalizeText(
-            typeof subcategory.category_id === 'string'
-              ? subcategory.category_id
-              : subcategory.category_id?._id || subcategory.category_id?.id
-          ) || categoryRef.id,
-      }
-
-      if (normalized.id) subcategoryById.set(normalized.id, normalized)
-      if (normalized.name) {
-        subcategoryByName.set(normalizeSearchValue(normalized.name), normalized)
-      }
-    })
-  })
-
-  const rows = new Map<
-    string,
-    InventoryRow & {
-      productMap: Map<string, VendorProduct>
-      subcategoryMap: Map<string, NormalizedSubcategory>
-    }
-  >()
-
-  products.forEach((product) => {
-    const rawCategoryRefs = uniqueRefs([
-      ...(Array.isArray(product.productCategories)
-        ? product.productCategories
-        : []),
-      ...(product.productCategory ? [product.productCategory] : []),
-    ])
-    const rawSubcategoryRefs = uniqueRefs(product.productSubCategories || [])
-    const productMainRef = toRef(product.mainCategory)
-
-    rawCategoryRefs.forEach((rawCategoryRef) => {
-      const categoryRef = toRef(rawCategoryRef)
-      const catalogCategory =
-        (categoryRef.id && categoryById.get(categoryRef.id)) ||
-        (categoryRef.name &&
-          categoryByName.get(normalizeSearchValue(categoryRef.name))) ||
-        null
-
-      const categoryCatalogRef = catalogCategory
-        ? toRef(catalogCategory)
-        : { id: '', name: '', slug: '' }
-      const categoryKey =
-        categoryCatalogRef.id ||
-        categoryRef.id ||
-        categoryCatalogRef.slug ||
-        categoryRef.slug ||
-        normalizeSearchValue(categoryCatalogRef.name || categoryRef.name)
-
-      if (!categoryKey) return
-
-      const categoryMainRef = catalogCategory
-        ? toRef(catalogCategory.mainCategory)
-        : { id: '', name: '', slug: '' }
-      const row = rows.get(categoryKey) || {
-        key: categoryKey,
-        id: categoryCatalogRef.id || categoryRef.id,
-        name: categoryCatalogRef.name || categoryRef.name || 'Unnamed category',
-        slug: categoryCatalogRef.slug || categoryRef.slug,
-        mainCategoryId: categoryMainRef.id || productMainRef.id,
-        mainCategoryName:
-          categoryMainRef.name ||
-          mainCategoryNameById.get(categoryMainRef.id || productMainRef.id) ||
-          productMainRef.name ||
-          'Unassigned',
-        productCount: 0,
-        totalStock: 0,
-        lowStockProducts: 0,
-        products: [],
-        subcategories: [],
-        productMap: new Map<string, VendorProduct>(),
-        subcategoryMap: new Map<string, NormalizedSubcategory>(),
-      }
-
-      if (!row.productMap.has(product._id)) {
-        row.productMap.set(product._id, product)
-      }
-
-      rawSubcategoryRefs.forEach((rawSubcategoryRef) => {
-        const subcategoryRef = toRef(rawSubcategoryRef)
-        const explicitCategoryId = toSubcategoryCategoryId(rawSubcategoryRef)
-        const matchedSubcategory =
-          (subcategoryRef.id && subcategoryById.get(subcategoryRef.id)) ||
-          (subcategoryRef.name &&
-            subcategoryByName.get(normalizeSearchValue(subcategoryRef.name))) ||
-          null
-
-        const categoryIdForMatch =
-          matchedSubcategory?.categoryId || explicitCategoryId || row.id
-
-        if (row.id && categoryIdForMatch && row.id !== categoryIdForMatch) {
-          return
-        }
-
-        const normalizedSubcategory: NormalizedSubcategory = {
-          ...(matchedSubcategory || subcategoryRef),
-          categoryId: categoryIdForMatch || row.id,
-        }
-
-        const subcategoryKey =
-          normalizedSubcategory.id ||
-          normalizedSubcategory.slug ||
-          normalizeSearchValue(normalizedSubcategory.name)
-
-        if (!subcategoryKey || !normalizedSubcategory.name) return
-        row.subcategoryMap.set(subcategoryKey, normalizedSubcategory)
-      })
-
-      rows.set(categoryKey, row)
-    })
-  })
-
-  return Array.from(rows.values())
-    .map((row) => {
-      const rowProducts = Array.from(row.productMap.values()).sort((a, b) =>
-        normalizeText(a.productName).localeCompare(normalizeText(b.productName))
-      )
-      const totalStock = rowProducts.reduce(
-        (sum, product) => sum + getStockCount(product),
-        0
-      )
-      const lowStockProducts = rowProducts.filter((product) => {
-        const stock = getStockCount(product)
-        return stock > 0 && stock < 10
-      }).length
-
-      return {
-        key: row.key,
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        mainCategoryId: row.mainCategoryId,
-        mainCategoryName: row.mainCategoryName,
-        productCount: rowProducts.length,
-        totalStock,
-        lowStockProducts,
-        products: rowProducts,
-        subcategories: Array.from(row.subcategoryMap.values()).sort((a, b) =>
-          a.name.localeCompare(b.name)
-        ),
-      }
-    })
-    .sort((a, b) => a.name.localeCompare(b.name))
+  return vendors
+    .map((vendor: any) => ({
+      value: normalizeText(vendor?._id || vendor?.id),
+      label: resolveVendorLabel(vendor),
+    }))
+    .filter((item: VendorOption) => item.value)
+    .sort((a: VendorOption, b: VendorOption) => a.label.localeCompare(b.label))
 }
 
-function getProductSubcategoriesForCategory(
-  product: VendorProduct,
-  row: InventoryRow
-) {
-  const allowedIds = new Set(
-    row.subcategories.map((subcategory) => subcategory.id).filter(Boolean)
-  )
-  const allowedNames = new Set(
-    row.subcategories
-      .map((subcategory) => normalizeSearchValue(subcategory.name))
-      .filter(Boolean)
+async function fetchVendorWebsites(vendorId: string, token: string) {
+  const response = await fetch(
+    `${API_BASE}/v1/templates/by-vendor?vendor_id=${encodeURIComponent(vendorId)}`,
+    {
+      headers: getReadHeaders(token),
+    }
   )
 
-  return uniqueRefs(product.productSubCategories || [])
-    .map((subcategory) => ({
-      ...toRef(subcategory),
-      categoryId: toSubcategoryCategoryId(subcategory),
+  if (!response.ok) {
+    throw new Error(`Failed to fetch websites (${response.status})`)
+  }
+
+  const body = await response.json()
+  const rows = Array.isArray(body?.data) ? body.data : []
+
+  return rows
+    .map((website: any) => ({
+      value: normalizeText(website?._id || website?.id),
+      label:
+        normalizeText(website?.name) ||
+        normalizeText(website?.business_name) ||
+        normalizeText(website?.website_slug) ||
+        normalizeText(website?.template_name) ||
+        'Website',
     }))
-    .filter((subcategory) => {
-      if (!subcategory.name) return false
-      if (!row.subcategories.length) return true
-      if (
-        subcategory.categoryId &&
-        row.id &&
-        subcategory.categoryId === row.id
-      ) {
-        return true
-      }
-      if (subcategory.id && allowedIds.has(subcategory.id)) return true
-      return allowedNames.has(normalizeSearchValue(subcategory.name))
-    })
+    .filter((item: WebsiteOption) => item.value)
+}
+
+async function fetchInventoryAdjustments(vendorId: string, token: string) {
+  const response = await fetch(
+    `${API_BASE}/v1/products/inventory/adjustments?vendor_id=${encodeURIComponent(vendorId)}&limit=80`,
+    {
+      headers: getReadHeaders(token),
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch inventory history (${response.status})`)
+  }
+
+  const body = await response.json()
+  return Array.isArray(body?.adjustments) ? body.adjustments : []
+}
+
+function InventoryStatCard({
+  title,
+  value,
+  helper,
+  icon,
+  accentClassName,
+}: {
+  title: string
+  value: string
+  helper: string
+  icon: ReactNode
+  accentClassName: string
+}) {
+  return (
+    <Card className='border border-sky-100/80 bg-white/85 py-0 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card'>
+      <CardHeader className='flex flex-row items-start justify-between gap-4 border-b border-border/60 pb-4'>
+        <div className='space-y-1'>
+          <CardDescription className='text-xs uppercase tracking-[0.18em]'>
+            {title}
+          </CardDescription>
+          <CardTitle className='text-2xl'>{value}</CardTitle>
+        </div>
+        <div
+          className={cn(
+            'rounded-md border px-3 py-2 text-sm shadow-sm',
+            accentClassName
+          )}
+        >
+          {icon}
+        </div>
+      </CardHeader>
+      <CardContent className='pt-0 text-sm text-muted-foreground'>
+        {helper}
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function InventoryDashboard() {
-  const vendorId = useSelector(
-    (state: RootState) => state.auth?.user?.id || state.auth?.user?._id || ''
-  )
+  const authUser = useSelector((state: RootState) => state.auth?.user)
   const token = useSelector((state: RootState) => state.auth?.token || '')
+  const authVendorId = normalizeText(authUser?.id || authUser?._id)
+  const role = normalizeText(authUser?.role).toLowerCase()
+  const isAdmin = role === 'admin' || role === 'superadmin'
 
-  const [products, setProducts] = useState<VendorProduct[]>([])
-  const [categoryCatalog, setCategoryCatalog] = useState<CategoryCatalogItem[]>(
-    []
+  const [vendorOptions, setVendorOptions] = useState<VendorOption[]>([])
+  const [selectedVendorId, setSelectedVendorId] = useState(
+    isAdmin ? '' : authVendorId
   )
+  const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([])
+  const [products, setProducts] = useState<VendorProduct[]>([])
+  const [categoryCatalog, setCategoryCatalog] = useState<CategoryCatalogItem[]>([])
+  const [recentAdjustments, setRecentAdjustments] = useState<
+    InventoryAdjustment[]
+  >([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [mainCategoryFilter, setMainCategoryFilter] = useState('all')
+  const [websiteFilter, setWebsiteFilter] = useState('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [stockFilter, setStockFilter] = useState('all')
+  const [catalogFilter, setCatalogFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [statsOpen, setStatsOpen] = useState(false)
-  const [selectedCategoryKey, setSelectedCategoryKey] = useState<string | null>(
-    null
-  )
+  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null)
+  const [stockInput, setStockInput] = useState('')
+  const [adjustmentReason, setAdjustmentReason] = useState('manual_adjustment')
+  const [adjustmentNote, setAdjustmentNote] = useState('')
+  const [adjusting, setAdjusting] = useState(false)
+  const [adjustmentError, setAdjustmentError] = useState('')
+  const [adjustmentSuccess, setAdjustmentSuccess] = useState('')
+  const [visibilityUpdatingProductId, setVisibilityUpdatingProductId] =
+    useState('')
+  const [visibilityError, setVisibilityError] = useState('')
+  const [visibilitySuccess, setVisibilitySuccess] = useState('')
+  const deferredSearch = useDeferredValue(search)
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setSelectedVendorId(authVendorId)
+    }
+  }, [authVendorId, isAdmin])
+
+  const fetchVendorCatalog = useCallback(async () => {
+    if (!isAdmin) {
+      setVendorOptions([])
+      return
+    }
+
+    try {
+      const options = await fetchVendorOptions()
+      setVendorOptions(options)
+    } catch (vendorError: any) {
+      setVendorOptions([])
+      setError(vendorError?.message || 'Failed to load vendors.')
+    }
+  }, [isAdmin])
+
+  useEffect(() => {
+    fetchVendorCatalog()
+  }, [fetchVendorCatalog])
+
+  useEffect(() => {
+    if (isAdmin && !selectedVendorId && vendorOptions.length) {
+      setSelectedVendorId(vendorOptions[0].value)
+    }
+  }, [isAdmin, selectedVendorId, vendorOptions])
 
   const fetchData = useCallback(async () => {
-    if (!vendorId || !token) {
+    if (!selectedVendorId || !token) {
       setProducts([])
       setCategoryCatalog([])
+      setWebsiteOptions([])
+      setRecentAdjustments([])
       setLoading(false)
       return
     }
@@ -553,10 +878,13 @@ export default function InventoryDashboard() {
       setLoading(true)
       setError('')
 
-      const [productsResult, categoriesResult] = await Promise.allSettled([
-        fetchVendorProducts(vendorId, token),
-        fetchCategoryCatalog(token),
-      ])
+      const [productsResult, categoriesResult, websitesResult, adjustmentsResult] =
+        await Promise.allSettled([
+          fetchVendorProducts(selectedVendorId, token),
+          fetchCategoryCatalog(token),
+          fetchVendorWebsites(selectedVendorId, token),
+          fetchInventoryAdjustments(selectedVendorId, token),
+        ])
 
       if (productsResult.status === 'rejected') {
         throw productsResult.reason
@@ -566,136 +894,453 @@ export default function InventoryDashboard() {
       setCategoryCatalog(
         categoriesResult.status === 'fulfilled' ? categoriesResult.value : []
       )
+      setWebsiteOptions(
+        websitesResult.status === 'fulfilled' ? websitesResult.value : []
+      )
+      setRecentAdjustments(
+        adjustmentsResult.status === 'fulfilled' ? adjustmentsResult.value : []
+      )
     } catch (fetchError: any) {
       setProducts([])
       setCategoryCatalog([])
-      setError(fetchError?.message || 'Failed to load inventory.')
+      setWebsiteOptions([])
+      setRecentAdjustments([])
+      setError(fetchError?.message || 'Failed to load inventory workspace.')
     } finally {
       setLoading(false)
     }
-  }, [token, vendorId])
+  }, [selectedVendorId, token])
+
+  useEffect(() => {
+    setWebsiteFilter('all')
+    setPage(1)
+  }, [selectedVendorId])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
-  const inventoryRows = useMemo(
-    () => buildInventoryRows(products, categoryCatalog),
-    [categoryCatalog, products]
+  const websiteLabelById = useMemo(
+    () =>
+      new Map(
+        websiteOptions.map((website) => [website.value, website.label] as const)
+      ),
+    [websiteOptions]
   )
 
-  const mainCategoryOptions = useMemo(() => {
-    const entries = new Map<string, string>()
-    inventoryRows.forEach((row) => {
-      const key = row.mainCategoryId || row.mainCategoryName
-      const label = row.mainCategoryName || 'Unassigned'
-      if (key) entries.set(key, label)
-    })
+  const catalogLookups = useMemo(
+    () => buildCatalogLookups(categoryCatalog),
+    [categoryCatalog]
+  )
 
-    return Array.from(entries.entries())
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label))
+  const inventoryRows = useMemo(
+    () =>
+      buildInventoryVariantRows(
+        products,
+        catalogLookups,
+        websiteOptions,
+        websiteLabelById
+      ),
+    [catalogLookups, products, websiteLabelById, websiteOptions]
+  )
+
+  const categoryOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(inventoryRows.map((row) => row.categoryName).filter(Boolean))
+    )
+    return values.sort((a, b) => a.localeCompare(b))
   }, [inventoryRows])
 
   const filteredRows = useMemo(() => {
-    const query = normalizeSearchValue(search)
+    const query = normalizeSearchValue(deferredSearch)
 
     return inventoryRows.filter((row) => {
-      const matchesMainCategory =
-        mainCategoryFilter === 'all' ||
-        row.mainCategoryId === mainCategoryFilter ||
-        row.mainCategoryName === mainCategoryFilter
+      const catalogState = getCatalogState(row)
+      const healthState = getHealthState(row)
 
-      if (!matchesMainCategory) return false
+      const matchesWebsite =
+        websiteFilter === 'all'
+          ? true
+          : websiteFilter === 'all_visible'
+            ? row.usesAllWebsites
+            : row.websiteIds.includes(websiteFilter)
+
+      if (!matchesWebsite) return false
+
+      const matchesCategory =
+        categoryFilter === 'all' || row.categoryName === categoryFilter
+      if (!matchesCategory) return false
+
+      const matchesStock =
+        stockFilter === 'all'
+          ? true
+          : stockFilter === 'attention'
+            ? healthState.key !== 'healthy' || catalogState.key !== 'sellable'
+            : healthState.key === stockFilter
+
+      if (!matchesStock) return false
+
+      const matchesCatalog =
+        catalogFilter === 'all'
+          ? true
+          : catalogFilter === 'not_sellable'
+            ? catalogState.key !== 'sellable'
+            : catalogState.key === catalogFilter
+
+      if (!matchesCatalog) return false
+
       if (!query) return true
 
       const haystack = [
-        row.name,
-        row.slug,
+        row.productName,
+        row.brand,
+        row.variantSku,
+        row.baseSku,
+        row.attributeSummary,
+        row.categoryName,
         row.mainCategoryName,
-        ...row.subcategories.map((subcategory) => subcategory.name),
-        ...row.products.map((product) => product.productName || ''),
-        ...row.products.map((product) => product.brand || ''),
+        ...row.subcategoryNames,
+        ...row.websiteNames,
       ]
         .map((value) => normalizeSearchValue(value))
         .join(' ')
 
       return haystack.includes(query)
     })
-  }, [inventoryRows, mainCategoryFilter, search])
+  }, [
+    inventoryRows,
+    deferredSearch,
+    websiteFilter,
+    categoryFilter,
+    stockFilter,
+    catalogFilter,
+  ])
 
   useEffect(() => {
     setPage(1)
-  }, [mainCategoryFilter, pageSize, search])
+  }, [categoryFilter, catalogFilter, pageSize, search, stockFilter, websiteFilter])
 
   const totalPages = Math.max(Math.ceil(filteredRows.length / pageSize), 1)
   const currentPage = Math.min(page, totalPages)
+
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize
     return filteredRows.slice(start, start + pageSize)
   }, [currentPage, filteredRows, pageSize])
 
-  const selectedCategory = useMemo(
-    () => inventoryRows.find((row) => row.key === selectedCategoryKey) || null,
-    [inventoryRows, selectedCategoryKey]
+  const selectedRow = useMemo(
+    () => inventoryRows.find((row) => row.key === selectedRowKey) || null,
+    [inventoryRows, selectedRowKey]
+  )
+  const selectedProduct = useMemo(
+    () =>
+      products.find((product) => product._id === selectedRow?.productId) || null,
+    [products, selectedRow?.productId]
+  )
+  const selectedProductWebsiteVisibility = useMemo(
+    () =>
+      resolveProductWebsiteVisibility(
+        selectedProduct,
+        websiteOptions,
+        websiteLabelById
+      ),
+    [selectedProduct, websiteLabelById, websiteOptions]
   )
 
   useEffect(() => {
-    if (selectedCategoryKey && !selectedCategory) {
-      setSelectedCategoryKey(null)
+    if (selectedRowKey && !selectedRow) {
+      setSelectedRowKey(null)
     }
-  }, [selectedCategory, selectedCategoryKey])
+  }, [selectedRow, selectedRowKey])
 
-  const totalStockUnits = useMemo(
-    () => products.reduce((sum, product) => sum + getStockCount(product), 0),
-    [products]
-  )
+  useEffect(() => {
+    if (!selectedRow) return
+    setStockInput(String(selectedRow.onHand))
+    setAdjustmentReason('manual_adjustment')
+    setAdjustmentNote('')
+    setAdjustmentError('')
+    setAdjustmentSuccess('')
+    setVisibilityError('')
+    setVisibilitySuccess('')
+  }, [selectedRow])
 
-  const lowStockProducts = useMemo(
-    () =>
-      products.filter((product) => {
-        const stock = getStockCount(product)
-        return stock > 0 && stock < 10
-      }).length,
-    [products]
-  )
+  const selectedVendorLabel = useMemo(() => {
+    if (!selectedVendorId) return 'Select vendor'
+    if (!isAdmin) {
+      return resolveVendorLabel(authUser)
+    }
+    return (
+      vendorOptions.find((vendor) => vendor.value === selectedVendorId)?.label ||
+      'Selected vendor'
+    )
+  }, [authUser, isAdmin, selectedVendorId, vendorOptions])
+
+  const selectedRowAdjustments = useMemo(() => {
+    if (!selectedRow) return []
+    return recentAdjustments.filter(
+      (adjustment) => normalizeText(adjustment.variantId) === selectedRow.variantId
+    )
+  }, [recentAdjustments, selectedRow])
+
+  const visibleStats = useMemo(() => {
+    const totalOnHand = filteredRows.reduce((sum, row) => sum + row.onHand, 0)
+    const totalAvailable = filteredRows.reduce(
+      (sum, row) => sum + row.available,
+      0
+    )
+    const totalValue = filteredRows.reduce(
+      (sum, row) => sum + row.inventoryValue,
+      0
+    )
+    const lowStockCount = filteredRows.filter(
+      (row) => getHealthState(row).key === 'low'
+    ).length
+    const outOfStockCount = filteredRows.filter(
+      (row) => getHealthState(row).key === 'out'
+    ).length
+    const notSellableCount = filteredRows.filter(
+      (row) => getCatalogState(row).key !== 'sellable'
+    ).length
+    const uniqueProducts = new Set(filteredRows.map((row) => row.productId)).size
+
+    return {
+      totalSkus: filteredRows.length,
+      totalOnHand,
+      totalAvailable,
+      totalValue,
+      lowStockCount,
+      outOfStockCount,
+      notSellableCount,
+      uniqueProducts,
+    }
+  }, [filteredRows])
 
   const statsItems = useMemo(
     () => [
       {
-        label: 'Used Categories',
-        value: inventoryRows.length,
-        helper: 'Categories currently mapped to your products.',
+        label: 'Tracked SKUs',
+        value: visibleStats.totalSkus,
+        helper: 'Variant rows currently in this inventory view.',
       },
       {
-        label: 'Main Categories',
-        value: mainCategoryOptions.length,
-        helper: 'Main categories currently represented in inventory.',
+        label: 'Products',
+        value: visibleStats.uniqueProducts,
+        helper: 'Unique products represented by the filtered SKUs.',
       },
       {
-        label: 'Mapped Products',
-        value: products.length,
-        helper: 'Products contributing to this inventory view.',
+        label: 'On hand units',
+        value: visibleStats.totalOnHand,
+        helper: 'Current physical stock recorded in the catalog.',
       },
       {
-        label: 'Stock Units',
-        value: totalStockUnits,
-        helper: 'Combined stock quantity across the full catalog.',
+        label: 'Available units',
+        value: visibleStats.totalAvailable,
+        helper: 'Stock that is immediately sellable on the storefront.',
       },
       {
-        label: 'Low Stock Products',
-        value: lowStockProducts,
-        helper: 'Products that are running low on stock.',
+        label: 'Not sellable SKUs',
+        value: visibleStats.notSellableCount,
+        helper: 'Draft, hidden, or inactive variants holding inventory.',
+      },
+      {
+        label: 'Low stock SKUs',
+        value: visibleStats.lowStockCount,
+        helper: 'Sellable variants below the low stock threshold.',
+      },
+      {
+        label: 'Out of stock SKUs',
+        value: visibleStats.outOfStockCount,
+        helper: 'Variants with zero on-hand inventory.',
+      },
+      {
+        label: 'Estimated retail value',
+        value: formatINR(visibleStats.totalValue, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }),
+        helper: 'Inventory value based on current selling price.',
       },
     ],
+    [visibleStats]
+  )
+
+  const updateProductCatalogVisibility = useCallback(
+    async (
+      productId: string,
+      payload: { isAvailable?: boolean; websiteIds?: string[] },
+      successMessage: string
+    ) => {
+      if (!token) return
+
+      try {
+        setVisibilityUpdatingProductId(productId)
+        setVisibilityError('')
+        setVisibilitySuccess('')
+
+        const response = await fetch(
+          `${API_BASE}/v1/admin/products/${productId}/content`,
+          {
+            method: 'PUT',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(payload),
+          }
+        )
+
+        const body = await response.json().catch(() => ({}))
+        if (!response.ok || body?.success === false) {
+          throw new Error(body?.message || 'Failed to update product visibility.')
+        }
+
+        setProducts((prev) =>
+          prev.map((product) =>
+            product._id === productId
+              ? {
+                  ...product,
+                  ...(payload.isAvailable !== undefined
+                    ? { isAvailable: payload.isAvailable }
+                    : {}),
+                  ...(payload.websiteIds !== undefined
+                    ? { websiteIds: payload.websiteIds }
+                    : {}),
+                }
+              : product
+          )
+        )
+
+        setVisibilitySuccess(successMessage)
+        toast.success(successMessage)
+      } catch (visibilityUpdateError: any) {
+        const message =
+          visibilityUpdateError?.message || 'Failed to update product visibility.'
+        setVisibilityError(message)
+        toast.error(message)
+      } finally {
+        setVisibilityUpdatingProductId('')
+      }
+    },
+    [token]
+  )
+
+  const handleProductVisibilityToggle = useCallback(
+    async (productId: string, nextValue: boolean) => {
+      await updateProductCatalogVisibility(
+        productId,
+        { isAvailable: nextValue },
+        nextValue
+          ? 'Product is now visible on its configured websites.'
+          : 'Product is hidden across all websites.'
+      )
+    },
+    [updateProductCatalogVisibility]
+  )
+
+  const handleWebsiteVisibilityToggle = useCallback(
+    async (websiteId: string, nextValue: boolean) => {
+      if (!selectedProduct) return
+
+      const allWebsiteIds = Array.from(
+        new Set(
+          websiteOptions.map((website) => normalizeText(website.value)).filter(Boolean)
+        )
+      )
+      const baseIds = selectedProductWebsiteVisibility.configuredWebsiteIds.length
+        ? selectedProductWebsiteVisibility.configuredWebsiteIds
+        : allWebsiteIds
+      const nextSet = new Set(baseIds)
+
+      if (nextValue) {
+        nextSet.add(websiteId)
+      } else {
+        nextSet.delete(websiteId)
+      }
+
+      if (nextSet.size === 0) {
+        const message =
+          'At least one website must stay enabled. Hide the product globally if you want it off everywhere.'
+        setVisibilityError(message)
+        toast.error(message)
+        return
+      }
+
+      const nextWebsiteIds =
+        allWebsiteIds.length && nextSet.size === allWebsiteIds.length
+          ? []
+          : allWebsiteIds.filter((id) => nextSet.has(id))
+
+      const websiteLabel =
+        websiteOptions.find((website) => website.value === websiteId)?.label ||
+        'the selected website'
+
+      await updateProductCatalogVisibility(
+        selectedProduct._id,
+        { websiteIds: nextWebsiteIds },
+        nextValue
+          ? `Product will show on ${websiteLabel}.`
+          : `Product hidden on ${websiteLabel}.`
+      )
+    },
     [
-      inventoryRows.length,
-      lowStockProducts,
-      mainCategoryOptions.length,
-      products.length,
-      totalStockUnits,
+      selectedProduct,
+      selectedProductWebsiteVisibility.configuredWebsiteIds,
+      updateProductCatalogVisibility,
+      websiteOptions,
     ]
   )
+
+  const handleAdjustInventory = useCallback(async () => {
+    if (!selectedRow || !token) return
+
+    const nextQuantity = Number(stockInput)
+    if (!Number.isInteger(nextQuantity) || nextQuantity < 0) {
+      setAdjustmentError('Inventory quantity must be a non-negative integer.')
+      return
+    }
+
+    try {
+      setAdjusting(true)
+      setAdjustmentError('')
+      setAdjustmentSuccess('')
+
+      const response = await fetch(
+        `${API_BASE}/v1/products/${selectedRow.productId}/inventory`,
+        {
+          method: 'PATCH',
+          headers: getAuthHeaders(token),
+          body: JSON.stringify({
+            updates: [
+              {
+                variantId: selectedRow.variantId,
+                stockQuantity: nextQuantity,
+              },
+            ],
+            reason: adjustmentReason,
+            note: adjustmentNote,
+          }),
+        }
+      )
+
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(body?.message || 'Failed to update inventory.')
+      }
+
+      setAdjustmentSuccess('Inventory updated successfully.')
+      await fetchData()
+    } catch (inventoryError: any) {
+      setAdjustmentError(
+        inventoryError?.message || 'Failed to update inventory.'
+      )
+    } finally {
+      setAdjusting(false)
+    }
+  }, [
+    adjustmentNote,
+    adjustmentReason,
+    fetchData,
+    selectedRow,
+    stockInput,
+    token,
+  ])
 
   return (
     <>
@@ -704,39 +1349,98 @@ export default function InventoryDashboard() {
         stacked
         actionsClassName='gap-2'
       >
+        {isAdmin ? (
+          <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
+            <SelectTrigger className='h-10 w-[280px] shrink-0'>
+              <SelectValue placeholder='Select vendor' />
+            </SelectTrigger>
+            <SelectContent>
+              {vendorOptions.map((vendor) => (
+                <SelectItem key={vendor.value} value={vendor.value}>
+                  {vendor.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+
         <Input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder='Search category, subcategory, or product'
+          placeholder='Search product, SKU, brand, attribute, or website'
           className='h-10 w-[340px] shrink-0'
+          disabled={!selectedVendorId}
         />
-        <Select
-          value={mainCategoryFilter}
-          onValueChange={setMainCategoryFilter}
-        >
+
+        <Select value={websiteFilter} onValueChange={setWebsiteFilter}>
           <SelectTrigger className='h-10 w-[220px] shrink-0'>
-            <SelectValue placeholder='All main categories' />
+            <SelectValue placeholder='All websites' />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value='all'>All main categories</SelectItem>
-            {mainCategoryOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
+            <SelectItem value='all'>All websites</SelectItem>
+            <SelectItem value='all_visible'>Visible on all websites</SelectItem>
+            {websiteOptions.map((website) => (
+              <SelectItem key={website.value} value={website.value}>
+                {website.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className='h-10 w-[220px] shrink-0'>
+            <SelectValue placeholder='All categories' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>All categories</SelectItem>
+            {categoryOptions.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={stockFilter} onValueChange={setStockFilter}>
+          <SelectTrigger className='h-10 w-[190px] shrink-0'>
+            <SelectValue placeholder='All stock states' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>All stock states</SelectItem>
+            <SelectItem value='attention'>Needs attention</SelectItem>
+            <SelectItem value='healthy'>Healthy</SelectItem>
+            <SelectItem value='low'>Low stock</SelectItem>
+            <SelectItem value='out'>Out of stock</SelectItem>
+            <SelectItem value='unavailable'>Not sellable</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={catalogFilter} onValueChange={setCatalogFilter}>
+          <SelectTrigger className='h-10 w-[190px] shrink-0'>
+            <SelectValue placeholder='All selling states' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>All selling states</SelectItem>
+            <SelectItem value='sellable'>Sellable</SelectItem>
+            <SelectItem value='draft'>Draft / pending</SelectItem>
+            <SelectItem value='hidden'>Hidden</SelectItem>
+            <SelectItem value='inactive'>Inactive variant</SelectItem>
+            <SelectItem value='not_sellable'>Any not sellable</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Button
           variant='outline'
           className='h-10 shrink-0'
           onClick={() => setStatsOpen(true)}
+          disabled={!selectedVendorId}
         >
           Statistics
         </Button>
         <Button
           className='h-10 shrink-0'
           onClick={() => fetchData()}
-          disabled={loading}
+          disabled={loading || !selectedVendorId}
         >
           {loading ? 'Refreshing...' : 'Refresh'}
         </Button>
@@ -749,312 +1453,798 @@ export default function InventoryDashboard() {
           </div>
         ) : null}
 
-        <TableShell
-          className='flex-1'
-          title='Inventory categories'
-          description=''
-          footer={
-            <ServerPagination
-              page={currentPage}
-              totalPages={totalPages}
-              totalItems={filteredRows.length}
-              pageSize={pageSize}
-              pageSizeOptions={[10, 20, 30, 50]}
-              onPageChange={(nextPage) => {
-                setPage(nextPage)
-                window.scrollTo({ top: 0, behavior: 'smooth' })
-              }}
-              onPageSizeChange={setPageSize}
-              disabled={loading}
-            />
-          }
-        >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className='min-w-[220px]'>Category</TableHead>
-                <TableHead className='min-w-[180px]'>Main Category</TableHead>
-                <TableHead className='min-w-[220px]'>
-                  Subcategories Used
-                </TableHead>
-                <TableHead className='min-w-[120px]'>Products</TableHead>
-                <TableHead className='min-w-[130px]'>Stock Units</TableHead>
-                <TableHead className='min-w-[140px]'>Low Stock</TableHead>
-                <TableHead className='text-right'>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className='h-24 text-center'>
-                    <div className='text-muted-foreground flex items-center justify-center gap-2 text-sm'>
-                      <Loader2 className='h-4 w-4 animate-spin' />
-                      Loading inventory...
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : paginatedRows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className='text-muted-foreground h-24 text-center'
-                  >
-                    {products.length === 0
-                      ? 'No inventory categories found. Add products to your catalog first.'
-                      : 'No inventory categories match the current filters.'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedRows.map((row) => (
-                  <TableRow key={row.key}>
-                    <TableCell>
-                      <div className='space-y-1'>
-                        <div className='text-sm font-medium'>{row.name}</div>
-                        <div className='text-muted-foreground text-xs'>
-                          {row.slug || 'No slug'}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant='outline'
-                        className='rounded-md border-slate-200 bg-slate-50 text-slate-700'
-                      >
-                        {row.mainCategoryName}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className='flex flex-wrap gap-1.5'>
-                        {row.subcategories.length ? (
-                          row.subcategories.slice(0, 3).map((subcategory) => (
-                            <Badge
-                              key={subcategory.id || subcategory.name}
-                              variant='secondary'
-                              className='rounded-md'
-                            >
-                              {subcategory.name}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className='text-muted-foreground text-sm'>
-                            No subcategories
-                          </span>
-                        )}
-                        {row.subcategories.length > 3 ? (
-                          <Badge variant='outline' className='rounded-md'>
-                            +{row.subcategories.length - 3} more
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant='secondary' className='rounded-md'>
-                        {row.productCount} products
-                      </Badge>
-                    </TableCell>
-                    <TableCell className='text-sm font-medium'>
-                      {row.totalStock} units
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant='outline'
-                        className={cn(
-                          'rounded-md',
-                          row.lowStockProducts
-                            ? 'border-amber-200 bg-amber-50 text-amber-700'
-                            : 'border-slate-200 bg-slate-50 text-slate-600'
-                        )}
-                      >
-                        {row.lowStockProducts
-                          ? `${row.lowStockProducts} low stock`
-                          : 'Stable'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='rounded-md'
-                        onClick={() => setSelectedCategoryKey(row.key)}
-                      >
-                        <Eye className='mr-2 h-4 w-4' />
-                        View Inventory
-                      </Button>
-                    </TableCell>
+        {!selectedVendorId ? (
+          <Card className='border border-dashed border-slate-300 bg-white/80 py-0 shadow-sm'>
+            <CardHeader>
+              <CardTitle>Select a vendor</CardTitle>
+              <CardDescription>
+                Admin inventory controls open after you choose a vendor catalog.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <>
+            <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-6'>
+              <InventoryStatCard
+                title='Tracked Skus'
+                value={visibleStats.totalSkus.toLocaleString()}
+                helper={`Viewing ${selectedVendorLabel}`}
+                icon={<Boxes className='h-4 w-4' />}
+                accentClassName='border-sky-200 bg-sky-50 text-sky-700'
+              />
+              <InventoryStatCard
+                title='On Hand'
+                value={visibleStats.totalOnHand.toLocaleString()}
+                helper='Recorded physical units in inventory.'
+                icon={<Package2 className='h-4 w-4' />}
+                accentClassName='border-slate-200 bg-slate-50 text-slate-700'
+              />
+              <InventoryStatCard
+                title='Available'
+                value={visibleStats.totalAvailable.toLocaleString()}
+                helper='Units that can be sold right now.'
+                icon={<TrendingUp className='h-4 w-4' />}
+                accentClassName='border-emerald-200 bg-emerald-50 text-emerald-700'
+              />
+              <InventoryStatCard
+                title='Low Stock'
+                value={visibleStats.lowStockCount.toLocaleString()}
+                helper='Sellable variants below threshold.'
+                icon={<AlertTriangle className='h-4 w-4' />}
+                accentClassName='border-amber-200 bg-amber-50 text-amber-700'
+              />
+              <InventoryStatCard
+                title='Out Of Stock'
+                value={visibleStats.outOfStockCount.toLocaleString()}
+                helper='Variants that need replenishment.'
+                icon={<ShieldAlert className='h-4 w-4' />}
+                accentClassName='border-red-200 bg-red-50 text-red-700'
+              />
+              <InventoryStatCard
+                title='Retail Value'
+                value={formatINR(visibleStats.totalValue, {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}
+                helper='Estimated value at current selling price.'
+                icon={<Store className='h-4 w-4' />}
+                accentClassName='border-violet-200 bg-violet-50 text-violet-700'
+              />
+            </div>
+
+            <TableShell
+              className='flex-1'
+              title='Variant inventory'
+              description='Track sellable stock the way Shopify separates on-hand inventory from what can actually be sold.'
+              footer={
+                <ServerPagination
+                  page={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredRows.length}
+                  pageSize={pageSize}
+                  pageSizeOptions={[10, 20, 30, 50]}
+                  onPageChange={(nextPage) => {
+                    setPage(nextPage)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  onPageSizeChange={setPageSize}
+                  disabled={loading}
+                />
+              }
+            >
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className='min-w-[280px]'>Product</TableHead>
+                    <TableHead className='min-w-[170px]'>Sku</TableHead>
+                    <TableHead className='min-w-[180px]'>Category</TableHead>
+                    <TableHead className='min-w-[220px]'>Websites</TableHead>
+                    <TableHead className='min-w-[190px]'>Storefront</TableHead>
+                    <TableHead className='min-w-[150px]'>Availability</TableHead>
+                    <TableHead className='min-w-[140px]'>Retail value</TableHead>
+                    <TableHead className='min-w-[180px]'>Status</TableHead>
+                    <TableHead className='min-w-[120px]'>Updated</TableHead>
+                    <TableHead className='text-right'>Action</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableShell>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className='h-24 text-center'>
+                        <div className='text-muted-foreground flex items-center justify-center gap-2 text-sm'>
+                          <Loader2 className='h-4 w-4 animate-spin' />
+                          Loading inventory...
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : paginatedRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={10}
+                        className='text-muted-foreground h-24 text-center'
+                      >
+                        {products.length === 0
+                          ? 'No variants found. Add products with variants to manage inventory.'
+                          : 'No inventory rows match the current filters.'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedRows.map((row) => {
+                      const catalogState = getCatalogState(row)
+                      const healthState = getHealthState(row)
+
+                      return (
+                        <TableRow key={row.key}>
+                          <TableCell>
+                            <div className='flex min-w-0 gap-4'>
+                              <div className='bg-muted flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border'>
+                                {row.imageUrl ? (
+                                  <img
+                                    src={row.imageUrl}
+                                    alt={row.productName}
+                                    className='h-full w-full object-cover'
+                                  />
+                                ) : (
+                                  <div className='text-muted-foreground flex flex-col items-center gap-1 text-[11px]'>
+                                    <ImageIcon className='h-4 w-4' />
+                                    <span>No image</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className='min-w-0 space-y-1'>
+                                <div className='truncate text-sm font-semibold'>
+                                  {row.productName}
+                                </div>
+                                <div className='text-muted-foreground text-xs'>
+                                  {row.attributeSummary}
+                                </div>
+                                <div className='text-muted-foreground text-xs'>
+                                  {row.brand || 'No brand'}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className='space-y-1 text-sm'>
+                              <div className='font-medium'>{row.variantSku}</div>
+                              <div className='text-muted-foreground text-xs'>
+                                Base: {row.baseSku || 'N/A'}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className='space-y-1 text-sm'>
+                              <div className='font-medium'>{row.categoryName}</div>
+                              <div className='text-muted-foreground text-xs'>
+                                {row.mainCategoryName}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className='space-y-2'>
+                              <div className='flex flex-wrap gap-1.5'>
+                                {row.websiteNames.slice(0, 2).map((websiteName) => (
+                                  <Badge
+                                    key={`${row.key}:${websiteName}`}
+                                    variant='secondary'
+                                    className='rounded-md'
+                                  >
+                                    {websiteName}
+                                  </Badge>
+                                ))}
+                                {row.websiteNames.length > 2 ? (
+                                  <Badge variant='outline' className='rounded-md'>
+                                    +{row.websiteNames.length - 2} more
+                                  </Badge>
+                                ) : null}
+                              </div>
+                              <div className='text-muted-foreground text-xs'>
+                                {row.usesAllWebsites
+                                  ? 'Using all vendor websites'
+                                  : `${row.websiteIds.length} website${row.websiteIds.length === 1 ? '' : 's'} enabled`}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className='space-y-2'>
+                              <div className='flex items-center gap-3'>
+                                <Switch
+                                  checked={row.productVisible}
+                                  onCheckedChange={(checked) =>
+                                    handleProductVisibilityToggle(
+                                      row.productId,
+                                      checked
+                                    )
+                                  }
+                                  disabled={
+                                    visibilityUpdatingProductId === row.productId
+                                  }
+                                />
+                                <span
+                                  className={cn(
+                                    'text-sm font-medium',
+                                    row.productVisible
+                                      ? 'text-emerald-700'
+                                      : 'text-slate-500'
+                                  )}
+                                >
+                                  {visibilityUpdatingProductId === row.productId
+                                    ? 'Saving...'
+                                    : row.productVisible
+                                      ? 'Visible'
+                                      : 'Hidden'}
+                                </span>
+                              </div>
+                              <div className='text-muted-foreground text-xs'>
+                                Global product visibility
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className='space-y-1 text-sm'>
+                              <div className='font-medium'>
+                                On hand: {row.onHand.toLocaleString()}
+                              </div>
+                              <div className='text-muted-foreground text-xs'>
+                                Available: {row.available.toLocaleString()}
+                              </div>
+                              <div className='text-muted-foreground text-xs'>
+                                Unavailable: {row.unavailable.toLocaleString()}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className='space-y-1 text-sm'>
+                              <div className='font-medium'>
+                                {formatINR(row.inventoryValue, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 0,
+                                })}
+                              </div>
+                              <div className='text-muted-foreground text-xs'>
+                                Unit: {formatINR(row.unitPrice)}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className='flex flex-wrap gap-1.5'>
+                              <Badge
+                                variant='outline'
+                                className={cn('rounded-md', catalogState.className)}
+                              >
+                                {catalogState.label}
+                              </Badge>
+                              <Badge
+                                variant='outline'
+                                className={cn('rounded-md', healthState.className)}
+                              >
+                                {healthState.label}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className='text-sm text-muted-foreground'>
+                            {formatDate(row.updatedAt)}
+                          </TableCell>
+                          <TableCell className='text-right'>
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              className='rounded-md'
+                              onClick={() => setSelectedRowKey(row.key)}
+                            >
+                              <PencilLine className='mr-2 h-4 w-4' />
+                              Manage
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableShell>
+          </>
+        )}
       </Main>
 
       <Sheet
-        open={Boolean(selectedCategory)}
-        onOpenChange={(open) => !open && setSelectedCategoryKey(null)}
+        open={Boolean(selectedRow)}
+        onOpenChange={(open) => !open && setSelectedRowKey(null)}
       >
         <SheetContent side='right' className='w-full gap-0 p-0 sm:max-w-3xl'>
           <SheetHeader className='border-b px-5 py-5 pr-14 text-left'>
             <SheetTitle>
-              {selectedCategory?.name || 'Category'} inventory
+              {selectedRow?.productName || 'Inventory item'} inventory
             </SheetTitle>
             <SheetDescription>
-              Products currently mapped to this category.
+              Review stock health, storefront visibility, and manual
+              inventory adjustments.
             </SheetDescription>
           </SheetHeader>
 
-          {selectedCategory ? (
-            <div className='flex-1 overflow-y-auto px-5 py-5'>
-              <div className='grid gap-3 sm:grid-cols-4'>
-                <div className='bg-background rounded-md border px-4 py-3 shadow-sm'>
-                  <p className='text-muted-foreground text-xs font-medium'>
-                    Main category
-                  </p>
-                  <p className='mt-1 text-sm font-semibold'>
-                    {selectedCategory.mainCategoryName}
-                  </p>
-                </div>
-                <div className='bg-background rounded-md border px-4 py-3 shadow-sm'>
-                  <p className='text-muted-foreground text-xs font-medium'>
-                    Products
-                  </p>
-                  <p className='mt-1 text-sm font-semibold'>
-                    {selectedCategory.products.length}
-                  </p>
-                </div>
-                <div className='bg-background rounded-md border px-4 py-3 shadow-sm'>
-                  <p className='text-muted-foreground text-xs font-medium'>
-                    Stock units
-                  </p>
-                  <p className='mt-1 text-sm font-semibold'>
-                    {selectedCategory.totalStock}
-                  </p>
-                </div>
-                <div className='bg-background rounded-md border px-4 py-3 shadow-sm'>
-                  <p className='text-muted-foreground text-xs font-medium'>
-                    Low stock products
-                  </p>
-                  <p className='mt-1 text-sm font-semibold'>
-                    {selectedCategory.lowStockProducts}
-                  </p>
-                </div>
-              </div>
+          {selectedRow ? (
+            <div className='flex h-full flex-col overflow-hidden'>
+              <div className='flex-1 overflow-y-auto px-5 py-5'>
+                <div className='flex flex-col gap-4 rounded-lg border bg-white p-4 shadow-sm'>
+                  <div className='flex gap-4'>
+                    <div className='bg-muted flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border'>
+                      {selectedRow.imageUrl ? (
+                        <img
+                          src={selectedRow.imageUrl}
+                          alt={selectedRow.productName}
+                          className='h-full w-full object-cover'
+                        />
+                      ) : (
+                        <div className='text-muted-foreground flex flex-col items-center gap-1 text-[11px]'>
+                          <ImageIcon className='h-5 w-5' />
+                          <span>No image</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className='min-w-0 space-y-1'>
+                      <div className='truncate text-lg font-semibold'>
+                        {selectedRow.productName}
+                      </div>
+                      <div className='text-muted-foreground text-sm'>
+                        {selectedRow.attributeSummary}
+                      </div>
+                      <div className='text-muted-foreground text-xs'>
+                        Variant SKU: {selectedRow.variantSku}
+                      </div>
+                      <div className='text-muted-foreground text-xs'>
+                        Base SKU: {selectedRow.baseSku || 'N/A'}
+                      </div>
+                    </div>
+                  </div>
 
-              <div className='mt-5 space-y-3'>
-                {selectedCategory.products.map((product) => {
-                  const stock = getStockCount(product)
-                  const stockState = getLowStockState(stock)
-                  const productImageUrl = getPrimaryProductImageUrl(product)
-                  const usedSubcategories = getProductSubcategoriesForCategory(
-                    product,
-                    selectedCategory
-                  )
-
-                  return (
-                    <div
-                      key={product._id}
-                      className='bg-background rounded-lg border p-4 shadow-sm'
+                  <div className='flex flex-wrap gap-2'>
+                    <Badge
+                      variant='outline'
+                      className={cn(
+                        'rounded-md',
+                        getCatalogState(selectedRow).className
+                      )}
                     >
-                      <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
-                        <div className='flex min-w-0 gap-4'>
-                          <div className='bg-muted flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border'>
-                            {productImageUrl ? (
-                              <img
-                                src={productImageUrl}
-                                alt={product.productName || 'Product image'}
-                                className='h-full w-full object-cover'
-                              />
-                            ) : (
-                              <div className='text-muted-foreground flex flex-col items-center gap-1 text-[11px]'>
-                                <ImageIcon className='h-5 w-5' />
-                                <span>No image</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className='min-w-0 space-y-1'>
-                            <div className='truncate text-sm font-semibold'>
-                              {product.productName || 'Unnamed product'}
-                            </div>
-                            <div className='text-muted-foreground text-xs break-all'>
-                              {product.baseSku || product._id}
-                            </div>
-                          </div>
-                        </div>
-                        <div className='flex flex-wrap gap-1.5'>
-                          <Badge variant='outline' className='rounded-md'>
-                            {formatStatusLabel(product)}
-                          </Badge>
-                          <Badge
-                            variant='outline'
-                            className={cn('rounded-md', stockState.className)}
-                          >
-                            {stockState.label}
-                          </Badge>
-                        </div>
-                      </div>
+                      {getCatalogState(selectedRow).label}
+                    </Badge>
+                    <Badge
+                      variant='outline'
+                      className={cn(
+                        'rounded-md',
+                        getHealthState(selectedRow).className
+                      )}
+                    >
+                      {getHealthState(selectedRow).label}
+                    </Badge>
+                  </div>
+                </div>
 
-                      <div className='mt-4 grid gap-3 sm:grid-cols-4'>
-                        <div>
-                          <p className='text-muted-foreground text-xs font-medium'>
-                            Brand
-                          </p>
-                          <p className='mt-1 text-sm font-medium'>
-                            {product.brand || 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className='text-muted-foreground text-xs font-medium'>
-                            Variants
-                          </p>
-                          <p className='mt-1 text-sm font-medium'>
-                            {getVariantCount(product)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className='text-muted-foreground text-xs font-medium'>
-                            Stock
-                          </p>
-                          <p className='mt-1 text-sm font-medium'>{stock}</p>
-                        </div>
-                        <div>
-                          <p className='text-muted-foreground text-xs font-medium'>
-                            Price
-                          </p>
-                          <p className='mt-1 text-sm font-medium'>
-                            {getPriceRange(product.variants)}
-                          </p>
-                        </div>
-                      </div>
+                <div className='mt-5 grid gap-3 sm:grid-cols-4'>
+                  <div className='rounded-md border bg-white px-4 py-3 shadow-sm'>
+                    <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                      On hand
+                    </p>
+                    <p className='mt-1 text-xl font-semibold'>
+                      {selectedRow.onHand.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className='rounded-md border bg-white px-4 py-3 shadow-sm'>
+                    <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                      Available
+                    </p>
+                    <p className='mt-1 text-xl font-semibold'>
+                      {selectedRow.available.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className='rounded-md border bg-white px-4 py-3 shadow-sm'>
+                    <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                      Unavailable
+                    </p>
+                    <p className='mt-1 text-xl font-semibold'>
+                      {selectedRow.unavailable.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className='rounded-md border bg-white px-4 py-3 shadow-sm'>
+                    <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                      Retail value
+                    </p>
+                    <p className='mt-1 text-xl font-semibold'>
+                      {formatINR(selectedRow.inventoryValue, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}
+                    </p>
+                  </div>
+                </div>
 
-                      <div className='mt-4'>
-                        <p className='text-muted-foreground mb-2 text-xs font-medium'>
-                          Subcategories
-                        </p>
-                        <div className='flex flex-wrap gap-1.5'>
-                          {usedSubcategories.length ? (
-                            usedSubcategories.map((subcategory) => (
+                <div className='mt-5 grid gap-5 lg:grid-cols-[1.1fr,0.9fr]'>
+                  <div className='space-y-5'>
+                    <Card className='border bg-white py-0 shadow-sm'>
+                      <CardHeader>
+                        <CardTitle className='text-base'>
+                          Inventory details
+                        </CardTitle>
+                        <CardDescription>
+                          Core catalog and pricing context for this SKU.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className='grid gap-3 sm:grid-cols-2'>
+                        <div>
+                          <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                            Category
+                          </p>
+                          <p className='mt-1 text-sm font-medium'>
+                            {selectedRow.categoryName}
+                          </p>
+                        </div>
+                        <div>
+                          <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                            Main category
+                          </p>
+                          <p className='mt-1 text-sm font-medium'>
+                            {selectedRow.mainCategoryName}
+                          </p>
+                        </div>
+                        <div>
+                          <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                            Unit price
+                          </p>
+                          <p className='mt-1 text-sm font-medium'>
+                            {formatINR(selectedRow.unitPrice)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                            Compare at
+                          </p>
+                          <p className='mt-1 text-sm font-medium'>
+                            {formatINR(selectedRow.compareAtPrice)}
+                          </p>
+                        </div>
+                        <div className='sm:col-span-2'>
+                          <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                            Websites
+                          </p>
+                          <div className='mt-2 flex flex-wrap gap-1.5'>
+                            {selectedRow.websiteNames.map((websiteName) => (
                               <Badge
-                                key={subcategory.id || subcategory.name}
+                                key={`${selectedRow.key}:${websiteName}`}
                                 variant='secondary'
                                 className='rounded-md'
                               >
-                                {subcategory.name}
+                                {websiteName}
                               </Badge>
-                            ))
-                          ) : (
-                            <span className='text-muted-foreground text-sm'>
-                              No subcategories
-                            </span>
-                          )}
+                            ))}
+                          </div>
+                          <p className='text-muted-foreground mt-2 text-xs'>
+                            {selectedRow.usesAllWebsites
+                              ? 'This product is configured to use all vendor websites.'
+                              : `${selectedRow.websiteIds.length} website${selectedRow.websiteIds.length === 1 ? '' : 's'} currently enabled.`}
+                          </p>
                         </div>
-                      </div>
+                        <div className='sm:col-span-2'>
+                          <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                            Subcategories
+                          </p>
+                          <div className='mt-2 flex flex-wrap gap-1.5'>
+                            {selectedRow.subcategoryNames.length ? (
+                              selectedRow.subcategoryNames.map((subcategory) => (
+                                <Badge
+                                  key={`${selectedRow.key}:${subcategory}`}
+                                  variant='outline'
+                                  className='rounded-md'
+                                >
+                                  {subcategory}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className='text-muted-foreground text-sm'>
+                                No subcategories
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                            Created
+                          </p>
+                          <p className='mt-1 text-sm font-medium'>
+                            {formatDateTime(selectedRow.createdAt)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className='text-muted-foreground text-xs font-medium uppercase tracking-wide'>
+                            Updated
+                          </p>
+                          <p className='mt-1 text-sm font-medium'>
+                            {formatDateTime(selectedRow.updatedAt)}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
 
-                      <div className='text-muted-foreground mt-4 text-xs'>
-                        Created: {formatDate(product.createdAt)}
-                      </div>
-                    </div>
-                  )
-                })}
+                    <Card className='border bg-white py-0 shadow-sm'>
+                      <CardHeader>
+                        <CardTitle className='text-base'>
+                          Recent inventory history
+                        </CardTitle>
+                        <CardDescription>
+                          Manual adjustments logged for this SKU.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className='space-y-3'>
+                        {selectedRowAdjustments.length ? (
+                          selectedRowAdjustments.slice(0, 8).map((adjustment) => {
+                            const delta = Number(adjustment.delta || 0)
+
+                            return (
+                              <div
+                                key={adjustment._id || `${adjustment.createdAt}-${delta}`}
+                                className='rounded-md border bg-slate-50 px-4 py-3'
+                              >
+                                <div className='flex items-start justify-between gap-3'>
+                                  <div>
+                                    <p className='text-sm font-medium'>
+                                      {formatReasonLabel(adjustment.reason)}
+                                    </p>
+                                    <p className='text-muted-foreground text-xs'>
+                                      {adjustment.actorName || adjustment.actorRole || 'System'}{' '}
+                                      on {formatDateTime(adjustment.createdAt)}
+                                    </p>
+                                  </div>
+                                  <Badge
+                                    variant='outline'
+                                    className={cn(
+                                      'rounded-md',
+                                      delta >= 0
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                        : 'border-red-200 bg-red-50 text-red-700'
+                                    )}
+                                  >
+                                    {delta >= 0 ? '+' : ''}
+                                    {delta}
+                                  </Badge>
+                                </div>
+                                <div className='mt-2 text-xs text-muted-foreground'>
+                                  {adjustment.previousQuantity || 0} to{' '}
+                                  {adjustment.nextQuantity || 0}
+                                </div>
+                                {normalizeText(adjustment.note) ? (
+                                  <p className='mt-2 text-sm text-slate-700'>
+                                    {adjustment.note}
+                                  </p>
+                                ) : null}
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <div className='text-muted-foreground rounded-md border border-dashed px-4 py-6 text-sm'>
+                            No inventory history recorded for this SKU yet.
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className='space-y-5'>
+                    <Card className='border bg-white py-0 shadow-sm'>
+                      <CardHeader>
+                        <CardTitle className='text-base'>
+                          Storefront visibility
+                        </CardTitle>
+                        <CardDescription>
+                          Manage the global visibility switch here, then fine-tune
+                          which websites should show this product.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className='space-y-4'>
+                        <div className='flex items-start justify-between gap-4 rounded-md border bg-slate-50 px-4 py-3'>
+                          <div>
+                            <p className='text-sm font-semibold text-slate-900'>
+                              Product visibility
+                            </p>
+                            <p className='text-muted-foreground mt-1 text-xs'>
+                              Turn this off to hide the product everywhere,
+                              regardless of website rules.
+                            </p>
+                          </div>
+                          <div className='flex items-center gap-3'>
+                            <Switch
+                              checked={selectedProduct?.isAvailable !== false}
+                              onCheckedChange={(checked) =>
+                                handleProductVisibilityToggle(
+                                  selectedRow.productId,
+                                  checked
+                                )
+                              }
+                              disabled={
+                                visibilityUpdatingProductId === selectedRow.productId
+                              }
+                            />
+                            <span
+                              className={cn(
+                                'text-sm font-medium',
+                                selectedProduct?.isAvailable !== false
+                                  ? 'text-emerald-700'
+                                  : 'text-slate-500'
+                              )}
+                            >
+                              {visibilityUpdatingProductId === selectedRow.productId
+                                ? 'Saving...'
+                                : selectedProduct?.isAvailable !== false
+                                  ? 'Visible'
+                                  : 'Hidden'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className='rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600'>
+                          {selectedProductWebsiteVisibility.usesAllWebsites
+                            ? 'All vendor websites are currently enabled for this product.'
+                            : `${selectedProductWebsiteVisibility.websiteIds.length} website${selectedProductWebsiteVisibility.websiteIds.length === 1 ? '' : 's'} are currently enabled for this product.`}
+                        </div>
+
+                        {websiteOptions.length ? (
+                          <div className='space-y-2'>
+                            {websiteOptions.map((website) => {
+                              const checked =
+                                selectedProductWebsiteVisibility.websiteIds.includes(
+                                  website.value
+                                )
+
+                              return (
+                                <div
+                                  key={`${selectedRow.productId}:${website.value}`}
+                                  className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'
+                                >
+                                  <div className='min-w-0'>
+                                    <p className='truncate text-sm font-medium text-slate-900'>
+                                      {website.label}
+                                    </p>
+                                    <p className='text-muted-foreground mt-1 text-xs'>
+                                      {checked
+                                        ? 'Visible on this website when global visibility is on.'
+                                        : 'Hidden on this website.'}
+                                    </p>
+                                  </div>
+                                  <Switch
+                                    checked={checked}
+                                    onCheckedChange={(nextValue) =>
+                                      handleWebsiteVisibilityToggle(
+                                        website.value,
+                                        nextValue
+                                      )
+                                    }
+                                    disabled={
+                                      visibilityUpdatingProductId ===
+                                      selectedRow.productId
+                                    }
+                                  />
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <div className='rounded-md border border-dashed px-4 py-6 text-sm text-muted-foreground'>
+                            No websites found for this vendor yet.
+                          </div>
+                        )}
+
+                        {selectedProduct?.isAvailable === false ? (
+                          <div className='rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700'>
+                            Global visibility is off. Website rules are saved, but
+                            the product is currently hidden everywhere.
+                          </div>
+                        ) : null}
+
+                        {visibilityError ? (
+                          <div className='rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'>
+                            {visibilityError}
+                          </div>
+                        ) : null}
+
+                        {visibilitySuccess ? (
+                          <div className='rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700'>
+                            {visibilitySuccess}
+                          </div>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+
+                    <Card className='border bg-white py-0 shadow-sm'>
+                      <CardHeader>
+                        <CardTitle className='text-base'>
+                          Adjust stock quantity
+                        </CardTitle>
+                        <CardDescription>
+                          Update on-hand stock. Sellable availability is derived from
+                          product visibility and variant status.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className='space-y-4'>
+                        <div className='space-y-2'>
+                          <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                            New on-hand quantity
+                          </p>
+                          <Input
+                            type='number'
+                            min='0'
+                            step='1'
+                            value={stockInput}
+                            onChange={(event) => setStockInput(event.target.value)}
+                          />
+                        </div>
+
+                        <div className='space-y-2'>
+                          <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                            Adjustment reason
+                          </p>
+                          <Select
+                            value={adjustmentReason}
+                            onValueChange={setAdjustmentReason}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select reason' />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {adjustmentReasonOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className='space-y-2'>
+                          <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+                            Internal note
+                          </p>
+                          <Textarea
+                            value={adjustmentNote}
+                            onChange={(event) => setAdjustmentNote(event.target.value)}
+                            placeholder='Explain why this stock count changed'
+                            rows={4}
+                          />
+                        </div>
+
+                        {adjustmentError ? (
+                          <div className='rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'>
+                            {adjustmentError}
+                          </div>
+                        ) : null}
+
+                        {adjustmentSuccess ? (
+                          <div className='rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700'>
+                            {adjustmentSuccess}
+                          </div>
+                        ) : null}
+
+                        <div className='rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600'>
+                          Shopify tracks multiple inventory states like on hand,
+                          available, committed, incoming, and unavailable. Your
+                          current backend tracks on-hand stock and derives sellable
+                          availability from storefront visibility.
+                        </div>
+
+                        <Button
+                          className='w-full'
+                          onClick={handleAdjustInventory}
+                          disabled={adjusting}
+                        >
+                          {adjusting ? (
+                            <>
+                              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                              Saving...
+                            </>
+                          ) : (
+                            'Apply inventory update'
+                          )}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}
@@ -1065,7 +2255,7 @@ export default function InventoryDashboard() {
         open={statsOpen}
         onOpenChange={setStatsOpen}
         title='Inventory statistics'
-        description='Summary of your category-wise inventory.'
+        description='Operational summary for the currently selected vendor and filters.'
         items={statsItems}
       />
     </>

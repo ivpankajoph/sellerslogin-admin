@@ -12,8 +12,8 @@ type AnalyticsSourceContextValue = {
   source: AnalyticsSourceValue;
   setSource: (value: AnalyticsSourceValue) => void;
   options: AnalyticsSourceOption[];
-  templateId: string;
-  setTemplateId: (value: string) => void;
+  websiteId: string;
+  setWebsiteId: (value: string) => void;
 };
 
 const AnalyticsSourceContext = createContext<AnalyticsSourceContextValue | null>(
@@ -21,7 +21,8 @@ const AnalyticsSourceContext = createContext<AnalyticsSourceContextValue | null>
 );
 
 const STORAGE_KEY = "analytics_source";
-const TEMPLATE_STORAGE_KEY = "analytics_template";
+const WEBSITE_STORAGE_KEY = "analytics_website";
+const LEGACY_TEMPLATE_STORAGE_KEY = "analytics_template";
 
 const getStoredSource = (): AnalyticsSourceValue => {
   if (typeof window === "undefined") return "all";
@@ -32,9 +33,13 @@ const getStoredSource = (): AnalyticsSourceValue => {
   return "all";
 };
 
-const getStoredTemplate = (): string => {
+const getStoredWebsite = (): string => {
   if (typeof window === "undefined") return "all";
-  return window.localStorage.getItem(TEMPLATE_STORAGE_KEY) || "all";
+  return (
+    window.localStorage.getItem(WEBSITE_STORAGE_KEY) ||
+    window.localStorage.getItem(LEGACY_TEMPLATE_STORAGE_KEY) ||
+    "all"
+  );
 };
 
 export function AnalyticsSourceProvider({
@@ -47,8 +52,8 @@ export function AnalyticsSourceProvider({
   const [source, setSourceState] = useState<AnalyticsSourceValue>(() =>
     getStoredSource()
   );
-  const [templateId, setTemplateIdState] = useState<string>(() =>
-    getStoredTemplate()
+  const [websiteId, setWebsiteIdState] = useState<string>(() =>
+    getStoredWebsite()
   );
 
   const setSource = (value: AnalyticsSourceValue) => {
@@ -58,21 +63,22 @@ export function AnalyticsSourceProvider({
     }
   };
 
-  const setTemplateId = (value: string) => {
-    setTemplateIdState(value);
+  const setWebsiteId = (value: string) => {
+    setWebsiteIdState(value);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(TEMPLATE_STORAGE_KEY, value);
+      window.localStorage.setItem(WEBSITE_STORAGE_KEY, value);
+      window.localStorage.setItem(LEGACY_TEMPLATE_STORAGE_KEY, value);
     }
   };
 
   useEffect(() => {
     if (role === "vendor") {
       setSource("template");
-      if (templateId === "all") {
-        setTemplateId("all");
+      if (!websiteId) {
+        setWebsiteId("all");
       }
     }
-  }, [role, templateId]);
+  }, [role, websiteId]);
 
   const options = useMemo<AnalyticsSourceOption[]>(() => {
     if (role === "vendor") {
@@ -87,7 +93,7 @@ export function AnalyticsSourceProvider({
 
   return (
     <AnalyticsSourceContext.Provider
-      value={{ source, setSource, options, templateId, setTemplateId }}
+      value={{ source, setSource, options, websiteId, setWebsiteId }}
     >
       {children}
     </AnalyticsSourceContext.Provider>

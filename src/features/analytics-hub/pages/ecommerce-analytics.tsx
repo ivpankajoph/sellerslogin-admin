@@ -20,12 +20,17 @@ import { getQueryFn } from "@/features/analytics-hub/lib/query";
 import { formatINR } from "@/lib/currency";
 
 export default function EcommerceAnalytics() {
-  const { vendorId, source, templateId } = useAnalyticsContext();
+  const { role, vendorId, source, websiteId } = useAnalyticsContext();
   const sourceParam = source === "all" ? undefined : source;
-  const templateParam = templateId === "all" ? undefined : templateId;
+  const websiteParam =
+    role === "vendor" || source === "template"
+      ? websiteId === "all"
+        ? undefined
+        : websiteId
+      : undefined;
   const queryFn = getQueryFn<AnalyticsSummary>();
   const { data, isLoading } = useQuery<AnalyticsSummary>({
-    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, template_id: templateParam })],
+    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, website_id: websiteParam })],
     queryFn,
   });
   const cardClassName =

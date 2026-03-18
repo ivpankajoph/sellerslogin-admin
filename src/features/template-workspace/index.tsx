@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from '@tanstack/react-router'
+import { type AppDispatch } from '@/store'
+import { BASE_URL } from '@/store/slices/vendor/productSlice'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import {
   Building2,
-  CheckCircle2,
   ExternalLink,
   Globe,
   LayoutTemplate,
@@ -17,9 +19,12 @@ import {
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
-import { ConfirmDialog } from '@/components/confirm-dialog'
-import { TablePageHeader } from '@/components/data-table/table-page-header'
-import { Main } from '@/components/layout/main'
+import {
+  getVendorTemplatePreviewUrl,
+  peekStoredTemplatePreviewCity,
+  setStoredTemplatePreviewCity,
+} from '@/lib/storefront-url'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -30,32 +35,30 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
-  getVendorTemplatePreviewUrl,
-  peekStoredTemplatePreviewCity,
-  setStoredTemplatePreviewCity,
-} from '@/lib/storefront-url'
-import { cn } from '@/lib/utils'
-import { type AppDispatch } from '@/store'
-import { BASE_URL } from '@/store/slices/vendor/productSlice'
-import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
-import { setStoredEditingTemplateKey } from '@/features/vendor-template/components/templateVariantParam'
-import {
-  getStoredActiveWebsiteId,
-  setStoredActiveWebsiteId,
-} from '@/features/vendor-template/components/websiteStudioStorage'
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { TablePageHeader } from '@/components/data-table/table-page-header'
+import { Main } from '@/components/layout/main'
+import { setStoredEditingTemplateKey } from '@/features/vendor-template/components/templateVariantParam'
+import {
+  getStoredActiveWebsiteId,
+  setStoredActiveWebsiteId,
+} from '@/features/vendor-template/components/websiteStudioStorage'
+
+type TemplateAudience = 'b2b' | 'b2c'
+type CreateWebsiteStep = 'audience' | 'template'
 
 type TemplateCatalogItem = {
   key: string
   name: string
   description?: string
   previewImage?: string
+  audience?: TemplateAudience | string
 }
 
 type WebsiteCard = {
@@ -90,9 +93,37 @@ type WorkspaceEditorPage = 'home' | 'about' | 'contact' | 'pages' | 'other'
 
 const cardClass =
   'group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-md'
+const modalSectionClass = 'border border-border bg-card p-5 shadow-sm'
 const REQUEST_TIMEOUT_MS = 10000
 const LIVE_PREVIEW_SCALE = 0.25
 const LIVE_PREVIEW_DIMENSION = `${100 / LIVE_PREVIEW_SCALE}%`
+const B2B_TEMPLATE_KEYS = new Set(['mquiq', 'poupqz'])
+const TEMPLATE_AUDIENCE_COPY: Record<
+  TemplateAudience,
+  {
+    description: string
+    emptyDescription: string
+    label: string
+    shortLabel: string
+  }
+> = {
+  b2b: {
+    label: 'B2B Website (Bulk Orders)',
+    shortLabel: 'B2B',
+    description:
+      'Show industrial, wholesale, and enquiry-first templates built for bulk buyers.',
+    emptyDescription:
+      'No B2B templates are available right now. Add a bulk-order layout to this catalog first.',
+  },
+  b2c: {
+    label: 'B2C (Ecommerce, D2C Brands, etc.)',
+    shortLabel: 'B2C',
+    description:
+      'Show ecommerce, D2C, and consumer-brand templates focused on storefront conversion.',
+    emptyDescription:
+      'No B2C templates are available right now. Add a consumer storefront layout to this catalog first.',
+  },
+}
 
 const extractIdList = (values: unknown) => {
   if (!Array.isArray(values)) return []
@@ -102,7 +133,9 @@ const extractIdList = (values: unknown) => {
       if (typeof value === 'string') return value
       if (typeof value === 'object') {
         if ('_id' in value && value._id) return String(value._id)
-        if (typeof (value as { toString?: () => string }).toString === 'function') {
+        if (
+          typeof (value as { toString?: () => string }).toString === 'function'
+        ) {
           return String((value as { toString: () => string }).toString())
         }
       }
@@ -112,7 +145,9 @@ const extractIdList = (values: unknown) => {
 }
 
 const formatCityLabel = (slug?: string) => {
-  const normalized = String(slug || '').trim().toLowerCase()
+  const normalized = String(slug || '')
+    .trim()
+    .toLowerCase()
   if (!normalized || normalized === 'all') return 'All Cities'
   return normalized
     .split('-')
@@ -128,10 +163,44 @@ const normalizeCitySlugValue = (value?: string) =>
     .replace(/[^a-z0-9-]+/g, '-')
     .replace(/^-+|-+$/g, '')
 
+const normalizeTemplateAudience = (
+  value?: string,
+  templateKey?: string
+): TemplateAudience => {
+  const normalizedValue = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
+  const normalizedKey = String(templateKey || '')
+    .trim()
+    .toLowerCase()
+
+  if (normalizedValue.includes('b2b') || normalizedValue.includes('bulk')) {
+    return 'b2b'
+  }
+  if (
+    normalizedValue.includes('b2c') ||
+    normalizedValue.includes('ecommerce') ||
+    normalizedValue.includes('d2c') ||
+    normalizedValue.includes('consumer')
+  ) {
+    return 'b2c'
+  }
+
+  return B2B_TEMPLATE_KEYS.has(normalizedKey) ? 'b2b' : 'b2c'
+}
+
+const normalizeTemplateCatalog = (items: TemplateCatalogItem[]) =>
+  items.map((item) => ({
+    ...item,
+    audience: normalizeTemplateAudience(item.audience, item.key),
+  }))
+
 const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   {
     key: 'mquiq',
     name: 'StorageMax Gold',
+    audience: 'b2b',
     description:
       'Industrial storage layout with bold yellow highlights and sectioned storytelling.',
     previewImage:
@@ -140,6 +209,7 @@ const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   {
     key: 'poupqz',
     name: 'RackFlow Blue',
+    audience: 'b2b',
     description:
       'Industrial rack layout with clean blue-white sections and dense content blocks.',
     previewImage:
@@ -148,6 +218,7 @@ const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   {
     key: 'oragze',
     name: 'Organic Freshmart',
+    audience: 'b2c',
     description:
       'Organic storefront layout with vibrant grocery-first sections and promotional blocks.',
     previewImage:
@@ -156,6 +227,7 @@ const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   {
     key: 'whiterose',
     name: 'White Rose',
+    audience: 'b2c',
     description:
       'Premium furniture storefront with clean white-blue utility navigation and launch-first merchandising.',
     previewImage:
@@ -183,7 +255,12 @@ function StorefrontThumbnail({
   }, [previewUrl])
 
   return (
-    <div className={cn('relative aspect-[16/9] overflow-hidden bg-muted', className)}>
+    <div
+      className={cn(
+        'bg-muted relative aspect-[16/9] overflow-hidden',
+        className
+      )}
+    >
       {fallbackImage ? (
         <img
           src={fallbackImage}
@@ -200,19 +277,19 @@ function StorefrontThumbnail({
             iframeLoaded ? 'opacity-0' : 'opacity-100'
           )}
         >
-          <LayoutTemplate className='h-10 w-10 text-muted-foreground' />
+          <LayoutTemplate className='text-muted-foreground h-10 w-10' />
         </div>
       )}
 
       {previewUrl ? (
         <div
           className={cn(
-            'absolute inset-0 bg-background transition-opacity duration-300',
+            'bg-background absolute inset-0 transition-opacity duration-300',
             iframeLoaded ? 'opacity-100' : 'opacity-0'
           )}
         >
           <div
-            className='pointer-events-none absolute left-0 top-0 origin-top-left overflow-hidden'
+            className='pointer-events-none absolute top-0 left-0 origin-top-left overflow-hidden'
             style={{
               width: LIVE_PREVIEW_DIMENSION,
               height: LIVE_PREVIEW_DIMENSION,
@@ -284,30 +361,57 @@ export default function TemplateWorkspace() {
   const [websites, setWebsites] = useState<WebsiteCard[]>([])
   const [cities, setCities] = useState<CityRow[]>([])
   const [products, setProducts] = useState<VendorProduct[]>([])
-  const [templateCatalog, setTemplateCatalog] = useState<TemplateCatalogItem[]>([])
+  const [templateCatalog, setTemplateCatalog] = useState<TemplateCatalogItem[]>(
+    []
+  )
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [createWebsiteStep, setCreateWebsiteStep] =
+    useState<CreateWebsiteStep>('audience')
+  const [selectedTemplateAudience, setSelectedTemplateAudience] =
+    useState<TemplateAudience>('b2b')
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('')
   const [websiteName, setWebsiteName] = useState('')
   const [selectedCitySlug, setSelectedCitySlug] = useState('')
   const [previewCityTouched, setPreviewCityTouched] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<WebsiteCard | null>(null)
-  const [deletingWebsiteId, setDeletingWebsiteId] = useState<string | null>(null)
+  const [deletingWebsiteId, setDeletingWebsiteId] = useState<string | null>(
+    null
+  )
 
-  const availableTemplates = templateCatalog.length
-    ? templateCatalog
-    : DEFAULT_TEMPLATE_CATALOG
+  const availableTemplates = useMemo(
+    () =>
+      normalizeTemplateCatalog(
+        templateCatalog.length ? templateCatalog : DEFAULT_TEMPLATE_CATALOG
+      ),
+    [templateCatalog]
+  )
+
+  const filteredTemplates = useMemo(
+    () =>
+      availableTemplates.filter(
+        (template) => template.audience === selectedTemplateAudience
+      ),
+    [availableTemplates, selectedTemplateAudience]
+  )
 
   const selectedTemplate = useMemo(
-    () => availableTemplates.find((template) => template.key === selectedTemplateKey),
+    () =>
+      availableTemplates.find(
+        (template) => template.key === selectedTemplateKey
+      ),
     [availableTemplates, selectedTemplateKey]
   )
+  const selectedAudienceCopy = TEMPLATE_AUDIENCE_COPY[selectedTemplateAudience]
   const trimmedWebsiteName = websiteName.trim()
-  const canCreateWebsite = Boolean(trimmedWebsiteName && selectedTemplateKey && !creating)
+  const canCreateWebsite = Boolean(
+    trimmedWebsiteName && selectedTemplateKey && !creating
+  )
 
   const templateByKey = useMemo(
-    () => new Map(availableTemplates.map((template) => [template.key, template])),
+    () =>
+      new Map(availableTemplates.map((template) => [template.key, template])),
     [availableTemplates]
   )
 
@@ -348,7 +452,8 @@ export default function TemplateWorkspace() {
 
   const selectedCityId = useMemo(
     () =>
-      cities.find((city) => String(city.slug || '').trim() === selectedCitySlug)?._id || '',
+      cities.find((city) => String(city.slug || '').trim() === selectedCitySlug)
+        ?._id || '',
     [cities, selectedCitySlug]
   )
 
@@ -369,7 +474,10 @@ export default function TemplateWorkspace() {
       )
     })
 
-    return normalizeCitySlugValue(matchedCity?.slug || vendorDefaultCityName) || 'all'
+    return (
+      normalizeCitySlugValue(matchedCity?.slug || vendorDefaultCityName) ||
+      'all'
+    )
   }, [cities, vendorDefaultCityName, vendorDefaultCitySlug])
 
   const visibleProductsCount = useMemo(() => {
@@ -398,20 +506,29 @@ export default function TemplateWorkspace() {
         timeout: REQUEST_TIMEOUT_MS,
       }
 
-      const [catalogResponse, websitesResponse, citiesResponse, productsResponse] =
-        await Promise.allSettled([
+      const [
+        catalogResponse,
+        websitesResponse,
+        citiesResponse,
+        productsResponse,
+      ] = await Promise.allSettled([
         axios.get(`${BASE_URL}/v1/templates/catalog`, requestConfig),
-        axios.get(`${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`, requestConfig),
+        axios.get(
+          `${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`,
+          requestConfig
+        ),
         axios.get(`${BASE_URL}/v1/cities?includeInactive=true`, requestConfig),
         axios.get(`${BASE_URL}/v1/products/vendor/${vendorId}`, requestConfig),
-        ])
+      ])
 
       const fetchedCatalog =
         catalogResponse.status === 'fulfilled' &&
         Array.isArray(catalogResponse.value.data?.data)
           ? (catalogResponse.value.data.data as TemplateCatalogItem[])
           : []
-      const nextCatalog = fetchedCatalog.length ? fetchedCatalog : DEFAULT_TEMPLATE_CATALOG
+      const nextCatalog = fetchedCatalog.length
+        ? fetchedCatalog
+        : DEFAULT_TEMPLATE_CATALOG
       const nextWebsites =
         websitesResponse.status === 'fulfilled' &&
         Array.isArray(websitesResponse.value.data?.data)
@@ -433,7 +550,10 @@ export default function TemplateWorkspace() {
       setCities(nextCities)
       setProducts(nextProducts)
       setSelectedTemplateKey((current) => {
-        if (current && nextCatalog.some((template) => template.key === current)) {
+        if (
+          current &&
+          nextCatalog.some((template) => template.key === current)
+        ) {
           return current
         }
         return nextCatalog[0]?.key || ''
@@ -468,7 +588,11 @@ export default function TemplateWorkspace() {
         }
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to load websites')
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          'Failed to load websites'
+      )
     } finally {
       setLoading(false)
     }
@@ -479,6 +603,23 @@ export default function TemplateWorkspace() {
   }, [vendorId, token])
 
   useEffect(() => {
+    if (!filteredTemplates.length) {
+      if (selectedTemplateKey) {
+        setSelectedTemplateKey('')
+      }
+      return
+    }
+
+    if (
+      filteredTemplates.some((template) => template.key === selectedTemplateKey)
+    ) {
+      return
+    }
+
+    setSelectedTemplateKey(filteredTemplates[0]?.key || '')
+  }, [filteredTemplates, selectedTemplateKey])
+
+  useEffect(() => {
     if (!token || vendorProfile) return
     void dispatch(fetchVendorProfile())
   }, [dispatch, token, vendorProfile])
@@ -486,8 +627,12 @@ export default function TemplateWorkspace() {
   useEffect(() => {
     if (previewCityTouched) return
 
-    const normalizedDefaultSlug = normalizeCitySlugValue(effectiveDefaultCitySlug)
-    const normalizedStoredSlug = normalizeCitySlugValue(peekStoredTemplatePreviewCity())
+    const normalizedDefaultSlug = normalizeCitySlugValue(
+      effectiveDefaultCitySlug
+    )
+    const normalizedStoredSlug = normalizeCitySlugValue(
+      peekStoredTemplatePreviewCity()
+    )
     const nextCitySlug =
       (normalizedDefaultSlug && normalizedDefaultSlug !== 'all'
         ? normalizedDefaultSlug
@@ -508,14 +653,44 @@ export default function TemplateWorkspace() {
   }, [selectedCitySlug])
 
   const openCreateDialog = () => {
-    setWebsiteName('')
-    setSelectedTemplateKey(
-      (current) => current || availableTemplates[0]?.key || DEFAULT_TEMPLATE_CATALOG[0]?.key || ''
+    const currentTemplate = availableTemplates.find(
+      (template) => template.key === selectedTemplateKey
     )
+    const fallbackAudience = normalizeTemplateAudience(
+      currentTemplate?.audience,
+      currentTemplate?.key
+    )
+    const nextAudience = currentTemplate?.key
+      ? fallbackAudience
+      : normalizeTemplateAudience(
+          availableTemplates[0]?.audience,
+          availableTemplates[0]?.key
+        )
+    const nextTemplate =
+      currentTemplate?.key && currentTemplate.audience === nextAudience
+        ? currentTemplate
+        : availableTemplates.find(
+            (template) => template.audience === nextAudience
+          ) || availableTemplates[0]
+
+    setWebsiteName('')
+    setSelectedTemplateAudience(nextAudience)
+    setSelectedTemplateKey(nextTemplate?.key || '')
+    setCreateWebsiteStep('audience')
     setDialogOpen(true)
   }
 
-  const openWebsiteEditor = (website: WebsiteCard, page: WorkspaceEditorPage = 'home') => {
+  const handleCreateDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open)
+    if (!open) {
+      setCreateWebsiteStep('audience')
+    }
+  }
+
+  const openWebsiteEditor = (
+    website: WebsiteCard,
+    page: WorkspaceEditorPage = 'home'
+  ) => {
     const templateKey = String(website.template_key || '').trim()
     if (!vendorId || !templateKey) {
       toast.error('Website template could not be opened')
@@ -525,7 +700,10 @@ export default function TemplateWorkspace() {
     setStoredActiveWebsiteId(vendorId, website._id)
     setStoredEditingTemplateKey(vendorId, templateKey)
     setStoredTemplatePreviewCity(
-      selectedCitySlug || effectiveDefaultCitySlug || vendorDefaultCitySlug || 'all'
+      selectedCitySlug ||
+        effectiveDefaultCitySlug ||
+        vendorDefaultCitySlug ||
+        'all'
     )
 
     if (page === 'home') {
@@ -563,7 +741,8 @@ export default function TemplateWorkspace() {
       if (product.isAvailable === false) return false
 
       const websiteIds = extractIdList(product.websiteIds)
-      const matchesWebsite = !websiteIds.length || websiteIds.includes(websiteId)
+      const matchesWebsite =
+        !websiteIds.length || websiteIds.includes(websiteId)
       if (!matchesWebsite) return false
 
       if (selectedCitySlug === 'all') return true
@@ -575,7 +754,9 @@ export default function TemplateWorkspace() {
 
   const handleCreateWebsite = async () => {
     if (!vendorId) {
-      toast.error('Vendor profile is still loading. Please refresh and try again.')
+      toast.error(
+        'Vendor profile is still loading. Please refresh and try again.'
+      )
       return
     }
     if (!trimmedWebsiteName) {
@@ -604,7 +785,9 @@ export default function TemplateWorkspace() {
         }
       )
 
-      const createdWebsite = response.data?.data as Partial<WebsiteCard> | undefined
+      const createdWebsite = response.data?.data as
+        | Partial<WebsiteCard>
+        | undefined
       const createdWebsiteId = String(createdWebsite?._id || '').trim()
       const createdTemplateKey = String(
         createdWebsite?.template_key || selectedTemplate.key || ''
@@ -632,7 +815,11 @@ export default function TemplateWorkspace() {
         )
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to create website')
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          'Failed to create website'
+      )
     } finally {
       setCreating(false)
     }
@@ -643,9 +830,12 @@ export default function TemplateWorkspace() {
 
     setDeletingWebsiteId(deleteTarget._id)
     try {
-      await axios.delete(`${BASE_URL}/v1/templates/website/${deleteTarget._id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      })
+      await axios.delete(
+        `${BASE_URL}/v1/templates/website/${deleteTarget._id}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
+      )
 
       if (vendorId && getStoredActiveWebsiteId(vendorId) === deleteTarget._id) {
         setStoredActiveWebsiteId(vendorId, undefined)
@@ -656,7 +846,11 @@ export default function TemplateWorkspace() {
       setDeleteTarget(null)
       await loadWorkspace()
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to delete website')
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          'Failed to delete website'
+      )
     } finally {
       setDeletingWebsiteId(null)
     }
@@ -673,12 +867,6 @@ export default function TemplateWorkspace() {
     } catch {
       return 'Recently created'
     }
-  }
-
-  const getTemplateBlurb = (description?: string) => {
-    const text = String(description || 'Use this storefront template to start your site.').trim()
-    if (text.length <= 110) return text
-    return `${text.slice(0, 107).trimEnd()}...`
   }
 
   return (
@@ -706,43 +894,48 @@ export default function TemplateWorkspace() {
 
       <Main className='flex flex-1 flex-col gap-6'>
         <section className='grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(220px,0.6fr)_minmax(220px,0.6fr)_minmax(240px,0.8fr)]'>
-          <div className='rounded-2xl border border-border bg-card p-6 shadow-sm'>
-            <p className='text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground'>
+          <div className='border-border bg-card rounded-2xl border p-6 shadow-sm'>
+            <p className='text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase'>
               Workspace
             </p>
-            <h2 className='mt-2 text-xl font-semibold tracking-tight text-foreground'>
+            <h2 className='text-foreground mt-2 text-xl font-semibold tracking-tight'>
               Manage storefront websites for {vendorName}
             </h2>
-            <p className='mt-2 text-sm leading-6 text-muted-foreground'>
-              Create a new website from any available template, jump straight into the builder,
-              and manage every preview link from this one page.
+            <p className='text-muted-foreground mt-2 text-sm leading-6'>
+              Create a new website from any available template, jump straight
+              into the builder, and manage every preview link from this one
+              page.
             </p>
           </div>
 
-          <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
-            <p className='text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+          <div className='border-border bg-card rounded-2xl border p-5 shadow-sm'>
+            <p className='text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase'>
               Websites
             </p>
-            <p className='mt-2 text-3xl font-semibold tracking-tight text-foreground'>
+            <p className='text-foreground mt-2 text-3xl font-semibold tracking-tight'>
               {websites.length}
             </p>
-            <p className='mt-2 text-sm text-muted-foreground'>Active website entries in your workspace.</p>
+            <p className='text-muted-foreground mt-2 text-sm'>
+              Active website entries in your workspace.
+            </p>
           </div>
 
-          <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
-            <p className='text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+          <div className='border-border bg-card rounded-2xl border p-5 shadow-sm'>
+            <p className='text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase'>
               Templates
             </p>
-            <p className='mt-2 text-3xl font-semibold tracking-tight text-foreground'>
+            <p className='text-foreground mt-2 text-3xl font-semibold tracking-tight'>
               {availableTemplates.length}
             </p>
-            <p className='mt-2 text-sm text-muted-foreground'>Starting layouts ready for new websites.</p>
+            <p className='text-muted-foreground mt-2 text-sm'>
+              Starting layouts ready for new websites.
+            </p>
           </div>
 
-          <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
-            <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+          <div className='border-border bg-card rounded-2xl border p-5 shadow-sm'>
+            <div className='text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-[0.16em] uppercase'>
               <MapPinned className='h-3.5 w-3.5' />
-              Preview City
+              Preview Location
             </div>
             <Select
               value={selectedCitySlug || 'all'}
@@ -752,7 +945,7 @@ export default function TemplateWorkspace() {
               }}
             >
               <SelectTrigger className='mt-3 h-11 w-full rounded-xl'>
-                <SelectValue placeholder='Select city' />
+                <SelectValue placeholder='Select location' />
               </SelectTrigger>
               <SelectContent>
                 {cityOptions.map((option) => (
@@ -762,10 +955,11 @@ export default function TemplateWorkspace() {
                 ))}
               </SelectContent>
             </Select>
-            <p className='mt-3 text-sm text-muted-foreground'>
-              Preview URLs and page editors will open for {selectedCityOption.label}.
+            <p className='text-muted-foreground mt-3 text-sm'>
+              Preview URLs and page editors will open for{' '}
+              {selectedCityOption.label}.
             </p>
-            <div className='mt-3 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground'>
+            <div className='bg-muted text-muted-foreground mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold'>
               <Package2 className='h-3.5 w-3.5' />
               {visibleProductsCount} products visible
             </div>
@@ -774,16 +968,22 @@ export default function TemplateWorkspace() {
 
         <section className='space-y-4'>
           <div>
-            <h2 className='text-2xl font-semibold tracking-tight text-foreground'>Created Websites</h2>
-            <p className='text-sm text-muted-foreground'>
-              Preview, edit, and review city-specific product visibility from here.
+            <h2 className='text-foreground text-2xl font-semibold tracking-tight'>
+              Created Websites
+            </h2>
+            <p className='text-muted-foreground text-sm'>
+              Preview, edit, and review location-specific product visibility
+              from here.
             </p>
           </div>
 
           {loading ? (
             <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className={`${cardClass} h-[420px] animate-pulse bg-muted/30`} />
+                <div
+                  key={index}
+                  className={`${cardClass} bg-muted/30 h-[420px] animate-pulse`}
+                />
               ))}
             </div>
           ) : websites.length ? (
@@ -794,21 +994,32 @@ export default function TemplateWorkspace() {
                 const previewUrl = getVendorTemplatePreviewUrl(
                   vendorPublicIdentifier || vendorId,
                   templateKey,
-                  selectedCitySlug || effectiveDefaultCitySlug || vendorDefaultCitySlug,
+                  selectedCitySlug ||
+                    effectiveDefaultCitySlug ||
+                    vendorDefaultCitySlug,
                   website.website_slug || website._id
                 )
-                const thumbnail = website.previewImage || websiteTemplate?.previewImage || ''
-                const visibleProducts = getVisibleProductsForWebsite(website._id)
+                const thumbnail =
+                  website.previewImage || websiteTemplate?.previewImage || ''
+                const visibleProducts = getVisibleProductsForWebsite(
+                  website._id
+                )
                 const visibleProductLabels = visibleProducts
                   .slice(0, 4)
-                  .map((product) => String(product.productName || 'Untitled Product').trim())
+                  .map((product) =>
+                    String(product.productName || 'Untitled Product').trim()
+                  )
                   .filter(Boolean)
 
                 return (
                   <article key={website._id} className={cardClass}>
                     <div className='relative'>
                       <StorefrontThumbnail
-                        title={website.name || website.template_name || 'Website preview'}
+                        title={
+                          website.name ||
+                          website.template_name ||
+                          'Website preview'
+                        }
                         previewUrl={previewUrl}
                         fallbackImage={thumbnail}
                         className='transition duration-300 group-hover:scale-[1.02]'
@@ -816,12 +1027,14 @@ export default function TemplateWorkspace() {
 
                       <div className='absolute inset-x-0 top-0 flex items-start justify-between p-4'>
                         <div className='inline-flex rounded-full border border-white/30 bg-black/55 px-3 py-1 text-xs font-semibold text-white backdrop-blur'>
-                          {website.template_name || websiteTemplate?.name || templateKey}
+                          {website.template_name ||
+                            websiteTemplate?.name ||
+                            templateKey}
                         </div>
                         <button
                           type='button'
                           onClick={() => setDeleteTarget(website)}
-                          className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/90 text-destructive shadow-sm transition hover:bg-white'
+                          className='text-destructive inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm transition hover:bg-white'
                           aria-label={`Delete ${website.name || website.business_name || 'website'}`}
                         >
                           <Trash2 className='h-4 w-4' />
@@ -831,55 +1044,63 @@ export default function TemplateWorkspace() {
 
                     <div className='flex flex-1 flex-col gap-4 p-5'>
                       <div>
-                        <h3 className='truncate text-xl font-semibold text-foreground'>
-                          {website.name || website.business_name || 'Untitled Website'}
+                        <h3 className='text-foreground truncate text-xl font-semibold'>
+                          {website.name ||
+                            website.business_name ||
+                            'Untitled Website'}
                         </h3>
-                        <p className='mt-1 text-sm text-muted-foreground'>
+                        <p className='text-muted-foreground mt-1 text-sm'>
                           Created {formatDate(website.createdAt)}
                         </p>
                       </div>
 
-                      <div className='rounded-2xl border border-border bg-background/70 p-3'>
-                        <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                      <div className='border-border bg-background/70 rounded-2xl border p-3'>
+                        <div className='text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-[0.16em] uppercase'>
                           <Globe className='h-3.5 w-3.5' />
                           Preview URL
                         </div>
-                        <div className='mt-2 inline-flex items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground'>
+                        <div className='bg-muted text-muted-foreground mt-2 inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold'>
                           <Building2 className='h-3 w-3' />
                           {selectedCityOption.label}
                         </div>
-                        <p className='mt-2 break-all text-sm leading-6 text-foreground'>
+                        <p className='text-foreground mt-2 text-sm leading-6 break-all'>
                           {previewUrl || 'Preview not available'}
                         </p>
                       </div>
 
-                      <div className='rounded-2xl border border-border bg-background/70 p-3'>
-                        <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                      <div className='border-border bg-background/70 rounded-2xl border p-3'>
+                        <div className='text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-[0.16em] uppercase'>
                           <Package2 className='h-3.5 w-3.5' />
                           Visible Products
                         </div>
-                        <p className='mt-2 text-sm font-medium text-foreground'>
-                          {visibleProducts.length} products in {selectedCityOption.label}
+                        <p className='text-foreground mt-2 text-sm font-medium'>
+                          {visibleProducts.length} products in{' '}
+                          {selectedCityOption.label}
                         </p>
                         {visibleProductLabels.length ? (
                           <div className='mt-3 flex flex-wrap gap-2'>
                             {visibleProductLabels.map((label) => (
                               <span
                                 key={`${website._id}-${label}`}
-                                className='inline-flex max-w-full items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground'
+                                className='bg-muted text-muted-foreground inline-flex max-w-full items-center rounded-full px-3 py-1 text-xs font-medium'
                               >
                                 <span className='truncate'>{label}</span>
                               </span>
                             ))}
-                            {visibleProducts.length > visibleProductLabels.length ? (
-                              <span className='inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground'>
-                                +{visibleProducts.length - visibleProductLabels.length} more
+                            {visibleProducts.length >
+                            visibleProductLabels.length ? (
+                              <span className='bg-muted text-muted-foreground inline-flex items-center rounded-full px-3 py-1 text-xs font-medium'>
+                                +
+                                {visibleProducts.length -
+                                  visibleProductLabels.length}{' '}
+                                more
                               </span>
                             ) : null}
                           </div>
                         ) : (
-                          <p className='mt-2 text-sm text-muted-foreground'>
-                            No products mapped to this website for {selectedCityOption.label}.
+                          <p className='text-muted-foreground mt-2 text-sm'>
+                            No products mapped to this website for{' '}
+                            {selectedCityOption.label}.
                           </p>
                         )}
                       </div>
@@ -895,8 +1116,17 @@ export default function TemplateWorkspace() {
                         </Button>
 
                         {previewUrl ? (
-                          <a href={previewUrl} target='_blank' rel='noreferrer' className='block'>
-                            <Button type='button' variant='outline' className='h-11 w-full rounded-2xl'>
+                          <a
+                            href={previewUrl}
+                            target='_blank'
+                            rel='noreferrer'
+                            className='block'
+                          >
+                            <Button
+                              type='button'
+                              variant='outline'
+                              className='h-11 w-full rounded-2xl'
+                            >
                               <ExternalLink className='h-4 w-4' />
                               Open Preview
                             </Button>
@@ -916,10 +1146,10 @@ export default function TemplateWorkspace() {
 
                       <div className='space-y-2'>
                         <div className='flex items-center justify-between gap-2'>
-                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                          <p className='text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase'>
                             Edit Pages
                           </p>
-                          <span className='text-xs text-muted-foreground'>
+                          <span className='text-muted-foreground text-xs'>
                             {selectedCityOption.label}
                           </span>
                         </div>
@@ -938,7 +1168,10 @@ export default function TemplateWorkspace() {
                               size='sm'
                               className='h-9 rounded-full'
                               onClick={() =>
-                                openWebsiteEditor(website, page as WorkspaceEditorPage)
+                                openWebsiteEditor(
+                                  website,
+                                  page as WorkspaceEditorPage
+                                )
                               }
                             >
                               <PencilLine className='h-3.5 w-3.5' />
@@ -953,14 +1186,20 @@ export default function TemplateWorkspace() {
               })}
             </div>
           ) : (
-            <div className='rounded-[24px] border border-dashed border-border bg-card px-6 py-12 text-center shadow-sm'>
-              <LayoutTemplate className='mx-auto h-10 w-10 text-muted-foreground' />
-              <h3 className='mt-4 text-xl font-semibold text-foreground'>No websites created yet</h3>
-              <p className='mt-2 text-sm text-muted-foreground'>
-                Create your first website from a template and it will appear here with its preview
-                link and edit access.
+            <div className='border-border bg-card rounded-[24px] border border-dashed px-6 py-12 text-center shadow-sm'>
+              <LayoutTemplate className='text-muted-foreground mx-auto h-10 w-10' />
+              <h3 className='text-foreground mt-4 text-xl font-semibold'>
+                No websites created yet
+              </h3>
+              <p className='text-muted-foreground mt-2 text-sm'>
+                Create your first website from a template and it will appear
+                here with its preview link and edit access.
               </p>
-              <Button type='button' onClick={openCreateDialog} className='mt-6 h-11 rounded-2xl'>
+              <Button
+                type='button'
+                onClick={openCreateDialog}
+                className='mt-6 h-11 rounded-2xl'
+              >
                 <Plus className='h-4 w-4' />
                 Create First Website
               </Button>
@@ -969,136 +1208,211 @@ export default function TemplateWorkspace() {
         </section>
       </Main>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className='w-[min(96vw,1120px)] max-w-[min(96vw,1120px)] gap-0 overflow-hidden rounded-2xl border-border/70 p-0 sm:max-w-[min(96vw,1120px)]'>
+      <Dialog open={dialogOpen} onOpenChange={handleCreateDialogOpenChange}>
+        <DialogContent className='border-border bg-background w-[min(96vw,920px)] max-w-[min(96vw,920px)] gap-0 overflow-hidden rounded-none border p-0 sm:max-w-[min(96vw,920px)] [&>button]:rounded-none'>
           <div className='flex max-h-[90vh] flex-col'>
-            <DialogHeader className='border-b border-border px-6 py-5 text-left sm:px-8'>
-              <DialogTitle className='text-2xl font-semibold tracking-tight text-foreground'>
-                Create Website
+            <DialogHeader className='border-border border-b px-6 py-4 text-left sm:px-8'>
+              <DialogTitle className='text-foreground text-2xl font-semibold tracking-tight'>
+                {createWebsiteStep === 'audience'
+                  ? 'Choose Website Type'
+                  : 'Choose Template'}
               </DialogTitle>
-              <DialogDescription className='max-w-3xl text-sm leading-6'>
-                Give your website a name, choose one template, and continue directly to the builder.
+              <DialogDescription className='text-muted-foreground mt-1 text-sm'>
+                {createWebsiteStep === 'audience'
+                  ? 'Step 1 of 2'
+                  : `Step 2 of 2 • ${selectedAudienceCopy.shortLabel}`}
               </DialogDescription>
             </DialogHeader>
 
             <div className='flex-1 overflow-y-auto px-6 py-6 sm:px-8'>
-              <div className='space-y-6'>
-                <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
-                  <label className='mb-3 block text-sm font-medium text-foreground'>
-                    Website Name
-                  </label>
-                  <Input
-                    value={websiteName}
-                    onChange={(event) => setWebsiteName(event.target.value)}
-                    placeholder='Example: Dust Filter India Storefront'
-                    className='h-12 rounded-2xl'
-                  />
-                  <p className='mt-3 text-sm leading-6 text-muted-foreground'>
-                    This name will help you identify the website later in your dashboard.
-                  </p>
-                </div>
+              {createWebsiteStep === 'audience' ? (
+                <div className='grid gap-4 md:grid-cols-2'>
+                  {(
+                    Object.entries(TEMPLATE_AUDIENCE_COPY) as Array<
+                      [
+                        TemplateAudience,
+                        (typeof TEMPLATE_AUDIENCE_COPY)[TemplateAudience],
+                      ]
+                    >
+                  ).map(([audienceKey, audience]) => {
+                    const isSelected = selectedTemplateAudience === audienceKey
+                    const Icon = audienceKey === 'b2b' ? Building2 : Globe
 
-                <div className='rounded-2xl border border-border bg-card p-5 shadow-sm'>
-                  <div className='flex flex-wrap items-center justify-between gap-3'>
-                    <div>
-                      <h3 className='text-lg font-semibold text-foreground'>Choose a Template</h3>
-                      <p className='mt-1 text-sm leading-6 text-muted-foreground'>
-                        Pick one clean starting point. You can edit the website later, but you
-                        cannot switch its template after creation.
+                    return (
+                      <button
+                        key={audienceKey}
+                        type='button'
+                        onClick={() => {
+                          setSelectedTemplateAudience(audienceKey)
+                          setCreateWebsiteStep('template')
+                        }}
+                        className={cn(
+                          'flex min-h-[180px] flex-col justify-between border p-5 text-left transition',
+                          isSelected
+                            ? 'border-primary bg-primary/[0.04]'
+                            : 'border-border bg-background hover:border-primary/40 hover:bg-muted/20'
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            'inline-flex h-12 w-12 items-center justify-center border',
+                            isSelected
+                              ? 'border-primary text-primary'
+                              : 'border-border text-muted-foreground'
+                          )}
+                        >
+                          <Icon className='h-5 w-5' />
+                        </div>
+
+                        <div className='mt-8'>
+                          <div className='text-foreground text-xl font-semibold'>
+                            {audience.shortLabel}
+                          </div>
+                          <div className='text-muted-foreground mt-2 text-sm'>
+                            {audienceKey === 'b2b'
+                              ? 'Bulk orders'
+                              : 'Online store'}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className='space-y-5'>
+                  <div className='flex items-center justify-between gap-3'>
+                    <div className='text-foreground text-sm font-medium'>
+                      {selectedAudienceCopy.shortLabel}
+                    </div>
+                    <div className='text-muted-foreground text-sm'>
+                      {filteredTemplates.length} templates
+                    </div>
+                  </div>
+
+                  {filteredTemplates.length ? (
+                    <div className='grid gap-4 md:grid-cols-2'>
+                      {filteredTemplates.map((template) => {
+                        const isSelected = selectedTemplateKey === template.key
+                        const previewUrl = getVendorTemplatePreviewUrl(
+                          vendorPublicIdentifier || vendorId,
+                          template.key,
+                          effectiveDefaultCitySlug || vendorDefaultCitySlug
+                        )
+
+                        return (
+                          <button
+                            key={template.key}
+                            type='button'
+                            onClick={() => setSelectedTemplateKey(template.key)}
+                            className={cn(
+                              'border-border bg-background flex h-full flex-col border p-3 text-left transition',
+                              isSelected
+                                ? 'border-primary bg-primary/[0.04]'
+                                : 'hover:border-primary/40 hover:bg-muted/20'
+                            )}
+                          >
+                            <div className='border-border overflow-hidden border'>
+                              <StorefrontThumbnail
+                                title={template.name}
+                                previewUrl={previewUrl}
+                                fallbackImage={template.previewImage}
+                                className='aspect-[16/10]'
+                              />
+                            </div>
+
+                            <div className='mt-3 flex items-start justify-between gap-3'>
+                              <div>
+                                <div className='text-foreground text-base font-semibold'>
+                                  {template.name}
+                                </div>
+                                <div className='text-muted-foreground mt-1 text-xs uppercase'>
+                                  {template.key}
+                                </div>
+                              </div>
+
+                              {isSelected ? (
+                                <span className='border border-emerald-500 px-2 py-1 text-[11px] font-semibold text-emerald-700'>
+                                  Selected
+                                </span>
+                              ) : null}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className='border-border bg-background border px-5 py-10 text-center'>
+                      <LayoutTemplate className='text-muted-foreground mx-auto h-8 w-8' />
+                      <p className='text-muted-foreground mt-3 text-sm'>
+                        No {selectedAudienceCopy.shortLabel} templates
                       </p>
                     </div>
-                    <div className='inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground'>
-                      {availableTemplates.length} templates
-                    </div>
-                  </div>
+                  )}
 
-                  <div className='mt-5 grid grid-cols-[repeat(auto-fit,minmax(260px,320px))] justify-center gap-4'>
-                    {availableTemplates.map((template) => {
-                      const isSelected = selectedTemplateKey === template.key
-                      const previewUrl = getVendorTemplatePreviewUrl(
-                        vendorPublicIdentifier || vendorId,
-                        template.key,
-                        effectiveDefaultCitySlug || vendorDefaultCitySlug
-                      )
-                      return (
-                        <button
-                          key={template.key}
-                          type='button'
-                          onClick={() => setSelectedTemplateKey(template.key)}
-                          className={`group mx-auto flex h-full w-full max-w-[320px] min-h-[220px] flex-col overflow-hidden rounded-2xl border bg-background text-left shadow-sm transition ${
-                            isSelected
-                              ? 'border-primary ring-1 ring-primary/20'
-                              : 'border-border hover:border-primary/40 hover:shadow-md'
-                          }`}
-                        >
-                          <div className='relative overflow-hidden bg-muted'>
-                            <StorefrontThumbnail
-                              title={template.name}
-                              previewUrl={previewUrl}
-                              fallbackImage={template.previewImage}
-                              className='aspect-[16/9] transition duration-300 group-hover:scale-[1.02]'
-                            />
-                            {isSelected ? (
-                              <div className='absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-background/95 px-3 py-1 text-xs font-semibold text-foreground shadow-sm'>
-                                <CheckCircle2 className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
-                                Selected
-                              </div>
-                            ) : null}
-                          </div>
-
-                          <div className='flex flex-1 flex-col p-4'>
-                            <div>
-                              <h4 className='text-base font-semibold leading-snug text-foreground'>
-                                {template.name}
-                              </h4>
-                              <p className='mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
-                                {template.key}
-                              </p>
-                            </div>
-
-                            <p className='mt-3 flex-1 text-sm leading-6 text-muted-foreground'>
-                              {getTemplateBlurb(template.description)}
-                            </p>
-
-                            <div className='mt-3'>
-                              <div
-                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                                  isSelected
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted text-muted-foreground'
-                                }`}
-                              >
-                                {isSelected ? (
-                                  <>
-                                    <CheckCircle2 className='h-3.5 w-3.5' />
-                                    Selected for this website
-                                  </>
-                                ) : (
-                                  'Click to use this template'
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      )
-                    })}
+                  <div className={modalSectionClass}>
+                    <label className='text-foreground text-sm font-medium'>
+                      Website Name
+                    </label>
+                    <Input
+                      value={websiteName}
+                      onChange={(event) => setWebsiteName(event.target.value)}
+                      placeholder='Website name'
+                      className='border-border bg-background mt-3 h-11 rounded-none shadow-none'
+                    />
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            <div className='flex flex-wrap items-center justify-end gap-3 border-t border-border px-6 py-4 sm:px-8'>
-              <Button type='button' variant='outline' onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type='button' onClick={handleCreateWebsite} disabled={!canCreateWebsite}>
-                {creating ? (
-                  <Loader2 className='h-4 w-4 animate-spin' />
-                ) : (
-                  <Plus className='h-4 w-4' />
-                )}
-                Create Website
-              </Button>
+            <div className='border-border bg-background flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4 sm:px-8'>
+              {createWebsiteStep === 'audience' ? (
+                <>
+                  <div />
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={() => setDialogOpen(false)}
+                    className='h-11 rounded-none'
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className='flex flex-wrap items-center gap-3'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      onClick={() => setCreateWebsiteStep('audience')}
+                      className='h-11 rounded-none'
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      onClick={() => setDialogOpen(false)}
+                      className='h-11 rounded-none'
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+
+                  <Button
+                    type='button'
+                    onClick={handleCreateWebsite}
+                    disabled={!canCreateWebsite}
+                    className='h-11 rounded-none'
+                  >
+                    {creating ? (
+                      <Loader2 className='h-4 w-4 animate-spin' />
+                    ) : (
+                      <Plus className='h-4 w-4' />
+                    )}
+                    Create Website
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </DialogContent>
@@ -1119,7 +1433,10 @@ export default function TemplateWorkspace() {
         desc={
           <div className='space-y-2 text-sm'>
             <p>This will permanently remove the website from your workspace.</p>
-            <p>You can create a new website again later, but this deleted website cannot be restored.</p>
+            <p>
+              You can create a new website again later, but this deleted website
+              cannot be restored.
+            </p>
           </div>
         }
         destructive

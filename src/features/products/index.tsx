@@ -11,7 +11,6 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
-import { toast } from 'sonner'
 import { formatINR } from '@/lib/currency'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -31,7 +30,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Switch } from '@/components/ui/switch'
 import {
   Table,
   TableBody,
@@ -92,7 +90,6 @@ type Product = {
   defaultImages?: Array<{ url?: string }>
   variants?: ProductVariant[]
   status?: string
-  isAvailable?: boolean
   createdAt?: string
   specifications?: Array<Record<string, unknown>>
   faqs?: Array<{ question?: string; answer?: string }>
@@ -149,6 +146,37 @@ const formatFieldLabel = (value: string) =>
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase())
+
+const normalizeProductStatus = (value?: string) =>
+  normalizeText(value).toLowerCase()
+
+const formatProductStatusLabel = (value?: string) => {
+  switch (normalizeProductStatus(value)) {
+    case 'approved':
+      return 'Verified'
+    case 'pending':
+      return 'Pending'
+    case 'rejected':
+      return 'Rejected'
+    case 'draft':
+      return 'Draft'
+    default:
+      return 'Unspecified'
+  }
+}
+
+const getProductStatusClassName = (value?: string) => {
+  switch (normalizeProductStatus(value)) {
+    case 'approved':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    case 'rejected':
+      return 'border-red-200 bg-red-50 text-red-700'
+    case 'draft':
+      return 'border-slate-200 bg-slate-100 text-slate-700'
+    default:
+      return 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+}
 
 const toRef = (
   value: ProductCategoryRef | ProductSubcategoryRef | undefined
@@ -557,8 +585,8 @@ function ProductDetailsDialog({
         <SheetHeader className='border-b px-5 py-5 pr-14 text-left'>
           <SheetTitle>{product.productName || 'Unnamed Product'}</SheetTitle>
           <SheetDescription>
-            Review product visibility, categories, pricing, stock, variants, and
-            FAQ data.
+            Review product verification status, categories, pricing, stock,
+            variants, and FAQ data.
           </SheetDescription>
         </SheetHeader>
 
@@ -575,12 +603,10 @@ function ProductDetailsDialog({
                   variant='outline'
                   className={cn(
                     'rounded-md',
-                    product.isAvailable !== false
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 bg-slate-100 text-slate-600'
+                    getProductStatusClassName(product.status)
                   )}
                 >
-                  {product.isAvailable !== false ? 'Visible' : 'Hidden'}
+                  {formatProductStatusLabel(product.status)}
                 </Badge>
                 <Badge variant='outline' className='rounded-md'>
                   <CalendarDays className='mr-1 h-3.5 w-3.5' />
@@ -801,12 +827,11 @@ export default function VendorProductsTable() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [visibilityFilter, setVisibilityFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [statsOpen, setStatsOpen] = useState(false)
-  const [visibilityUpdatingId, setVisibilityUpdatingId] = useState('')
 
   const fetchData = useCallback(
     async (signal?: AbortSignal) => {
@@ -875,31 +900,33 @@ export default function VendorProductsTable() {
       ),
     [products]
   )
-  const visibleProducts = useMemo(
-    () => products.filter((product) => product.isAvailable !== false).length,
+  const verifiedProducts = useMemo(
+    () =>
+      products.filter(
+        (product) => normalizeProductStatus(product.status) === 'approved'
+      ).length,
     [products]
   )
-  const hiddenProducts = Math.max(totalProducts - visibleProducts, 0)
+  const productsNeedingReview = Math.max(totalProducts - verifiedProducts, 0)
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
 
     return products.filter((product) => {
-      const matchesVisibility =
-        visibilityFilter === 'all' ||
-        (visibilityFilter === 'visible' && product.isAvailable !== false) ||
-        (visibilityFilter === 'hidden' && product.isAvailable === false)
+      const matchesStatus =
+        statusFilter === 'all' ||
+        normalizeProductStatus(product.status) === statusFilter
 
-      if (!matchesVisibility) return false
+      if (!matchesStatus) return false
       if (!query) return true
 
       return getSearchableProductText(product, categoryLookup).includes(query)
     })
-  }, [categoryLookup, products, search, visibilityFilter])
+  }, [categoryLookup, products, search, statusFilter])
 
   useEffect(() => {
     setPage(1)
-  }, [search, visibilityFilter, pageSize])
+  }, [pageSize, search, statusFilter])
 
   const totalPages = Math.max(Math.ceil(filteredProducts.length / pageSize), 1)
   const currentPage = Math.min(page, totalPages)
@@ -916,14 +943,14 @@ export default function VendorProductsTable() {
         helper: 'Total products available in your vendor catalog.',
       },
       {
-        label: 'Visible Products',
-        value: visibleProducts,
-        helper: 'Products currently visible to buyers.',
+        label: 'Verified Products',
+        value: verifiedProducts,
+        helper: 'Products already verified for selling.',
       },
       {
-        label: 'Hidden Products',
-        value: hiddenProducts,
-        helper: 'Products currently hidden from buyers.',
+        label: 'Needs Review',
+        value: productsNeedingReview,
+        helper: 'Products still in pending, draft, or rejected states.',
       },
       {
         label: 'Variants',
@@ -936,70 +963,13 @@ export default function VendorProductsTable() {
         helper: 'Combined stock available across all products.',
       },
     ],
-    [hiddenProducts, totalProducts, totalStock, totalVariants, visibleProducts]
-  )
-
-  const handleVisibilityToggle = useCallback(
-    async (productId: string, nextValue: boolean) => {
-      if (!token) {
-        toast.error('Your session has expired. Please login again.')
-        return
-      }
-
-      setVisibilityUpdatingId(productId)
-      try {
-        const response = await fetch(
-          `${API_BASE}/v1/admin/products/${productId}/content`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ isAvailable: nextValue }),
-          }
-        )
-
-        const body = await response.json().catch(() => null)
-        if (!response.ok || body?.success === false || !body?.data?._id) {
-          throw new Error(
-            body?.message || 'Failed to update product visibility.'
-          )
-        }
-
-        setProducts((prev) =>
-          prev.map((product) =>
-            product._id === productId
-              ? {
-                  ...product,
-                  isAvailable: nextValue,
-                }
-              : product
-          )
-        )
-        setSelectedProduct((current) =>
-          current && current._id === productId
-            ? {
-                ...current,
-                isAvailable: nextValue,
-              }
-            : current
-        )
-
-        toast.success(
-          nextValue
-            ? 'Product is now visible everywhere.'
-            : 'Product has been hidden everywhere.'
-        )
-      } catch (updateError: any) {
-        toast.error(
-          updateError?.message || 'Failed to update product visibility.'
-        )
-      } finally {
-        setVisibilityUpdatingId('')
-      }
-    },
-    [token]
+    [
+      productsNeedingReview,
+      totalProducts,
+      totalStock,
+      totalVariants,
+      verifiedProducts,
+    ]
   )
 
   return (
@@ -1016,14 +986,16 @@ export default function VendorProductsTable() {
           placeholder='Search product, brand, SKU, or description'
           className='h-10 w-[340px] shrink-0'
         />
-        <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className='h-10 w-[200px] shrink-0'>
-            <SelectValue placeholder='All visibility' />
+            <SelectValue placeholder='All status' />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value='all'>All visibility</SelectItem>
-            <SelectItem value='visible'>Visible only</SelectItem>
-            <SelectItem value='hidden'>Hidden only</SelectItem>
+            <SelectItem value='all'>All status</SelectItem>
+            <SelectItem value='approved'>Verified only</SelectItem>
+            <SelectItem value='pending'>Pending only</SelectItem>
+            <SelectItem value='rejected'>Rejected only</SelectItem>
+            <SelectItem value='draft'>Draft only</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -1084,7 +1056,7 @@ export default function VendorProductsTable() {
                 <TableHead className='min-w-[160px]'>Brand</TableHead>
                 <TableHead className='min-w-[120px]'>Stock</TableHead>
                 <TableHead className='min-w-[140px]'>Price</TableHead>
-                <TableHead className='min-w-[150px]'>Visible</TableHead>
+                <TableHead className='min-w-[150px]'>Status</TableHead>
                 <TableHead className='text-right'>Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -1153,29 +1125,15 @@ export default function VendorProductsTable() {
                       {getPriceRange(product.variants)}
                     </TableCell>
                     <TableCell>
-                      <div className='flex min-w-[148px] items-center gap-3'>
-                        <Switch
-                          checked={product.isAvailable !== false}
-                          onCheckedChange={(checked) =>
-                            handleVisibilityToggle(product._id, checked)
-                          }
-                          disabled={visibilityUpdatingId === product._id}
-                        />
-                        <span
-                          className={cn(
-                            'text-sm font-medium',
-                            product.isAvailable !== false
-                              ? 'text-emerald-700'
-                              : 'text-slate-500'
-                          )}
-                        >
-                          {visibilityUpdatingId === product._id
-                            ? 'Saving...'
-                            : product.isAvailable !== false
-                              ? 'Visible'
-                              : 'Hidden'}
-                        </span>
-                      </div>
+                      <Badge
+                        variant='outline'
+                        className={cn(
+                          'rounded-md',
+                          getProductStatusClassName(product.status)
+                        )}
+                      >
+                        {formatProductStatusLabel(product.status)}
+                      </Badge>
                     </TableCell>
                     <TableCell className='text-right'>
                       <Button

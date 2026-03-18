@@ -71,8 +71,11 @@ const limit = 10
 const selectClassName =
   'h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100'
 
-const titleCase = (value?: string) =>
-  (value || 'pending').replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+const titleCase = (value?: string) => {
+  const normalized = (value || 'pending').trim().toLowerCase()
+  if (normalized === 'approved') return 'Verified'
+  return normalized.replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
 
 const formatFieldLabel = (value: string) =>
   value
@@ -427,7 +430,7 @@ export default function AdminProductsTable() {
               <div className='space-y-2'>
                 <h1 className='text-4xl font-semibold tracking-tight text-slate-950'>Admin Product Inventory</h1>
                 <p className='max-w-3xl text-lg leading-8 text-slate-600'>
-                  Review product quality, pricing, stock, and approval status from one shared inventory view.
+                  Review product quality, pricing, stock, and verification status from one shared inventory view.
                 </p>
               </div>
               <div className='flex flex-wrap gap-2'>
@@ -499,7 +502,7 @@ export default function AdminProductsTable() {
             />
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={selectClassName}>
               <option value='all'>All status</option>
-              <option value='approved'>Approved</option>
+              <option value='approved'>Verified</option>
               <option value='pending'>Pending</option>
               <option value='rejected'>Rejected</option>
               <option value='draft'>Draft</option>

@@ -21,6 +21,7 @@ import {
   TrendingUp,
   Layers,
 } from 'lucide-react'
+import { normalizeVendorPageAccess } from '@/features/team-access/access-config'
 
 type Product = {
   _id: string
@@ -59,6 +60,10 @@ const VendorDashboard = () => {
   const vendorId = user?.id || user?._id
   const role = (user?.role || '').toLowerCase()
   const isAdminRole = role === 'admin' || role === 'superadmin'
+  const isVendorTeamUser =
+    role === 'vendor' && String(user?.account_type || '').toLowerCase() === 'vendor_user'
+  const pageAccess = normalizeVendorPageAccess(user?.page_access)
+  const canManageProducts = !isVendorTeamUser || pageAccess.has('products')
   const [products, setProducts] = useState<Product[]>([])
   const [categoryMap, setCategoryMap] = useState<Record<string, Category>>({})
   const [loading, setLoading] = useState(true)
@@ -405,8 +410,12 @@ const VendorDashboard = () => {
       subtitle: 'Active catalog items',
       icon: ShoppingBag,
       className: 'from-emerald-50 via-white to-emerald-100 text-emerald-900',
-      ctaLabel: 'Add Product',
-      ctaTo: '/products/create-products' as const,
+      ...(canManageProducts
+        ? {
+            ctaLabel: 'Add Product',
+            ctaTo: '/products/create-products' as const,
+          }
+        : {}),
     },
     {
       title: 'Variants',

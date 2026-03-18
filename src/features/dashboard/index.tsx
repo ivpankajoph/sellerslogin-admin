@@ -26,6 +26,7 @@ import {
 } from '@/lib/vendor-integrations'
 import type { RootState } from '@/store'
 import { setUser } from '@/store/slices/authSlice'
+import { normalizeVendorPageAccess } from '@/features/team-access/access-config'
 
 export function Dashboard() {
   const dispatch = useDispatch()
@@ -33,9 +34,18 @@ export function Dashboard() {
   const { data: integrationData } = useVendorIntegrations()
   const effectiveRole = user?.role === 'superadmin' ? 'admin' : user?.role
   const isVendor = effectiveRole === 'vendor'
+  const isVendorTeamUser =
+    isVendor && String(user?.account_type || '').toLowerCase() === 'vendor_user'
+  const pageAccess = normalizeVendorPageAccess(user?.page_access)
+  const canAccessMyWebsites = !isVendorTeamUser || pageAccess.has('my_websites')
+  const canAccessToolkitStore =
+    !isVendorTeamUser || pageAccess.has('toolkit_store')
+  const canAccessMyApps = !isVendorTeamUser || pageAccess.has('my_apps')
+  const canOpenAppsMenu = isVendor && (canAccessToolkitStore || canAccessMyApps)
   const connectedAppIds = getInstalledProviderIds(integrationData)
 
   useEffect(() => {
+    if (isVendorTeamUser) return
     if (!user?.id) return
     const loadProfile = async () => {
       try {
@@ -52,7 +62,7 @@ export function Dashboard() {
       }
     }
     loadProfile()
-  }, [dispatch, user?.id])
+  }, [dispatch, isVendorTeamUser, user?.id])
 
   return (
     <>
@@ -66,13 +76,15 @@ export function Dashboard() {
           </div>
           <div className='flex items-center space-x-4'>
             <div className='flex items-center space-x-2'>
-              <Button variant='outline' asChild>
-                <Link to='/template-workspace'>
-                  <Sparkles className='h-4 w-4 text-primary' />
-                  Create your website for free
-                </Link>
-              </Button>
-              {isVendor && (
+              {canAccessMyWebsites ? (
+                <Button variant='outline' asChild>
+                  <Link to='/template-workspace'>
+                    <Sparkles className='h-4 w-4 text-primary' />
+                    Create your website for free
+                  </Link>
+                </Button>
+              ) : null}
+              {canOpenAppsMenu ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -86,14 +98,18 @@ export function Dashboard() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align='end' className='w-72'>
                     <DropdownMenuLabel>Sellerslogin Toolkit</DropdownMenuLabel>
-                    <DropdownMenuItem asChild>
-                      <Link to='/integrations' className='flex items-center gap-2'>
-                        <Store className='h-4 w-4' />
-                        <span>Open Toolkit Store</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {connectedAppIds.length ? (
+                    {canAccessToolkitStore ? (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link to='/integrations' className='flex items-center gap-2'>
+                            <Store className='h-4 w-4' />
+                            <span>Open Toolkit Store</span>
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : null}
+                    {canAccessMyApps && connectedAppIds.length ? (
                       connectedAppIds.map((providerId) => (
                         <DropdownMenuItem key={providerId} asChild>
                           <Link
@@ -110,21 +126,25 @@ export function Dashboard() {
                           </Link>
                         </DropdownMenuItem>
                       ))
-                    ) : ( 
+                    ) : canAccessMyApps ? (
                       <DropdownMenuItem disabled>
                         No connected apps yet
                       </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link to='/integrations' className='flex items-center gap-2'>
-                        <span>Browse all apps</span>
-                        <ExternalLink className='ml-auto h-4 w-4' />
-                      </Link>
-                    </DropdownMenuItem>
+                    ) : null}
+                    {canAccessToolkitStore ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link to='/integrations' className='flex items-center gap-2'>
+                            <span>Browse all apps</span>
+                            <ExternalLink className='ml-auto h-4 w-4' />
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )}
+              ) : null}
             </div>
             <NotificationBell />
             <ThemeSwitch />

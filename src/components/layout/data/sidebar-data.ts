@@ -217,7 +217,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           pageKey: 'location_workspace',
         },
         {
-          title: 'Manage Cities',
+          title: 'Manage Locations',
           url: '/cities',
           icon: MapPinned,
           roles: [ROLES.ADMIN, ROLES.VENDOR],

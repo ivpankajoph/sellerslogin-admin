@@ -22,6 +22,63 @@ const initialState: AuthState = {
 };
 const BASE_URL = import.meta.env.VITE_PUBLIC_API_URL;
 
+const mergeTeamMemberSession = (currentUser: any, nextUser: any) => {
+  const safeCurrentUser =
+    currentUser && typeof currentUser === "object" ? currentUser : null;
+  const safeNextUser =
+    nextUser && typeof nextUser === "object" ? nextUser : nextUser;
+
+  const currentAccountType = String(safeCurrentUser?.account_type || "")
+    .trim()
+    .toLowerCase();
+  const nextAccountType = String((safeNextUser as any)?.account_type || "")
+    .trim()
+    .toLowerCase();
+  const nextRole = String((safeNextUser as any)?.role || safeCurrentUser?.role || "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    currentAccountType !== "vendor_user" ||
+    nextAccountType === "vendor_user" ||
+    nextRole !== "vendor" ||
+    !safeCurrentUser ||
+    !safeNextUser ||
+    typeof safeNextUser !== "object"
+  ) {
+    return safeNextUser;
+  }
+
+  return {
+    ...safeNextUser,
+    id: safeCurrentUser.id || (safeNextUser as any).id,
+    vendor_id:
+      safeCurrentUser.vendor_id ||
+      (safeNextUser as any).vendor_id ||
+      (safeNextUser as any).id,
+    actor_id: safeCurrentUser.actor_id,
+    account_type: "vendor_user",
+    is_team_member: true,
+    role: "vendor",
+    name: safeCurrentUser.name || (safeNextUser as any).name,
+    email: safeCurrentUser.email || (safeNextUser as any).email,
+    avatar: safeCurrentUser.avatar || (safeNextUser as any).avatar || "",
+    page_access: Array.isArray(safeCurrentUser.page_access)
+      ? safeCurrentUser.page_access
+      : [],
+    website_access: Array.isArray(safeCurrentUser.website_access)
+      ? safeCurrentUser.website_access
+      : [],
+    vendor_name:
+      safeCurrentUser.vendor_name ||
+      (safeNextUser as any).vendor_name ||
+      (safeNextUser as any).name ||
+      (safeNextUser as any).business_name ||
+      "",
+    must_change_password: false,
+  };
+};
+
 
 export const loginAdmin = createAsyncThunk(
   "auth/loginAdmin",
@@ -61,7 +118,7 @@ const authSlice = createSlice({
       state.error = null;
     },
     setUser: (state, action: PayloadAction<any>) => {
-      state.user = action.payload;
+      state.user = mergeTeamMemberSession(state.user, action.payload);
     },
     setAuthSession: (
       state,

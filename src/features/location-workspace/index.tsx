@@ -1,6 +1,10 @@
-import { Link } from '@tanstack/react-router'
-import axios from 'axios'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
+import { Link } from '@tanstack/react-router'
+import type { AppDispatch } from '@/store'
+import { setUser } from '@/store/slices/authSlice'
+import { BASE_URL } from '@/store/slices/vendor/productSlice'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import {
   ExternalLink,
   Loader2,
@@ -11,11 +15,8 @@ import {
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
-import { ServerPagination } from '@/components/data-table/server-pagination'
-import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
-import { TablePageHeader } from '@/components/data-table/table-page-header'
-import { TableShell } from '@/components/data-table/table-shell'
-import { Main } from '@/components/layout/main'
+import { getVendorTemplateProductUrl } from '@/lib/storefront-url'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -45,12 +46,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { getVendorTemplateProductUrl } from '@/lib/storefront-url'
-import { cn } from '@/lib/utils'
-import type { AppDispatch } from '@/store'
-import { setUser } from '@/store/slices/authSlice'
-import { BASE_URL } from '@/store/slices/vendor/productSlice'
-import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
+import { ServerPagination } from '@/components/data-table/server-pagination'
+import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
+import { TablePageHeader } from '@/components/data-table/table-page-header'
+import { TableShell } from '@/components/data-table/table-shell'
+import { Main } from '@/components/layout/main'
 
 type CityRow = {
   _id: string
@@ -189,12 +189,11 @@ const toIdString = (value: unknown) => {
 const extractIdList = (values: unknown) => {
   if (!Array.isArray(values)) return []
 
-  return values
-    .map((value) => normalizeText(toIdString(value)))
-    .filter(Boolean)
+  return values.map((value) => normalizeText(toIdString(value))).filter(Boolean)
 }
 
-const uniqueIds = (values: string[]) => Array.from(new Set(values.filter(Boolean)))
+const uniqueIds = (values: string[]) =>
+  Array.from(new Set(values.filter(Boolean)))
 
 const parseKeywordInput = (value: string) =>
   value
@@ -223,7 +222,10 @@ const getPrimaryImageUrl = (product?: VendorProduct) =>
 
 const getTotalStock = (variants?: ProductVariant[]) =>
   Array.isArray(variants)
-    ? variants.reduce((sum, variant) => sum + Number(variant?.stockQuantity || 0), 0)
+    ? variants.reduce(
+        (sum, variant) => sum + Number(variant?.stockQuantity || 0),
+        0
+      )
     : 0
 
 const getPriceRangeLabel = (variants?: ProductVariant[]) => {
@@ -264,7 +266,10 @@ const getProductCityOverride = (
     )
   }) || null
 
-const resolveMappedCityIds = (product: VendorProduct, activeCityIds: string[] = []) =>
+const resolveMappedCityIds = (
+  product: VendorProduct,
+  activeCityIds: string[] = []
+) =>
   uniqueIds(
     extractIdList(product.availableCities).filter(
       (mappedCityId) =>
@@ -289,7 +294,9 @@ const resolveCityIdsForUpdate = (
     return uniqueIds([...baseCityIds, cityId])
   }
 
-  return uniqueIds(baseCityIds.filter((mappedCityId) => mappedCityId !== cityId))
+  return uniqueIds(
+    baseCityIds.filter((mappedCityId) => mappedCityId !== cityId)
+  )
 }
 
 const areIdListsEqual = (left: string[], right: string[]) => {
@@ -303,8 +310,16 @@ const areIdListsEqual = (left: string[], right: string[]) => {
 }
 
 const toEditorForm = (
-  source?: Partial<EditorForm> | Partial<CityOverrideSummary> | Partial<VendorProduct> | null,
-  fallback?: Partial<EditorForm> | Partial<CityOverrideSummary> | Partial<VendorProduct> | null
+  source?:
+    | Partial<EditorForm>
+    | Partial<CityOverrideSummary>
+    | Partial<VendorProduct>
+    | null,
+  fallback?:
+    | Partial<EditorForm>
+    | Partial<CityOverrideSummary>
+    | Partial<VendorProduct>
+    | null
 ): EditorForm => ({
   productName: normalizeText(source?.productName ?? fallback?.productName),
   brand: normalizeText(source?.brand ?? fallback?.brand),
@@ -336,19 +351,16 @@ const buildEditorPayload = (form: EditorForm) => ({
 })
 
 const getWebsiteLabel = (website?: WebsiteCard | null) =>
-  normalizeText(website?.name || website?.business_name || website?.template_name) ||
-  'Untitled Website'
+  normalizeText(
+    website?.name || website?.business_name || website?.template_name
+  ) || 'Untitled Website'
 
-function ProductThumbnail({
-  product,
-}: {
-  product: VendorProduct
-}) {
+function ProductThumbnail({ product }: { product: VendorProduct }) {
   const imageUrl = getPrimaryImageUrl(product)
 
   if (!imageUrl) {
     return (
-      <div className='flex h-14 w-14 items-center justify-center border border-dashed border-border bg-muted/30 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground'>
+      <div className='border-border bg-muted/30 text-muted-foreground flex h-14 w-14 items-center justify-center border border-dashed text-xs font-semibold tracking-[0.18em] uppercase'>
         Page
       </div>
     )
@@ -358,7 +370,7 @@ function ProductThumbnail({
     <img
       src={imageUrl}
       alt={product.productName || 'Product page'}
-      className='h-14 w-14 border border-border object-cover'
+      className='border-border h-14 w-14 border object-cover'
     />
   )
 }
@@ -413,7 +425,8 @@ export default function LocationWorkspacePage() {
   const [editorLoading, setEditorLoading] = useState(false)
   const [editorSaving, setEditorSaving] = useState(false)
   const [editorScope, setEditorScope] = useState<EditorScope>('global')
-  const [editorForms, setEditorForms] = useState<EditorFormsState>(EMPTY_EDITOR_FORMS)
+  const [editorForms, setEditorForms] =
+    useState<EditorFormsState>(EMPTY_EDITOR_FORMS)
   const [editorCityIds, setEditorCityIds] = useState<string[]>([])
 
   const activeCities = useMemo(
@@ -421,9 +434,13 @@ export default function LocationWorkspacePage() {
       [...cities]
         .filter((city) => city?.isActive !== false)
         .sort((left, right) =>
-          String(left?.name || '').localeCompare(String(right?.name || ''), undefined, {
-            sensitivity: 'base',
-          })
+          String(left?.name || '').localeCompare(
+            String(right?.name || ''),
+            undefined,
+            {
+              sensitivity: 'base',
+            }
+          )
         ),
     [cities]
   )
@@ -432,7 +449,8 @@ export default function LocationWorkspacePage() {
     [activeCities]
   )
   const websiteById = useMemo(
-    () => new Map(websites.map((website) => [normalizeText(website._id), website])),
+    () =>
+      new Map(websites.map((website) => [normalizeText(website._id), website])),
     [websites]
   )
 
@@ -451,7 +469,8 @@ export default function LocationWorkspacePage() {
     [activeCities, selectedCitySlug]
   )
   const selectedCityId = normalizeText(selectedCity?._id)
-  const selectedCityLabel = selectedCity?.name || formatCityLabel(selectedCitySlug)
+  const selectedCityLabel =
+    selectedCity?.name || formatCityLabel(selectedCitySlug)
   const isSelectedCityDefault =
     Boolean(selectedCitySlug) &&
     Boolean(vendorDefaultCitySlug) &&
@@ -459,7 +478,9 @@ export default function LocationWorkspacePage() {
 
   const selectedProduct = useMemo(
     () =>
-      products.find((product) => normalizeText(product._id) === editorProductId) || null,
+      products.find(
+        (product) => normalizeText(product._id) === editorProductId
+      ) || null,
     [editorProductId, products]
   )
 
@@ -503,14 +524,21 @@ export default function LocationWorkspacePage() {
         timeout: REQUEST_TIMEOUT_MS,
       }
 
-      const [citiesResult, productsResult, websitesResult] = await Promise.allSettled([
-        axios.get(`${BASE_URL}/v1/cities?includeInactive=true`, requestConfig),
-        axios.get(`${BASE_URL}/v1/products/vendor/${vendorId}`, requestConfig),
-        axios.get(
-          `${BASE_URL}/v1/templates/by-vendor?vendor_id=${encodeURIComponent(vendorId)}`,
-          requestConfig
-        ),
-      ])
+      const [citiesResult, productsResult, websitesResult] =
+        await Promise.allSettled([
+          axios.get(
+            `${BASE_URL}/v1/cities?includeInactive=true`,
+            requestConfig
+          ),
+          axios.get(
+            `${BASE_URL}/v1/products/vendor/${vendorId}`,
+            requestConfig
+          ),
+          axios.get(
+            `${BASE_URL}/v1/templates/by-vendor?vendor_id=${encodeURIComponent(vendorId)}`,
+            requestConfig
+          ),
+        ])
 
       const nextCities =
         citiesResult.status === 'fulfilled' &&
@@ -595,7 +623,8 @@ export default function LocationWorkspacePage() {
       if (
         normalizedCurrent &&
         activeCities.some(
-          (city) => normalizeCitySlug(city.slug || city.name) === normalizedCurrent
+          (city) =>
+            normalizeCitySlug(city.slug || city.name) === normalizedCurrent
         )
       ) {
         return normalizedCurrent
@@ -646,7 +675,11 @@ export default function LocationWorkspacePage() {
       if (!matchesWebsite) return false
       if (!query) return true
 
-      const override = getProductCityOverride(product, selectedCityId, selectedCitySlug)
+      const override = getProductCityOverride(
+        product,
+        selectedCityId,
+        selectedCitySlug
+      )
       const websiteLabels = websiteIds
         .map((websiteId) => getWebsiteLabel(websiteById.get(websiteId)))
         .join(' ')
@@ -659,7 +692,9 @@ export default function LocationWorkspacePage() {
         product.description,
         product.metaTitle,
         product.metaDescription,
-        Array.isArray(product.metaKeywords) ? product.metaKeywords.join(' ') : '',
+        Array.isArray(product.metaKeywords)
+          ? product.metaKeywords.join(' ')
+          : '',
         override?.citySlug,
         websiteLabels,
       ]
@@ -694,7 +729,9 @@ export default function LocationWorkspacePage() {
   const cityOverrideCount = useMemo(
     () =>
       filteredProducts.filter((product) =>
-        Boolean(getProductCityOverride(product, selectedCityId, selectedCitySlug))
+        Boolean(
+          getProductCityOverride(product, selectedCityId, selectedCitySlug)
+        )
       ).length,
     [filteredProducts, selectedCityId, selectedCitySlug]
   )
@@ -786,7 +823,8 @@ export default function LocationWorkspacePage() {
         const body = await response.json().catch(() => null)
         if (!response.ok || body?.success === false) {
           throw new Error(
-            body?.message || `Failed to update ${product.productName || 'product'}`
+            body?.message ||
+              `Failed to update ${product.productName || 'product'}`
           )
         }
 
@@ -808,7 +846,8 @@ export default function LocationWorkspacePage() {
         )
       } catch (error: any) {
         toast.error(
-          error?.message || 'Selected city ke liye product visibility update nahi hui.'
+          error?.message ||
+            'Selected city ke liye product visibility update nahi hui.'
         )
       } finally {
         setTogglingProductId('')
@@ -852,7 +891,9 @@ export default function LocationWorkspacePage() {
 
           if (
             currentCityIds.length === nextCityIds.length &&
-            currentCityIds.every((cityId, index) => cityId === nextCityIds[index])
+            currentCityIds.every(
+              (cityId, index) => cityId === nextCityIds[index]
+            )
           ) {
             return
           }
@@ -891,7 +932,8 @@ export default function LocationWorkspacePage() {
         await loadWorkspace()
       } catch (error: any) {
         toast.error(
-          error?.message || 'Bulk city visibility update complete nahi ho paayi.'
+          error?.message ||
+            'Bulk city visibility update complete nahi ho paayi.'
         )
         await loadWorkspace()
       } finally {
@@ -924,7 +966,9 @@ export default function LocationWorkspacePage() {
 
       const body = await response.json().catch(() => null)
       if (!response.ok || body?.success === false || !body?.data?._id) {
-        throw new Error(body?.message || 'Global product page save nahi ho paayi.')
+        throw new Error(
+          body?.message || 'Global product page save nahi ho paayi.'
+        )
       }
 
       return body.data as VendorProduct
@@ -1004,7 +1048,9 @@ export default function LocationWorkspacePage() {
         setEditorCityIds(resolveMappedCityIds(detail, activeCityIds))
         setEditorScope(cityOverride ? 'city' : 'global')
       } catch (error: any) {
-        toast.error(error?.message || 'City-specific product page open nahi ho paayi.')
+        toast.error(
+          error?.message || 'City-specific product page open nahi ho paayi.'
+        )
         setEditorOpen(false)
         resetEditorState()
       } finally {
@@ -1044,10 +1090,19 @@ export default function LocationWorkspacePage() {
       const nextMappedCityIds = uniqueIds(
         editorCityIds.filter((cityId) => activeCityIds.includes(cityId))
       )
-      const currentMappedCityIds = resolveMappedCityIds(selectedProduct, activeCityIds)
-      const mappingChanged = !areIdListsEqual(currentMappedCityIds, nextMappedCityIds)
+      const currentMappedCityIds = resolveMappedCityIds(
+        selectedProduct,
+        activeCityIds
+      )
+      const mappingChanged = !areIdListsEqual(
+        currentMappedCityIds,
+        nextMappedCityIds
+      )
 
-      if (editorScope === 'city' && !nextMappedCityIds.includes(selectedCityId)) {
+      if (
+        editorScope === 'city' &&
+        !nextMappedCityIds.includes(selectedCityId)
+      ) {
         toast.error(
           `${selectedCityLabel} ko mapped cities me select kijiye ya Global Content par switch kijiye.`
         )
@@ -1057,7 +1112,9 @@ export default function LocationWorkspacePage() {
       let latestGlobalProduct =
         mappingChanged || editorScope === 'global'
           ? await updateProductByAdmin(productId, {
-              ...(editorScope === 'global' ? buildEditorPayload(editorForms.global) : {}),
+              ...(editorScope === 'global'
+                ? buildEditorPayload(editorForms.global)
+                : {}),
               availableCities: nextMappedCityIds,
             })
           : null
@@ -1080,7 +1137,7 @@ export default function LocationWorkspacePage() {
         })
         setEditorScope('city')
         toast.success(
-          `${selectedProduct.productName || 'Product'} ka ${selectedCityLabel} city page update ho gaya.`
+          `${selectedProduct.productName || 'Product'} ka ${selectedCityLabel} location page update ho gaya.`
         )
       } else {
         latestGlobalProduct = latestGlobalProduct || selectedProduct
@@ -1132,16 +1189,19 @@ export default function LocationWorkspacePage() {
 
     setDefaultCitySaving(true)
     try {
-      const response = await fetch(`${BASE_URL}/v1/vendor/profile/default-city`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          cityId: selectedCityId,
-        }),
-      })
+      const response = await fetch(
+        `${BASE_URL}/v1/vendor/profile/default-city`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            cityId: selectedCityId,
+          }),
+        }
+      )
 
       const body = await response.json().catch(() => null)
       if (!response.ok || body?.success === false) {
@@ -1167,12 +1227,14 @@ export default function LocationWorkspacePage() {
   }, [authUser, dispatch, selectedCityId, selectedCityLabel, token])
 
   const previewUrl = useMemo(() => {
-    if (!selectedProduct || !vendorPublicIdentifier || !selectedCitySlug) return undefined
+    if (!selectedProduct || !vendorPublicIdentifier || !selectedCitySlug)
+      return undefined
 
     const preferredWebsiteId =
       selectedWebsiteId !== 'all'
         ? selectedWebsiteId
-        : extractIdList(selectedProduct.websiteIds)[0] || normalizeText(websites[0]?._id)
+        : extractIdList(selectedProduct.websiteIds)[0] ||
+          normalizeText(websites[0]?._id)
 
     const preferredWebsite = websiteById.get(preferredWebsiteId)
     const websiteIdentifier =
@@ -1229,7 +1291,7 @@ export default function LocationWorkspacePage() {
         </Select>
         <Select value={selectedCitySlug} onValueChange={setSelectedCitySlug}>
           <SelectTrigger className='h-10 w-[220px] shrink-0'>
-            <SelectValue placeholder='Select city' />
+            <SelectValue placeholder='Select location' />
           </SelectTrigger>
           <SelectContent>
             {activeCities.map((city) => (
@@ -1247,12 +1309,14 @@ export default function LocationWorkspacePage() {
           variant='outline'
           className='h-10 shrink-0'
           onClick={() => void handleSetDefaultCity()}
-          disabled={defaultCitySaving || !selectedCityId || isSelectedCityDefault}
+          disabled={
+            defaultCitySaving || !selectedCityId || isSelectedCityDefault
+          }
         >
           {defaultCitySaving ? (
             <Loader2 className='h-4 w-4 animate-spin' />
           ) : null}
-          {isSelectedCityDefault ? 'Default City' : 'Make Default'}
+          {isSelectedCityDefault ? 'Default Location' : 'Make Default'}
         </Button>
         <Button
           variant='outline'
@@ -1278,15 +1342,15 @@ export default function LocationWorkspacePage() {
 
       <Main className='flex flex-1 flex-col gap-4 md:gap-6'>
         {!activeCities.length ? (
-          <section className='border border-dashed border-border bg-card px-6 py-12 text-center shadow-sm'>
-            <MapPinned className='mx-auto h-10 w-10 text-muted-foreground' />
-            <h2 className='mt-4 text-2xl font-semibold text-foreground'>
+          <section className='border-border bg-card border border-dashed px-6 py-12 text-center shadow-sm'>
+            <MapPinned className='text-muted-foreground mx-auto h-10 w-10' />
+            <h2 className='text-foreground mt-4 text-2xl font-semibold'>
               Location Workspace start karne ke liye city list chahiye
             </h2>
-            <p className='mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground'>
-              Pehle vendor ke active cities add kijiye. Uske baad aap har product page ko
-              selected city ke hisaab se visible, hidden, aur customized content ke saath
-              manage kar sakenge.
+            <p className='text-muted-foreground mx-auto mt-3 max-w-2xl text-sm leading-6'>
+              Pehle vendor ke active cities add kijiye. Uske baad aap har
+              product page ko selected city ke hisaab se visible, hidden, aur
+              customized content ke saath manage kar sakenge.
             </p>
             <Button asChild className='mt-6 h-11'>
               <Link to='/cities'>Open Manage Cities</Link>
@@ -1294,233 +1358,248 @@ export default function LocationWorkspacePage() {
           </section>
         ) : (
           <TableShell
-              className='flex-1'
-              title={`Product Pages for ${selectedCityLabel}`}
-              description='Yahin se selected city ke liye product visibility aur page content manage kijiye.'
-              footer={
-                <ServerPagination
-                  page={currentPage}
-                  totalPages={totalPages}
-                  totalItems={filteredProducts.length}
-                  pageSize={pageSize}
-                  pageSizeOptions={[10, 20, 30, 50]}
-                  onPageChange={(nextPage) => {
-                    setPage(nextPage)
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }}
-                  onPageSizeChange={setPageSize}
-                  disabled={loading}
-                />
-              }
-            >
-              <div className='mb-4 flex flex-wrap items-center justify-between gap-3 border border-border bg-background/60 p-4'>
-                <div>
-                  <p className='text-sm font-semibold text-foreground'>
-                    Bulk city mapping for filtered products
-                  </p>
-                  <p className='text-sm text-muted-foreground'>
-                    Agar ek website me 100 products hain, to un sab ko selected filters ke
-                    basis par ek hi click me {selectedCityLabel} me show ya hide kar sakte
-                    hain.
-                  </p>
-                </div>
-                <div className='flex flex-wrap gap-2'>
-                  <Button
-                    type='button'
-                    variant='outline'
-                    onClick={() => void handleBulkVisibilityUpdate(false)}
-                    disabled={loading || bulkAction !== '' || !filteredProducts.length}
-                  >
-                    {bulkAction === 'hide' ? (
-                      <Loader2 className='h-4 w-4 animate-spin' />
-                    ) : (
-                      <MapPinned className='h-4 w-4' />
-                    )}
-                    Hide Filtered
-                  </Button>
-                  <Button
-                    type='button'
-                    onClick={() => void handleBulkVisibilityUpdate(true)}
-                    disabled={loading || bulkAction !== '' || !filteredProducts.length}
-                  >
-                    {bulkAction === 'show' ? (
-                      <Loader2 className='h-4 w-4 animate-spin' />
-                    ) : (
-                      <Package2 className='h-4 w-4' />
-                    )}
-                    Show Filtered
-                  </Button>
-                </div>
+            className='flex-1'
+            title={`Product Pages for ${selectedCityLabel}`}
+            description='Yahin se selected city ke liye product visibility aur page content manage kijiye.'
+            footer={
+              <ServerPagination
+                page={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredProducts.length}
+                pageSize={pageSize}
+                pageSizeOptions={[10, 20, 30, 50]}
+                onPageChange={(nextPage) => {
+                  setPage(nextPage)
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                onPageSizeChange={setPageSize}
+                disabled={loading}
+              />
+            }
+          >
+            <div className='border-border bg-background/60 mb-4 flex flex-wrap items-center justify-between gap-3 border p-4'>
+              <div>
+                <p className='text-foreground text-sm font-semibold'>
+                  Bulk city mapping for filtered products
+                </p>
+                <p className='text-muted-foreground text-sm'>
+                  Agar ek website me 100 products hain, to un sab ko selected
+                  filters ke basis par ek hi click me {selectedCityLabel} me
+                  show ya hide kar sakte hain.
+                </p>
               </div>
-
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className='min-w-[280px]'>Product Page</TableHead>
-                    <TableHead className='min-w-[200px]'>Websites</TableHead>
-                    <TableHead className='min-w-[180px]'>Visible In City</TableHead>
-                    <TableHead className='min-w-[190px]'>Content Source</TableHead>
-                    <TableHead className='min-w-[180px]'>Last Updated</TableHead>
-                    <TableHead className='text-right'>Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className='h-24 text-center'>
-                        <div className='flex items-center justify-center gap-2 text-sm text-muted-foreground'>
-                          <Loader2 className='h-4 w-4 animate-spin' />
-                          Location workspace load ho raha hai...
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : paginatedProducts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className='h-24 text-center text-muted-foreground'>
-                        {products.length === 0
-                          ? 'Abhi tak koi product page nahi mili.'
-                          : 'Current filters ke liye koi product page match nahi hui.'}
-                      </TableCell>
-                    </TableRow>
+              <div className='flex flex-wrap gap-2'>
+                <Button
+                  type='button'
+                  variant='outline'
+                  onClick={() => void handleBulkVisibilityUpdate(false)}
+                  disabled={
+                    loading || bulkAction !== '' || !filteredProducts.length
+                  }
+                >
+                  {bulkAction === 'hide' ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
                   ) : (
-                    paginatedProducts.map((product) => {
-                      const productId = normalizeText(product._id)
-                      const websiteIds = extractIdList(product.websiteIds)
-                      const visibleInCity = isProductVisibleInCity(
-                        product,
-                        selectedCityId
-                      )
-                      const mappedCityCount = resolveMappedCityIds(
-                        product,
-                        activeCityIds
-                      ).length
-                      const cityOverride = getProductCityOverride(
-                        product,
-                        selectedCityId,
-                        selectedCitySlug
-                      )
-
-                      return (
-                        <TableRow key={productId}>
-                          <TableCell>
-                            <div className='flex items-center gap-3'>
-                              <ProductThumbnail product={product} />
-                              <div className='min-w-0'>
-                                <div className='truncate text-sm font-semibold text-foreground'>
-                                  {product.productName || 'Untitled Product'}
-                                </div>
-                                <p className='mt-1 truncate text-xs text-muted-foreground'>
-                                  {product.brand || 'No brand'} •{' '}
-                                  {product.slug || 'slug unavailable'}
-                                </p>
-                                <p className='mt-1 text-xs text-muted-foreground'>
-                                  {getPriceRangeLabel(product.variants)} • Stock{' '}
-                                  {getTotalStock(product.variants)}
-                                </p>
-                              </div>
-                            </div>
-                          </TableCell>
-
-                          <TableCell>
-                            <div className='flex flex-wrap gap-1.5'>
-                              {websiteIds.length ? (
-                                websiteIds.map((websiteId) => (
-                                  <Badge
-                                    key={`${productId}-${websiteId}`}
-                                    variant='secondary'
-                                  >
-                                    {getWebsiteLabel(websiteById.get(websiteId))}
-                                  </Badge>
-                                ))
-                              ) : (
-                                <Badge variant='outline'>
-                                  All websites
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-
-                          <TableCell>
-                            <div className='flex min-w-[160px] items-center gap-3'>
-                              <Switch
-                                checked={visibleInCity}
-                                onCheckedChange={(checked) =>
-                                  void updateSelectedCityVisibility(product, checked)
-                                }
-                                disabled={
-                                  togglingProductId === productId || bulkAction !== ''
-                                }
-                              />
-                              <div>
-                                <div
-                                  className={cn(
-                                    'text-sm font-semibold',
-                                    visibleInCity
-                                      ? 'text-emerald-700'
-                                      : 'text-slate-500'
-                                  )}
-                                >
-                                  {togglingProductId === productId
-                                    ? 'Saving...'
-                                    : visibleInCity
-                                      ? 'Visible'
-                                      : 'Hidden'}
-                                </div>
-                                <p className='text-xs text-muted-foreground'>
-                                  {visibleInCity
-                                    ? `Template me ${selectedCityLabel} ke liye dikh raha hai`
-                                    : `Template se ${selectedCityLabel} me hidden hai`}
-                                </p>
-                                <p className='text-xs text-muted-foreground'>
-                                  {mappedCityCount
-                                    ? `${mappedCityCount} cities mapped`
-                                    : 'No city mapped yet'}
-                                </p>
-                              </div>
-                            </div>
-                          </TableCell>
-
-                          <TableCell>
-                            <Badge
-                              className={cn(
-                                'border px-3 py-1',
-                                cityOverride
-                                  ? 'border-cyan-200 bg-cyan-50 text-cyan-700'
-                                  : 'border-slate-200 bg-slate-50 text-slate-700'
-                              )}
-                            >
-                              {cityOverride ? 'City override' : 'Global content'}
-                            </Badge>
-                            <p className='mt-2 text-xs text-muted-foreground'>
-                              {cityOverride
-                                ? `${selectedCityLabel} ke liye alag page content saved hai`
-                                : 'Ye city abhi global product page content use kar rahi hai'}
-                            </p>
-                          </TableCell>
-
-                          <TableCell className='text-sm text-muted-foreground'>
-                            {formatDate(cityOverride?.updatedAt || product.updatedAt)}
-                          </TableCell>
-
-                          <TableCell className='text-right'>
-                            <div className='flex justify-end gap-2'>
-                              <Button
-                                type='button'
-                                variant='outline'
-                                size='sm'
-                                onClick={() => void openCityEditor(product)}
-                              >
-                                <PencilLine className='h-4 w-4' />
-                                Edit Page
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
+                    <MapPinned className='h-4 w-4' />
                   )}
-                </TableBody>
-              </Table>
+                  Hide Filtered
+                </Button>
+                <Button
+                  type='button'
+                  onClick={() => void handleBulkVisibilityUpdate(true)}
+                  disabled={
+                    loading || bulkAction !== '' || !filteredProducts.length
+                  }
+                >
+                  {bulkAction === 'show' ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : (
+                    <Package2 className='h-4 w-4' />
+                  )}
+                  Show Filtered
+                </Button>
+              </div>
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className='min-w-[280px]'>Product Page</TableHead>
+                  <TableHead className='min-w-[200px]'>Websites</TableHead>
+                  <TableHead className='min-w-[180px]'>
+                    Visible In Location
+                  </TableHead>
+                  <TableHead className='min-w-[190px]'>
+                    Content Source
+                  </TableHead>
+                  <TableHead className='min-w-[180px]'>Last Updated</TableHead>
+                  <TableHead className='text-right'>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className='h-24 text-center'>
+                      <div className='text-muted-foreground flex items-center justify-center gap-2 text-sm'>
+                        <Loader2 className='h-4 w-4 animate-spin' />
+                        Location workspace load ho raha hai...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedProducts.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className='text-muted-foreground h-24 text-center'
+                    >
+                      {products.length === 0
+                        ? 'Abhi tak koi product page nahi mili.'
+                        : 'Current filters ke liye koi product page match nahi hui.'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedProducts.map((product) => {
+                    const productId = normalizeText(product._id)
+                    const websiteIds = extractIdList(product.websiteIds)
+                    const visibleInCity = isProductVisibleInCity(
+                      product,
+                      selectedCityId
+                    )
+                    const mappedCityCount = resolveMappedCityIds(
+                      product,
+                      activeCityIds
+                    ).length
+                    const cityOverride = getProductCityOverride(
+                      product,
+                      selectedCityId,
+                      selectedCitySlug
+                    )
+
+                    return (
+                      <TableRow key={productId}>
+                        <TableCell>
+                          <div className='flex items-center gap-3'>
+                            <ProductThumbnail product={product} />
+                            <div className='min-w-0'>
+                              <div className='text-foreground truncate text-sm font-semibold'>
+                                {product.productName || 'Untitled Product'}
+                              </div>
+                              <p className='text-muted-foreground mt-1 truncate text-xs'>
+                                {product.brand || 'No brand'} •{' '}
+                                {product.slug || 'slug unavailable'}
+                              </p>
+                              <p className='text-muted-foreground mt-1 text-xs'>
+                                {getPriceRangeLabel(product.variants)} • Stock{' '}
+                                {getTotalStock(product.variants)}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <div className='flex flex-wrap gap-1.5'>
+                            {websiteIds.length ? (
+                              websiteIds.map((websiteId) => (
+                                <Badge
+                                  key={`${productId}-${websiteId}`}
+                                  variant='secondary'
+                                >
+                                  {getWebsiteLabel(websiteById.get(websiteId))}
+                                </Badge>
+                              ))
+                            ) : (
+                              <Badge variant='outline'>All websites</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <div className='flex min-w-[160px] items-center gap-3'>
+                            <Switch
+                              checked={visibleInCity}
+                              onCheckedChange={(checked) =>
+                                void updateSelectedCityVisibility(
+                                  product,
+                                  checked
+                                )
+                              }
+                              disabled={
+                                togglingProductId === productId ||
+                                bulkAction !== ''
+                              }
+                            />
+                            <div>
+                              <div
+                                className={cn(
+                                  'text-sm font-semibold',
+                                  visibleInCity
+                                    ? 'text-emerald-700'
+                                    : 'text-slate-500'
+                                )}
+                              >
+                                {togglingProductId === productId
+                                  ? 'Saving...'
+                                  : visibleInCity
+                                    ? 'Visible'
+                                    : 'Hidden'}
+                              </div>
+                              <p className='text-muted-foreground text-xs'>
+                                {visibleInCity
+                                  ? `Template me ${selectedCityLabel} ke liye dikh raha hai`
+                                  : `Template se ${selectedCityLabel} me hidden hai`}
+                              </p>
+                              <p className='text-muted-foreground text-xs'>
+                                {mappedCityCount
+                                  ? `${mappedCityCount} cities mapped`
+                                  : 'No city mapped yet'}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <Badge
+                            className={cn(
+                              'border px-3 py-1',
+                              cityOverride
+                                ? 'border-cyan-200 bg-cyan-50 text-cyan-700'
+                                : 'border-slate-200 bg-slate-50 text-slate-700'
+                            )}
+                          >
+                            {cityOverride ? 'City override' : 'Global content'}
+                          </Badge>
+                          <p className='text-muted-foreground mt-2 text-xs'>
+                            {cityOverride
+                              ? `${selectedCityLabel} ke liye alag page content saved hai`
+                              : 'Ye city abhi global product page content use kar rahi hai'}
+                          </p>
+                        </TableCell>
+
+                        <TableCell className='text-muted-foreground text-sm'>
+                          {formatDate(
+                            cityOverride?.updatedAt || product.updatedAt
+                          )}
+                        </TableCell>
+
+                        <TableCell className='text-right'>
+                          <div className='flex justify-end gap-2'>
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={() => void openCityEditor(product)}
+                            >
+                              <PencilLine className='h-4 w-4' />
+                              Edit Page
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
           </TableShell>
         )}
       </Main>
@@ -1546,7 +1625,8 @@ export default function LocationWorkspacePage() {
           <SheetHeader className='border-b px-5 py-5 pr-14 text-left'>
             <div className='flex flex-wrap items-center gap-2'>
               <SheetTitle>
-                {selectedProduct?.productName || 'Product Page'} • {selectedCityLabel}
+                {selectedProduct?.productName || 'Product Page'} •{' '}
+                {selectedCityLabel}
               </SheetTitle>
               <Badge
                 className={cn(
@@ -1556,7 +1636,9 @@ export default function LocationWorkspacePage() {
                     : 'border-slate-200 bg-slate-50 text-slate-700'
                 )}
               >
-                {editorScope === 'city' ? 'City-scoped content' : 'Global content'}
+                {editorScope === 'city'
+                  ? 'City-scoped content'
+                  : 'Global content'}
               </Badge>
             </div>
             <div className='mt-3 flex flex-wrap gap-2'>
@@ -1586,18 +1668,20 @@ export default function LocationWorkspacePage() {
 
           <div className='flex-1 overflow-y-auto px-5 py-5'>
             {editorLoading ? (
-              <div className='flex min-h-[240px] items-center justify-center gap-2 text-sm text-muted-foreground'>
+              <div className='text-muted-foreground flex min-h-[240px] items-center justify-center gap-2 text-sm'>
                 <Loader2 className='h-4 w-4 animate-spin' />
                 Product page load ho rahi hai...
               </div>
             ) : selectedProduct ? (
               <div className='space-y-6'>
-                <section className='grid gap-4 border border-border bg-background/70 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center'>
+                <section className='border-border bg-background/70 grid gap-4 border p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center'>
                   <div>
-                    <p className='text-sm font-semibold text-foreground'>
-                      {editorScope === 'city' ? 'Selected City Status' : 'City Mapping'}
+                    <p className='text-foreground text-sm font-semibold'>
+                      {editorScope === 'city'
+                        ? 'Selected City Status'
+                        : 'City Mapping'}
                     </p>
-                    <p className='mt-1 text-sm text-muted-foreground'>
+                    <p className='text-muted-foreground mt-1 text-sm'>
                       {editorScope === 'city'
                         ? `Ab jo bhi changes save honge, wo sirf ${selectedCityLabel} ke liye apply honge.`
                         : 'Ek hi product ko multiple cities me show karne ke liye yahin city list select kijiye. Global content sab mapped cities me use hoga, aur city mode selected city ke liye override save karega.'}
@@ -1637,11 +1721,7 @@ export default function LocationWorkspacePage() {
                     ) : null}
                     {previewUrl && editorSelectedCityVisible ? (
                       <a href={previewUrl} target='_blank' rel='noreferrer'>
-                        <Button
-                          type='button'
-                          size='sm'
-                          variant='outline'
-                        >
+                        <Button type='button' size='sm' variant='outline'>
                           <ExternalLink className='h-4 w-4' />
                           Preview
                         </Button>
@@ -1651,15 +1731,15 @@ export default function LocationWorkspacePage() {
                 </section>
 
                 {editorScope === 'global' ? (
-                  <section className='grid gap-4 border border-border bg-card p-5'>
+                  <section className='border-border bg-card grid gap-4 border p-5'>
                     <div className='flex flex-wrap items-center justify-between gap-3'>
                       <div>
-                        <h3 className='text-lg font-semibold text-foreground'>
+                        <h3 className='text-foreground text-lg font-semibold'>
                           Show Product In Cities
                         </h3>
-                        <p className='mt-1 text-sm text-muted-foreground'>
-                          Jitni cities select hongi, product utni cities ke template pages me
-                          visible hoga.
+                        <p className='text-muted-foreground mt-1 text-sm'>
+                          Jitni cities select hongi, product utni cities ke
+                          template pages me visible hoga.
                         </p>
                       </div>
                       <div className='flex flex-wrap gap-2'>
@@ -1676,7 +1756,9 @@ export default function LocationWorkspacePage() {
                           variant='outline'
                           size='sm'
                           onClick={() =>
-                            setEditorCityIds(selectedCityId ? [selectedCityId] : [])
+                            setEditorCityIds(
+                              selectedCityId ? [selectedCityId] : []
+                            )
                           }
                           disabled={!selectedCityId}
                         >
@@ -1701,7 +1783,7 @@ export default function LocationWorkspacePage() {
                         return (
                           <label
                             key={cityId}
-                            className='flex items-center gap-3 border border-border px-3 py-3'
+                            className='border-border flex items-center gap-3 border px-3 py-3'
                           >
                             <Checkbox
                               checked={checked}
@@ -1714,11 +1796,12 @@ export default function LocationWorkspacePage() {
                               }}
                             />
                             <div className='min-w-0'>
-                              <div className='text-sm font-medium text-foreground'>
+                              <div className='text-foreground text-sm font-medium'>
                                 {city.name}
                               </div>
-                              <p className='text-xs text-muted-foreground'>
-                                {normalizeCitySlug(city.slug || city.name) === selectedCitySlug
+                              <p className='text-muted-foreground text-xs'>
+                                {normalizeCitySlug(city.slug || city.name) ===
+                                selectedCitySlug
                                   ? 'Current workspace city'
                                   : city.state || city.country || 'Active city'}
                               </p>
@@ -1728,7 +1811,7 @@ export default function LocationWorkspacePage() {
                       })}
                     </div>
 
-                    <p className='text-xs text-muted-foreground'>
+                    <p className='text-muted-foreground text-xs'>
                       {editorCityIds.length
                         ? `${editorCityIds.length} cities selected.`
                         : 'Abhi koi city selected nahi hai. Save karne par product sab city templates se hidden ho jayega.'}
@@ -1737,8 +1820,8 @@ export default function LocationWorkspacePage() {
                 ) : !editorSelectedCityVisible ? (
                   <section className='grid gap-3 border border-amber-200 bg-amber-50/50 p-4'>
                     <p className='text-sm text-amber-800'>
-                      City-scoped content save karne ke liye {selectedCityLabel} ko visible
-                      rakhna zaroori hai.
+                      City-scoped content save karne ke liye {selectedCityLabel}{' '}
+                      ko visible rakhna zaroori hai.
                     </p>
                     <div>
                       <Button
@@ -1757,29 +1840,37 @@ export default function LocationWorkspacePage() {
                   </section>
                 ) : null}
 
-                <section className='grid gap-4 border border-border bg-card p-5'>
+                <section className='border-border bg-card grid gap-4 border p-5'>
                   <div>
-                    <h3 className='text-lg font-semibold text-foreground'>Page Content</h3>
-                    <p className='mt-1 text-sm text-muted-foreground'>
+                    <h3 className='text-foreground text-lg font-semibold'>
+                      Page Content
+                    </h3>
+                    <p className='text-muted-foreground mt-1 text-sm'>
                       {editorScope === 'city'
                         ? `Ye fields ${selectedCityLabel} ke product page content ko control karengi.`
                         : 'Ye fields global product page content ko control karengi.'}
                     </p>
-                    <p className='mt-2 text-xs text-muted-foreground'>
-                      Global content me <code>{'{{city}}'}</code> use kar sakte hain. Agar
-                      kisi mapped city ka naam content me likha hoga to storefront par
-                      selected URL city ke hisaab se auto replace ho jayega.
+                    <p className='text-muted-foreground mt-2 text-xs'>
+                      Global content me <code>{'{{city}}'}</code> use kar sakte
+                      hain. Agar kisi mapped city ka naam content me likha hoga
+                      to storefront par selected URL city ke hisaab se auto
+                      replace ho jayega.
                     </p>
                   </div>
 
                   <div className='grid gap-4 md:grid-cols-2'>
                     <div className='space-y-2'>
-                      <Label htmlFor='location-workspace-product-name'>Product Name</Label>
+                      <Label htmlFor='location-workspace-product-name'>
+                        Product Name
+                      </Label>
                       <Input
                         id='location-workspace-product-name'
                         value={editorForm.productName}
                         onChange={(event) =>
-                          handleEditorFieldChange('productName', event.target.value)
+                          handleEditorFieldChange(
+                            'productName',
+                            event.target.value
+                          )
                         }
                         placeholder={
                           editorScope === 'city'
@@ -1825,7 +1916,10 @@ export default function LocationWorkspacePage() {
                       id='location-workspace-short-description'
                       value={editorForm.shortDescription}
                       onChange={(event) =>
-                        handleEditorFieldChange('shortDescription', event.target.value)
+                        handleEditorFieldChange(
+                          'shortDescription',
+                          event.target.value
+                        )
                       }
                       rows={4}
                       placeholder={
@@ -1838,12 +1932,17 @@ export default function LocationWorkspacePage() {
                   </div>
 
                   <div className='space-y-2'>
-                    <Label htmlFor='location-workspace-description'>Full Description</Label>
+                    <Label htmlFor='location-workspace-description'>
+                      Full Description
+                    </Label>
                     <Textarea
                       id='location-workspace-description'
                       value={editorForm.description}
                       onChange={(event) =>
-                        handleEditorFieldChange('description', event.target.value)
+                        handleEditorFieldChange(
+                          'description',
+                          event.target.value
+                        )
                       }
                       rows={8}
                       placeholder={
@@ -1856,22 +1955,26 @@ export default function LocationWorkspacePage() {
                   </div>
                 </section>
 
-                <section className='grid gap-4 border border-border bg-card p-5'>
+                <section className='border-border bg-card grid gap-4 border p-5'>
                   <div>
-                    <h3 className='text-lg font-semibold text-foreground'>SEO</h3>
-                    <p className='mt-1 text-sm text-muted-foreground'>
+                    <h3 className='text-foreground text-lg font-semibold'>
+                      SEO
+                    </h3>
+                    <p className='text-muted-foreground mt-1 text-sm'>
                       {editorScope === 'city'
                         ? `Meta title, description aur keywords ${selectedCityLabel} ke page ke liye alag save hongi.`
                         : 'Meta title, description aur keywords global product page ke liye save hongi.'}
                     </p>
-                    <p className='mt-2 text-xs text-muted-foreground'>
-                      SEO fields me bhi <code>{'{{city}}'}</code> aur mapped city names
-                      selected city ke naam se render honge.
+                    <p className='text-muted-foreground mt-2 text-xs'>
+                      SEO fields me bhi <code>{'{{city}}'}</code> aur mapped
+                      city names selected city ke naam se render honge.
                     </p>
                   </div>
 
                   <div className='space-y-2'>
-                    <Label htmlFor='location-workspace-meta-title'>Meta Title</Label>
+                    <Label htmlFor='location-workspace-meta-title'>
+                      Meta Title
+                    </Label>
                     <Input
                       id='location-workspace-meta-title'
                       value={editorForm.metaTitle}
@@ -1890,7 +1993,10 @@ export default function LocationWorkspacePage() {
                       id='location-workspace-meta-description'
                       value={editorForm.metaDescription}
                       onChange={(event) =>
-                        handleEditorFieldChange('metaDescription', event.target.value)
+                        handleEditorFieldChange(
+                          'metaDescription',
+                          event.target.value
+                        )
                       }
                       rows={4}
                       placeholder='Meta description'
@@ -1906,29 +2012,32 @@ export default function LocationWorkspacePage() {
                       id='location-workspace-meta-keywords'
                       value={editorForm.metaKeywords}
                       onChange={(event) =>
-                        handleEditorFieldChange('metaKeywords', event.target.value)
+                        handleEditorFieldChange(
+                          'metaKeywords',
+                          event.target.value
+                        )
                       }
                       rows={3}
                       placeholder='keyword 1, keyword 2, keyword 3'
                       className='min-h-[96px]'
                     />
-                    <p className='text-xs text-muted-foreground'>
+                    <p className='text-muted-foreground text-xs'>
                       Keywords comma separated rakhiye.
                     </p>
                   </div>
                 </section>
               </div>
             ) : (
-              <div className='flex min-h-[240px] items-center justify-center text-sm text-muted-foreground'>
+              <div className='text-muted-foreground flex min-h-[240px] items-center justify-center text-sm'>
                 Product page select kijiye.
               </div>
             )}
           </div>
 
           <div className='flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4'>
-            <div className='text-sm text-muted-foreground'>
+            <div className='text-muted-foreground text-sm'>
               {editorScope === 'city'
-                ? `Save hone ke baad ${selectedCityLabel} ka city page update ho jayega.`
+                ? `Save hone ke baad ${selectedCityLabel} ka location page update ho jayega.`
                 : 'Save hone ke baad global product page update ho jayega.'}
             </div>
             <div className='flex flex-wrap gap-2'>

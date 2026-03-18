@@ -11,14 +11,19 @@ import { getQueryFn } from "@/features/analytics-hub/lib/query";
 import { formatINR } from "@/lib/currency";
 
 export default function RealtimeDashboard() {
-  const { vendorId, source, templateId } = useAnalyticsContext();
+  const { role, vendorId, source, websiteId } = useAnalyticsContext();
   const summaryQueryFn = getQueryFn<AnalyticsSummary>();
   const realtimeQueryFn = getQueryFn<RealtimeAnalytics>();
   const sourceParam = source === "all" ? undefined : source;
-  const templateParam = templateId === "all" ? undefined : templateId;
+  const websiteParam =
+    role === "vendor" || source === "template"
+      ? websiteId === "all"
+        ? undefined
+        : websiteId
+      : undefined;
   
   const { data: summaryData, isLoading: summaryLoading } = useQuery<AnalyticsSummary>({
-    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, template_id: templateParam })],
+    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, website_id: websiteParam })],
     queryFn: summaryQueryFn,
     refetchInterval: 30000,
   });
@@ -29,7 +34,7 @@ export default function RealtimeDashboard() {
     isError: realtimeError,
     refetch,
   } = useQuery<RealtimeAnalytics>({
-    queryKey: [buildApiUrl("/analytics/dashboard/realtime", { vendorId, source: sourceParam, template_id: templateParam })],
+    queryKey: [buildApiUrl("/analytics/dashboard/realtime", { vendorId, source: sourceParam, website_id: websiteParam })],
     queryFn: realtimeQueryFn,
     refetchInterval: 5000,
   });

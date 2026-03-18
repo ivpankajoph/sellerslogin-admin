@@ -18,6 +18,10 @@ import { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import axios from "axios";
 
+type WebsiteOption = {
+  id: string;
+  label: string;
+};
 
 function StorefrontSelect() {
   const { source, setSource, options } = useAnalyticsSource();
@@ -64,49 +68,146 @@ function StorefrontSelect() {
   );
 }
 
+function WebsiteSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  options: WebsiteOption[];
+  placeholder: string;
+}) {
+  const [query, setQuery] = useState("");
+
+  const filteredOptions = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return options;
+    return options.filter((option) =>
+      option.label.toLowerCase().includes(normalized)
+    );
+  }, [options, query]);
+
+  return (
+    <div className="flex items-center gap-2">
+      <Store className="h-4 w-4 text-muted-foreground" />
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger className="h-8 w-56">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          <div className="p-2">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search websites..."
+              className="h-8"
+            />
+          </div>
+          <SelectItem value="all">{placeholder}</SelectItem>
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              No matches found
+            </div>
+          ) : (
+            filteredOptions.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {option.label}
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function AnalyticsHubShell() {
   const role = useSelector((state: any) => state.auth?.user?.role);
   const authUser = useSelector((state: any) => state.auth?.user);
   const vendorId = authUser?._id || authUser?.id || "";
   const token = useSelector((state: any) => state.auth?.token);
-  const { templateId, setTemplateId } = useAnalyticsSource();
-  const [templateOptions, setTemplateOptions] = useState<
-    { id: string; label: string; key?: string }[]
-  >([]);
+  const { source, websiteId, setWebsiteId } = useAnalyticsSource();
+  const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([]);
   const style: CSSProperties = {
-  "--sidebar-width": "16rem",
-  "--sidebar-width-icon": "3rem",
-} as CSSProperties;
+    "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "3rem",
+  } as CSSProperties;
+  const shouldShowWebsiteSelect = role === "vendor" || source === "template";
 
   useEffect(() => {
-    if (role !== "vendor" || !vendorId) return;
-    const fetchTemplates = async () => {
+    if (!shouldShowWebsiteSelect || !token) {
+      setWebsiteOptions([]);
+      return;
+    }
+
+    if (role === "vendor" && !vendorId) {
+      setWebsiteOptions([]);
+      return;
+    }
+
+    const fetchWebsites = async () => {
       try {
         const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
-          params: { vendor_id: vendorId },
+          params: role === "vendor" ? { vendor_id: vendorId } : undefined,
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         const rows = res.data?.data || [];
-        const options = rows.map((template: any) => ({
-          id: String(template?._id || template?.id || ""),
-          label:
-            template?.template_name ||
-            template?.name ||
-            template?.business_name ||
-            template?.template_key ||
-            "Template",
-          key: String(template?.template_key || ""),
-        }));
-        setTemplateOptions(options);
-        if (templateId === "all" && options.length === 1) {
-          setTemplateId(options[0].id);
+        const options = rows
+          .map((website: any) => {
+            const websiteName = String(
+              website?.name ||
+                website?.business_name ||
+                website?.website_slug ||
+                website?.template_name ||
+                website?.template_key ||
+                "Website"
+            ).trim();
+            const vendorName = String(
+              website?.vendor_name ||
+                website?.vendor_business_name ||
+                website?.vendor_email ||
+                ""
+            ).trim();
+            const templateName = String(website?.template_name || "").trim();
+            const secondaryLabel =
+              role === "vendor"
+                ? templateName && templateName !== websiteName
+                  ? templateName
+                  : ""
+                : vendorName ||
+                  (templateName && templateName !== websiteName ? templateName : "");
+
+            return {
+              id: String(website?._id || website?.id || ""),
+              label: secondaryLabel
+                ? `${websiteName} - ${secondaryLabel}`
+                : websiteName,
+            };
+          })
+          .filter((option: WebsiteOption) => option.id);
+
+        setWebsiteOptions(options);
+
+        if (options.length === 1 && websiteId === "all") {
+          setWebsiteId(options[0].id);
+          return;
+        }
+
+        if (
+          websiteId !== "all" &&
+          !options.some((option: WebsiteOption) => option.id === websiteId)
+        ) {
+          setWebsiteId("all");
         }
       } catch {
-        setTemplateOptions([]);
+        setWebsiteOptions([]);
       }
     };
-    fetchTemplates();
-  }, [role, vendorId, token, templateId, setTemplateId]);
+
+    fetchWebsites();
+  }, [role, vendorId, token, shouldShowWebsiteSelect, websiteId, setWebsiteId]);
 
   return (
     <SidebarProvider style={style}>
@@ -120,23 +221,13 @@ function AnalyticsHubShell() {
             </div>
             <div className="flex items-center gap-2">
               {role !== "vendor" && <StorefrontSelect />}
-              {role === "vendor" && (
-                <Select
-                  value={templateId}
-                  onValueChange={(value) => setTemplateId(value)}
-                >
-                  <SelectTrigger className="h-8 w-48">
-                    <SelectValue placeholder="All templates" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All templates</SelectItem>
-                    {templateOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {shouldShowWebsiteSelect && (
+                <WebsiteSelect
+                  value={websiteId}
+                  onValueChange={setWebsiteId}
+                  options={websiteOptions}
+                  placeholder={role === "vendor" ? "All websites" : "All vendor websites"}
+                />
               )}
             </div>
           </header>

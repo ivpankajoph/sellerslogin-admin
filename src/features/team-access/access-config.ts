@@ -7,6 +7,7 @@ export type VendorPageAccessKey =
   | 'products'
   | 'inventory_management'
   | 'my_websites'
+  | 'location_workspace'
   | 'manage_cities'
   | 'get_domain'
   | 'toolkit_store'
@@ -64,6 +65,11 @@ export const VENDOR_PAGE_ACCESS_OPTIONS: VendorPageAccessOption[] = [
     key: 'my_websites',
     label: 'My Websites',
     description: 'Access assigned websites and website builder pages.',
+  },
+  {
+    key: 'location_workspace',
+    label: 'Location Workspace',
+    description: 'Access city-wise product content and location workspace pages.',
   },
   {
     key: 'manage_cities',
@@ -141,6 +147,7 @@ const ROUTE_MATCHERS: RouteMatcher[] = [
       '/vendor-template-pages',
     ],
   },
+  { key: 'location_workspace', exact: ['/location-workspace'] },
   { key: 'manage_cities', exact: ['/cities'] },
   { key: 'get_domain', exact: ['/get-domain'] },
   { key: 'toolkit_store', exact: ['/integrations'] },
@@ -161,6 +168,7 @@ const FIRST_PAGE_ROUTE_BY_KEY: Partial<Record<VendorPageAccessKey, string>> = {
   products: '/products',
   inventory_management: '/inventory-management',
   my_websites: '/template-workspace',
+  location_workspace: '/location-workspace',
   manage_cities: '/cities',
   get_domain: '/get-domain',
   toolkit_store: '/integrations',
