@@ -43,6 +43,8 @@ const ICON_ACCENTS = [
   { chip: 'bg-fuchsia-100 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-600 dark:text-fuchsia-300' },
 ]
 
+const NAV_ITEM_TEXT_CLASS = 'flex-1 min-w-0 break-words leading-snug text-start'
+
 const iconAccentByKey = (key: string) => {
   const code = Array.from(String(key || '')).reduce((acc, char) => acc + char.charCodeAt(0), 0)
   return ICON_ACCENTS[code % ICON_ACCENTS.length]
@@ -104,18 +106,18 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
   const isActive = checkIsActive(href, item)
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={isActive}
-        tooltip={item.title}
-        className='text-sidebar-foreground/90 data-[active=true]:text-sidebar-accent-foreground'
-      >
-        <Link to={item.url} onClick={() => setOpenMobile(false)}>
-          <SidebarItemIcon icon={item.icon} seed={item.title} />
-          <span>{item.title}</span>
-          {item.badge && <NavBadge>{item.badge}</NavBadge>}
-        </Link>
-      </SidebarMenuButton>
+          <SidebarMenuButton
+            asChild
+            isActive={isActive}
+            tooltip={item.title}
+            className='text-sidebar-foreground/90 data-[active=true]:text-sidebar-accent-foreground'
+          >
+            <Link to={item.url} onClick={() => setOpenMobile(false)}>
+              <SidebarItemIcon icon={item.icon} seed={item.title} />
+              <span className={NAV_ITEM_TEXT_CLASS}>{item.title}</span>
+              {item.badge && <NavBadge>{item.badge}</NavBadge>}
+            </Link>
+          </SidebarMenuButton>
     </SidebarMenuItem>
   )
 }
@@ -143,7 +145,7 @@ function SidebarMenuCollapsible({
             className='text-sidebar-foreground/90 data-[active=true]:text-sidebar-accent-foreground'
           >
             <SidebarItemIcon icon={item.icon} seed={item.title} />
-            <span>{item.title}</span>
+            <span className={NAV_ITEM_TEXT_CLASS}>{item.title}</span>
             {item.badge && <NavBadge>{item.badge}</NavBadge>}
             <ChevronRight className='ms-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 rtl:rotate-180' />
           </SidebarMenuButton>
@@ -159,7 +161,7 @@ function SidebarMenuCollapsible({
                 >
                   <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
                     <SidebarItemIcon icon={subItem.icon} seed={subItem.title} />
-                    <span>{subItem.title}</span>
+                    <span className={NAV_ITEM_TEXT_CLASS}>{subItem.title}</span>
                     {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
                   </Link>
                 </SidebarMenuSubButton>
