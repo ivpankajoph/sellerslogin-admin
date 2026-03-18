@@ -1765,6 +1765,11 @@ export default function LocationWorkspacePage() {
                         ? `Ye fields ${selectedCityLabel} ke product page content ko control karengi.`
                         : 'Ye fields global product page content ko control karengi.'}
                     </p>
+                    <p className='mt-2 text-xs text-muted-foreground'>
+                      Global content me <code>{'{{city}}'}</code> use kar sakte hain. Agar
+                      kisi mapped city ka naam content me likha hoga to storefront par
+                      selected URL city ke hisaab se auto replace ho jayega.
+                    </p>
                   </div>
 
                   <div className='grid gap-4 md:grid-cols-2'>
@@ -1858,6 +1863,10 @@ export default function LocationWorkspacePage() {
                       {editorScope === 'city'
                         ? `Meta title, description aur keywords ${selectedCityLabel} ke page ke liye alag save hongi.`
                         : 'Meta title, description aur keywords global product page ke liye save hongi.'}
+                    </p>
+                    <p className='mt-2 text-xs text-muted-foreground'>
+                      SEO fields me bhi <code>{'{{city}}'}</code> aur mapped city names
+                      selected city ke naam se render honge.
                     </p>
                   </div>
 
