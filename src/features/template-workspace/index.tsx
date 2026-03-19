@@ -64,6 +64,7 @@ type TemplateCatalogItem = {
 
 type WebsiteCard = {
   _id: string
+  vendor_id?: string
   template_key: string
   template_name?: string
   name?: string
@@ -71,6 +72,9 @@ type WebsiteCard = {
   website_slug?: string
   previewImage?: string
   createdAt?: string
+  vendor_name?: string
+  vendor_business_name?: string
+  vendor_email?: string
 }
 
 type CityRow = {
@@ -317,6 +321,10 @@ export default function TemplateWorkspace() {
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
   const authUser = useSelector((state: any) => state.auth?.user || null)
+  const role = String(authUser?.role || '')
+    .trim()
+    .toLowerCase()
+  const isAdmin = role === 'admin' || role === 'superadmin'
   const vendorProfile = useSelector(
     (state: any) =>
       state.vendorprofile?.profile?.vendor ||
@@ -516,7 +524,7 @@ export default function TemplateWorkspace() {
   )
 
   const loadWorkspace = async () => {
-    if (!vendorId) {
+    if (!vendorId && !isAdmin) {
       setLoading(false)
       setWebsites([])
       setCities([])
@@ -541,11 +549,15 @@ export default function TemplateWorkspace() {
       ] = await Promise.allSettled([
         axios.get(`${BASE_URL}/v1/templates/catalog`, requestConfig),
         axios.get(
-          `${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`,
+          isAdmin
+            ? `${BASE_URL}/v1/templates/by-vendor`
+            : `${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`,
           requestConfig
         ),
         axios.get(`${BASE_URL}/v1/cities?includeInactive=true`, requestConfig),
-        axios.get(`${BASE_URL}/v1/products/vendor/${vendorId}`, requestConfig),
+        isAdmin
+          ? Promise.resolve({ data: { products: [] } })
+          : axios.get(`${BASE_URL}/v1/products/vendor/${vendorId}`, requestConfig),
       ])
 
       const fetchedCatalog =
@@ -897,14 +909,20 @@ export default function TemplateWorkspace() {
 
   return (
     <>
-      <TablePageHeader title='My Websites'>
-        {activeWebsiteId ? (
-          <div className='inline-flex h-11 min-w-[220px] shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-emerald-50 to-white px-4 text-sm font-semibold text-emerald-700 shadow-sm'>
-            <Globe className='h-4 w-4 shrink-0' />
+      <TablePageHeader
+        title={isAdmin ? 'Show Websites' : 'My Websites'}
+        stackOnMobile
+      >
+        {!isAdmin && activeWebsiteId ? (
+          <div className='inline-flex h-12 min-w-[300px] shrink-0 items-center justify-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-emerald-50 to-white px-6 text-sm font-semibold text-emerald-700 shadow-sm'>
+            <span className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700'>
+              <Globe className='h-4 w-4 shrink-0' />
+            </span>
             <span className='whitespace-nowrap'>Active website selected</span>
           </div>
         ) : null}
-        <div className='min-w-[240px] shrink-0'>
+
+        <div className='min-w-[240px] shrink-0 sm:min-w-[260px]'>
           <Select
             value={selectedCitySlug || 'all'}
             onValueChange={(value) => {
@@ -927,19 +945,21 @@ export default function TemplateWorkspace() {
             </SelectContent>
           </Select>
         </div>
+
         <Button
           type='button'
           variant='outline'
-          className='shrink-0'
+          className='h-11 shrink-0 rounded-xl'
           onClick={() => setStatisticsOpen(true)}
         >
           <ChartColumn className='h-4 w-4' />
           Statistics
         </Button>
+
         <Button
           type='button'
           variant='outline'
-          className='shrink-0'
+          className='h-11 shrink-0 rounded-xl'
           onClick={loadWorkspace}
           disabled={loading}
         >
@@ -950,21 +970,30 @@ export default function TemplateWorkspace() {
           )}
           Refresh
         </Button>
-        <Button type='button' className='shrink-0' onClick={openCreateDialog}>
-          <Plus className='h-4 w-4' />
-          Create Website
-        </Button>
+
+        {!isAdmin ? (
+          <Button
+            type='button'
+            className='h-11 shrink-0 rounded-xl'
+            onClick={openCreateDialog}
+          >
+            <Plus className='h-4 w-4' />
+            Create Website
+          </Button>
+        ) : null}
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-6'>
+
         <section className='space-y-4'>
           <div>
             <h2 className='text-foreground text-2xl font-semibold tracking-tight'>
-              Created Websites
+              {isAdmin ? 'All Websites' : 'Created Websites'}
             </h2>
             <p className='text-muted-foreground text-sm'>
-              Preview, edit, and manage storefront websites for{' '}
-              {selectedCityOption.label} from here.
+              {isAdmin
+                ? `Browse every vendor website from one place. Preview links currently use ${selectedCityOption.label}.`
+                : `Preview, edit, and manage storefront websites for ${selectedCityOption.label} from here.`}
             </p>
           </div>
 
@@ -984,7 +1013,11 @@ export default function TemplateWorkspace() {
                 const templateKey = String(website.template_key || '').trim()
                 const websiteTemplate = templateByKey.get(templateKey)
                 const previewUrl = getVendorTemplatePreviewUrl(
-                  vendorPublicIdentifier || vendorId,
+                  String(
+                    website.vendor_id ||
+                      vendorPublicIdentifier ||
+                      vendorId
+                  ).trim(),
                   templateKey,
                   selectedCitySlug ||
                     effectiveDefaultCitySlug ||
@@ -1027,14 +1060,16 @@ export default function TemplateWorkspace() {
                             </div>
                           ) : null}
                         </div>
-                        <button
-                          type='button'
-                          onClick={() => setDeleteTarget(website)}
-                          className='text-destructive inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm transition hover:bg-white'
-                          aria-label={`Delete ${website.name || website.business_name || 'website'}`}
-                        >
-                          <Trash2 className='h-4 w-4' />
-                        </button>
+                        {!isAdmin ? (
+                          <button
+                            type='button'
+                            onClick={() => setDeleteTarget(website)}
+                            className='text-destructive inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm transition hover:bg-white'
+                            aria-label={`Delete ${website.name || website.business_name || 'website'}`}
+                          >
+                            <Trash2 className='h-4 w-4' />
+                          </button>
+                        ) : null}
                       </div>
                     </div>
 
@@ -1048,6 +1083,18 @@ export default function TemplateWorkspace() {
                         <p className='text-muted-foreground mt-1 text-sm'>
                           Created {formatDate(website.createdAt)}
                         </p>
+                        {isAdmin ? (
+                          <p className='text-muted-foreground mt-2 text-sm'>
+                            Vendor:{' '}
+                            <span className='text-foreground font-medium'>
+                              {website.vendor_business_name ||
+                                website.vendor_name ||
+                                website.business_name ||
+                                website.vendor_email ||
+                                'Unknown vendor'}
+                            </span>
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className='border-border bg-background/70 rounded-2xl border p-3'>
@@ -1064,14 +1111,21 @@ export default function TemplateWorkspace() {
                         </p>
                       </div>
 
-                      <div className='mt-auto grid gap-3 sm:grid-cols-2'>
-                        <Button
-                          type='button'
-                          onClick={() => handleEditWebsite(website)}
-                          className='h-11 w-full rounded-2xl'
-                        >
-                          Edit Website
-                        </Button>
+                      <div
+                        className={cn(
+                          'mt-auto grid gap-3',
+                          !isAdmin && 'sm:grid-cols-2'
+                        )}
+                      >
+                        {!isAdmin ? (
+                          <Button
+                            type='button'
+                            onClick={() => handleEditWebsite(website)}
+                            className='h-11 w-full rounded-2xl'
+                          >
+                            Edit Website
+                          </Button>
+                        ) : null}
 
                         {previewUrl ? (
                           <a
@@ -1101,7 +1155,6 @@ export default function TemplateWorkspace() {
                           </Button>
                         )}
                       </div>
-
                     </div>
                   </article>
                 )
@@ -1111,26 +1164,29 @@ export default function TemplateWorkspace() {
             <div className='border-border bg-card rounded-[24px] border border-dashed px-6 py-12 text-center shadow-sm'>
               <LayoutTemplate className='text-muted-foreground mx-auto h-10 w-10' />
               <h3 className='text-foreground mt-4 text-xl font-semibold'>
-                No websites created yet
+                {isAdmin ? 'No websites found yet' : 'No websites created yet'}
               </h3>
               <p className='text-muted-foreground mt-2 text-sm'>
-                Create your first website from a template and it will appear
-                here with its preview link and edit access.
+                {isAdmin
+                  ? 'When vendors create websites, they will appear here with preview access.'
+                  : 'Create your first website from a template and it will appear here with its preview link and edit access.'}
               </p>
-              <Button
-                type='button'
-                onClick={openCreateDialog}
-                className='mt-6 h-11 rounded-2xl'
-              >
-                <Plus className='h-4 w-4' />
-                Create First Website
-              </Button>
+              {!isAdmin ? (
+                <Button
+                  type='button'
+                  onClick={openCreateDialog}
+                  className='mt-6 h-11 rounded-2xl'
+                >
+                  <Plus className='h-4 w-4' />
+                  Create First Website
+                </Button>
+              ) : null}
             </div>
           )}
         </section>
       </Main>
 
-      <Dialog open={dialogOpen} onOpenChange={handleCreateDialogOpenChange}>
+      <Dialog open={!isAdmin && dialogOpen} onOpenChange={handleCreateDialogOpenChange}>
         <DialogContent className='border-border bg-background w-[min(96vw,920px)] max-w-[min(96vw,920px)] gap-0 overflow-hidden rounded-none border p-0 sm:max-w-[min(96vw,920px)] [&>button]:rounded-none'>
           <div className='flex max-h-[90vh] flex-col'>
             <DialogHeader className='border-border border-b px-6 py-4 text-left sm:px-8'>
@@ -1338,21 +1394,25 @@ export default function TemplateWorkspace() {
             </div>
           </div>
         </DialogContent>
-        </Dialog>
+      </Dialog>
 
-        <StatisticsDialog
-          open={statisticsOpen}
-          onOpenChange={setStatisticsOpen}
-          title='Workspace Statistics'
-          description={`Overview for ${vendorName} in ${selectedCityOption.label}.`}
-          items={statisticsItems}
-        />
+      <StatisticsDialog
+        open={statisticsOpen}
+        onOpenChange={setStatisticsOpen}
+        title='Workspace Statistics'
+        description={
+          isAdmin
+            ? `Overview for all websites in ${selectedCityOption.label}.`
+            : `Overview for ${vendorName} in ${selectedCityOption.label}.`
+        }
+        items={statisticsItems}
+      />
 
-        <ConfirmDialog
-          open={Boolean(deleteTarget)}
+      <ConfirmDialog
+        open={!isAdmin && Boolean(deleteTarget)}
         onOpenChange={(open) => {
-          if (!deletingWebsiteId) {
-            if (!open) setDeleteTarget(null)
+          if (!deletingWebsiteId && !open) {
+            setDeleteTarget(null)
           }
         }}
         title={

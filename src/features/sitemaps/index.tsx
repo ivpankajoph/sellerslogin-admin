@@ -1,10 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { ExternalLink, RefreshCcw, Search } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { useSelector } from 'react-redux'
+import { ConfigDrawer } from '@/components/config-drawer'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 import type { RootState } from '@/store'
 
@@ -54,6 +76,11 @@ type TemplatePage = {
 type SitemapEntry = {
   label: string
   url: string
+}
+
+type SitemapGroup = {
+  title: string
+  entries: SitemapEntry[]
 }
 
 const objectIdRegex = /^[a-f\d]{24}$/i
@@ -106,6 +133,8 @@ export default function SitemapsPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [storefrontGroupFilter, setStorefrontGroupFilter] = useState('all')
+  const [templateGroupFilter, setTemplateGroupFilter] = useState('all')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [subcategories, setSubcategories] = useState<SubCategory[]>([])
@@ -434,239 +463,349 @@ export default function SitemapsPage() {
       .filter((entry) => entry.url)
   }, [products, templateBase])
 
-  const storefrontGroups = [
-    { title: 'Static pages', entries: storefrontStaticEntries },
-    { title: 'Main categories', entries: storefrontMainCategoryEntries },
-    { title: 'Categories', entries: storefrontCategoryEntries },
-    { title: 'Subcategories', entries: storefrontSubcategoryEntries },
-    { title: 'Vendor catalogs', entries: storefrontVendorEntries },
-    { title: 'Product detail pages', entries: storefrontProductEntries },
-  ]
+  const storefrontGroups = useMemo<SitemapGroup[]>(
+    () => [
+      { title: 'Static pages', entries: storefrontStaticEntries },
+      { title: 'Main categories', entries: storefrontMainCategoryEntries },
+      { title: 'Categories', entries: storefrontCategoryEntries },
+      { title: 'Subcategories', entries: storefrontSubcategoryEntries },
+      { title: 'Vendor catalogs', entries: storefrontVendorEntries },
+      { title: 'Product detail pages', entries: storefrontProductEntries },
+    ],
+    [
+      storefrontStaticEntries,
+      storefrontMainCategoryEntries,
+      storefrontCategoryEntries,
+      storefrontSubcategoryEntries,
+      storefrontVendorEntries,
+      storefrontProductEntries,
+    ],
+  )
 
-  const templateGroups = [
-    { title: 'Static pages', entries: templateStaticEntries },
-    { title: 'Template categories', entries: templateCategoryEntries },
-    { title: 'Custom pages', entries: templateCustomPageEntries },
-    { title: 'Template product pages', entries: templateProductEntries },
-  ]
+  const templateGroups = useMemo<SitemapGroup[]>(
+    () => [
+      { title: 'Static pages', entries: templateStaticEntries },
+      { title: 'Template categories', entries: templateCategoryEntries },
+      { title: 'Custom pages', entries: templateCustomPageEntries },
+      { title: 'Template product pages', entries: templateProductEntries },
+    ],
+    [
+      templateStaticEntries,
+      templateCategoryEntries,
+      templateCustomPageEntries,
+      templateProductEntries,
+    ],
+  )
 
-  const renderEntries = (entries: SitemapEntry[]) => {
-    const visible = filterEntries(entries, query)
-    if (visible.length === 0) {
-      return <p className='text-sm text-muted-foreground'>No pages found.</p>
-    }
+  const visibleStorefrontGroups = useMemo(
+    () =>
+      storefrontGroups
+        .map((group) => ({
+          ...group,
+          entries: filterEntries(group.entries, query),
+        }))
+        .filter((group) =>
+          storefrontGroupFilter === 'all' ? true : group.title === storefrontGroupFilter,
+        )
+        .filter((group) => group.entries.length > 0),
+    [storefrontGroups, query, storefrontGroupFilter],
+  )
 
-    return (
-      <div className='space-y-2'>
-        {visible.map((entry, index) => {
-          const accent =
-            index % 3 === 0
-              ? 'border-indigo-400'
-              : index % 3 === 1
-                ? 'border-emerald-400'
-                : 'border-fuchsia-400'
-          return (
-            <div
-              key={entry.url}
-              className={`flex flex-col gap-2 rounded-lg border border-slate-200 border-l-4 ${accent} bg-white p-3 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between`}
-            >
-              <div className='min-w-0'>
-                <p className='font-medium text-slate-900'>{entry.label}</p>
-                <p className='break-all text-xs text-slate-500'>{entry.url}</p>
-              </div>
-              <div className='flex items-center gap-2'>
-                <Button
-                  asChild
-                  size='sm'
-                  variant='outline'
-                  className='border-indigo-200 text-indigo-700 hover:bg-indigo-50'
-                >
-                  <a href={entry.url} target='_blank' rel='noreferrer'>
-                    <ExternalLink className='h-4 w-4' />
-                    Open
-                  </a>
-                </Button>
-                <Button
-                  size='sm'
-                  variant='ghost'
-                  className='text-slate-600 hover:text-slate-900'
-                  onClick={() => navigator.clipboard?.writeText(entry.url)}
-                >
-                  Copy
-                </Button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
+  const visibleTemplateGroups = useMemo(
+    () =>
+      templateGroups
+        .map((group) => ({
+          ...group,
+          entries: filterEntries(group.entries, query),
+        }))
+        .filter((group) =>
+          templateGroupFilter === 'all' ? true : group.title === templateGroupFilter,
+        )
+        .filter((group) => group.entries.length > 0),
+    [templateGroups, query, templateGroupFilter],
+  )
+
+  const totalVisibleStorefrontEntries = visibleStorefrontGroups.reduce(
+    (total, group) => total + group.entries.length,
+    0,
+  )
+
+  const totalVisibleTemplateEntries = visibleTemplateGroups.reduce(
+    (total, group) => total + group.entries.length,
+    0,
+  )
 
   return (
-    <div className='space-y-6 pb-6'>
-      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-        <div>
-          <h1 className='text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-500'>
-            Sitemap Pages
-          </h1>
-          <p className='text-sm text-slate-600'>
-            Browse SellersLogin storefront and vendor template URLs.
-          </p>
-        </div>
-        <div className='flex items-center gap-2'>
-          <div className='relative'>
-            <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400' />
+    <>
+      <Header fixed>
+        <div className='flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between'>
+          <div>
+            <div className='text-lg font-semibold tracking-tight'>Sitemap</div>
+            <p className='text-muted-foreground text-sm'>
+              Storefront aur template URLs ko table view me browse karo.
+            </p>
+          </div>
+
+          <div className='flex w-full flex-col gap-2 sm:flex-row lg:w-auto'>
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder='Search pages...'
-              className='pl-9 border-indigo-200 focus-visible:ring-indigo-300/60'
+              className='h-9 w-full sm:w-72'
             />
+            <Button variant='outline' size='sm' onClick={loadData} disabled={loading}>
+              <RefreshCcw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
-          <Button
-            onClick={loadData}
-            disabled={loading}
-            className='bg-indigo-600 text-white hover:bg-indigo-500'
-          >
-            <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+        </div>
+
+        <div className='ms-auto flex items-center space-x-4'>
+          <ThemeSwitch />
+          <ConfigDrawer />
+          <ProfileDropdown />
+        </div>
+      </Header>
+
+      <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
+        <div className='grid gap-4 md:grid-cols-3'>
+          <Card>
+            <CardContent className='flex items-center justify-between p-5'>
+              <div>
+                <p className='text-muted-foreground text-sm'>Storefront URLs</p>
+                <p className='text-2xl font-semibold'>{totalVisibleStorefrontEntries}</p>
+              </div>
+              <Search className='text-muted-foreground h-5 w-5' />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className='flex items-center justify-between p-5'>
+              <div>
+                <p className='text-muted-foreground text-sm'>Template URLs</p>
+                <p className='text-2xl font-semibold'>{totalVisibleTemplateEntries}</p>
+              </div>
+              <ExternalLink className='text-muted-foreground h-5 w-5' />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className='flex items-center justify-between p-5'>
+              <div>
+                <p className='text-muted-foreground text-sm'>Groups</p>
+                <p className='text-2xl font-semibold'>
+                  {visibleStorefrontGroups.length + visibleTemplateGroups.length}
+                </p>
+              </div>
+              <RefreshCcw className='text-muted-foreground h-5 w-5' />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className='flex flex-wrap gap-2'>
+          <Button asChild variant='outline'>
+            <Link to='/seo'>SEO Rules</Link>
+          </Button>
+          <Button asChild variant='outline'>
+            <Link to='/seo/entities'>Entity SEO</Link>
+          </Button>
+          <Button asChild>
+            <Link to='/seo/sitemaps'>Sitemap</Link>
           </Button>
         </div>
-      </div>
 
-      {error && (
-        <Card className='border-red-200 bg-red-50'>
-          <CardContent className='py-4 text-sm text-red-700'>{error}</CardContent>
+        {error && (
+          <Card className='border-red-200 bg-red-50'>
+            <CardContent className='py-4 text-sm text-red-700'>{error}</CardContent>
+          </Card>
+        )}
+
+        <div className='grid gap-4 md:grid-cols-2'>
+          <Card>
+            <CardHeader>
+              <CardTitle>Storefront Base</CardTitle>
+            </CardHeader>
+            <CardContent className='flex flex-wrap gap-2'>
+              {storefrontBase ? (
+                <>
+                  <Button asChild variant='outline' size='sm'>
+                    <a href={storefrontBase} target='_blank' rel='noreferrer'>
+                      Open storefront
+                    </a>
+                  </Button>
+                  <Button asChild variant='outline' size='sm'>
+                    <a href={joinUrl(storefrontBase, '/sitemap.xml')} target='_blank' rel='noreferrer'>
+                      Open sitemap.xml
+                    </a>
+                  </Button>
+                </>
+              ) : (
+                <p className='text-muted-foreground text-sm'>Storefront base URL not configured.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Template Base</CardTitle>
+            </CardHeader>
+            <CardContent className='flex flex-wrap gap-2'>
+              {templateBase ? (
+                <>
+                  <Button asChild variant='outline' size='sm'>
+                    <a href={templateBase} target='_blank' rel='noreferrer'>
+                      Open template base
+                    </a>
+                  </Button>
+                  <Button asChild variant='outline' size='sm'>
+                    <a href={joinUrl(templateBase, '/sitemap.xml')} target='_blank' rel='noreferrer'>
+                      Open sitemap.xml
+                    </a>
+                  </Button>
+                </>
+              ) : (
+                <p className='text-muted-foreground text-sm'>Template base URL not configured.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+            <CardTitle>SellersLogin Storefront</CardTitle>
+            <Select value={storefrontGroupFilter} onValueChange={setStorefrontGroupFilter}>
+              <SelectTrigger className='h-9 w-full sm:w-56'>
+                <SelectValue placeholder='Select group' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All groups</SelectItem>
+                {storefrontGroups.map((group) => (
+                  <SelectItem key={group.title} value={group.title}>
+                    {group.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className='space-y-4'>
+            {visibleStorefrontGroups.length === 0 ? (
+              <p className='text-muted-foreground text-sm'>No storefront pages found.</p>
+            ) : (
+              visibleStorefrontGroups.map((group) => (
+                <div key={group.title} className='space-y-3'>
+                  <div className='flex items-center justify-between'>
+                    <div className='text-sm font-semibold'>{group.title}</div>
+                    <Badge variant='secondary'>{group.entries.length}</Badge>
+                  </div>
+                  <div className='overflow-hidden rounded-md border'>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Page</TableHead>
+                          <TableHead>URL</TableHead>
+                          <TableHead className='text-right'>Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {group.entries.map((entry) => (
+                          <TableRow key={entry.url}>
+                            <TableCell className='font-medium'>{entry.label}</TableCell>
+                            <TableCell className='font-mono text-xs'>{entry.url}</TableCell>
+                            <TableCell className='text-right'>
+                              <div className='flex justify-end gap-2'>
+                                <Button asChild variant='outline' size='sm'>
+                                  <a href={entry.url} target='_blank' rel='noreferrer'>
+                                    <ExternalLink className='mr-2 h-4 w-4' />
+                                    Open
+                                  </a>
+                                </Button>
+                                <Button
+                                  variant='ghost'
+                                  size='sm'
+                                  onClick={() => navigator.clipboard?.writeText(entry.url)}
+                                >
+                                  Copy
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
         </Card>
-      )}
 
-      <Card className='border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50'>
-        <CardHeader className='space-y-2'>
-          <CardTitle className='text-indigo-700'>Storefront base URLs</CardTitle>
-          <div className='flex flex-wrap gap-2'>
-            {storefrontBase && (
-              <Button
-                asChild
-                size='sm'
-                variant='outline'
-                className='border-indigo-200 text-indigo-700 hover:bg-indigo-50'
-              >
-                <a href={storefrontBase} target='_blank' rel='noreferrer'>
-                  Open storefront
-                </a>
-              </Button>
+        <Card>
+          <CardHeader className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+            <CardTitle>Vendor Template Storefronts</CardTitle>
+            <Select value={templateGroupFilter} onValueChange={setTemplateGroupFilter}>
+              <SelectTrigger className='h-9 w-full sm:w-56'>
+                <SelectValue placeholder='Select group' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All groups</SelectItem>
+                {templateGroups.map((group) => (
+                  <SelectItem key={group.title} value={group.title}>
+                    {group.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className='space-y-4'>
+            {visibleTemplateGroups.length === 0 ? (
+              <p className='text-muted-foreground text-sm'>No template pages found.</p>
+            ) : (
+              visibleTemplateGroups.map((group) => (
+                <div key={group.title} className='space-y-3'>
+                  <div className='flex items-center justify-between'>
+                    <div className='text-sm font-semibold'>{group.title}</div>
+                    <Badge variant='secondary'>{group.entries.length}</Badge>
+                  </div>
+                  <div className='overflow-hidden rounded-md border'>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Page</TableHead>
+                          <TableHead>URL</TableHead>
+                          <TableHead className='text-right'>Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {group.entries.map((entry) => (
+                          <TableRow key={entry.url}>
+                            <TableCell className='font-medium'>{entry.label}</TableCell>
+                            <TableCell className='font-mono text-xs'>{entry.url}</TableCell>
+                            <TableCell className='text-right'>
+                              <div className='flex justify-end gap-2'>
+                                <Button asChild variant='outline' size='sm'>
+                                  <a href={entry.url} target='_blank' rel='noreferrer'>
+                                    <ExternalLink className='mr-2 h-4 w-4' />
+                                    Open
+                                  </a>
+                                </Button>
+                                <Button
+                                  variant='ghost'
+                                  size='sm'
+                                  onClick={() => navigator.clipboard?.writeText(entry.url)}
+                                >
+                                  Copy
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ))
             )}
-            {storefrontBase && (
-              <Button
-                asChild
-                size='sm'
-                variant='outline'
-                className='border-fuchsia-200 text-fuchsia-700 hover:bg-fuchsia-50'
-              >
-                <a
-                  href={joinUrl(storefrontBase, '/sitemap.xml')}
-                  target='_blank'
-                  rel='noreferrer'
-                >
-                  Open sitemap.xml
-                </a>
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-      </Card>
-
-      <Card className='border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-cyan-50'>
-        <CardHeader className='space-y-2'>
-          <CardTitle className='text-emerald-700'>Template storefront base URLs</CardTitle>
-          <div className='flex flex-wrap gap-2'>
-            {templateBase && (
-              <Button
-                asChild
-                size='sm'
-                variant='outline'
-                className='border-emerald-200 text-emerald-700 hover:bg-emerald-50'
-              >
-                <a href={templateBase} target='_blank' rel='noreferrer'>
-                  Open template base
-                </a>
-              </Button>
-            )}
-            {templateBase && (
-              <Button
-                asChild
-                size='sm'
-                variant='outline'
-                className='border-cyan-200 text-cyan-700 hover:bg-cyan-50'
-              >
-                <a
-                  href={joinUrl(templateBase, '/sitemap.xml')}
-                  target='_blank'
-                  rel='noreferrer'
-                >
-                  Open sitemap.xml
-                </a>
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-      </Card>
-
-      <Card className='border-slate-200 bg-white shadow-sm'>
-        <CardHeader className='border-b border-slate-100'>
-          <CardTitle className='text-slate-900'>SellersLogin storefront</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          {storefrontGroups.map((group, index) => (
-            <details key={group.title} open={group.title === 'Static pages'}>
-              <summary className='cursor-pointer text-sm font-semibold text-slate-900 flex items-center gap-2'>
-                <span
-                  className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                    index % 3 === 0
-                      ? 'bg-indigo-500'
-                      : index % 3 === 1
-                        ? 'bg-emerald-500'
-                        : 'bg-fuchsia-500'
-                  }`}
-                />
-                {group.title}
-                <span className='rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600'>
-                  {filterEntries(group.entries, query).length}
-                </span>
-              </summary>
-              <div className='mt-3'>{renderEntries(group.entries)}</div>
-            </details>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card className='border-slate-200 bg-white shadow-sm'>
-        <CardHeader className='border-b border-slate-100'>
-          <CardTitle className='text-slate-900'>Vendor template storefronts</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          {templateGroups.map((group, index) => (
-            <details key={group.title} open={group.title === 'Static pages'}>
-              <summary className='cursor-pointer text-sm font-semibold text-slate-900 flex items-center gap-2'>
-                <span
-                  className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                    index % 3 === 0
-                      ? 'bg-cyan-500'
-                      : index % 3 === 1
-                        ? 'bg-amber-500'
-                        : 'bg-rose-500'
-                  }`}
-                />
-                {group.title}
-                <span className='rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600'>
-                  {filterEntries(group.entries, query).length}
-                </span>
-              </summary>
-              <div className='mt-3'>{renderEntries(group.entries)}</div>
-            </details>
-          ))} 
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </Main>
+    </>
   )
 }

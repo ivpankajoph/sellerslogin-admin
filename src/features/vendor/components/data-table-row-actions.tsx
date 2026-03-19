@@ -83,7 +83,7 @@ export function DataTableRowActions({ row }: any) {
     Swal.fire({
       title: "Delete Vendor?",
       html:
-        "This will permanently delete the vendor, products, templates, tickets, notifications, and template users.<br/><br/><strong>Transactions and wallet records will be kept.</strong>",
+        "This will permanently delete the vendor and its related data, including products, websites, template data, team users, tickets, queries, reviews, inventory logs, SEO configs, notifications, analytics, wallet records, and vendor-only orders.<br/><br/><strong>Shared customer orders containing other vendors' items will be kept.</strong>",
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Yes, Delete",

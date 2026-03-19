@@ -2,8 +2,15 @@ import { useMemo, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowRight, CheckCircle2, Loader2 } from 'lucide-react'
+import {
+  ArrowRight,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { PASSWORD_REQUIREMENTS, isStrongPassword } from '@/lib/password-rules'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,7 +27,10 @@ const formSchema = z
   .object({
     password: z
       .string()
-      .min(7, { message: 'Password must be at least 7 characters' }),
+      .min(8, { message: 'Password must be at least 8 characters' })
+      .refine(isStrongPassword, {
+        message: 'Use 1 capital letter, 1 number, and 1 special character.',
+      }),
     confirmPassword: z.string(),
   })
   .refine((values) => values.password === values.confirmPassword, {
@@ -41,6 +51,8 @@ export function ResetPasswordForm({
 }: ResetPasswordFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [done, setDone] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const apiBaseUrl = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/$/, '')
   const authBaseUrl = apiBaseUrl.endsWith('/v1')
     ? apiBaseUrl.slice(0, -3)
@@ -52,6 +64,7 @@ export function ResetPasswordForm({
   })
 
   const canSubmit = useMemo(() => Boolean(email && token), [email, token])
+  const passwordValue = form.watch('password')
 
   async function onSubmit(data: z.infer<typeof formSchema>) {
     if (!canSubmit) {
@@ -77,8 +90,10 @@ export function ResetPasswordForm({
       setDone(true)
       toast.success(body?.message || 'Password updated successfully')
       form.reset()
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to reset password')
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to reset password'
+      )
     } finally {
       setIsLoading(false)
     }
@@ -109,15 +124,51 @@ export function ResetPasswordForm({
         className={cn('grid gap-2', className)}
         {...props}
       >
+        <div className='rounded-lg border border-slate-200 bg-slate-50 p-3'>
+          <p className='text-[11px] font-semibold tracking-[0.18em] text-slate-500 uppercase'>
+            Strong password instructions
+          </p>
+          <ul className='mt-3 grid gap-2 text-sm'>
+            {PASSWORD_REQUIREMENTS.map((requirement) => (
+              <li
+                key={requirement.key}
+                className={cn(
+                  'flex items-center gap-2',
+                  requirement.test(passwordValue)
+                    ? 'text-emerald-600'
+                    : 'text-slate-500'
+                )}
+              >
+                <span className='text-base leading-none'>&bull;</span>
+                <span>{requirement.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
         <FormField
           control={form.control}
           name='password'
           render={({ field }) => (
             <FormItem>
               <FormLabel>New password</FormLabel>
-              <FormControl>
-                <Input type='password' placeholder='Enter new password' {...field} />
-              </FormControl>
+              <div className='relative'>
+                <FormControl>
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder='Enter new password'
+                    className='pr-10'
+                    {...field}
+                  />
+                </FormControl>
+                <button
+                  type='button'
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className='absolute top-1/2 right-3 -translate-y-1/2 text-slate-500 hover:text-slate-700'
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
               <FormMessage />
             </FormItem>
           )}
@@ -128,9 +179,26 @@ export function ResetPasswordForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Confirm password</FormLabel>
-              <FormControl>
-                <Input type='password' placeholder='Confirm password' {...field} />
-              </FormControl>
+              <div className='relative'>
+                <FormControl>
+                  <Input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder='Confirm password'
+                    className='pr-10'
+                    {...field}
+                  />
+                </FormControl>
+                <button
+                  type='button'
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className='absolute top-1/2 right-3 -translate-y-1/2 text-slate-500 hover:text-slate-700'
+                  aria-label={
+                    showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'
+                  }
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
               <FormMessage />
             </FormItem>
           )}

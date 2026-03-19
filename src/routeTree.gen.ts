@@ -48,12 +48,12 @@ import { Route as AuthenticatedSitemapsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedSeoIndexRouteImport } from './routes/_authenticated/seo/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authenticated/products/index'
+import { Route as AuthenticatedPlansIndexRouteImport } from './routes/_authenticated/plans/index'
 import { Route as AuthenticatedOrderIndexRouteImport } from './routes/_authenticated/order/index'
 import { Route as AuthenticatedLocationWorkspaceIndexRouteImport } from './routes/_authenticated/location-workspace/index'
 import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './routes/_authenticated/inventory-management/index'
 import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
-import { Route as AuthenticatedGetDomainIndexRouteImport } from './routes/_authenticated/get-domain/index'
 import { Route as AuthenticatedDeliveryChargesIndexRouteImport } from './routes/_authenticated/delivery-charges/index'
 import { Route as AuthenticatedCustomerReviewsIndexRouteImport } from './routes/_authenticated/customer-reviews/index'
 import { Route as AuthenticatedCustomerQueriesIndexRouteImport } from './routes/_authenticated/customer-queries/index'
@@ -68,6 +68,7 @@ import { Route as ClerkauthSignUpRouteImport } from './routes/clerk/(auth)/sign-
 import { Route as ClerkauthSignInRouteImport } from './routes/clerk/(auth)/sign-in'
 import { Route as AuthenticatedVendorTemplateTemplateKeyRouteImport } from './routes/_authenticated/vendor-template/$templateKey'
 import { Route as AuthenticatedUsersUserIdRouteImport } from './routes/_authenticated/users/$userId'
+import { Route as AuthenticatedSeoSitemapsRouteImport } from './routes/_authenticated/seo/sitemaps'
 import { Route as AuthenticatedSeoEntitiesRouteImport } from './routes/_authenticated/seo/entities'
 import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
@@ -295,6 +296,11 @@ const AuthenticatedProductsIndexRoute =
     path: '/products/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPlansIndexRoute = AuthenticatedPlansIndexRouteImport.update({
+  id: '/plans/',
+  path: '/plans/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedOrderIndexRoute = AuthenticatedOrderIndexRouteImport.update({
   id: '/order/',
   path: '/order/',
@@ -322,12 +328,6 @@ const AuthenticatedHelpCenterIndexRoute =
   AuthenticatedHelpCenterIndexRouteImport.update({
     id: '/help-center/',
     path: '/help-center/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedGetDomainIndexRoute =
-  AuthenticatedGetDomainIndexRouteImport.update({
-    id: '/get-domain/',
-    path: '/get-domain/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDeliveryChargesIndexRoute =
@@ -409,6 +409,12 @@ const AuthenticatedUsersUserIdRoute =
   AuthenticatedUsersUserIdRouteImport.update({
     id: '/users/$userId',
     path: '/users/$userId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedSeoSitemapsRoute =
+  AuthenticatedSeoSitemapsRouteImport.update({
+    id: '/seo/sitemaps',
+    path: '/seo/sitemaps',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedSeoEntitiesRoute =
@@ -508,6 +514,7 @@ export interface FileRoutesByFullPath {
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
+  '/seo/sitemaps': typeof AuthenticatedSeoSitemapsRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/vendor-template/$templateKey': typeof AuthenticatedVendorTemplateTemplateKeyRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
@@ -522,12 +529,12 @@ export interface FileRoutesByFullPath {
   '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
-  '/get-domain': typeof AuthenticatedGetDomainIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/location-workspace': typeof AuthenticatedLocationWorkspaceIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
+  '/plans': typeof AuthenticatedPlansIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/seo': typeof AuthenticatedSeoIndexRoute
@@ -577,6 +584,7 @@ export interface FileRoutesByTo {
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
+  '/seo/sitemaps': typeof AuthenticatedSeoSitemapsRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/vendor-template/$templateKey': typeof AuthenticatedVendorTemplateTemplateKeyRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
@@ -591,12 +599,12 @@ export interface FileRoutesByTo {
   '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
-  '/get-domain': typeof AuthenticatedGetDomainIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/location-workspace': typeof AuthenticatedLocationWorkspaceIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
+  '/plans': typeof AuthenticatedPlansIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/seo': typeof AuthenticatedSeoIndexRoute
@@ -651,6 +659,7 @@ export interface FileRoutesById {
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/_authenticated/seo/entities': typeof AuthenticatedSeoEntitiesRoute
+  '/_authenticated/seo/sitemaps': typeof AuthenticatedSeoSitemapsRoute
   '/_authenticated/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/_authenticated/vendor-template/$templateKey': typeof AuthenticatedVendorTemplateTemplateKeyRoute
   '/clerk/(auth)/sign-in': typeof ClerkauthSignInRoute
@@ -665,12 +674,12 @@ export interface FileRoutesById {
   '/_authenticated/customer-queries/': typeof AuthenticatedCustomerQueriesIndexRoute
   '/_authenticated/customer-reviews/': typeof AuthenticatedCustomerReviewsIndexRoute
   '/_authenticated/delivery-charges/': typeof AuthenticatedDeliveryChargesIndexRoute
-  '/_authenticated/get-domain/': typeof AuthenticatedGetDomainIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/inventory-management/': typeof AuthenticatedInventoryManagementIndexRoute
   '/_authenticated/location-workspace/': typeof AuthenticatedLocationWorkspaceIndexRoute
   '/_authenticated/order/': typeof AuthenticatedOrderIndexRoute
+  '/_authenticated/plans/': typeof AuthenticatedPlansIndexRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/seo/': typeof AuthenticatedSeoIndexRoute
@@ -723,6 +732,7 @@ export interface FileRouteTypes {
     | '/errors/$error'
     | '/integrations/$provider'
     | '/seo/entities'
+    | '/seo/sitemaps'
     | '/users/$userId'
     | '/vendor-template/$templateKey'
     | '/clerk/sign-in'
@@ -737,12 +747,12 @@ export interface FileRouteTypes {
     | '/customer-queries'
     | '/customer-reviews'
     | '/delivery-charges'
-    | '/get-domain'
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
     | '/location-workspace'
     | '/order'
+    | '/plans'
     | '/products'
     | '/profile'
     | '/seo'
@@ -792,6 +802,7 @@ export interface FileRouteTypes {
     | '/errors/$error'
     | '/integrations/$provider'
     | '/seo/entities'
+    | '/seo/sitemaps'
     | '/users/$userId'
     | '/vendor-template/$templateKey'
     | '/clerk/sign-in'
@@ -806,12 +817,12 @@ export interface FileRouteTypes {
     | '/customer-queries'
     | '/customer-reviews'
     | '/delivery-charges'
-    | '/get-domain'
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
     | '/location-workspace'
     | '/order'
+    | '/plans'
     | '/products'
     | '/profile'
     | '/seo'
@@ -865,6 +876,7 @@ export interface FileRouteTypes {
     | '/_authenticated/errors/$error'
     | '/_authenticated/integrations/$provider'
     | '/_authenticated/seo/entities'
+    | '/_authenticated/seo/sitemaps'
     | '/_authenticated/users/$userId'
     | '/_authenticated/vendor-template/$templateKey'
     | '/clerk/(auth)/sign-in'
@@ -879,12 +891,12 @@ export interface FileRouteTypes {
     | '/_authenticated/customer-queries/'
     | '/_authenticated/customer-reviews/'
     | '/_authenticated/delivery-charges/'
-    | '/_authenticated/get-domain/'
     | '/_authenticated/help-center/'
     | '/_authenticated/integrations/'
     | '/_authenticated/inventory-management/'
     | '/_authenticated/location-workspace/'
     | '/_authenticated/order/'
+    | '/_authenticated/plans/'
     | '/_authenticated/products/'
     | '/_authenticated/profile/'
     | '/_authenticated/seo/'
@@ -1202,6 +1214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/plans/': {
+      id: '/_authenticated/plans/'
+      path: '/plans'
+      fullPath: '/plans'
+      preLoaderRoute: typeof AuthenticatedPlansIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/order/': {
       id: '/_authenticated/order/'
       path: '/order'
@@ -1235,13 +1254,6 @@ declare module '@tanstack/react-router' {
       path: '/help-center'
       fullPath: '/help-center'
       preLoaderRoute: typeof AuthenticatedHelpCenterIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/get-domain/': {
-      id: '/_authenticated/get-domain/'
-      path: '/get-domain'
-      fullPath: '/get-domain'
-      preLoaderRoute: typeof AuthenticatedGetDomainIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/delivery-charges/': {
@@ -1340,6 +1352,13 @@ declare module '@tanstack/react-router' {
       path: '/users/$userId'
       fullPath: '/users/$userId'
       preLoaderRoute: typeof AuthenticatedUsersUserIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/seo/sitemaps': {
+      id: '/_authenticated/seo/sitemaps'
+      path: '/seo/sitemaps'
+      fullPath: '/seo/sitemaps'
+      preLoaderRoute: typeof AuthenticatedSeoSitemapsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/seo/entities': {
@@ -1461,6 +1480,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
   AuthenticatedSeoEntitiesRoute: typeof AuthenticatedSeoEntitiesRoute
+  AuthenticatedSeoSitemapsRoute: typeof AuthenticatedSeoSitemapsRoute
   AuthenticatedUsersUserIdRoute: typeof AuthenticatedUsersUserIdRoute
   AuthenticatedVendorTemplateTemplateKeyRoute: typeof AuthenticatedVendorTemplateTemplateKeyRoute
   AuthenticatedBorzoReportIndexRoute: typeof AuthenticatedBorzoReportIndexRoute
@@ -1471,12 +1491,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCustomerQueriesIndexRoute: typeof AuthenticatedCustomerQueriesIndexRoute
   AuthenticatedCustomerReviewsIndexRoute: typeof AuthenticatedCustomerReviewsIndexRoute
   AuthenticatedDeliveryChargesIndexRoute: typeof AuthenticatedDeliveryChargesIndexRoute
-  AuthenticatedGetDomainIndexRoute: typeof AuthenticatedGetDomainIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
   AuthenticatedLocationWorkspaceIndexRoute: typeof AuthenticatedLocationWorkspaceIndexRoute
   AuthenticatedOrderIndexRoute: typeof AuthenticatedOrderIndexRoute
+  AuthenticatedPlansIndexRoute: typeof AuthenticatedPlansIndexRoute
   AuthenticatedProductsIndexRoute: typeof AuthenticatedProductsIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedSeoIndexRoute: typeof AuthenticatedSeoIndexRoute
@@ -1514,6 +1534,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIntegrationsProviderRoute:
     AuthenticatedIntegrationsProviderRoute,
   AuthenticatedSeoEntitiesRoute: AuthenticatedSeoEntitiesRoute,
+  AuthenticatedSeoSitemapsRoute: AuthenticatedSeoSitemapsRoute,
   AuthenticatedUsersUserIdRoute: AuthenticatedUsersUserIdRoute,
   AuthenticatedVendorTemplateTemplateKeyRoute:
     AuthenticatedVendorTemplateTemplateKeyRoute,
@@ -1528,7 +1549,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedCustomerReviewsIndexRoute,
   AuthenticatedDeliveryChargesIndexRoute:
     AuthenticatedDeliveryChargesIndexRoute,
-  AuthenticatedGetDomainIndexRoute: AuthenticatedGetDomainIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,
   AuthenticatedInventoryManagementIndexRoute:
@@ -1536,6 +1556,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLocationWorkspaceIndexRoute:
     AuthenticatedLocationWorkspaceIndexRoute,
   AuthenticatedOrderIndexRoute: AuthenticatedOrderIndexRoute,
+  AuthenticatedPlansIndexRoute: AuthenticatedPlansIndexRoute,
   AuthenticatedProductsIndexRoute: AuthenticatedProductsIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedSeoIndexRoute: AuthenticatedSeoIndexRoute,

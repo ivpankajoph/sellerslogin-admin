@@ -25,7 +25,6 @@ import {
 import { DataTablePagination, DataTableToolbar } from '@/components/data-table'
 import { roles } from '../data/data'
 
-import { DataTableBulkActions } from './data-table-bulk-actions'
 import { vendorColumns as columns } from './users-columns'
 
 type DataTableProps = {
@@ -35,10 +34,9 @@ type DataTableProps = {
 }
 
 export function UsersTable({ data, search, navigate }: DataTableProps) {
-  // Local UI-only states
-  const [rowSelection, setRowSelection] = useState({})
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [sorting, setSorting] = useState<SortingState>([])
+  const visibleColumns = columns.filter((column) => column.id !== 'select')
 
   // Local state management for table (uncomment to use local-only state, not synced with URL)
   // const [columnFilters, onColumnFiltersChange] = useState<ColumnFiltersState>([])
@@ -67,18 +65,15 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
-    columns,
+    columns: visibleColumns,
     state: {
       sorting,
       pagination,
-      rowSelection,
       columnFilters,
       columnVisibility,
     },
-    enableRowSelection: true,
     onPaginationChange,
     onColumnFiltersChange,
-    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     getPaginationRowModel: getPaginationRowModel(),
@@ -102,8 +97,8 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
     >
       <DataTableToolbar
         table={table}
-        searchPlaceholder='Filter users...'
         searchKey='username'
+        showViewOptions={false}
         filters={[
           {
             columnId: 'status',
@@ -153,11 +148,7 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
-                  className='group/row'
-                >
+                <TableRow key={row.id} className='group/row'>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
@@ -178,7 +169,7 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={visibleColumns.length}
                   className='h-24 text-center'
                 >
                   No results.
@@ -189,7 +180,6 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
         </Table>
       </div>
       <DataTablePagination table={table} className='mt-auto' />
-      <DataTableBulkActions table={table} />
     </div>
   )
 }

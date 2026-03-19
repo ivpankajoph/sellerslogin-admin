@@ -5,18 +5,11 @@ import {
   useMemo,
   useState,
 } from 'react'
-import type { ReactNode } from 'react'
 import type { RootState } from '@/store'
 import {
-  AlertTriangle,
-  Boxes,
   ImageIcon,
   Loader2,
-  Package2,
   PencilLine,
-  ShieldAlert,
-  Store,
-  TrendingUp,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { formatINR } from '@/lib/currency'
@@ -755,44 +748,6 @@ async function fetchInventoryAdjustments(vendorId: string, token: string) {
   return Array.isArray(body?.adjustments) ? body.adjustments : []
 }
 
-function InventoryStatCard({
-  title,
-  value,
-  helper,
-  icon,
-  accentClassName,
-}: {
-  title: string
-  value: string
-  helper: string
-  icon: ReactNode
-  accentClassName: string
-}) {
-  return (
-    <Card className='border border-sky-100/80 bg-white/85 py-0 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card'>
-      <CardHeader className='flex flex-row items-start justify-between gap-4 border-b border-border/60 pb-4'>
-        <div className='space-y-1'>
-          <CardDescription className='text-xs uppercase tracking-[0.18em]'>
-            {title}
-          </CardDescription>
-          <CardTitle className='text-2xl'>{value}</CardTitle>
-        </div>
-        <div
-          className={cn(
-            'rounded-md border px-3 py-2 text-sm shadow-sm',
-            accentClassName
-          )}
-        >
-          {icon}
-        </div>
-      </CardHeader>
-      <CardContent className='pt-0 text-sm text-muted-foreground'>
-        {helper}
-      </CardContent>
-    </Card>
-  )
-}
-
 export default function InventoryDashboard() {
   const authUser = useSelector((state: RootState) => state.auth?.user)
   const token = useSelector((state: RootState) => state.auth?.token || '')
@@ -1063,17 +1018,6 @@ export default function InventoryDashboard() {
     setVisibilityError('')
     setVisibilitySuccess('')
   }, [selectedRow])
-
-  const selectedVendorLabel = useMemo(() => {
-    if (!selectedVendorId) return 'Select vendor'
-    if (!isAdmin) {
-      return resolveVendorLabel(authUser)
-    }
-    return (
-      vendorOptions.find((vendor) => vendor.value === selectedVendorId)?.label ||
-      'Selected vendor'
-    )
-  }, [authUser, isAdmin, selectedVendorId, vendorOptions])
 
   const selectedRowAdjustments = useMemo(() => {
     if (!selectedRow) return []
@@ -1347,7 +1291,8 @@ export default function InventoryDashboard() {
       <TablePageHeader
         title='Inventory Management'
         stacked
-        actionsClassName='gap-2'
+        actionsClassName='gap-2 flex-wrap overflow-visible pb-0'
+        showHeaderChrome={false}
       >
         {isAdmin ? (
           <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
@@ -1464,54 +1409,6 @@ export default function InventoryDashboard() {
           </Card>
         ) : (
           <>
-            <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-6'>
-              <InventoryStatCard
-                title='Tracked Skus'
-                value={visibleStats.totalSkus.toLocaleString()}
-                helper={`Viewing ${selectedVendorLabel}`}
-                icon={<Boxes className='h-4 w-4' />}
-                accentClassName='border-sky-200 bg-sky-50 text-sky-700'
-              />
-              <InventoryStatCard
-                title='On Hand'
-                value={visibleStats.totalOnHand.toLocaleString()}
-                helper='Recorded physical units in inventory.'
-                icon={<Package2 className='h-4 w-4' />}
-                accentClassName='border-slate-200 bg-slate-50 text-slate-700'
-              />
-              <InventoryStatCard
-                title='Available'
-                value={visibleStats.totalAvailable.toLocaleString()}
-                helper='Units that can be sold right now.'
-                icon={<TrendingUp className='h-4 w-4' />}
-                accentClassName='border-emerald-200 bg-emerald-50 text-emerald-700'
-              />
-              <InventoryStatCard
-                title='Low Stock'
-                value={visibleStats.lowStockCount.toLocaleString()}
-                helper='Sellable variants below threshold.'
-                icon={<AlertTriangle className='h-4 w-4' />}
-                accentClassName='border-amber-200 bg-amber-50 text-amber-700'
-              />
-              <InventoryStatCard
-                title='Out Of Stock'
-                value={visibleStats.outOfStockCount.toLocaleString()}
-                helper='Variants that need replenishment.'
-                icon={<ShieldAlert className='h-4 w-4' />}
-                accentClassName='border-red-200 bg-red-50 text-red-700'
-              />
-              <InventoryStatCard
-                title='Retail Value'
-                value={formatINR(visibleStats.totalValue, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0,
-                })}
-                helper='Estimated value at current selling price.'
-                icon={<Store className='h-4 w-4' />}
-                accentClassName='border-violet-200 bg-violet-50 text-violet-700'
-              />
-            </div>
-
             <TableShell
               className='flex-1'
               title='Variant inventory'
