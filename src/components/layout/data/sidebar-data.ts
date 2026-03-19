@@ -1,11 +1,9 @@
 import {
   Activity,
-  Globe,
   HelpCircle,
   KeyRound,
   LayoutDashboard,
   LayoutTemplate,
-  Map,
   MapPinned,
   PlugZap,
   SearchCheck,
@@ -88,7 +86,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
             {
               title: 'SellersLogin Orders',
               url: '/order',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              roles: [ROLES.ADMIN],
               pageKey: 'orders',
             },
             {
@@ -107,7 +105,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
             {
               title: 'SellersLogin Wallet',
               url: '/wallet',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              roles: [ROLES.ADMIN],
               pageKey: 'wallets',
             },
             {
@@ -216,10 +214,16 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           roles: [ROLES.ADMIN],
         },
         {
+          title: 'Show Websites',
+          url: '/template-workspace',
+          icon: LayoutTemplate,
+          roles: [ROLES.ADMIN],
+        },
+        {
           title: 'My Websites',
           url: '/template-workspace',
           icon: LayoutTemplate,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          roles: [ROLES.VENDOR],
           pageKey: 'my_websites',
         },
         {
@@ -235,13 +239,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           icon: MapPinned,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           pageKey: 'manage_cities',
-        },
-        {
-          title: 'Get Domain',
-          url: '/get-domain',
-          icon: Globe,
-          roles: [ROLES.VENDOR],
-          pageKey: 'get_domain',
         },
       ],
     },
@@ -329,6 +326,12 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               roles: [ROLES.ADMIN, ROLES.VENDOR],
               pageKey: 'seo_manager',
             },
+            {
+              title: 'Sitemap',
+              url: '/seo/sitemaps',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              pageKey: 'seo_manager',
+            },
           ],
         },
       ],
@@ -356,13 +359,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           icon: HelpCircle,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           pageKey: 'help_center',
-        },
-        {
-          title: 'Sitemaps',
-          url: '/sitemaps',
-          icon: Map,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-          pageKey: 'sitemaps',
         },
       ],
     },

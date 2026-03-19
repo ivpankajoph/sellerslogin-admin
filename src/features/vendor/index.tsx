@@ -5,10 +5,9 @@ import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { Input } from '@/components/ui/input'
 import { UsersDialogs } from './components/users-dialogs'
-import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersProvider } from './components/users-provider'
 import { UsersTable } from './components/users-table'
 import { useEffect } from 'react'
@@ -24,7 +23,7 @@ import { useSelector } from 'react-redux'
 const route = getRouteApi('/_authenticated/vendor/')
 
 export default function Vendor() {
-  const search = route.useSearch()
+  const search = route.useSearch() as Record<string, unknown>
   const navigate = route.useNavigate()
   const dispatch =useDispatch<AppDispatch>()
   useEffect(() => {
@@ -36,7 +35,23 @@ export default function Vendor() {
   return (
     <UsersProvider>
       <Header fixed>
-        <Search />
+        <div className='flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='text-lg font-semibold tracking-tight'>Vendor</div>
+          <Input
+            placeholder='Filter users...'
+            value={typeof search.username === 'string' ? search.username : ''}
+            onChange={(event) =>
+              navigate({
+                search: (prev: Record<string, unknown>) => ({
+                  ...prev,
+                  username: event.target.value || undefined,
+                  page: 1,
+                }),
+              })
+            }
+            className='h-9 w-full sm:max-w-xs'
+          />
+        </div>
         <div className='ms-auto flex items-center space-x-4'>
           <ThemeSwitch />
           <ConfigDrawer />
@@ -45,15 +60,6 @@ export default function Vendor() {
       </Header>
 
       <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
-        <div className='flex flex-wrap items-end justify-between gap-2'>
-          <div>
-            <h2 className='text-2xl font-bold tracking-tight'>Vendor List</h2>
-            <p className='text-muted-foreground'>
-              Manage your vendors here.
-            </p>
-          </div>
-          <UsersPrimaryButtons />
-        </div>
         <UsersTable data={users} search={search} navigate={navigate} />
       </Main>
 

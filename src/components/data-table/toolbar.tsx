@@ -9,6 +9,7 @@ type DataTableToolbarProps<TData> = {
   table: Table<TData>
   searchPlaceholder?: string
   searchKey?: string
+  showViewOptions?: boolean
   filters?: {
     columnId: string
     title: string
@@ -24,6 +25,7 @@ export function DataTableToolbar<TData>({
   table,
   searchPlaceholder = 'Filter...',
   searchKey,
+  showViewOptions = true,
   filters = [],
 }: DataTableToolbarProps<TData>) {
   const columnsById = new Map(
@@ -43,7 +45,7 @@ export function DataTableToolbar<TData>({
             onChange={(event) => searchColumn.setFilterValue(event.target.value)}
             className='h-8 w-[150px] lg:w-[250px]'
           />
-        ) : (
+        ) : searchKey ? null : (
           <Input
             placeholder={searchPlaceholder}
             value={table.getState().globalFilter ?? ''}
@@ -79,7 +81,7 @@ export function DataTableToolbar<TData>({
           </Button>
         )}
       </div>
-      <DataTableViewOptions table={table} />
+      {showViewOptions ? <DataTableViewOptions table={table} /> : null}
     </div>
   )
 }

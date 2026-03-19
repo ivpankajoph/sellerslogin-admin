@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BadgeCheck,
   Boxes,
   Globe,
   Link2,
   Package,
+  Pencil,
   Plus,
   RefreshCcw,
   Save,
@@ -15,6 +16,11 @@ import {
 import { Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import api from '@/lib/axios'
+import { ConfigDrawer } from '@/components/config-drawer'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { ThemeSwitch } from '@/components/theme-switch'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,7 +32,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 
 type SeoAppSource = 'ophmate_frontend' | 'vendor_template_frontend'
@@ -87,6 +109,13 @@ const MATCH_TYPE_LABELS: Record<SeoMatchType, string> = {
   pattern: 'Dynamic pattern',
 }
 
+const ENTITY_TYPE_LABELS: Record<Exclude<InventoryEntityType, 'all'>, string> = {
+  ophmate_product: 'Product',
+  vendor_catalog: 'Vendor Catalog',
+  template_home: 'Template Home',
+  template_product: 'Template Product',
+}
+
 const QUICK_PATTERNS: Array<{ label: string; route: string; appSource: SeoAppSource }> = [
   { label: 'Home', route: '/', appSource: 'ophmate_frontend' },
   { label: 'Product detail', route: '/product/[category]/[id]', appSource: 'ophmate_frontend' },
@@ -141,6 +170,25 @@ const fromKeywordInput = (input: string) =>
     .map((item) => item.trim())
     .filter(Boolean)
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    error.response &&
+    typeof error.response === 'object' &&
+    'data' in error.response &&
+    error.response.data &&
+    typeof error.response.data === 'object' &&
+    'message' in error.response.data &&
+    typeof error.response.data.message === 'string'
+  ) {
+    return error.response.data.message
+  }
+
+  return fallback
+}
+
 const toDraft = (config: SeoConfig): SeoDraft => ({
   app_source: config.app_source,
   page_name: config.page_name || '',
@@ -162,9 +210,11 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
   const [configs, setConfigs] = useState<SeoConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string>('')
   const [draft, setDraft] = useState<SeoDraft>(createEmptyDraft())
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [inventoryLoading, setInventoryLoading] = useState(false)
   const [inventoryError, setInventoryError] = useState('')
   const [inventorySearchInput, setInventorySearchInput] = useState('')
@@ -175,9 +225,6 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
   const [inventoryTotal, setInventoryTotal] = useState(0)
   const [inventoryTotalPages, setInventoryTotalPages] = useState(1)
   const [inventoryItems, setInventoryItems] = useState<InventoryPage[]>([])
-  const lastAutoFillKeyRef = useRef<string>('')
-  const editorCardRef = useRef<HTMLDivElement | null>(null)
-  const routePatternInputRef = useRef<HTMLInputElement | null>(null)
 
   const selectedConfig = useMemo(
     () => configs.find((item) => item._id === selectedId) || null,
@@ -205,13 +252,15 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
         ? (response.data.data as SeoConfig[])
         : []
       setConfigs(data)
+      setSearchInput(query)
+      setSearch(query)
       if (selectedId && !data.some((item) => item._id === selectedId)) {
         setSelectedId('')
         setDraft(createEmptyDraft())
+        setSheetOpen(false)
       }
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Failed to load SEO configs'
-      toast.error(message)
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to load SEO configs'))
     } finally {
       setLoading(false)
     }
@@ -230,7 +279,9 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
         },
       })
 
-      const data = Array.isArray(response?.data?.data) ? (response.data.data as InventoryPage[]) : []
+      const data = Array.isArray(response?.data?.data)
+        ? (response.data.data as InventoryPage[])
+        : []
       const pagination = response?.data?.pagination || {}
       const total = Number(pagination.total) || 0
       const totalPages = Math.max(Number(pagination.totalPages) || 1, 1)
@@ -242,11 +293,11 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
       if (inventoryPage > totalPages) {
         setInventoryPage(totalPages)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setInventoryItems([])
       setInventoryTotal(0)
       setInventoryTotalPages(1)
-      setInventoryError(error?.response?.data?.message || 'Failed to load page inventory')
+      setInventoryError(getErrorMessage(error, 'Failed to load page inventory'))
     } finally {
       setInventoryLoading(false)
     }
@@ -267,41 +318,38 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
     setDraft(toDraft(selectedConfig))
   }, [selectedConfig])
 
-  const loadExistingRuleForDraft = (nextDraft: SeoDraft, showToast = false) => {
-    const key = buildRuleKey(nextDraft.app_source, nextDraft.route_pattern, nextDraft.match_type)
-    const existing = configsByKey.get(key)
-    if (!existing) return false
-    if (selectedId === existing._id) return true
-
-    setSelectedId(existing._id)
-    setDraft(toDraft(existing))
-    if (showToast && lastAutoFillKeyRef.current !== key) {
-      toast.info('Existing SEO rule loaded into form for editing')
-      lastAutoFillKeyRef.current = key
-    }
-    return true
-  }
-
   const setDraftField = <K extends keyof SeoDraft>(key: K, value: SeoDraft[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }))
   }
 
-  const bringEditorIntoView = useCallback((focusInput = false) => {
-    if (typeof window === 'undefined') return
-    window.requestAnimationFrame(() => {
-      editorCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      if (focusInput) {
-        window.setTimeout(() => {
-          routePatternInputRef.current?.focus()
-        }, 220)
-      }
-    })
-  }, [])
-
-  const handleNew = () => {
+  const openCreateSheet = () => {
     setSelectedId('')
     setDraft(createEmptyDraft())
-    bringEditorIntoView(true)
+    setSheetOpen(true)
+  }
+
+  const openEditSheet = (config: SeoConfig) => {
+    setSelectedId(config._id)
+    setDraft(toDraft(config))
+    setSheetOpen(true)
+  }
+
+  const loadExistingRuleForDraft = (nextDraft: SeoDraft, showToast = false) => {
+    const key = buildRuleKey(nextDraft.app_source, nextDraft.route_pattern, nextDraft.match_type)
+    const existing = configsByKey.get(key)
+
+    if (!existing) {
+      setSelectedId('')
+      setDraft(nextDraft)
+      return false
+    }
+
+    setSelectedId(existing._id)
+    setDraft(toDraft(existing))
+    if (showToast) {
+      toast.info('Existing SEO rule loaded for editing')
+    }
+    return true
   }
 
   const handleSave = async () => {
@@ -329,17 +377,20 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
         const updated = response?.data?.data as SeoConfig
         setConfigs((prev) => prev.map((item) => (item._id === targetId ? updated : item)))
         setSelectedId(targetId)
+        setDraft(toDraft(updated))
         toast.success('SEO config updated')
       } else {
         const response = await api.post('/seo', payload)
         const created = response?.data?.data as SeoConfig
         setConfigs((prev) => [created, ...prev])
         setSelectedId(created._id)
+        setDraft(toDraft(created))
         toast.success('SEO config created')
       }
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Failed to save SEO config'
-      toast.error(message)
+
+      setSheetOpen(false)
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to save SEO config'))
     } finally {
       setSaving(false)
     }
@@ -347,23 +398,23 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
 
   const handleDelete = async () => {
     if (!selectedId) return
+
     try {
       setSaving(true)
       await api.delete(`/seo/${selectedId}`)
       setConfigs((prev) => prev.filter((item) => item._id !== selectedId))
       setSelectedId('')
       setDraft(createEmptyDraft())
+      setSheetOpen(false)
       toast.success('SEO config deleted')
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Failed to delete SEO config'
-      toast.error(message)
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to delete SEO config'))
     } finally {
       setSaving(false)
     }
   }
 
-  const useDiscoveredPageForSeo = (page: InventoryPage) => {
-    setSelectedId('')
+  const openDiscoveredPageForSeo = (page: InventoryPage) => {
     const nextDraft: SeoDraft = {
       app_source: page.app_source,
       page_name: page.label,
@@ -375,9 +426,13 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
       meta_keywords: (page.suggested_keywords || []).join(', '),
       is_active: true,
     }
-    setDraft(nextDraft)
+
     loadExistingRuleForDraft(nextDraft, true)
-    bringEditorIntoView(true)
+    setSheetOpen(true)
+  }
+
+  const handleRuleSearch = () => {
+    fetchConfigs(searchInput.trim())
   }
 
   const handleInventorySearch = () => {
@@ -385,72 +440,458 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
     setInventorySearch(inventorySearchInput.trim())
   }
 
-  const filteredCount = configs.length
+  const activeConfigCount = configs.filter((item) => item.is_active).length
 
   return (
-    <div className='space-y-6 pb-4'>
-      <Card className='border-0 !bg-gradient-to-r from-sky-600 via-cyan-600 to-emerald-600 !text-white shadow-xl !rounded-xl'>
-        <CardHeader className='flex flex-wrap items-start justify-between gap-4'>
+    <>
+      <Header fixed>
+        <div className='flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between'>
           <div>
-            <Badge className='border-white/40 bg-white/20 text-white'>SEO Control Center</Badge>
-            <CardTitle className='mt-2 text-2xl font-bold'>
-              {isEntitySection ? 'Entity SEO Manager' : 'Page SEO Manager'}
-            </CardTitle>
-            <p className='mt-1 max-w-2xl text-sm text-cyan-50'>
+            <div className='text-lg font-semibold tracking-tight'>
+              {isEntitySection ? 'Entity SEO' : 'SEO Rules'}
+            </div>
+            <p className='text-muted-foreground text-sm'>
               {isEntitySection
-                ? 'Manage SEO for each dynamic page entry (products, vendor pages, and template pages).'
-                : 'Manage meta title, description, and keywords for static and reusable route patterns.'}
+                ? 'Dynamic pages ke SEO ko table view me manage karo.'
+                : 'Static aur route-based SEO rules ko table view me manage karo.'}
             </p>
-            <div className='mt-3 flex flex-wrap gap-2'>
-              <Button asChild size='sm' variant={isEntitySection ? 'secondary' : 'default'}>
-                <Link to='/seo'>SEO Rules</Link>
-              </Button>
-              <Button asChild size='sm' variant={isEntitySection ? 'default' : 'secondary'}>
-                <Link to='/seo/entities'>Entity SEO</Link>
-              </Button>
-            </div>
           </div>
-          <div className='grid grid-cols-2 gap-2 text-sm'>
-            <div className='rounded-lg border border-white/30 bg-white/15 px-3 py-2'>
-              <p className='text-cyan-100'>Configs</p>
-              <p className='font-semibold'>{filteredCount}</p>
-            </div>
-            <div className='rounded-lg border border-white/30 bg-white/15 px-3 py-2'>
-              <p className='text-cyan-100'>Active</p>
-              <p className='font-semibold'>{configs.filter((item) => item.is_active).length}</p>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
 
-      <div className='grid gap-4 xl:grid-cols-[1.2fr_1fr]'>
-        <Card
-          ref={editorCardRef}
-          className='self-start border-slate-200/70 bg-gradient-to-b from-white via-white to-cyan-50/30 shadow-md xl:sticky xl:top-4'
-        >
-          <CardHeader className='flex flex-row flex-wrap items-center justify-between gap-2'>
-            <CardTitle className='text-base font-semibold'>Create / Edit SEO Rule</CardTitle>
-            <div className='flex gap-2'>
-              <Button variant='outline' size='sm' onClick={handleNew} disabled={saving}>
-                <Plus className='mr-1 h-4 w-4' />
-                New
-              </Button>
-              <Button size='sm' onClick={handleSave} disabled={saving}>
-                <Save className='mr-1 h-4 w-4' />
-                {saving ? 'Saving...' : selectedId ? 'Update' : 'Create'}
-              </Button>
+          <div className='flex w-full flex-col gap-2 sm:flex-row lg:w-auto'>
+            {isEntitySection ? (
+              <>
+                <Input
+                  placeholder='Search products, pages...'
+                  value={inventorySearchInput}
+                  onChange={(event) => setInventorySearchInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      handleInventorySearch()
+                    }
+                  }}
+                  className='h-9 w-full sm:w-64'
+                />
+                <Select
+                  value={inventoryType}
+                  onValueChange={(value) => {
+                    setInventoryType(value as InventoryEntityType)
+                    setInventoryPage(1)
+                  }}
+                >
+                  <SelectTrigger className='h-9 w-full sm:w-52'>
+                    <SelectValue placeholder='Filter entity type' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>All dynamic pages</SelectItem>
+                    <SelectItem value='ophmate_product'>SellersLogin product pages</SelectItem>
+                    <SelectItem value='vendor_catalog'>Vendor catalog pages</SelectItem>
+                    <SelectItem value='template_home'>Template home pages</SelectItem>
+                    <SelectItem value='template_product'>Template product pages</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={handleInventorySearch}
+                  disabled={inventoryLoading}
+                >
+                  <Search className='mr-2 h-4 w-4' />
+                  Search
+                </Button>
+              </>
+            ) : (
+              <>
+                <Input
+                  placeholder='Search by page, route, title...'
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      handleRuleSearch()
+                    }
+                  }}
+                  className='h-9 w-full sm:w-72'
+                />
+                <Button variant='outline' size='sm' onClick={handleRuleSearch} disabled={loading}>
+                  <Search className='mr-2 h-4 w-4' />
+                  Search
+                </Button>
+                <Button size='sm' onClick={openCreateSheet}>
+                  <Plus className='mr-2 h-4 w-4' />
+                  New Rule
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className='ms-auto flex items-center space-x-4'>
+          <ThemeSwitch />
+          <ConfigDrawer />
+          <ProfileDropdown />
+        </div>
+      </Header>
+
+      <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
+        <div className='grid gap-4 md:grid-cols-3'>
+          <Card>
+            <CardContent className='flex items-center justify-between p-5'>
+              <div>
+                <p className='text-muted-foreground text-sm'>Total Configs</p>
+                <p className='text-2xl font-semibold'>{configs.length}</p>
+              </div>
+              <Globe className='text-muted-foreground h-5 w-5' />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className='flex items-center justify-between p-5'>
+              <div>
+                <p className='text-muted-foreground text-sm'>Active Configs</p>
+                <p className='text-2xl font-semibold'>{activeConfigCount}</p>
+              </div>
+              <BadgeCheck className='text-muted-foreground h-5 w-5' />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className='flex items-center justify-between p-5'>
+              <div>
+                <p className='text-muted-foreground text-sm'>
+                  {isEntitySection ? 'Dynamic Pages' : 'Quick Patterns'}
+                </p>
+                <p className='text-2xl font-semibold'>
+                  {isEntitySection ? inventoryTotal : QUICK_PATTERNS.length}
+                </p>
+              </div>
+              <Boxes className='text-muted-foreground h-5 w-5' />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className='flex flex-wrap gap-2'>
+          <Button asChild variant={isEntitySection ? 'outline' : 'default'}>
+            <Link to='/seo'>SEO Rules</Link>
+          </Button>
+          <Button asChild variant={isEntitySection ? 'default' : 'outline'}>
+            <Link to='/seo/entities'>Entity SEO</Link>
+          </Button>
+          <Button asChild variant='outline'>
+            <Link to='/seo/sitemaps'>Sitemap</Link>
+          </Button>
+        </div>
+
+        {!isEntitySection && (
+          <Card>
+            <CardHeader className='flex flex-row items-center justify-between'>
+              <div>
+                <CardTitle>SEO Rules Table</CardTitle>
+                <p className='text-muted-foreground text-sm'>
+                  Saare SEO rules ek simple table me.
+                </p>
+              </div>
               <Button
+                variant='outline'
                 size='sm'
-                variant='destructive'
-                onClick={handleDelete}
-                disabled={saving || !selectedId}
+                onClick={() => fetchConfigs(search)}
+                disabled={loading}
               >
-                <Trash2 className='mr-1 h-4 w-4' />
-                Delete
+                <RefreshCcw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
               </Button>
-            </div>
-          </CardHeader>
-          <CardContent className='space-y-4'>
+            </CardHeader>
+            <CardContent>
+              <div className='overflow-hidden rounded-md border'>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Rule</TableHead>
+                      <TableHead>App</TableHead>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className='text-right'>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={7}
+                          className='h-24 text-center text-sm text-muted-foreground'
+                        >
+                          Loading SEO rules...
+                        </TableCell>
+                      </TableRow>
+                    ) : configs.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={7}
+                          className='h-24 text-center text-sm text-muted-foreground'
+                        >
+                          No SEO rules found.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      configs.map((item) => (
+                        <TableRow key={item._id}>
+                          <TableCell>
+                            <div className='font-medium'>{item.page_name || 'Untitled rule'}</div>
+                            <div className='text-muted-foreground text-xs'>
+                              {item.meta_title || 'No meta title'}
+                            </div>
+                          </TableCell>
+                          <TableCell>{APP_LABELS[item.app_source]}</TableCell>
+                          <TableCell className='font-mono text-xs'>{item.route_pattern}</TableCell>
+                          <TableCell>{MATCH_TYPE_LABELS[item.match_type]}</TableCell>
+                          <TableCell>{item.priority}</TableCell>
+                          <TableCell>
+                            <Badge variant={item.is_active ? 'default' : 'secondary'}>
+                              {item.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className='text-right'>
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              onClick={() => openEditSheet(item)}
+                            >
+                              <Pencil className='mr-2 h-4 w-4' />
+                              Edit
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isEntitySection && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Route Patterns</CardTitle>
+              <p className='text-muted-foreground text-sm'>
+                Common routes ko ek click me form me load karo.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className='overflow-hidden rounded-md border'>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Pattern</TableHead>
+                      <TableHead>App</TableHead>
+                      <TableHead>Route</TableHead>
+                      <TableHead className='text-right'>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {QUICK_PATTERNS.map((item) => (
+                      <TableRow key={`${item.appSource}-${item.route}`}>
+                        <TableCell className='font-medium'>{item.label}</TableCell>
+                        <TableCell>{APP_LABELS[item.appSource]}</TableCell>
+                        <TableCell className='font-mono text-xs'>{item.route}</TableCell>
+                        <TableCell className='text-right'>
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            onClick={() => {
+                              const nextDraft: SeoDraft = {
+                                ...createEmptyDraft(),
+                                app_source: item.appSource,
+                                route_pattern: item.route,
+                                match_type: 'pattern',
+                                page_name: item.label,
+                              }
+                              loadExistingRuleForDraft(nextDraft, true)
+                              setSheetOpen(true)
+                            }}
+                          >
+                            <Plus className='mr-2 h-4 w-4' />
+                            Use Pattern
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {isEntitySection && (
+          <Card>
+            <CardHeader className='flex flex-row items-center justify-between'>
+              <div>
+                <CardTitle>Entity SEO Table</CardTitle>
+                <p className='text-muted-foreground text-sm'>
+                  Products, vendor pages aur template pages ko yahin se manage karo.
+                </p>
+              </div>
+              <Button variant='outline' size='sm' onClick={loadInventory} disabled={inventoryLoading}>
+                <RefreshCcw className={`mr-2 h-4 w-4 ${inventoryLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </CardHeader>
+            <CardContent className='space-y-4'>
+              {inventoryError && (
+                <div className='rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'>
+                  {inventoryError}
+                </div>
+              )}
+
+              <div className='overflow-hidden rounded-md border'>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Page</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>App</TableHead>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className='text-right'>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inventoryLoading ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className='h-24 text-center text-sm text-muted-foreground'
+                        >
+                          Loading dynamic pages...
+                        </TableCell>
+                      </TableRow>
+                    ) : inventoryItems.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className='h-24 text-center text-sm text-muted-foreground'
+                        >
+                          No item pages found.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      inventoryItems.map((page) => {
+                        const key = buildRuleKey(page.app_source, page.route_pattern, 'exact')
+                        const configured = configsByKey.has(key)
+                        const typeIcon =
+                          page.entity_type === 'ophmate_product'
+                            ? Package
+                            : page.entity_type === 'template_product'
+                              ? Package
+                              : page.entity_type === 'vendor_catalog'
+                                ? Store
+                                : Globe
+                        const TypeIcon = typeIcon
+
+                        return (
+                          <TableRow key={page.id}>
+                            <TableCell>
+                              <div className='font-medium'>{page.label}</div>
+                              <div className='text-muted-foreground text-xs'>
+                                {page.suggested_title || 'No suggested title'}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className='flex items-center gap-2'>
+                                <TypeIcon className='h-4 w-4 text-muted-foreground' />
+                                {ENTITY_TYPE_LABELS[page.entity_type]}
+                              </div>
+                            </TableCell>
+                            <TableCell>{APP_LABELS[page.app_source]}</TableCell>
+                            <TableCell className='font-mono text-xs'>{page.route_pattern}</TableCell>
+                            <TableCell>
+                              <Badge variant={configured ? 'default' : 'secondary'}>
+                                {configured ? 'Configured' : 'Missing'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className='text-right'>
+                              <Button
+                                variant='outline'
+                                size='sm'
+                                onClick={() => openDiscoveredPageForSeo(page)}
+                              >
+                                <Link2 className='mr-2 h-4 w-4' />
+                                {configured ? 'Edit SEO' : 'Create SEO'}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+                <p className='text-muted-foreground text-sm'>
+                  Showing {inventoryTotal === 0 ? 0 : (inventoryPage - 1) * inventoryLimit + 1} -{' '}
+                  {Math.min(inventoryPage * inventoryLimit, inventoryTotal)} of {inventoryTotal}
+                </p>
+
+                <div className='flex items-center gap-2'>
+                  <Select
+                    value={String(inventoryLimit)}
+                    onValueChange={(value) => {
+                      setInventoryLimit(Number.parseInt(value, 10) || 20)
+                      setInventoryPage(1)
+                    }}
+                  >
+                    <SelectTrigger className='h-9 w-[110px]'>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='10'>10 / page</SelectItem>
+                      <SelectItem value='20'>20 / page</SelectItem>
+                      <SelectItem value='50'>50 / page</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    disabled={inventoryLoading || inventoryPage <= 1}
+                    onClick={() => setInventoryPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    Prev
+                  </Button>
+                  <div className='min-w-16 text-center text-sm'>
+                    {inventoryPage} / {inventoryTotalPages}
+                  </div>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    disabled={inventoryLoading || inventoryPage >= inventoryTotalPages}
+                    onClick={() =>
+                      setInventoryPage((prev) => Math.min(inventoryTotalPages, prev + 1))
+                    }
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </Main>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className='w-full overflow-y-auto sm:max-w-xl'>
+          <SheetHeader>
+            <SheetTitle>{selectedId ? 'Edit SEO Rule' : 'Create SEO Rule'}</SheetTitle>
+            <SheetDescription>
+              Meta title, description aur keywords yahin se update karo.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className='space-y-4 px-4 pb-4'>
             <div className='grid gap-3 md:grid-cols-2'>
               <div className='space-y-1'>
                 <label className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
@@ -460,7 +901,6 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
                   value={draft.app_source}
                   onValueChange={(value) => {
                     const next = { ...draft, app_source: value as SeoAppSource }
-                    setDraft(next)
                     loadExistingRuleForDraft(next, true)
                   }}
                 >
@@ -484,7 +924,6 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
                   value={draft.match_type}
                   onValueChange={(value) => {
                     const next = { ...draft, match_type: value as SeoMatchType }
-                    setDraft(next)
                     loadExistingRuleForDraft(next, true)
                   }}
                 >
@@ -516,18 +955,19 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
                   Route pattern / path
                 </label>
                 <Input
-                  ref={routePatternInputRef}
                   placeholder='/product/[category]/[id]'
                   value={draft.route_pattern}
                   onChange={(event) => setDraftField('route_pattern', event.target.value)}
                   onBlur={(event) => {
-                    const normalized = normalizeRoutePattern(event.target.value)
-                    const next = { ...draft, route_pattern: normalized }
-                    setDraft(next)
+                    const next = {
+                      ...draft,
+                      route_pattern: normalizeRoutePattern(event.target.value),
+                    }
                     loadExistingRuleForDraft(next, true)
                   }}
                 />
               </div>
+
               <div className='space-y-1'>
                 <label className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
                   Priority
@@ -559,7 +999,7 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
               </label>
               <Textarea
                 placeholder='SEO description'
-                className='min-h-24'
+                className='min-h-28'
                 value={draft.meta_description}
                 onChange={(event) => setDraftField('meta_description', event.target.value)}
               />
@@ -576,11 +1016,11 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
               />
             </div>
 
-            <div className='flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2'>
+            <div className='flex items-center justify-between rounded-md border px-3 py-3'>
               <div>
-                <p className='text-sm font-semibold text-slate-900'>Rule active</p>
-                <p className='text-xs text-slate-500'>
-                  Inactive rules are ignored in frontend meta resolution.
+                <p className='text-sm font-medium'>Rule active</p>
+                <p className='text-muted-foreground text-xs'>
+                  Inactive rules frontend me apply nahi honge.
                 </p>
               </div>
               <Switch
@@ -588,286 +1028,26 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
                 onCheckedChange={(checked) => setDraftField('is_active', Boolean(checked))}
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <div className='space-y-4'>
-          {!isEntitySection && (
-            <Card className='border-slate-200/70 shadow-md'>
-              <CardHeader className='pb-3'>
-                <CardTitle className='flex items-center gap-2 text-base font-semibold'>
-                  <Globe className='h-4 w-4 text-cyan-600' />
-                  SEO Rules
-                </CardTitle>
-                <div className='flex gap-2'>
-                  <div className='relative flex-1'>
-                    <Search className='absolute left-2 top-2.5 h-4 w-4 text-slate-400' />
-                    <Input
-                      className='pl-8'
-                      placeholder='Search by page, route, title...'
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          fetchConfigs(search)
-                        }
-                      }}
-                    />
-                  </div>
-                  <Button variant='outline' size='icon' onClick={() => fetchConfigs(search)}>
-                    <RefreshCcw className='h-4 w-4' />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className='max-h-[620px] space-y-2 overflow-y-auto'>
-                {loading && <p className='text-sm text-slate-500'>Loading SEO configs...</p>}
-                {!loading && configs.length === 0 && (
-                  <p className='text-sm text-slate-500'>No SEO configs found.</p>
-                )}
-                {!loading &&
-                  configs.map((item) => {
-                    const active = selectedId === item._id
-                    return (
-                      <button
-                        key={item._id}
-                        onClick={() => {
-                          setSelectedId(item._id)
-                          bringEditorIntoView()
-                        }}
-                        className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                          active
-                            ? 'border-cyan-300 bg-cyan-50 shadow-sm'
-                            : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-sm'
-                        }`}
-                      >
-                        <div className='flex items-start justify-between gap-2'>
-                          <p className='line-clamp-1 text-sm font-semibold text-slate-900'>
-                            {item.page_name || item.route_pattern}
-                          </p>
-                          <Badge variant={item.is_active ? 'default' : 'secondary'}>
-                            {item.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </div>
-                        <p className='mt-1 line-clamp-1 text-xs text-slate-500'>{item.route_pattern}</p>
-                        <div className='mt-2 flex flex-wrap gap-2'>
-                          <Badge variant='outline'>{APP_LABELS[item.app_source]}</Badge>
-                          <Badge variant='outline'>{MATCH_TYPE_LABELS[item.match_type]}</Badge>
-                          <Badge variant='outline'>P{item.priority}</Badge>
-                        </div>
-                      </button>
-                    )
-                  })}
-              </CardContent>
-            </Card>
-          )}
-
-          {!isEntitySection && (
-            <Card className='border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-teal-50 to-white shadow-md'>
-              <CardHeader className='pb-2'>
-                <CardTitle className='flex items-center gap-2 text-sm text-emerald-700'>
-                  <BadgeCheck className='h-4 w-4' />
-                  Quick Route Patterns
-                </CardTitle>
-              </CardHeader>
-              <CardContent className='space-y-2'>
-                {QUICK_PATTERNS.map((item) => (
-                  <button
-                    key={`${item.appSource}-${item.route}`}
-                    onClick={() => {
-                      const next: SeoDraft = {
-                        ...draft,
-                        app_source: item.appSource,
-                        route_pattern: item.route,
-                        match_type: 'pattern',
-                      }
-                      setDraft(next)
-                      loadExistingRuleForDraft(next, true)
-                      bringEditorIntoView(true)
-                    }}
-                    className='w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-left text-xs transition hover:bg-emerald-100'
-                  >
-                    <p className='font-semibold text-slate-900'>{item.label}</p>
-                    <p className='text-slate-500'>{item.route}</p>
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {isEntitySection && <Card className='border-sky-200/80 bg-gradient-to-br from-sky-50 via-cyan-50 to-white shadow-md'>
-            <CardHeader className='pb-2'>
-              <CardTitle className='flex items-center gap-2 text-sm text-sky-700'>
-                <Boxes className='h-4 w-4' />
-                Entity SEO (Per Dynamic Page)
-              </CardTitle>
-              <p className='text-xs text-slate-600'>
-                Manage exact SEO per item page. If you have 100 products, you can create/edit 100
-                separate SEO entries here.
-              </p>
-            </CardHeader>
-            <CardContent className='space-y-3'>
-              <div className='flex gap-2'>
-                <div className='relative flex-1'>
-                  <Search className='absolute left-2 top-2.5 h-4 w-4 text-slate-400' />
-                  <Input
-                    className='pl-8'
-                    placeholder='Search products/vendors/pages...'
-                    value={inventorySearchInput}
-                    onChange={(event) => setInventorySearchInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        handleInventorySearch()
-                      }
-                    }}
-                  />
-                </div>
-                <Button variant='outline' size='sm' onClick={handleInventorySearch} disabled={inventoryLoading}>
-                  Search
-                </Button>
-                <Button variant='outline' size='icon' onClick={loadInventory} disabled={inventoryLoading}>
-                  <RefreshCcw className={`h-4 w-4 ${inventoryLoading ? 'animate-spin' : ''}`} />
-                </Button>
-              </div>
-
-              <Select
-                value={inventoryType}
-                onValueChange={(value) => {
-                  setInventoryType(value as InventoryEntityType)
-                  setInventoryPage(1)
-                }}
+          <SheetFooter className='border-t'>
+            <div className='flex w-full flex-col gap-2 sm:flex-row sm:justify-between'>
+              <Button
+                variant='destructive'
+                onClick={handleDelete}
+                disabled={saving || !selectedId}
               >
-                <SelectTrigger className='w-full'>
-                  <SelectValue placeholder='Filter entity type' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='all'>All dynamic pages</SelectItem>
-                  <SelectItem value='ophmate_product'>SellersLogin product pages</SelectItem>
-                  <SelectItem value='vendor_catalog'>Vendor catalog pages</SelectItem>
-                  <SelectItem value='template_home'>Template home pages</SelectItem>
-                  <SelectItem value='template_product'>Template product pages</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {inventoryError && (
-                <div className='rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700'>
-                  {inventoryError}
-                </div>
-              )}
-
-              <div className='max-h-[420px] space-y-2 overflow-y-auto'>
-                {inventoryItems.length === 0 && (
-                  <p className='text-xs text-slate-500'>
-                    {inventoryLoading ? 'Loading page inventory...' : 'No item pages found.'}
-                  </p>
-                )}
-                {inventoryItems.map((page) => {
-                  const key = buildRuleKey(page.app_source, page.route_pattern, 'exact')
-                  const configured = configsByKey.has(key)
-                  const typeIcon =
-                    page.entity_type === 'ophmate_product'
-                      ? Package
-                      : page.entity_type === 'template_product'
-                        ? Package
-                        : page.entity_type === 'vendor_catalog'
-                          ? Store
-                          : Globe
-                  const TypeIcon = typeIcon
-                  const selectedForEdit =
-                    draft.match_type === 'exact' &&
-                    draft.app_source === page.app_source &&
-                    normalizeRoutePattern(draft.route_pattern) === normalizeRoutePattern(page.route_pattern)
-                  return (
-                    <div
-                      key={page.id}
-                      className={`rounded-xl border px-3 py-3 shadow-sm transition ${
-                        selectedForEdit
-                          ? 'border-cyan-300 bg-cyan-50/90 ring-2 ring-cyan-100'
-                          : 'border-white/90 bg-white/90 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md'
-                      }`}
-                    >
-                      <div className='flex items-start justify-between gap-2'>
-                        <div className='min-w-0'>
-                          <p className='line-clamp-1 text-sm font-semibold text-slate-900'>
-                            {page.label}
-                          </p>
-                          <p className='line-clamp-1 text-xs text-slate-500'>{page.route_pattern}</p>
-                          <div className='mt-1 flex items-center gap-2'>
-                            <Badge variant='outline' className='text-xs'>
-                              <TypeIcon className='mr-1 h-3 w-3' />
-                              {page.app_source === 'ophmate_frontend' ? 'SellersLogin' : 'Template'}
-                            </Badge>
-                            <Badge variant={configured ? 'default' : 'secondary'}>
-                              {configured ? 'SEO configured' : 'SEO missing'}
-                            </Badge>
-                            {selectedForEdit && <Badge className='bg-cyan-600 text-white'>Editing now</Badge>}
-                          </div>
-                        </div>
-                        <Button
-                          size='sm'
-                          variant={selectedForEdit ? 'default' : 'outline'}
-                          onClick={() => useDiscoveredPageForSeo(page)}
-                        >
-                          <Link2 className='mr-1 h-3 w-3' />
-                          {configured ? 'Edit SEO' : 'Create SEO'}
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className='flex flex-wrap items-center justify-between gap-2 border-t border-sky-100 pt-2 text-xs text-slate-600'>
-                <p>
-                  Showing{' '}
-                  {inventoryTotal === 0 ? 0 : (inventoryPage - 1) * inventoryLimit + 1} -{' '}
-                  {Math.min(inventoryPage * inventoryLimit, inventoryTotal)} of {inventoryTotal}
-                </p>
-                <div className='flex items-center gap-2'>
-                  <Select
-                    value={String(inventoryLimit)}
-                    onValueChange={(value) => {
-                      setInventoryLimit(Number.parseInt(value, 10) || 20)
-                      setInventoryPage(1)
-                    }}
-                  >
-                    <SelectTrigger className='h-8 w-[88px] text-xs'>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='10'>10 / page</SelectItem>
-                      <SelectItem value='20'>20 / page</SelectItem>
-                      <SelectItem value='50'>50 / page</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    className='h-8 px-2 text-xs'
-                    disabled={inventoryLoading || inventoryPage <= 1}
-                    onClick={() => setInventoryPage((prev) => Math.max(1, prev - 1))}
-                  >
-                    Prev
-                  </Button>
-                  <span className='min-w-[72px] text-center'>
-                    {inventoryPage} / {inventoryTotalPages}
-                  </span>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    className='h-8 px-2 text-xs'
-                    disabled={inventoryLoading || inventoryPage >= inventoryTotalPages}
-                    onClick={() =>
-                      setInventoryPage((prev) => Math.min(inventoryTotalPages, prev + 1))
-                    }
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>}
-        </div>
-      </div>
-    </div>
+                <Trash2 className='mr-2 h-4 w-4' />
+                Delete
+              </Button>
+              <Button onClick={handleSave} disabled={saving}>
+                <Save className='mr-2 h-4 w-4' />
+                {saving ? 'Saving...' : selectedId ? 'Update Rule' : 'Create Rule'}
+              </Button>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
   )
 }

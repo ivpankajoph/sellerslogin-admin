@@ -9,7 +9,6 @@ export type VendorPageAccessKey =
   | 'my_websites'
   | 'location_workspace'
   | 'manage_cities'
-  | 'get_domain'
   | 'toolkit_store'
   | 'my_apps'
   | 'seo_manager'
@@ -75,11 +74,6 @@ export const VENDOR_PAGE_ACCESS_OPTIONS: VendorPageAccessOption[] = [
     key: 'manage_cities',
     label: 'Manage Cities',
     description: 'Manage the cities available for the storefront.',
-  },
-  {
-    key: 'get_domain',
-    label: 'Get Domain',
-    description: 'Connect and manage website domain settings.',
   },
   {
     key: 'toolkit_store',
@@ -149,7 +143,6 @@ const ROUTE_MATCHERS: RouteMatcher[] = [
   },
   { key: 'location_workspace', exact: ['/location-workspace'] },
   { key: 'manage_cities', exact: ['/cities'] },
-  { key: 'get_domain', exact: ['/get-domain'] },
   { key: 'toolkit_store', exact: ['/integrations'] },
   { key: 'my_apps', prefixes: ['/integrations/', '/connect-brevo', '/borzo-report'] },
   { key: 'seo_manager', prefixes: ['/seo'] },
@@ -170,7 +163,6 @@ const FIRST_PAGE_ROUTE_BY_KEY: Partial<Record<VendorPageAccessKey, string>> = {
   my_websites: '/template-workspace',
   location_workspace: '/location-workspace',
   manage_cities: '/cities',
-  get_domain: '/get-domain',
   toolkit_store: '/integrations',
   my_apps: '/integrations',
   seo_manager: '/seo',

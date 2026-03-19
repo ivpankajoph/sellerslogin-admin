@@ -1,14 +1,6 @@
 import { Link } from '@tanstack/react-router'
-import { ChevronDown, ExternalLink, PlugZap, Sparkles, Store } from 'lucide-react'
+import { Crown, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -16,33 +8,26 @@ import { NotificationBell } from '@/components/notifications/notification-bell'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import VendorDashboard from './components/VendorDashboard'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import api from '@/lib/axios'
-import {
-  getInstalledProviderIds,
-  INTEGRATION_PROVIDER_META,
-} from '@/lib/vendor-integrations'
 import type { RootState } from '@/store'
 import { setUser } from '@/store/slices/authSlice'
 import { normalizeVendorPageAccess } from '@/features/team-access/access-config'
+import { UpgradePlanDialog } from './components/UpgradePlanDialog'
+import type { BillingSummary } from '@/features/plans/shared'
 
 export function Dashboard() {
   const dispatch = useDispatch()
   const user = useSelector((state: RootState) => state.auth.user)
-  const { data: integrationData } = useVendorIntegrations()
   const effectiveRole = user?.role === 'superadmin' ? 'admin' : user?.role
   const isVendor = effectiveRole === 'vendor'
   const isVendorTeamUser =
     isVendor && String(user?.account_type || '').toLowerCase() === 'vendor_user'
   const pageAccess = normalizeVendorPageAccess(user?.page_access)
   const canAccessMyWebsites = !isVendorTeamUser || pageAccess.has('my_websites')
-  const canAccessToolkitStore =
-    !isVendorTeamUser || pageAccess.has('toolkit_store')
-  const canAccessMyApps = !isVendorTeamUser || pageAccess.has('my_apps')
-  const canOpenAppsMenu = isVendor && (canAccessToolkitStore || canAccessMyApps)
-  const connectedAppIds = getInstalledProviderIds(integrationData)
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false)
+  const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
 
   useEffect(() => {
     if (isVendorTeamUser) return
@@ -64,6 +49,21 @@ export function Dashboard() {
     loadProfile()
   }, [dispatch, isVendorTeamUser, user?.id])
 
+  useEffect(() => {
+    if (!isVendor || isVendorTeamUser) return
+
+    const loadBillingSummary = async () => {
+      try {
+        const res = await api.get('/billing/summary')
+        setBillingSummary((res.data?.data || null) as BillingSummary | null)
+      } catch {
+        setBillingSummary(null)
+      }
+    }
+
+    loadBillingSummary()
+  }, [isVendor, isVendorTeamUser, user?.id])
+
   return (
     <>
       {/* ===== Top Heading ===== */}
@@ -84,66 +84,26 @@ export function Dashboard() {
                   </Link>
                 </Button>
               ) : null}
-              {canOpenAppsMenu ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant='outline'
-                      className='border-slate-200 bg-white hover:border-primary hover:bg-primary hover:text-primary-foreground'
-                    >
-                      <PlugZap className='h-4 w-4 text-indigo-600' />
-                      Apps{connectedAppIds.length ? ` (${connectedAppIds.length})` : ''}
-                      <ChevronDown className='h-4 w-4 text-slate-500' />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align='end' className='w-72'>
-                    <DropdownMenuLabel>Sellerslogin Toolkit</DropdownMenuLabel>
-                    {canAccessToolkitStore ? (
-                      <>
-                        <DropdownMenuItem asChild>
-                          <Link to='/integrations' className='flex items-center gap-2'>
-                            <Store className='h-4 w-4' />
-                            <span>Open Toolkit Store</span>
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    ) : null}
-                    {canAccessMyApps && connectedAppIds.length ? (
-                      connectedAppIds.map((providerId) => (
-                        <DropdownMenuItem key={providerId} asChild>
-                          <Link
-                            to='/integrations/$provider'
-                            params={{ provider: providerId }}
-                            className='flex items-center gap-2'
-                          >
-                            <span className='font-medium'>
-                              {INTEGRATION_PROVIDER_META[providerId].title}
-                            </span>
-                            <span className='ml-auto text-xs text-slate-500'>
-                              {INTEGRATION_PROVIDER_META[providerId].category}
-                            </span>
-                          </Link>
-                        </DropdownMenuItem>
-                      ))
-                    ) : canAccessMyApps ? (
-                      <DropdownMenuItem disabled>
-                        No connected apps yet
-                      </DropdownMenuItem>
-                    ) : null}
-                    {canAccessToolkitStore ? (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link to='/integrations' className='flex items-center gap-2'>
-                            <span>Browse all apps</span>
-                            <ExternalLink className='ml-auto h-4 w-4' />
-                          </Link>
-                        </DropdownMenuItem>
-                      </>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              {isVendor && !isVendorTeamUser ? (
+                billingSummary?.plan?.is_premium_active ? (
+                  <Button
+                    asChild
+                    className='border border-amber-300 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-black shadow-sm hover:brightness-95'
+                  >
+                    <Link to='/plans'>
+                      <Crown className='h-4 w-4 text-amber-900' />
+                      Premium Plan
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setUpgradeDialogOpen(true)}
+                    className='border border-amber-300 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-black shadow-sm hover:brightness-95'
+                  >
+                    <Sparkles className='h-4 w-4 text-amber-900' />
+                    Upgrade Plan
+                  </Button>
+                )
               ) : null}
             </div>
             <NotificationBell />
@@ -158,6 +118,23 @@ export function Dashboard() {
       <Main>
         <VendorDashboard />
       </Main>
+
+      {isVendor && !isVendorTeamUser ? (
+        <UpgradePlanDialog
+          open={upgradeDialogOpen}
+          onOpenChange={setUpgradeDialogOpen}
+          userName={user?.name}
+          userEmail={user?.email}
+          onPlanActivated={async () => {
+            try {
+              const res = await api.get('/billing/summary')
+              setBillingSummary((res.data?.data || null) as BillingSummary | null)
+            } catch {
+              return
+            }
+          }}
+        />
+      ) : null}
     </>
   )
 }

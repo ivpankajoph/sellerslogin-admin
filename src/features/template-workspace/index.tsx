@@ -63,6 +63,7 @@ type TemplateCatalogItem = {
 
 type WebsiteCard = {
   _id: string
+  vendor_id?: string
   template_key: string
   template_name?: string
   name?: string
@@ -70,6 +71,9 @@ type WebsiteCard = {
   website_slug?: string
   previewImage?: string
   createdAt?: string
+  vendor_name?: string
+  vendor_business_name?: string
+  vendor_email?: string
 }
 
 type CityRow = {
@@ -318,6 +322,10 @@ export default function TemplateWorkspace() {
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
   const authUser = useSelector((state: any) => state.auth?.user || null)
+  const role = String(authUser?.role || '')
+    .trim()
+    .toLowerCase()
+  const isAdmin = role === 'admin' || role === 'superadmin'
   const vendorProfile = useSelector(
     (state: any) =>
       state.vendorprofile?.profile?.vendor ||
@@ -489,7 +497,7 @@ export default function TemplateWorkspace() {
   }, [products, selectedCityId, selectedCitySlug])
 
   const loadWorkspace = async () => {
-    if (!vendorId) {
+    if (!vendorId && !isAdmin) {
       setLoading(false)
       setWebsites([])
       setCities([])
@@ -514,11 +522,15 @@ export default function TemplateWorkspace() {
       ] = await Promise.allSettled([
         axios.get(`${BASE_URL}/v1/templates/catalog`, requestConfig),
         axios.get(
-          `${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`,
+          isAdmin
+            ? `${BASE_URL}/v1/templates/by-vendor`
+            : `${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`,
           requestConfig
         ),
         axios.get(`${BASE_URL}/v1/cities?includeInactive=true`, requestConfig),
-        axios.get(`${BASE_URL}/v1/products/vendor/${vendorId}`, requestConfig),
+        isAdmin
+          ? Promise.resolve({ data: { products: [] } })
+          : axios.get(`${BASE_URL}/v1/products/vendor/${vendorId}`, requestConfig),
       ])
 
       const fetchedCatalog =
@@ -871,7 +883,7 @@ export default function TemplateWorkspace() {
 
   return (
     <>
-      <TablePageHeader title='My Websites'>
+      <TablePageHeader title={isAdmin ? 'Show Websites' : 'My Websites'}>
         <Button
           type='button'
           variant='outline'
@@ -886,10 +898,12 @@ export default function TemplateWorkspace() {
           )}
           Refresh
         </Button>
-        <Button type='button' className='shrink-0' onClick={openCreateDialog}>
-          <Plus className='h-4 w-4' />
-          Create Website
-        </Button>
+        {!isAdmin ? (
+          <Button type='button' className='shrink-0' onClick={openCreateDialog}>
+            <Plus className='h-4 w-4' />
+            Create Website
+          </Button>
+        ) : null}
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-6'>
@@ -899,12 +913,14 @@ export default function TemplateWorkspace() {
               Workspace
             </p>
             <h2 className='text-foreground mt-2 text-xl font-semibold tracking-tight'>
-              Manage storefront websites for {vendorName}
+              {isAdmin
+                ? 'Preview storefront websites across all vendors'
+                : `Manage storefront websites for ${vendorName}`}
             </h2>
             <p className='text-muted-foreground mt-2 text-sm leading-6'>
-              Create a new website from any available template, jump straight
-              into the builder, and manage every preview link from this one
-              page.
+              {isAdmin
+                ? 'Review all created websites, see which vendor owns each website, and open storefront previews without editing access.'
+                : 'Create a new website from any available template, jump straight into the builder, and manage every preview link from this one page.'}
             </p>
           </div>
 
@@ -916,7 +932,9 @@ export default function TemplateWorkspace() {
               {websites.length}
             </p>
             <p className='text-muted-foreground mt-2 text-sm'>
-              Active website entries in your workspace.
+              {isAdmin
+                ? 'Website entries across all vendors.'
+                : 'Active website entries in your workspace.'}
             </p>
           </div>
 
@@ -956,24 +974,28 @@ export default function TemplateWorkspace() {
               </SelectContent>
             </Select>
             <p className='text-muted-foreground mt-3 text-sm'>
-              Preview URLs and page editors will open for{' '}
-              {selectedCityOption.label}.
+              {isAdmin
+                ? `Preview URLs will open for ${selectedCityOption.label}.`
+                : `Preview URLs and page editors will open for ${selectedCityOption.label}.`}
             </p>
-            <div className='bg-muted text-muted-foreground mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold'>
-              <Package2 className='h-3.5 w-3.5' />
-              {visibleProductsCount} products visible
-            </div>
+            {!isAdmin ? (
+              <div className='bg-muted text-muted-foreground mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold'>
+                <Package2 className='h-3.5 w-3.5' />
+                {visibleProductsCount} products visible
+              </div>
+            ) : null}
           </div>
         </section>
 
         <section className='space-y-4'>
           <div>
             <h2 className='text-foreground text-2xl font-semibold tracking-tight'>
-              Created Websites
+              {isAdmin ? 'All Websites' : 'Created Websites'}
             </h2>
             <p className='text-muted-foreground text-sm'>
-              Preview, edit, and review location-specific product visibility
-              from here.
+              {isAdmin
+                ? 'Browse every vendor website from one place. Admin access is preview-only.'
+                : 'Preview, edit, and review location-specific product visibility from here.'}
             </p>
           </div>
 
@@ -992,7 +1014,11 @@ export default function TemplateWorkspace() {
                 const templateKey = String(website.template_key || '').trim()
                 const websiteTemplate = templateByKey.get(templateKey)
                 const previewUrl = getVendorTemplatePreviewUrl(
-                  vendorPublicIdentifier || vendorId,
+                  String(
+                    website.vendor_id ||
+                      vendorPublicIdentifier ||
+                      vendorId
+                  ).trim(),
                   templateKey,
                   selectedCitySlug ||
                     effectiveDefaultCitySlug ||
@@ -1031,14 +1057,16 @@ export default function TemplateWorkspace() {
                             websiteTemplate?.name ||
                             templateKey}
                         </div>
-                        <button
-                          type='button'
-                          onClick={() => setDeleteTarget(website)}
-                          className='text-destructive inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm transition hover:bg-white'
-                          aria-label={`Delete ${website.name || website.business_name || 'website'}`}
-                        >
-                          <Trash2 className='h-4 w-4' />
-                        </button>
+                        {!isAdmin ? (
+                          <button
+                            type='button'
+                            onClick={() => setDeleteTarget(website)}
+                            className='text-destructive inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/90 shadow-sm transition hover:bg-white'
+                            aria-label={`Delete ${website.name || website.business_name || 'website'}`}
+                          >
+                            <Trash2 className='h-4 w-4' />
+                          </button>
+                        ) : null}
                       </div>
                     </div>
 
@@ -1052,6 +1080,18 @@ export default function TemplateWorkspace() {
                         <p className='text-muted-foreground mt-1 text-sm'>
                           Created {formatDate(website.createdAt)}
                         </p>
+                        {isAdmin ? (
+                          <p className='text-muted-foreground mt-2 text-sm'>
+                            Vendor:{' '}
+                            <span className='text-foreground font-medium'>
+                              {website.vendor_business_name ||
+                                website.vendor_name ||
+                                website.business_name ||
+                                website.vendor_email ||
+                                'Unknown vendor'}
+                            </span>
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className='border-border bg-background/70 rounded-2xl border p-3'>
@@ -1068,52 +1108,56 @@ export default function TemplateWorkspace() {
                         </p>
                       </div>
 
-                      <div className='border-border bg-background/70 rounded-2xl border p-3'>
-                        <div className='text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-[0.16em] uppercase'>
-                          <Package2 className='h-3.5 w-3.5' />
-                          Visible Products
-                        </div>
-                        <p className='text-foreground mt-2 text-sm font-medium'>
-                          {visibleProducts.length} products in{' '}
-                          {selectedCityOption.label}
-                        </p>
-                        {visibleProductLabels.length ? (
-                          <div className='mt-3 flex flex-wrap gap-2'>
-                            {visibleProductLabels.map((label) => (
-                              <span
-                                key={`${website._id}-${label}`}
-                                className='bg-muted text-muted-foreground inline-flex max-w-full items-center rounded-full px-3 py-1 text-xs font-medium'
-                              >
-                                <span className='truncate'>{label}</span>
-                              </span>
-                            ))}
-                            {visibleProducts.length >
-                            visibleProductLabels.length ? (
-                              <span className='bg-muted text-muted-foreground inline-flex items-center rounded-full px-3 py-1 text-xs font-medium'>
-                                +
-                                {visibleProducts.length -
-                                  visibleProductLabels.length}{' '}
-                                more
-                              </span>
-                            ) : null}
+                      {!isAdmin ? (
+                        <div className='border-border bg-background/70 rounded-2xl border p-3'>
+                          <div className='text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-[0.16em] uppercase'>
+                            <Package2 className='h-3.5 w-3.5' />
+                            Visible Products
                           </div>
-                        ) : (
-                          <p className='text-muted-foreground mt-2 text-sm'>
-                            No products mapped to this website for{' '}
-                            {selectedCityOption.label}.
+                          <p className='text-foreground mt-2 text-sm font-medium'>
+                            {visibleProducts.length} products in{' '}
+                            {selectedCityOption.label}
                           </p>
-                        )}
-                      </div>
+                          {visibleProductLabels.length ? (
+                            <div className='mt-3 flex flex-wrap gap-2'>
+                              {visibleProductLabels.map((label) => (
+                                <span
+                                  key={`${website._id}-${label}`}
+                                  className='bg-muted text-muted-foreground inline-flex max-w-full items-center rounded-full px-3 py-1 text-xs font-medium'
+                                >
+                                  <span className='truncate'>{label}</span>
+                                </span>
+                              ))}
+                              {visibleProducts.length >
+                              visibleProductLabels.length ? (
+                                <span className='bg-muted text-muted-foreground inline-flex items-center rounded-full px-3 py-1 text-xs font-medium'>
+                                  +
+                                  {visibleProducts.length -
+                                    visibleProductLabels.length}{' '}
+                                  more
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <p className='text-muted-foreground mt-2 text-sm'>
+                              No products mapped to this website for{' '}
+                              {selectedCityOption.label}.
+                            </p>
+                          )}
+                        </div>
+                      ) : null}
 
-                      <div className='mt-auto grid gap-3 sm:grid-cols-2'>
-                        <Button
-                          type='button'
-                          onClick={() => handleEditWebsite(website)}
-                          className='h-11 w-full rounded-2xl'
-                        >
-                          <PencilLine className='h-4 w-4' />
-                          Edit Website
-                        </Button>
+                      <div className={cn('mt-auto grid gap-3', !isAdmin && 'sm:grid-cols-2')}>
+                        {!isAdmin ? (
+                          <Button
+                            type='button'
+                            onClick={() => handleEditWebsite(website)}
+                            className='h-11 w-full rounded-2xl'
+                          >
+                            <PencilLine className='h-4 w-4' />
+                            Edit Website
+                          </Button>
+                        ) : null}
 
                         {previewUrl ? (
                           <a
@@ -1144,42 +1188,44 @@ export default function TemplateWorkspace() {
                         )}
                       </div>
 
-                      <div className='space-y-2'>
-                        <div className='flex items-center justify-between gap-2'>
-                          <p className='text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase'>
-                            Edit Pages
-                          </p>
-                          <span className='text-muted-foreground text-xs'>
-                            {selectedCityOption.label}
-                          </span>
+                      {!isAdmin ? (
+                        <div className='space-y-2'>
+                          <div className='flex items-center justify-between gap-2'>
+                            <p className='text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase'>
+                              Edit Pages
+                            </p>
+                            <span className='text-muted-foreground text-xs'>
+                              {selectedCityOption.label}
+                            </span>
+                          </div>
+                          <div className='flex flex-wrap gap-2'>
+                            {[
+                              ['Home', 'home'],
+                              ['About', 'about'],
+                              ['Contact', 'contact'],
+                              ['Pages', 'pages'],
+                              ['Social + FAQ', 'other'],
+                            ].map(([label, page]) => (
+                              <Button
+                                key={`${website._id}-${page}`}
+                                type='button'
+                                variant='outline'
+                                size='sm'
+                                className='h-9 rounded-full'
+                                onClick={() =>
+                                  openWebsiteEditor(
+                                    website,
+                                    page as WorkspaceEditorPage
+                                  )
+                                }
+                              >
+                                <PencilLine className='h-3.5 w-3.5' />
+                                {label}
+                              </Button>
+                            ))}
+                          </div>
                         </div>
-                        <div className='flex flex-wrap gap-2'>
-                          {[
-                            ['Home', 'home'],
-                            ['About', 'about'],
-                            ['Contact', 'contact'],
-                            ['Pages', 'pages'],
-                            ['Social + FAQ', 'other'],
-                          ].map(([label, page]) => (
-                            <Button
-                              key={`${website._id}-${page}`}
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              className='h-9 rounded-full'
-                              onClick={() =>
-                                openWebsiteEditor(
-                                  website,
-                                  page as WorkspaceEditorPage
-                                )
-                              }
-                            >
-                              <PencilLine className='h-3.5 w-3.5' />
-                              {label}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
+                      ) : null}
                     </div>
                   </article>
                 )
@@ -1189,26 +1235,29 @@ export default function TemplateWorkspace() {
             <div className='border-border bg-card rounded-[24px] border border-dashed px-6 py-12 text-center shadow-sm'>
               <LayoutTemplate className='text-muted-foreground mx-auto h-10 w-10' />
               <h3 className='text-foreground mt-4 text-xl font-semibold'>
-                No websites created yet
+                {isAdmin ? 'No websites found yet' : 'No websites created yet'}
               </h3>
               <p className='text-muted-foreground mt-2 text-sm'>
-                Create your first website from a template and it will appear
-                here with its preview link and edit access.
+                {isAdmin
+                  ? 'When vendors create websites, they will appear here with preview access.'
+                  : 'Create your first website from a template and it will appear here with its preview link and edit access.'}
               </p>
-              <Button
-                type='button'
-                onClick={openCreateDialog}
-                className='mt-6 h-11 rounded-2xl'
-              >
-                <Plus className='h-4 w-4' />
-                Create First Website
-              </Button>
+              {!isAdmin ? (
+                <Button
+                  type='button'
+                  onClick={openCreateDialog}
+                  className='mt-6 h-11 rounded-2xl'
+                >
+                  <Plus className='h-4 w-4' />
+                  Create First Website
+                </Button>
+              ) : null}
             </div>
           )}
         </section>
       </Main>
 
-      <Dialog open={dialogOpen} onOpenChange={handleCreateDialogOpenChange}>
+      <Dialog open={!isAdmin && dialogOpen} onOpenChange={handleCreateDialogOpenChange}>
         <DialogContent className='border-border bg-background w-[min(96vw,920px)] max-w-[min(96vw,920px)] gap-0 overflow-hidden rounded-none border p-0 sm:max-w-[min(96vw,920px)] [&>button]:rounded-none'>
           <div className='flex max-h-[90vh] flex-col'>
             <DialogHeader className='border-border border-b px-6 py-4 text-left sm:px-8'>
@@ -1419,7 +1468,7 @@ export default function TemplateWorkspace() {
       </Dialog>
 
       <ConfirmDialog
-        open={Boolean(deleteTarget)}
+        open={!isAdmin && Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!deletingWebsiteId) {
             if (!open) setDeleteTarget(null)
