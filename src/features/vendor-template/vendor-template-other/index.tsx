@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
+import { useNavigate } from '@tanstack/react-router'
+import { ArrowLeft, Link2, Wand2 } from 'lucide-react'
 
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
 import { useSelector } from 'react-redux'
@@ -13,8 +15,8 @@ import { Switch } from '@/components/ui/switch'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { DomainModal } from '../components/DomainModel'
 import { TemplatePageLayout } from '../components/TemplatePageLayout'
 import { TemplatePreviewPanel } from '../components/TemplatePreviewPanel'
 import { TemplateSectionOrder } from '../components/TemplateSectionOrder'
@@ -29,7 +31,8 @@ import {
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
-import { getStoredActiveWebsiteId } from '../components/websiteStudioStorage'
+import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
+import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
 
 const selectVendorId = (state: any): string | undefined => state?.auth?.user?.id
 
@@ -203,6 +206,7 @@ const initialData: TemplateData = {
 }
 
 function VendorTemplateOther() {
+  const navigate = useNavigate()
   const vendor_id = useSelector(selectVendorId)
   const token = useSelector((state: any) => state.auth?.token)
   const authDefaultCitySlug = useSelector(
@@ -211,15 +215,13 @@ function VendorTemplateOther() {
   const [data, setData] = useState<TemplateData>(initialData)
   const [isSaving, setIsSaving] = useState(false)
   const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [domainOpen, setDomainOpen] = useState(false)
   const [sectionOrder, setSectionOrder] = useState(['faqs', 'social', 'footer'])
   const selectedTemplateKey = useMemo(
     () => getStoredEditingTemplateKey(vendor_id),
     [vendor_id]
   )
-  const activeWebsiteId = useMemo(
-    () => getStoredActiveWebsiteId(vendor_id),
-    [vendor_id]
-  )
+  const { activeWebsiteId, activeWebsite } = useActiveWebsiteSelection(vendor_id)
 
   useEffect(() => {
     if (!vendor_id) return
@@ -436,6 +438,61 @@ function VendorTemplateOther() {
     selectedTemplateKey,
     previewCity.slug,
     activeWebsiteId
+  )
+  const { connectedDomain, connectedDomainState } = useConnectedTemplateDomain({
+    vendorId: vendor_id,
+    token,
+    activeWebsiteId,
+    skip: domainOpen,
+  })
+  const headerActions = (
+    <>
+      <Button
+        variant='outline'
+        onClick={() => void navigate({ to: '/template-workspace' })}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+      >
+        <ArrowLeft className='h-4 w-4' /> My Websites
+      </Button>
+      <Button
+        onClick={() => {
+          void handleSave()
+        }}
+        disabled={isSaving || !vendor_id}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-3 text-xs text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 sm:px-4 sm:text-sm'
+      >
+        {isSaving ? 'Saving...' : 'Save Template'}
+      </Button>
+      <Button
+        variant='outline'
+        onClick={() => setDomainOpen(true)}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+      >
+        <Wand2 className='h-4 w-4' />{' '}
+        {connectedDomainState === 'connected'
+          ? 'Domain Connected'
+          : connectedDomainState === 'error'
+            ? 'Domain Error'
+            : connectedDomain?.hostname
+              ? 'Domain Pending'
+              : 'Connect Domain'}
+      </Button>
+      {previewBaseUrl ? (
+        <a
+          href={previewBaseUrl}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='shrink-0'
+        >
+          <Button
+            variant='outline'
+            className='h-9 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+          >
+            <Link2 className='h-4 w-4' /> Open Preview
+          </Button>
+        </a>
+      ) : null}
+    </>
   )
   const footerConfig = (((data?.components?.social_page as any)?.footer ||
     {}) as Record<string, any>)
@@ -985,8 +1042,17 @@ function VendorTemplateOther() {
   return (
     <>
       <Header fixed>
-        <Search />
-        <div className='ms-auto flex items-center space-x-4'>
+        <div className='flex min-w-0 flex-1 items-center gap-3 overflow-hidden'>
+          <div className='shrink-0 text-sm font-semibold text-slate-900 sm:text-base'>
+            Edit Website
+          </div>
+          <div className='min-w-0 flex-1 overflow-x-auto'>
+            <div className='flex min-w-max items-center gap-2 pe-2'>
+              {headerActions}
+            </div>
+          </div>
+        </div>
+        <div className='ms-auto flex shrink-0 items-center space-x-4'>
           <ThemeSwitch />
           <ConfigDrawer />
           <ProfileDropdown />
@@ -996,18 +1062,10 @@ function VendorTemplateOther() {
         title='Social + FAQ Builder'
         description='Configure FAQ content and social channels that appear across the template. Reorder sections to control the flow.'
         activeKey='other'
+        vendorId={vendor_id}
+        connectedDomainHost={connectedDomain?.hostname || ''}
+        connectedDomainState={connectedDomainState}
         editingTemplateKey={selectedTemplateKey}
-        actions={
-          <Button
-            onClick={() => {
-              void handleSave()
-            }}
-            disabled={isSaving || !vendor_id}
-            className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
-          >
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </Button>
-        }
         preview={
           <TemplatePreviewPanel
             title='Live Template Preview'
@@ -1049,6 +1107,12 @@ function VendorTemplateOther() {
           <div key={sectionId}>{sectionBlocks[sectionId]}</div>
         ))}
       </TemplatePageLayout>
+      <DomainModal
+        open={domainOpen}
+        setOpen={setDomainOpen}
+        activeWebsiteName={activeWebsite?.name || activeWebsite?.websiteSlug || ''}
+        initialDomain={connectedDomain}
+      />
     </>
   )
 }

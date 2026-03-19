@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
+import { useNavigate } from '@tanstack/react-router'
+import { ArrowLeft, Link2, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Header } from '@/components/layout/header'
-import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ProfileDropdown } from '@/components/profile-dropdown'
+import { DomainModal } from '../components/DomainModel'
 import { TemplatePageLayout } from '../components/TemplatePageLayout'
 import { TemplatePreviewPanel } from '../components/TemplatePreviewPanel'
 import { TemplateSectionOrder } from '../components/TemplateSectionOrder'
@@ -29,7 +31,8 @@ import {
 import {
   getStoredEditingTemplateKey,
 } from '../components/templateVariantParam'
-import { getStoredActiveWebsiteId } from '../components/websiteStudioStorage'
+import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
+import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
 
 type PageSection = any
 
@@ -233,12 +236,15 @@ const slugify = (value: string) =>
     .replace(/(^-|-$)+/g, '')
 
 export default function VendorTemplatePages() {
+  const navigate = useNavigate()
   const [data, setData] = useState<TemplateData>(initialData)
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [inlineEditVersion, setInlineEditVersion] = useState(0)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
+  const [domainOpen, setDomainOpen] = useState(false)
   const vendor_id = useSelector((state: any) => state.auth?.user?.id)
+  const token = useSelector((state: any) => state.auth?.token)
   const authDefaultCitySlug = useSelector(
     (state: any) => state.auth?.user?.default_city_slug || ''
   )
@@ -246,10 +252,7 @@ export default function VendorTemplatePages() {
     () => getStoredEditingTemplateKey(vendor_id),
     [vendor_id]
   )
-  const activeWebsiteId = useMemo(
-    () => getStoredActiveWebsiteId(vendor_id),
-    [vendor_id]
-  )
+  const { activeWebsiteId, activeWebsite } = useActiveWebsiteSelection(vendor_id)
 
   useEffect(() => {
     if (!vendor_id) return
@@ -320,6 +323,12 @@ export default function VendorTemplatePages() {
     previewCity.slug,
     activeWebsiteId
   )
+  const { connectedDomain, connectedDomainState } = useConnectedTemplateDomain({
+    vendorId: vendor_id,
+    token,
+    activeWebsiteId,
+    skip: domainOpen,
+  })
   const previewPath = selectedPage?.slug ? `/page/${selectedPage.slug}` : ''
 
   const sectionOrder = useMemo(() => {
@@ -509,6 +518,53 @@ export default function VendorTemplatePages() {
       setIsSaving(false)
     }
   }, [activeWebsiteId, data.components.theme, pages, vendor_id])
+  const headerActions = (
+    <>
+      <Button
+        variant='outline'
+        onClick={() => void navigate({ to: '/template-workspace' })}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+      >
+        <ArrowLeft className='h-4 w-4' /> My Websites
+      </Button>
+      <Button
+        onClick={handleSave}
+        disabled={isSaving}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-3 text-xs text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 sm:px-4 sm:text-sm'
+      >
+        {isSaving ? 'Saving...' : 'Save Template'}
+      </Button>
+      <Button
+        variant='outline'
+        onClick={() => setDomainOpen(true)}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+      >
+        <Wand2 className='h-4 w-4' />{' '}
+        {connectedDomainState === 'connected'
+          ? 'Domain Connected'
+          : connectedDomainState === 'error'
+            ? 'Domain Error'
+            : connectedDomain?.hostname
+              ? 'Domain Pending'
+              : 'Connect Domain'}
+      </Button>
+      {previewBaseUrl ? (
+        <a
+          href={previewBaseUrl}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='shrink-0'
+        >
+          <Button
+            variant='outline'
+            className='h-9 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+          >
+            <Link2 className='h-4 w-4' /> Open Preview
+          </Button>
+        </a>
+      ) : null}
+    </>
+  )
 
   const updateField = (path: string[], value: any) => {
     setData((prev) => updateFieldImmutable(prev, path, value))
@@ -541,8 +597,17 @@ export default function VendorTemplatePages() {
   return (
     <>
       <Header fixed>
-        <Search />
-        <div className='ms-auto flex items-center space-x-4'>
+        <div className='flex min-w-0 flex-1 items-center gap-3 overflow-hidden'>
+          <div className='shrink-0 text-sm font-semibold text-slate-900 sm:text-base'>
+            Edit Website
+          </div>
+          <div className='min-w-0 flex-1 overflow-x-auto'>
+            <div className='flex min-w-max items-center gap-2 pe-2'>
+              {headerActions}
+            </div>
+          </div>
+        </div>
+        <div className='ms-auto flex shrink-0 items-center space-x-4'>
           <ThemeSwitch />
           <ConfigDrawer />
           <ProfileDropdown />
@@ -553,24 +618,18 @@ export default function VendorTemplatePages() {
         title='Custom Pages Builder'
         description='Create additional pages for your storefront, organize sections, and keep the navbar in sync.'
         activeKey='pages'
+        vendorId={vendor_id}
+        connectedDomainHost={connectedDomain?.hostname || ''}
+        connectedDomainState={connectedDomainState}
         editingTemplateKey={selectedTemplateKey}
         actions={
-          <>
-            <Button
-              onClick={handleAddPage}
-              variant='outline'
-              className='rounded-full border-slate-300'
-            >
-              Add Page
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
-              className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
-            >
-              {isSaving ? 'Saving...' : 'Save Pages'}
-            </Button>
-          </>
+          <Button
+            onClick={handleAddPage}
+            variant='outline'
+            className='rounded-full border-slate-300'
+          >
+            Add Page
+          </Button>
         }
         preview={
           <TemplatePreviewPanel
@@ -1756,6 +1815,12 @@ export default function VendorTemplatePages() {
           </div>
         </div>
       </TemplatePageLayout>
+      <DomainModal
+        open={domainOpen}
+        setOpen={setDomainOpen}
+        activeWebsiteName={activeWebsite?.name || activeWebsite?.websiteSlug || ''}
+        initialDomain={connectedDomain}
+      />
     </>
   )
 }

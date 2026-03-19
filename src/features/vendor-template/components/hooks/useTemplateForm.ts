@@ -8,7 +8,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { initialData } from '../../data'
 import { updateFieldImmutable } from './utils'
 import { uploadFile, uploadImage } from '../../helper/fileupload'
-import { getStoredActiveWebsiteId } from '../websiteStudioStorage'
+import { useActiveWebsiteSelection } from '../websiteStudioStorage'
 
 type TemplateCatalogItem = {
   key: string
@@ -74,7 +74,7 @@ export function useTemplateForm() {
   const vendor_default_city_slug = String(
     vendorProfile?.default_city_slug || authUser?.default_city_slug || ''
   ).trim()
-  const activeWebsiteId = getStoredActiveWebsiteId(vendor_id)
+  const { activeWebsite, activeWebsiteId } = useActiveWebsiteSelection(vendor_id)
   const isAdmin = role === 'admin' || role === 'superadmin'
 
   const dispatch = useDispatch<AppDispatch>()
@@ -433,6 +433,8 @@ export function useTemplateForm() {
     vendor_weburl,
     vendor_default_city_slug,
     activeWebsiteId,
+    activeWebsite,
+    token,
     loadedSectionOrder,
     isAdmin,
     deleteTemplateVariant,

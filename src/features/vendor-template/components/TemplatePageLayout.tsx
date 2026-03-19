@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import {
   getTemplateDisplayName,
 } from './templateVariantParam'
+import { useActiveWebsiteSelection } from './websiteStudioStorage'
 
 const navItems = [
   { key: 'home', label: 'Home', to: '/vendor-template' },
@@ -32,24 +33,30 @@ interface TemplatePageLayoutProps {
   title: string
   description: string
   activeKey: string
+  vendorId?: string
   editingTemplateKey?: string
   showNavigation?: boolean
   actions?: ReactNode
   topContent?: ReactNode
   preview?: ReactNode
   children?: ReactNode
+  connectedDomainHost?: string
+  connectedDomainState?: 'connected' | 'pending' | 'error'
 }
 
 export function TemplatePageLayout({
-  title,
-  description,
+  title: _title,
+  description: _description,
   activeKey,
+  vendorId,
   editingTemplateKey,
   showNavigation = true,
   actions,
   topContent,
   preview,
   children,
+  connectedDomainHost,
+  connectedDomainState,
 }: TemplatePageLayoutProps) {
   const [editorPanelWidth, setEditorPanelWidth] = useState(DEFAULT_EDITOR_PANEL_WIDTH)
   const [isResizing, setIsResizing] = useState(false)
@@ -63,6 +70,21 @@ export function TemplatePageLayout({
   const hasMainContent = preview != null || children != null
   const isSplitLayout = Boolean(preview && children)
   const templateName = getTemplateDisplayName(editingTemplateKey)
+  const { activeWebsite } = useActiveWebsiteSelection(vendorId)
+  const domainBadgeLabel =
+    connectedDomainState === 'connected'
+      ? 'Domain Connected'
+      : connectedDomainState === 'error'
+        ? 'Domain Error'
+        : connectedDomainState === 'pending'
+          ? 'Domain Pending'
+          : ''
+  const domainBadgeClass =
+    connectedDomainState === 'connected'
+      ? 'border-sky-200 bg-sky-50 text-sky-700'
+      : connectedDomainState === 'error'
+        ? 'border-red-200 bg-red-50 text-red-700'
+        : 'border-amber-200 bg-amber-50 text-amber-700'
   const resolvedNavItems = navItems.map((item) =>
     item.key === 'home' && editingTemplateKey
       ? {
@@ -242,21 +264,39 @@ export function TemplatePageLayout({
         <header className='rounded-3xl border border-white/60 bg-white/80 p-6 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.35)] backdrop-blur'>
           <div className='flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between'>
             <div>
-              <p className='text-xs font-semibold uppercase tracking-[0.3em] text-slate-500'>
-                Template Studio
-              </p>
-              <h1 className='mt-2 text-3xl font-semibold text-slate-900 sm:text-4xl'>
-                {title}
-              </h1>
-              <p className='mt-2 max-w-2xl text-sm text-slate-600 sm:text-base'>
-                {description}
-              </p>
-              <p className='mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600'>
+            
+              <p className=' inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600'>
                 Editing Template: {editingTemplateKey ? templateName : 'Default'}
                 <span className='rounded-full bg-slate-100 px-2 py-0.5 text-[11px] uppercase tracking-[0.12em] text-slate-500'>
                   {editingTemplateKey || 'active'}
                 </span>
               </p>
+              {activeWebsite?.id ? (
+                <p className='mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700'>
+                  Website:
+                  <span className='rounded-full bg-white px-2 py-0.5 text-[11px] uppercase tracking-[0.12em] text-emerald-700'>
+                    {activeWebsite.name || activeWebsite.websiteSlug || activeWebsite.id}
+                  </span>
+                </p>
+              ) : null}
+              {connectedDomainHost ? (
+                <div className='mt-3'>
+                  <a
+                    href={`https://${connectedDomainHost}`}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition hover:shadow-sm',
+                      domainBadgeClass
+                    )}
+                  >
+                    {domainBadgeLabel}:
+                    <span className='rounded-full bg-white px-2 py-0.5 text-[11px] tracking-[0.04em]'>
+                      {connectedDomainHost}
+                    </span>
+                  </a>
+                </div>
+              ) : null}
             </div>
             <div className='flex flex-wrap items-center gap-3'>{actions}</div>
           </div>

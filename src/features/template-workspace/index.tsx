@@ -6,13 +6,12 @@ import { BASE_URL } from '@/store/slices/vendor/productSlice'
 import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import {
   Building2,
+  ChartColumn,
   ExternalLink,
   Globe,
   LayoutTemplate,
   Loader2,
   MapPinned,
-  Package2,
-  PencilLine,
   Plus,
   RefreshCw,
   Trash2,
@@ -42,12 +41,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
 import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { Main } from '@/components/layout/main'
 import { setStoredEditingTemplateKey } from '@/features/vendor-template/components/templateVariantParam'
 import {
+  setStoredActiveWebsite,
   getStoredActiveWebsiteId,
-  setStoredActiveWebsiteId,
+  useActiveWebsiteSelection,
 } from '@/features/vendor-template/components/websiteStudioStorage'
 
 type TemplateAudience = 'b2b' | 'b2c'
@@ -88,8 +89,6 @@ type VendorProduct = {
   availableCities?: unknown[]
   websiteIds?: unknown[]
 }
-
-type WorkspaceEditorPage = 'home' | 'about' | 'contact' | 'pages' | 'other'
 
 const cardClass =
   'group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-md'
@@ -375,10 +374,12 @@ export default function TemplateWorkspace() {
   const [websiteName, setWebsiteName] = useState('')
   const [selectedCitySlug, setSelectedCitySlug] = useState('')
   const [previewCityTouched, setPreviewCityTouched] = useState(false)
+  const [statisticsOpen, setStatisticsOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<WebsiteCard | null>(null)
   const [deletingWebsiteId, setDeletingWebsiteId] = useState<string | null>(
     null
   )
+  const { activeWebsiteId } = useActiveWebsiteSelection(vendorId)
 
   const availableTemplates = useMemo(
     () =>
@@ -487,6 +488,32 @@ export default function TemplateWorkspace() {
       extractIdList(product.availableCities).includes(selectedCityId)
     ).length
   }, [products, selectedCityId, selectedCitySlug])
+
+  const statisticsItems = useMemo(
+    () => [
+      {
+        label: 'Websites',
+        value: websites.length,
+        helper: 'Website entries available in this workspace.',
+      },
+      {
+        label: 'Templates',
+        value: availableTemplates.length,
+        helper: 'Templates ready for new website creation.',
+      },
+      {
+        label: 'Visible Products',
+        value: visibleProductsCount,
+        helper: `Products currently visible for ${selectedCityOption.label}.`,
+      },
+      {
+        label: 'Preview Location',
+        value: selectedCityOption.label,
+        helper: 'Preview links and editors use this location.',
+      },
+    ],
+    [availableTemplates.length, selectedCityOption.label, visibleProductsCount, websites.length]
+  )
 
   const loadWorkspace = async () => {
     if (!vendorId) {
@@ -689,7 +716,7 @@ export default function TemplateWorkspace() {
 
   const openWebsiteEditor = (
     website: WebsiteCard,
-    page: WorkspaceEditorPage = 'home'
+    page: 'home' | 'about' | 'contact' | 'pages' | 'other' = 'home'
   ) => {
     const templateKey = String(website.template_key || '').trim()
     if (!vendorId || !templateKey) {
@@ -697,7 +724,12 @@ export default function TemplateWorkspace() {
       return
     }
 
-    setStoredActiveWebsiteId(vendorId, website._id)
+    setStoredActiveWebsite(vendorId, {
+      id: website._id,
+      name: website.name || website.business_name || '',
+      templateKey,
+      websiteSlug: website.website_slug || website._id,
+    })
     setStoredEditingTemplateKey(vendorId, templateKey)
     setStoredTemplatePreviewCity(
       selectedCitySlug ||
@@ -734,22 +766,6 @@ export default function TemplateWorkspace() {
 
   const handleEditWebsite = (website: WebsiteCard) => {
     openWebsiteEditor(website, 'home')
-  }
-
-  const getVisibleProductsForWebsite = (websiteId: string) => {
-    return products.filter((product) => {
-      if (product.isAvailable === false) return false
-
-      const websiteIds = extractIdList(product.websiteIds)
-      const matchesWebsite =
-        !websiteIds.length || websiteIds.includes(websiteId)
-      if (!matchesWebsite) return false
-
-      if (selectedCitySlug === 'all') return true
-      if (!selectedCityId) return false
-
-      return extractIdList(product.availableCities).includes(selectedCityId)
-    })
   }
 
   const handleCreateWebsite = async () => {
@@ -797,7 +813,17 @@ export default function TemplateWorkspace() {
         throw new Error('Website was created, but editor data is incomplete')
       }
 
-      setStoredActiveWebsiteId(vendorId, createdWebsiteId)
+      setStoredActiveWebsite(vendorId, {
+        id: createdWebsiteId,
+        name:
+          String(
+            createdWebsite?.name || createdWebsite?.business_name || cleanName
+          ).trim() || cleanName,
+        templateKey: createdTemplateKey,
+        websiteSlug:
+          String(createdWebsite?.website_slug || createdWebsiteId).trim() ||
+          createdWebsiteId,
+      })
       setStoredEditingTemplateKey(vendorId, createdTemplateKey)
       setDialogOpen(false)
       toast.success('Website created. Opening builder...')
@@ -838,7 +864,7 @@ export default function TemplateWorkspace() {
       )
 
       if (vendorId && getStoredActiveWebsiteId(vendorId) === deleteTarget._id) {
-        setStoredActiveWebsiteId(vendorId, undefined)
+        setStoredActiveWebsite(vendorId, undefined)
         setStoredEditingTemplateKey(vendorId, undefined)
       }
 
@@ -872,6 +898,44 @@ export default function TemplateWorkspace() {
   return (
     <>
       <TablePageHeader title='My Websites'>
+        {activeWebsiteId ? (
+          <div className='inline-flex h-11 min-w-[220px] shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-emerald-50 to-white px-4 text-sm font-semibold text-emerald-700 shadow-sm'>
+            <Globe className='h-4 w-4 shrink-0' />
+            <span className='whitespace-nowrap'>Active website selected</span>
+          </div>
+        ) : null}
+        <div className='min-w-[240px] shrink-0'>
+          <Select
+            value={selectedCitySlug || 'all'}
+            onValueChange={(value) => {
+              setPreviewCityTouched(true)
+              setSelectedCitySlug(value)
+            }}
+          >
+            <SelectTrigger className='h-11 rounded-xl'>
+              <div className='flex min-w-0 items-center gap-2 truncate'>
+                <MapPinned className='text-muted-foreground h-4 w-4 shrink-0' />
+                <SelectValue placeholder='Preview Location' />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {cityOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
+          type='button'
+          variant='outline'
+          className='shrink-0'
+          onClick={() => setStatisticsOpen(true)}
+        >
+          <ChartColumn className='h-4 w-4' />
+          Statistics
+        </Button>
         <Button
           type='button'
           variant='outline'
@@ -893,87 +957,14 @@ export default function TemplateWorkspace() {
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-6'>
-        <section className='grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(220px,0.6fr)_minmax(220px,0.6fr)_minmax(240px,0.8fr)]'>
-          <div className='border-border bg-card rounded-2xl border p-6 shadow-sm'>
-            <p className='text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase'>
-              Workspace
-            </p>
-            <h2 className='text-foreground mt-2 text-xl font-semibold tracking-tight'>
-              Manage storefront websites for {vendorName}
-            </h2>
-            <p className='text-muted-foreground mt-2 text-sm leading-6'>
-              Create a new website from any available template, jump straight
-              into the builder, and manage every preview link from this one
-              page.
-            </p>
-          </div>
-
-          <div className='border-border bg-card rounded-2xl border p-5 shadow-sm'>
-            <p className='text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase'>
-              Websites
-            </p>
-            <p className='text-foreground mt-2 text-3xl font-semibold tracking-tight'>
-              {websites.length}
-            </p>
-            <p className='text-muted-foreground mt-2 text-sm'>
-              Active website entries in your workspace.
-            </p>
-          </div>
-
-          <div className='border-border bg-card rounded-2xl border p-5 shadow-sm'>
-            <p className='text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase'>
-              Templates
-            </p>
-            <p className='text-foreground mt-2 text-3xl font-semibold tracking-tight'>
-              {availableTemplates.length}
-            </p>
-            <p className='text-muted-foreground mt-2 text-sm'>
-              Starting layouts ready for new websites.
-            </p>
-          </div>
-
-          <div className='border-border bg-card rounded-2xl border p-5 shadow-sm'>
-            <div className='text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-[0.16em] uppercase'>
-              <MapPinned className='h-3.5 w-3.5' />
-              Preview Location
-            </div>
-            <Select
-              value={selectedCitySlug || 'all'}
-              onValueChange={(value) => {
-                setPreviewCityTouched(true)
-                setSelectedCitySlug(value)
-              }}
-            >
-              <SelectTrigger className='mt-3 h-11 w-full rounded-xl'>
-                <SelectValue placeholder='Select location' />
-              </SelectTrigger>
-              <SelectContent>
-                {cityOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className='text-muted-foreground mt-3 text-sm'>
-              Preview URLs and page editors will open for{' '}
-              {selectedCityOption.label}.
-            </p>
-            <div className='bg-muted text-muted-foreground mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold'>
-              <Package2 className='h-3.5 w-3.5' />
-              {visibleProductsCount} products visible
-            </div>
-          </div>
-        </section>
-
         <section className='space-y-4'>
           <div>
             <h2 className='text-foreground text-2xl font-semibold tracking-tight'>
               Created Websites
             </h2>
             <p className='text-muted-foreground text-sm'>
-              Preview, edit, and review location-specific product visibility
-              from here.
+              Preview, edit, and manage storefront websites for{' '}
+              {selectedCityOption.label} from here.
             </p>
           </div>
 
@@ -989,6 +980,7 @@ export default function TemplateWorkspace() {
           ) : websites.length ? (
             <div className='grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
               {websites.map((website) => {
+                const isActiveWebsite = activeWebsiteId === website._id
                 const templateKey = String(website.template_key || '').trim()
                 const websiteTemplate = templateByKey.get(templateKey)
                 const previewUrl = getVendorTemplatePreviewUrl(
@@ -1001,18 +993,15 @@ export default function TemplateWorkspace() {
                 )
                 const thumbnail =
                   website.previewImage || websiteTemplate?.previewImage || ''
-                const visibleProducts = getVisibleProductsForWebsite(
-                  website._id
-                )
-                const visibleProductLabels = visibleProducts
-                  .slice(0, 4)
-                  .map((product) =>
-                    String(product.productName || 'Untitled Product').trim()
-                  )
-                  .filter(Boolean)
-
                 return (
-                  <article key={website._id} className={cardClass}>
+                  <article
+                    key={website._id}
+                    className={cn(
+                      cardClass,
+                      isActiveWebsite &&
+                        'ring-2 ring-emerald-500 ring-offset-2 ring-offset-background'
+                    )}
+                  >
                     <div className='relative'>
                       <StorefrontThumbnail
                         title={
@@ -1026,10 +1015,17 @@ export default function TemplateWorkspace() {
                       />
 
                       <div className='absolute inset-x-0 top-0 flex items-start justify-between p-4'>
-                        <div className='inline-flex rounded-full border border-white/30 bg-black/55 px-3 py-1 text-xs font-semibold text-white backdrop-blur'>
-                          {website.template_name ||
-                            websiteTemplate?.name ||
-                            templateKey}
+                        <div className='flex flex-wrap items-center gap-2'>
+                          <div className='inline-flex rounded-full border border-white/30 bg-black/55 px-3 py-1 text-xs font-semibold text-white backdrop-blur'>
+                            {website.template_name ||
+                              websiteTemplate?.name ||
+                              templateKey}
+                          </div>
+                          {isActiveWebsite ? (
+                            <div className='inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700'>
+                              Selected Website
+                            </div>
+                          ) : null}
                         </div>
                         <button
                           type='button'
@@ -1068,50 +1064,12 @@ export default function TemplateWorkspace() {
                         </p>
                       </div>
 
-                      <div className='border-border bg-background/70 rounded-2xl border p-3'>
-                        <div className='text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-[0.16em] uppercase'>
-                          <Package2 className='h-3.5 w-3.5' />
-                          Visible Products
-                        </div>
-                        <p className='text-foreground mt-2 text-sm font-medium'>
-                          {visibleProducts.length} products in{' '}
-                          {selectedCityOption.label}
-                        </p>
-                        {visibleProductLabels.length ? (
-                          <div className='mt-3 flex flex-wrap gap-2'>
-                            {visibleProductLabels.map((label) => (
-                              <span
-                                key={`${website._id}-${label}`}
-                                className='bg-muted text-muted-foreground inline-flex max-w-full items-center rounded-full px-3 py-1 text-xs font-medium'
-                              >
-                                <span className='truncate'>{label}</span>
-                              </span>
-                            ))}
-                            {visibleProducts.length >
-                            visibleProductLabels.length ? (
-                              <span className='bg-muted text-muted-foreground inline-flex items-center rounded-full px-3 py-1 text-xs font-medium'>
-                                +
-                                {visibleProducts.length -
-                                  visibleProductLabels.length}{' '}
-                                more
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <p className='text-muted-foreground mt-2 text-sm'>
-                            No products mapped to this website for{' '}
-                            {selectedCityOption.label}.
-                          </p>
-                        )}
-                      </div>
-
                       <div className='mt-auto grid gap-3 sm:grid-cols-2'>
                         <Button
                           type='button'
                           onClick={() => handleEditWebsite(website)}
                           className='h-11 w-full rounded-2xl'
                         >
-                          <PencilLine className='h-4 w-4' />
                           Edit Website
                         </Button>
 
@@ -1144,42 +1102,6 @@ export default function TemplateWorkspace() {
                         )}
                       </div>
 
-                      <div className='space-y-2'>
-                        <div className='flex items-center justify-between gap-2'>
-                          <p className='text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase'>
-                            Edit Pages
-                          </p>
-                          <span className='text-muted-foreground text-xs'>
-                            {selectedCityOption.label}
-                          </span>
-                        </div>
-                        <div className='flex flex-wrap gap-2'>
-                          {[
-                            ['Home', 'home'],
-                            ['About', 'about'],
-                            ['Contact', 'contact'],
-                            ['Pages', 'pages'],
-                            ['Social + FAQ', 'other'],
-                          ].map(([label, page]) => (
-                            <Button
-                              key={`${website._id}-${page}`}
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              className='h-9 rounded-full'
-                              onClick={() =>
-                                openWebsiteEditor(
-                                  website,
-                                  page as WorkspaceEditorPage
-                                )
-                              }
-                            >
-                              <PencilLine className='h-3.5 w-3.5' />
-                              {label}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
                     </div>
                   </article>
                 )
@@ -1416,10 +1338,18 @@ export default function TemplateWorkspace() {
             </div>
           </div>
         </DialogContent>
-      </Dialog>
+        </Dialog>
 
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
+        <StatisticsDialog
+          open={statisticsOpen}
+          onOpenChange={setStatisticsOpen}
+          title='Workspace Statistics'
+          description={`Overview for ${vendorName} in ${selectedCityOption.label}.`}
+          items={statisticsItems}
+        />
+
+        <ConfirmDialog
+          open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!deletingWebsiteId) {
             if (!open) setDeleteTarget(null)

@@ -18,8 +18,8 @@ import { TemplateVariantSelector } from './components/form/TemplateVariantSelect
 
 import { ThemeSettingsSection } from './components/form/ThemeSettingsSection'
 import { useTemplateForm } from './components/hooks/useTemplateForm'
+import { useConnectedTemplateDomain } from './components/hooks/useConnectedTemplateDomain'
 import { Header } from '@/components/layout/header'
-import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -67,6 +67,8 @@ export default function TemplateForm() {
     isDeletingTemplateKey,
     vendor_default_city_slug,
     activeWebsiteId,
+    activeWebsite,
+    token,
   } = useTemplateForm()
 
   const handleInlineEdit = (path: string[], value: unknown) => {
@@ -234,6 +236,12 @@ export default function TemplateForm() {
     previewCity.slug,
     activeWebsiteId
   )
+  const { connectedDomain, connectedDomainState } = useConnectedTemplateDomain({
+    vendorId: vendor_id,
+    token,
+    activeWebsiteId,
+    skip: domainOpen,
+  })
   const isEditingWebsite = Boolean(activeWebsiteId)
 
   const handleSubmitWithOrder = () => handleSubmit(sectionOrder)
@@ -486,6 +494,68 @@ export default function TemplateForm() {
       .slice(0, 12)
   }, [builderSearchTargets, builderSearchTerm])
 
+  const builderHeaderActions = isBuilderOpen ? (
+    <>
+      <Button
+        variant='outline'
+        onClick={() => {
+          setIsBuilderOpen(false)
+          setSelectedSection(null)
+          setSelectedComponent(null)
+          void navigate({ to: '/template-workspace' })
+        }}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+      >
+        <ArrowLeft className='h-4 w-4' /> My Websites
+      </Button>
+      {!isEditingWebsite ? (
+        <Button
+          onClick={applyTemplateVariant}
+          disabled={isUpdatingTemplate || selectedTemplateKey === activeTemplateKey}
+          className='h-9 shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-3 text-xs text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 sm:px-4 sm:text-sm'
+        >
+          {isUpdatingTemplate ? 'Applying...' : 'Set as Default'}
+        </Button>
+      ) : null}
+      <Button
+        onClick={handleSubmitWithOrder}
+        disabled={isSubmitting || uploadingPaths.size > 0}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-3 text-xs text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 sm:px-4 sm:text-sm'
+      >
+        {isSubmitting ? 'Saving...' : 'Save Template'}
+      </Button>
+      <Button
+        variant='outline'
+        onClick={() => setDomainOpen(true)}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+      >
+        <Wand2 className='h-4 w-4' />{' '}
+        {connectedDomainState === 'connected'
+          ? 'Domain Connected'
+          : connectedDomainState === 'error'
+            ? 'Domain Error'
+            : connectedDomain?.hostname
+              ? 'Domain Pending'
+              : 'Connect Domain'}
+      </Button>
+      {previewBaseUrl ? (
+        <a
+          href={previewBaseUrl}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='shrink-0'
+        >
+          <Button
+            variant='outline'
+            className='h-9 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+          >
+            <Link2 className='h-4 w-4' /> Open Preview
+          </Button>
+        </a>
+      ) : null}
+    </>
+  ) : null
+
   const sectionBlocks: Record<string, JSX.Element> = {
     branding: (
       <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
@@ -695,8 +765,19 @@ export default function TemplateForm() {
   return (
     <>
       <Header fixed>
-        <Search />
-        <div className='ms-auto flex items-center space-x-4'>
+        <div className='flex min-w-0 flex-1 items-center gap-3 overflow-hidden'>
+          <div className='shrink-0 text-sm font-semibold text-slate-900 sm:text-base'>
+            Edit Website
+          </div>
+          {builderHeaderActions ? (
+            <div className='min-w-0 flex-1 overflow-x-auto'>
+              <div className='flex min-w-max items-center gap-2 pe-2'>
+                {builderHeaderActions}
+              </div>
+            </div>
+          ) : null}
+        </div>
+        <div className='ms-auto flex shrink-0 items-center space-x-4'>
           <ThemeSwitch />
           <ConfigDrawer />
           <ProfileDropdown />
@@ -714,6 +795,9 @@ export default function TemplateForm() {
             : 'Select a storefront template card first. The editor and live preview will open after selection.'
         }
         activeKey='home'
+        vendorId={vendor_id}
+        connectedDomainHost={connectedDomain?.hostname || ''}
+        connectedDomainState={connectedDomainState}
         editingTemplateKey={selectedTemplateKey}
         showNavigation={isBuilderOpen}
         topContent={
@@ -751,61 +835,6 @@ export default function TemplateForm() {
                 <p className='text-sm text-slate-500'>
                   No templates found for "{templateSearchTerm.trim()}".
                 </p>
-              ) : null}
-            </>
-          ) : null
-        }
-        actions={
-          isBuilderOpen ? (
-            <>
-              <Button
-                variant='outline'
-                onClick={() => {
-                  setIsBuilderOpen(false)
-                  setSelectedSection(null)
-                  setSelectedComponent(null)
-                  void navigate({ to: '/template-workspace' })
-                }}
-                className='rounded-full border-slate-300'
-              >
-                <ArrowLeft className='h-4 w-4' /> My Websites
-              </Button>
-              {!isEditingWebsite ? (
-                <Button
-                  onClick={applyTemplateVariant}
-                  disabled={isUpdatingTemplate || selectedTemplateKey === activeTemplateKey}
-                  className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
-                >
-                  {isUpdatingTemplate ? 'Applying...' : 'Set as Default'}
-                </Button>
-              ) : null}
-              <Button
-                onClick={handleSubmitWithOrder}
-                disabled={isSubmitting || uploadingPaths.size > 0}
-                className='rounded-full bg-slate-900 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800'
-              >
-                {isSubmitting ? 'Saving...' : 'Save Template'}
-              </Button>
-              <Button
-                variant='outline'
-                onClick={() => setDomainOpen(true)}
-                className='rounded-full border-slate-300'
-              >
-                <Wand2 className='h-4 w-4' /> Connect Domain
-              </Button>
-              {previewBaseUrl ? (
-                <a
-                  href={previewBaseUrl}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                >
-                  <Button
-                    variant='outline'
-                    className='rounded-full border-slate-300'
-                  >
-                    <Link2 className='h-4 w-4' /> Open Preview
-                  </Button>
-                </a>
               ) : null}
             </>
           ) : null
@@ -919,7 +948,12 @@ export default function TemplateForm() {
           </>
         ) : null}
       </TemplatePageLayout>
-      <DomainModal open={domainOpen} setOpen={setDomainOpen} />
+      <DomainModal
+        open={domainOpen}
+        setOpen={setDomainOpen}
+        activeWebsiteName={activeWebsite?.name || activeWebsite?.websiteSlug || ''}
+        initialDomain={connectedDomain}
+      />
     </>
   )
 }
