@@ -104,7 +104,7 @@ const statusLabel: Record<string, string> = {
   checking: 'Checking...',
   unconfigured: 'Not connected',
   pending_dns: 'Waiting for DNS',
-  active: 'Live',
+  active: 'DNS Connected',
   error: 'Error',
 }
 
@@ -334,21 +334,32 @@ export function DomainModal({
     String(liveProbe?.preferredUrl || '').trim() ||
     (currentDomain?.hostname ? `https://${currentDomain.hostname}` : '')
   const selectedWebsiteLive = Boolean(liveProbe?.matched)
+  const liveStatusCode =
+    typeof liveProbe?.statusCode === 'number' ? liveProbe.statusCode : 0
+  const hasLiveServerError = liveStatusCode >= 500
   const liveCheckSummary = selectedWebsiteLive
     ? 'Selected website is responding on this domain right now.'
+    : hasLiveServerError
+      ? `The domain reached your server, but the live site returned HTTP ${liveStatusCode}. Check nginx/upstream on the VM and finish SSL provisioning for this hostname.`
+    : String(liveProbe?.message || '').trim()
+      ? String(liveProbe?.message || '').trim()
     : liveProbe?.endpointDetected
       ? 'This domain is serving a storefront, but it does not match the currently selected website.'
       : liveProbe?.headerDetected
-      ? 'This domain is serving a storefront, but it does not match the currently selected website.'
+        ? 'This domain is serving a storefront, but it does not match the currently selected website.'
       : liveProbe?.reachable && currentStatus === 'active'
-        ? 'The domain is reachable and appears to be serving your site.'
+        ? 'The domain is reaching your server, but the selected website could not be verified yet.'
       : currentStatus === 'active'
         ? 'DNS is pointed correctly, but the live storefront identity could not be verified yet.'
         : 'Save the domain and update DNS records to see live confirmation here.'
   const liveCheckLabel = selectedWebsiteLive
     ? 'Confirmed'
+    : hasLiveServerError
+      ? 'Error'
+    : liveProbe?.endpointDetected || liveProbe?.headerDetected
+      ? 'Mismatch'
     : liveProbe?.reachable && currentStatus === 'active'
-      ? 'Connected'
+      ? 'Reachable'
       : liveProbe?.reachable
         ? 'Detected'
         : 'Pending'
@@ -394,6 +405,8 @@ export function DomainModal({
           : 'neutral'
   const liveCheckTone = selectedWebsiteLive
     ? 'success'
+    : hasLiveServerError || currentDomain?.ssl_status === 'error'
+      ? 'error'
     : liveProbe?.reachable
       ? 'warning'
       : 'neutral'
@@ -597,6 +610,12 @@ export function DomainModal({
                       </div>
                     </div>
                     <div className='mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600'>
+                      {liveStatusCode ? (
+                        <p>
+                          <span className='font-medium'>HTTP status:</span>{' '}
+                          {liveStatusCode}
+                        </p>
+                      ) : null}
                       {liveProbe?.protocol ? (
                         <p>
                           <span className='font-medium'>Detected via:</span>{' '}
