@@ -106,7 +106,7 @@ export function UserAuthForm({
           allowOutsideClick: false,
         });
 
-        navigate({ to: "/profile" });
+        navigate({ to: "/profile", replace: true });
         return;
       }
 
@@ -126,7 +126,7 @@ export function UserAuthForm({
         showConfirmButton: false,
         timer: 1500,
       });
-      navigate({ to: redirectTo || "/" });
+      navigate({ to: redirectTo || "/", replace: true });
 
     }
     else {

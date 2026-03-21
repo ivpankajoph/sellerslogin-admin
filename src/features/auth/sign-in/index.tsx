@@ -1,6 +1,6 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   Card,
   CardContent,
@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/card'
 import { AuthLayout } from '../auth-layout'
 import { UserAuthForm } from './components/user-auth-form'
-import type { AppDispatch } from '@/store'
+import type { AppDispatch, RootState } from '@/store'
 import { setAuthSession } from '@/store/slices/authSlice'
 
 const AUTO_LOGIN_CACHE_KEY = 'seller_autologin_cache_v1'
@@ -41,6 +41,15 @@ export function SignIn() {
   const { redirect, autologin, authtoken, authuser } = useSearch({ from: '/(auth)/sign-in' })
   const dispatch = useDispatch<AppDispatch>()
   const navigate = useNavigate()
+  const token = useSelector((state: RootState) => state.auth?.token)
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.auth?.isAuthenticated
+  )
+
+  useEffect(() => {
+    if (!token && !isAuthenticated) return
+    navigate({ to: redirect || '/', replace: true })
+  }, [isAuthenticated, navigate, redirect, token])
 
   useEffect(() => {
     const shouldAutoLogin = String(autologin || '').toLowerCase() === '1'

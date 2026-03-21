@@ -17,7 +17,8 @@ import { routeTree } from './routeTree.gen'
 // Styles
 import './styles/index.css'
 import { Provider } from "react-redux";
-import { store } from './store'
+import { PersistGate } from 'redux-persist/integration/react'
+import { persistor, store } from './store'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -87,15 +88,17 @@ if (!rootElement.innerHTML) {
   root.render(
     <StrictMode>
       <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <FontProvider>
-            <DirectionProvider>
-              <RouterProvider router={router} />
-            </DirectionProvider>
-          </FontProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
+        <PersistGate loading={null} persistor={persistor}>
+          <QueryClientProvider client={queryClient}>
+            <ThemeProvider>
+              <FontProvider>
+                <DirectionProvider>
+                  <RouterProvider router={router} />
+                </DirectionProvider>
+              </FontProvider>
+            </ThemeProvider>
+          </QueryClientProvider>
+        </PersistGate>
       </Provider>
     </StrictMode>
   )
