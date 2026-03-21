@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getRouteApi } from '@tanstack/react-router'
+import axios from 'axios'
 import { useSelector } from 'react-redux'
 import api from '@/lib/axios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
 import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { Main } from '@/components/layout/main'
@@ -14,16 +22,27 @@ import { type User } from './data/schema'
 
 const route = getRouteApi('/_authenticated/users/')
 
+type WebsiteOption = {
+  id: string
+  label: string
+}
+
 export function Users() {
   const search = route.useSearch()
   const navigate = route.useNavigate()
   const token = useSelector((state: any) => state.auth?.token)
   const role = useSelector((state: any) => state.auth?.user?.role)
+  const authUser = useSelector((state: any) => state.auth?.user)
+  const vendorId = String(authUser?._id || authUser?.id || '')
   const [data, setData] = useState<User[]>([])
+  const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([])
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState('all')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filterValue, setFilterValue] = useState(String(search.username || ''))
   const [statsOpen, setStatsOpen] = useState(false)
+  const shouldShowWebsiteFilter =
+    role === 'vendor' || role === 'admin' || role === 'superadmin'
 
   const fetchUsers = async () => {
     if (!token) return
@@ -32,7 +51,12 @@ export function Users() {
     try {
       const isVendor = role === 'vendor'
       const endpoint = isVendor ? '/vendor/customers' : '/users/getall'
-      const res = await api.get(endpoint)
+      const res = await api.get(endpoint, {
+        params:
+          selectedWebsiteId !== 'all'
+            ? { website_id: selectedWebsiteId }
+            : undefined,
+      })
 
       const users = isVendor
         ? (res.data?.customers ?? [])
@@ -49,6 +73,18 @@ export function Users() {
           user?.source === 'template'
             ? 'template_customer'
             : user?.role || 'customer'
+        const vendorName = String(
+          user?.vendor_name ||
+            user?.vendor_business_name ||
+            user?.vendor_email ||
+            ''
+        ).trim()
+        const websiteName = String(
+          user?.website_name ||
+            user?.source_website_name ||
+            user?.website_slug ||
+            ''
+        ).trim()
 
         return {
           id: String(user?._id || user?.id || ''),
@@ -59,6 +95,13 @@ export function Users() {
           phoneNumber: String(user?.phone || ''),
           status,
           role: roleValue,
+          source: String(user?.source || ''),
+          vendorId: String(user?.vendor_id || ''),
+          vendorName,
+          websiteId: String(user?.website_id || ''),
+          websiteName,
+          websiteType: String(user?.website_type || ''),
+          isMainWebsite: Boolean(user?.is_main_website),
           createdAt: user?.createdAt || new Date().toISOString(),
           updatedAt: user?.updatedAt || new Date().toISOString(),
         }
@@ -96,7 +139,83 @@ export function Users() {
 
   useEffect(() => {
     fetchUsers()
-  }, [token, role])
+  }, [token, role, selectedWebsiteId])
+
+  useEffect(() => {
+    if (!token || !shouldShowWebsiteFilter) {
+      setWebsiteOptions([])
+      setSelectedWebsiteId('all')
+      return
+    }
+
+    if (role === 'vendor' && !vendorId) {
+      setWebsiteOptions([])
+      return
+    }
+
+    const fetchWebsiteOptions = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`,
+          {
+            params: {
+              ...(role === 'vendor' ? { vendor_id: vendorId } : {}),
+              ...(role !== 'vendor'
+                ? { include_main_website: 'true' }
+                : {}),
+            },
+            headers: token
+              ? {
+                  Authorization: `Bearer ${token}`,
+                }
+              : undefined,
+          }
+        )
+
+        const nextOptions: WebsiteOption[] = Array.isArray(res.data?.data)
+          ? res.data.data
+              .map((website: any) => {
+                const websiteName = String(
+                  website?.name ||
+                    website?.business_name ||
+                    website?.website_slug ||
+                    website?.template_name ||
+                    website?.template_key ||
+                    'Website'
+                ).trim()
+                const vendorName = String(
+                  website?.vendor_name ||
+                    website?.vendor_business_name ||
+                    website?.vendor_email ||
+                    ''
+                ).trim()
+
+                return {
+                  id: String(website?._id || website?.id || '').trim(),
+                  label:
+                    role === 'vendor' || !vendorName
+                      ? websiteName
+                      : `${websiteName} - ${vendorName}`,
+                }
+              })
+              .filter((website: WebsiteOption) => website.id)
+          : []
+
+        setWebsiteOptions(nextOptions)
+        setSelectedWebsiteId((current) =>
+          current !== 'all' &&
+          !nextOptions.some((website) => website.id === current)
+            ? 'all'
+            : current
+        )
+      } catch {
+        setWebsiteOptions([])
+        setSelectedWebsiteId('all')
+      }
+    }
+
+    fetchWebsiteOptions()
+  }, [token, role, vendorId, shouldShowWebsiteFilter])
 
   const activeUsers = useMemo(
     () => data.filter((user) => user.status === 'active').length,
@@ -194,6 +313,24 @@ export function Users() {
       <TablePageHeader
         title={role === 'vendor' ? 'Customer List' : 'User List'}
       >
+        {websiteOptions.length ? (
+          <Select
+            value={selectedWebsiteId}
+            onValueChange={setSelectedWebsiteId}
+          >
+            <SelectTrigger className='h-10 w-56 shrink-0'>
+              <SelectValue placeholder='All websites' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>All websites</SelectItem>
+              {websiteOptions.map((website) => (
+                <SelectItem key={website.id} value={website.id}>
+                  {website.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
         <Input
           value={filterValue}
           onChange={(event) => setFilterValue(event.target.value)}

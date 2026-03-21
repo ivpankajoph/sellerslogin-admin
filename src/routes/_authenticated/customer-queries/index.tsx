@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import axios from 'axios'
 import { format } from 'date-fns'
 import { createFileRoute } from '@tanstack/react-router'
 import type { RootState } from '@/store'
@@ -60,20 +61,36 @@ type CustomerQuery = {
   message: string
   userId: any
   vendorId?: any
+  website_id?: string
+  website_name?: string
+  website_slug?: string
+  website_type?: string
+  is_main_website?: boolean
   status: 'pending' | 'in-progress' | 'resolved' | 'closed'
   replies: Reply[]
   createdAt: string
   updatedAt: string
 }
 
+type WebsiteOption = {
+  id: string
+  label: string
+}
+
 const DEFAULT_PAGE_SIZE = 10
 
 function CustomerQueriesPage() {
   const user = useSelector((state: RootState) => state.auth?.user)
+  const token = useSelector((state: RootState) => state.auth?.token)
   const role = user?.role
   const isAdmin = role === 'superadmin' || role === 'admin'
+  const vendorId = String(user?._id || user?.id || '')
+  const shouldShowWebsiteFilter =
+    role === 'vendor' || role === 'admin' || role === 'superadmin'
 
   const [queries, setQueries] = useState<CustomerQuery[]>([])
+  const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([])
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState('all')
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -87,7 +104,23 @@ function CustomerQueriesPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [isSendingReply, setIsSendingReply] = useState(false)
-  const filtersRef = useRef({ status: 'all', search: '' })
+  const filtersRef = useRef({ status: 'all', search: '', websiteId: 'all' })
+  const columnCount = isAdmin ? 8 : 7
+
+  const getVendorLabel = (query: CustomerQuery) =>
+    String(
+      query?.vendorId?.business_name ||
+        query?.vendorId?.name ||
+        query?.vendorId?.email ||
+        ''
+    ).trim()
+
+  const getWebsiteLabel = (query: CustomerQuery) =>
+    String(
+      query?.website_name ||
+        query?.website_slug ||
+        (query?.is_main_website ? 'Main Website' : '')
+    ).trim() || 'Unknown website'
 
   const loadQueries = async () => {
     setLoading(true)
@@ -104,6 +137,9 @@ function CustomerQueriesPage() {
       }
       if (debouncedSearch) {
         params.set('search', debouncedSearch)
+      }
+      if (selectedWebsiteId !== 'all') {
+        params.set('website_id', selectedWebsiteId)
       }
 
       const response = await api.get(`${endpoint}?${params.toString()}`)
@@ -139,10 +175,93 @@ function CustomerQueriesPage() {
   }, [search])
 
   useEffect(() => {
-    const nextFilters = { status: statusFilter, search: debouncedSearch }
+    if (!token || !shouldShowWebsiteFilter) {
+      setWebsiteOptions([])
+      setSelectedWebsiteId('all')
+      return
+    }
+
+    if (role === 'vendor' && !vendorId) {
+      setWebsiteOptions([])
+      return
+    }
+
+    const fetchWebsiteOptions = async () => {
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`,
+          {
+            params: {
+              ...(role === 'vendor' ? { vendor_id: vendorId } : {}),
+              ...(role !== 'vendor'
+                ? { include_main_website: 'true' }
+                : {}),
+            },
+            headers: token
+              ? {
+                  Authorization: `Bearer ${token}`,
+                }
+              : undefined,
+          }
+        )
+
+        const nextOptions: WebsiteOption[] = Array.isArray(response.data?.data)
+          ? response.data.data
+              .map((website: any) => {
+                const isMainWebsite = Boolean(website?.is_main_website)
+                const websiteName = String(
+                  (isMainWebsite ? website?.name || 'Main Website' : '') ||
+                    website?.name ||
+                    website?.business_name ||
+                    website?.website_slug ||
+                    website?.template_name ||
+                    website?.template_key ||
+                    'Website'
+                ).trim()
+                const vendorName = String(
+                  website?.vendor_name ||
+                    website?.vendor_business_name ||
+                    website?.vendor_email ||
+                    ''
+                ).trim()
+
+                return {
+                  id: String(website?._id || website?.id || '').trim(),
+                  label:
+                    !isMainWebsite && isAdmin && vendorName
+                      ? `${websiteName} - ${vendorName}`
+                      : websiteName,
+                }
+              })
+              .filter((website: WebsiteOption) => website.id)
+          : []
+
+        setWebsiteOptions(nextOptions)
+        setSelectedWebsiteId((current) =>
+          current !== 'all' &&
+          !nextOptions.some((website) => website.id === current)
+            ? 'all'
+            : current
+        )
+      } catch {
+        setWebsiteOptions([])
+        setSelectedWebsiteId('all')
+      }
+    }
+
+    fetchWebsiteOptions()
+  }, [token, role, vendorId, shouldShowWebsiteFilter, isAdmin])
+
+  useEffect(() => {
+    const nextFilters = {
+      status: statusFilter,
+      search: debouncedSearch,
+      websiteId: selectedWebsiteId,
+    }
     const filtersChanged =
       nextFilters.status !== filtersRef.current.status ||
-      nextFilters.search !== filtersRef.current.search
+      nextFilters.search !== filtersRef.current.search ||
+      nextFilters.websiteId !== filtersRef.current.websiteId
 
     if (filtersChanged) {
       filtersRef.current = nextFilters
@@ -153,7 +272,7 @@ function CustomerQueriesPage() {
     }
 
     loadQueries()
-  }, [page, statusFilter, debouncedSearch])
+  }, [page, statusFilter, debouncedSearch, selectedWebsiteId])
 
   const openDetails = (query: CustomerQuery) => {
     setSelectedQuery(query)
@@ -170,7 +289,7 @@ function CustomerQueriesPage() {
       if (response.data.success) {
         await loadQueries()
         if (selectedQuery?._id === id) {
-          setSelectedQuery({ ...selectedQuery, status: newStatus as any })
+          setSelectedQuery(response.data.data || selectedQuery)
         }
       }
     } catch (error) {
@@ -264,6 +383,24 @@ function CustomerQueriesPage() {
   return (
     <>
       <TablePageHeader title='Customer Queries'>
+        {websiteOptions.length ? (
+          <Select
+            value={selectedWebsiteId}
+            onValueChange={setSelectedWebsiteId}
+          >
+            <SelectTrigger className='h-10 w-56 shrink-0'>
+              <SelectValue placeholder='All websites' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='all'>All websites</SelectItem>
+              {websiteOptions.map((website) => (
+                <SelectItem key={website.id} value={website.id}>
+                  {website.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -318,6 +455,10 @@ function CustomerQueriesPage() {
               <TableRow>
                 <TableHead className='min-w-[160px]'>Customer</TableHead>
                 <TableHead className='min-w-[180px]'>Issue</TableHead>
+                {isAdmin ? (
+                  <TableHead className='min-w-[160px]'>Vendor</TableHead>
+                ) : null}
+                <TableHead className='min-w-[160px]'>Website</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className='min-w-[140px]'>Submitted</TableHead>
                 <TableHead className='min-w-[140px]'>Order / Product</TableHead>
@@ -327,14 +468,14 @@ function CustomerQueriesPage() {
             <TableBody>
               {loading && queries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className='h-24 text-center'>
+                  <TableCell colSpan={columnCount} className='h-24 text-center'>
                     Loading queries...
                   </TableCell>
                 </TableRow>
               ) : queries.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={columnCount}
                     className='text-muted-foreground h-24 text-center'
                   >
                     No queries found.
@@ -358,6 +499,14 @@ function CustomerQueriesPage() {
                           Product enquiry
                         </div>
                       )}
+                    </TableCell>
+                    {isAdmin ? (
+                      <TableCell className='text-muted-foreground text-sm'>
+                        {getVendorLabel(query) || '-'}
+                      </TableCell>
+                    ) : null}
+                    <TableCell className='text-muted-foreground text-sm'>
+                      {getWebsiteLabel(query)}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -464,6 +613,24 @@ function CustomerQueriesPage() {
                       </p>
                     </div>
                   )}
+                  {isAdmin && getVendorLabel(selectedQuery) ? (
+                    <div>
+                      <Label className='text-muted-foreground text-xs'>
+                        Vendor
+                      </Label>
+                      <p className='text-sm font-medium'>
+                        {getVendorLabel(selectedQuery)}
+                      </p>
+                    </div>
+                  ) : null}
+                  <div>
+                    <Label className='text-muted-foreground text-xs'>
+                      Website
+                    </Label>
+                    <p className='text-sm font-medium'>
+                      {getWebsiteLabel(selectedQuery)}
+                    </p>
+                  </div>
                   <div>
                     <Label className='text-muted-foreground text-xs'>
                       Submitted On

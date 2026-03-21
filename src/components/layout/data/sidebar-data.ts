@@ -90,7 +90,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               pageKey: 'orders',
             },
             {
-              title: 'Template Orders',
+              title: 'Website Orders',
               url: '/template-orders',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
               pageKey: 'orders',
@@ -109,7 +109,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               pageKey: 'wallets',
             },
             {
-              title: 'Template Wallet',
+              title: 'Website Wallet',
               url: '/template-wallet',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
               pageKey: 'wallets',
@@ -121,13 +121,12 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           url: '/borzo-report',
           icon: Truck,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
-          requiresIntegration: 'borzo',
         },
         {
           title: 'Delivery Charges',
           url: '/delivery-charges',
           icon: Truck,
-          roles: [ROLES.ADMIN],
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
       ],
     },

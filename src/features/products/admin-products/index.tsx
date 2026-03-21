@@ -6,32 +6,42 @@ import {
   FileText,
   HelpCircle,
   ImageIcon,
-  type LucideIcon,
   Loader2,
-  Package,
-  ScanSearch,
-  Tag,
-  TrendingUp,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { Pagination } from '@/components/pagination'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
+import axios from 'axios'
+import type { RootState } from '@/store'
+import { ServerPagination } from '@/components/data-table/server-pagination'
+import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
+import { TablePageHeader } from '@/components/data-table/table-page-header'
+import { TableShell } from '@/components/data-table/table-shell'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { formatINR } from '@/lib/currency'
 import { cn } from '@/lib/utils'
 import { LinkedText } from '../components/linked-text'
@@ -59,17 +69,15 @@ type Product = {
   faqs?: Array<{ question?: string; answer?: string }>
 }
 
-type SummaryCard = {
+type WebsiteOption = {
+  id: string
   label: string
-  value: number
-  Icon: LucideIcon
-  iconClass: string
+  vendorId: string
 }
 
 const limit = 10
-
-const selectClassName =
-  'h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100'
+const DETAILS_CARD_CLASSNAME =
+  'rounded-md border bg-background px-4 py-3 shadow-sm'
 
 const titleCase = (value?: string) => {
   const normalized = (value || 'pending').trim().toLowerCase()
@@ -126,6 +134,53 @@ const getStatusClassName = (status?: string) => {
   }
 }
 
+const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value)
+
+const resolveBaseUrl = () => {
+  const explicit = String(
+    import.meta.env.VITE_PUBLIC_API_URL_BANNERS || ''
+  ).trim()
+  if (explicit) return explicit.replace(/\/$/, '')
+  const api = String(import.meta.env.VITE_PUBLIC_API_URL || '').trim()
+  if (!api) return ''
+  return api
+    .replace(/\/v1$/, '')
+    .replace(/\/api$/, '')
+    .replace(/\/$/, '')
+}
+
+const resolveImageUrl = (value?: string) => {
+  const trimmed = String(value || '').trim()
+  if (!trimmed) return ''
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed
+  if (trimmed.startsWith('//')) return `https:${trimmed}`
+  if (isAbsoluteUrl(trimmed)) return trimmed
+  if (/^(localhost:|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+)/.test(trimmed)) {
+    return `http://${trimmed}`
+  }
+  if (trimmed.startsWith('ik.imagekit.io') || trimmed.startsWith('imagekit.io')) {
+    return `https://${trimmed}`
+  }
+  const base = resolveBaseUrl()
+  if (!base) return trimmed
+  const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  return `${base}${normalized}`
+}
+
+const getVariantImageUrl = (variant?: ProductVariant) =>
+  String(variant?.variantsImageUrls?.[0]?.url || '').trim()
+
+const getPrimaryProductImageUrl = (product?: Product) => {
+  const defaultImage = String(product?.defaultImages?.[0]?.url || '').trim()
+  if (defaultImage) return resolveImageUrl(defaultImage)
+  const fromVariant = Array.isArray(product?.variants)
+    ? product.variants
+        .map((variant) => getVariantImageUrl(variant))
+        .find((imageUrl) => Boolean(imageUrl)) || ''
+    : ''
+  return resolveImageUrl(fromVariant)
+}
+
 function ProductImage({
   src,
   alt,
@@ -148,6 +203,23 @@ function ProductImage({
   return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />
 }
 
+function ProductDetailCard({
+  label,
+  children,
+  className,
+}: {
+  label: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={cn(DETAILS_CARD_CLASSNAME, className)}>
+      <p className='text-muted-foreground text-xs font-medium'>{label}</p>
+      <div className='text-foreground mt-1 text-sm font-semibold'>{children}</div>
+    </div>
+  )
+}
+
 function ProductDetailsDialog({
   product,
   open,
@@ -159,58 +231,57 @@ function ProductDetailsDialog({
 }) {
   if (!product) return null
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-h-[90vh] overflow-hidden rounded-[30px] border-slate-200 p-0 shadow-2xl sm:max-w-5xl'>
-        <div className='border-b border-sky-100 bg-sky-50/70 px-6 py-5'>
-          <Badge variant='outline' className='mb-3 rounded-full border-sky-200 bg-white/80 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-sky-700'>
-            Product Details
-          </Badge>
-          <DialogHeader className='text-left'>
-            <DialogTitle className='text-2xl font-semibold text-slate-950'>
-              {product.productName || 'Unnamed Product'}
-            </DialogTitle>
-            <DialogDescription className='text-sm text-slate-600'>
-              Review catalog content, variants, specifications, and FAQs in one place.
-            </DialogDescription>
-          </DialogHeader>
-        </div>
+  const variants = Array.isArray(product.variants) ? product.variants : []
+  const specificationEntries =
+    Array.isArray(product.specifications) &&
+    product.specifications[0] &&
+    Object.keys(product.specifications[0]).length > 0
+      ? Object.entries(product.specifications[0])
+      : []
 
-        <div className='max-h-[calc(90vh-112px)] space-y-6 overflow-y-auto px-6 py-6'>
-          <div className='grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]'>
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side='right' className='w-full gap-0 p-0 sm:max-w-3xl'>
+        <SheetHeader className='border-b px-5 py-5 pr-14 text-left'>
+          <SheetTitle>{product.productName || 'Unnamed Product'}</SheetTitle>
+          <SheetDescription>
+            Review product verification status, pricing, stock, variants, and FAQ data.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className='flex-1 overflow-y-auto px-5 py-5'>
+          <div className='grid gap-4 lg:grid-cols-[140px_minmax(0,1fr)]'>
             <ProductImage
-              src={product.defaultImages?.[0]?.url}
+              src={getPrimaryProductImageUrl(product)}
               alt={product.productName || 'Product image'}
-              className='aspect-square w-full rounded-[28px] border border-slate-200 object-cover'
+              className='h-36 w-36 rounded-md border object-cover'
             />
             <div className='space-y-5'>
-              <div className='flex flex-wrap items-center gap-3'>
-                <Badge className={cn('rounded-full border px-3 py-1 text-xs font-semibold', getStatusClassName(product.status))}>
+              <div className='flex flex-wrap items-center gap-2'>
+                <Badge
+                  variant='outline'
+                  className={cn('rounded-md', getStatusClassName(product.status))}
+                >
                   {titleCase(product.status)}
                 </Badge>
-                <Badge variant='outline' className='rounded-full border-slate-200 px-3 py-1 text-slate-600'>
-                  <CalendarDays className='h-3.5 w-3.5' />
+                <Badge variant='outline' className='rounded-md'>
+                  <CalendarDays className='mr-1 h-3.5 w-3.5' />
                   {formatDate(product.createdAt)}
                 </Badge>
               </div>
 
               <div className='grid gap-4 sm:grid-cols-3'>
-                <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-                  <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>Brand</p>
-                  <p className='mt-2 text-base font-semibold text-slate-900'>{product.brand || 'Unavailable'}</p>
-                </div>
-                <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-                  <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>Variants</p>
-                  <p className='mt-2 text-base font-semibold text-slate-900'>{product.variants?.length || 0}</p>
-                </div>
-                <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-                  <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>Stock</p>
-                  <p className='mt-2 text-base font-semibold text-slate-900'>{getTotalStock(product.variants)} units</p>
-                </div>
+                <ProductDetailCard label='Brand'>
+                  {product.brand || 'Unavailable'}
+                </ProductDetailCard>
+                <ProductDetailCard label='Variants'>{variants.length}</ProductDetailCard>
+                <ProductDetailCard label='Stock'>
+                  {getTotalStock(product.variants)} units
+                </ProductDetailCard>
               </div>
 
-              <div className='rounded-[24px] border border-slate-200 bg-white p-5'>
-                <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>Description</p>
+              <div className={DETAILS_CARD_CLASSNAME}>
+                <p className='text-muted-foreground text-xs font-medium'>Description</p>
                 <LinkedText
                   as='p'
                   text={
@@ -218,95 +289,116 @@ function ProductDetailsDialog({
                     product.shortDescription ||
                     'No description available.'
                   }
-                  className='mt-3 text-sm leading-7 text-slate-700'
+                  className='mt-2 text-sm leading-6 text-slate-700'
                 />
               </div>
             </div>
           </div>
 
-          {Array.isArray(product.specifications) &&
-            product.specifications[0] &&
-            Object.keys(product.specifications[0]).length > 0 && (
-              <section className='rounded-[24px] border border-slate-200 bg-white p-5'>
-                <div className='mb-4 flex items-center gap-2 text-slate-900'>
-                  <FileText className='h-4 w-4 text-sky-700' />
-                  <h3 className='text-lg font-semibold'>Specifications</h3>
-                </div>
-                <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-3'>
-                  {Object.entries(product.specifications[0]).map(([key, value]) => (
-                    <div key={key} className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-                      <p className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-500'>
-                        {formatFieldLabel(key)}
-                      </p>
-                      <p className='mt-2 text-sm font-medium text-slate-900'>
-                        {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value ?? 'Unavailable')}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+          {specificationEntries.length ? (
+            <section className='bg-background mt-5 rounded-md border p-4 shadow-sm'>
+              <div className='text-foreground mb-4 flex items-center gap-2'>
+                <FileText className='h-4 w-4' />
+                <h3 className='text-sm font-semibold'>Specifications</h3>
+              </div>
+              <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-3'>
+                {specificationEntries.map(([key, value]) => (
+                  <div key={key} className='bg-muted/20 rounded-md border px-4 py-3'>
+                    <p className='text-muted-foreground text-xs font-medium'>
+                      {formatFieldLabel(key)}
+                    </p>
+                    <p className='text-foreground mt-1 text-sm font-medium'>
+                      {typeof value === 'boolean'
+                        ? value
+                          ? 'Yes'
+                          : 'No'
+                        : String(value ?? 'Unavailable')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
-          <section className='rounded-[24px] border border-slate-200 bg-white p-5'>
-            <div className='mb-4 flex items-center gap-2 text-slate-900'>
-              <Boxes className='h-4 w-4 text-sky-700' />
-              <h3 className='text-lg font-semibold'>Variants</h3>
+          <section className='bg-background mt-5 rounded-md border p-4 shadow-sm'>
+            <div className='text-foreground mb-4 flex items-center gap-2'>
+              <Boxes className='h-4 w-4' />
+              <h3 className='text-sm font-semibold'>Variants</h3>
             </div>
-            <div className='space-y-4'>
-              {(product.variants || []).map((variant, index) => (
-                <div key={variant.variantSku || index} className='rounded-[22px] border border-slate-200 bg-slate-50 p-4'>
-                  <div className='flex flex-col gap-4 lg:flex-row'>
-                    <ProductImage
-                      src={variant.variantsImageUrls?.[0]?.url}
-                      alt={`${product.productName || 'Product'} variant`}
-                      className='h-28 w-28 rounded-2xl border border-slate-200 object-cover'
-                    />
-                    <div className='min-w-0 flex-1 space-y-3'>
-                      <div className='flex flex-wrap gap-2'>
-                        {Object.entries(variant.variantAttributes || {}).map(([key, value]) => (
-                          <Badge key={key} variant='outline' className='rounded-full border-sky-200 bg-white px-3 py-1 text-sky-700'>
-                            {formatFieldLabel(key)}: {String(value || 'N/A')}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className='grid gap-3 sm:grid-cols-3 xl:grid-cols-4'>
-                        <div>
-                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-slate-500'>SKU</p>
-                          <p className='mt-1 text-sm font-medium text-slate-900'>{variant.variantSku || 'Unavailable'}</p>
+            {variants.length ? (
+              <div className='space-y-4'>
+                {variants.map((variant, index) => (
+                  <div
+                    key={variant.variantSku || index}
+                    className='bg-muted/20 rounded-md border p-4'
+                  >
+                    <div className='flex flex-col gap-4 sm:flex-row'>
+                      <ProductImage
+                        src={resolveImageUrl(variant.variantsImageUrls?.[0]?.url)}
+                        alt={`${product.productName || 'Product'} variant`}
+                        className='h-20 w-20 rounded-md border object-cover'
+                      />
+                      <div className='min-w-0 flex-1 space-y-3'>
+                        <div className='flex flex-wrap gap-1.5'>
+                          {Object.entries(variant.variantAttributes || {})
+                            .filter(
+                              ([key, value]) =>
+                                Boolean(key) &&
+                                value !== undefined &&
+                                value !== null &&
+                                String(value).trim()
+                            )
+                            .map(([key, value]) => (
+                              <Badge key={key} variant='secondary' className='rounded-md'>
+                                {formatFieldLabel(key)}: {String(value)}
+                              </Badge>
+                            ))}
+                          {!Object.keys(variant.variantAttributes || {}).length ? (
+                            <Badge variant='outline' className='rounded-md'>
+                              Default variant
+                            </Badge>
+                          ) : null}
                         </div>
-                        <div>
-                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-slate-500'>Actual Price</p>
-                          <p className='mt-1 text-sm font-medium text-slate-900'>{formatINR(variant.actualPrice || 0)}</p>
-                        </div>
-                        <div>
-                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-slate-500'>Final Price</p>
-                          <p className='mt-1 text-sm font-medium text-slate-900'>{formatINR(variant.finalPrice || 0)}</p>
-                        </div>
-                        <div>
-                          <p className='text-xs font-semibold uppercase tracking-[0.16em] text-slate-500'>Stock</p>
-                          <p className='mt-1 text-sm font-medium text-slate-900'>{Number(variant.stockQuantity || 0)} units</p>
+                        <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
+                          <ProductDetailCard label='SKU' className='shadow-none'>
+                            {variant.variantSku || 'Unavailable'}
+                          </ProductDetailCard>
+                          <ProductDetailCard label='Actual Price' className='shadow-none'>
+                            {formatINR(variant.actualPrice || 0)}
+                          </ProductDetailCard>
+                          <ProductDetailCard label='Final Price' className='shadow-none'>
+                            {formatINR(variant.finalPrice || 0)}
+                          </ProductDetailCard>
+                          <ProductDetailCard label='Stock' className='shadow-none'>
+                            {Number(variant.stockQuantity || 0)} units
+                          </ProductDetailCard>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className='text-muted-foreground text-sm'>No variants found.</p>
+            )}
           </section>
 
           {Array.isArray(product.faqs) && product.faqs.length > 0 && (
-            <section className='rounded-[24px] border border-slate-200 bg-white p-5'>
-              <div className='mb-4 flex items-center gap-2 text-slate-900'>
-                <HelpCircle className='h-4 w-4 text-sky-700' />
-                <h3 className='text-lg font-semibold'>FAQs</h3>
+            <section className='bg-background mt-5 rounded-md border p-4 shadow-sm'>
+              <div className='text-foreground mb-4 flex items-center gap-2'>
+                <HelpCircle className='h-4 w-4' />
+                <h3 className='text-sm font-semibold'>FAQs</h3>
               </div>
               <div className='space-y-3'>
                 {product.faqs.map((faq, index) => (
-                  <div key={`${faq.question || 'faq'}-${index}`} className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+                  <div
+                    key={`${faq.question || 'faq'}-${index}`}
+                    className='bg-muted/20 rounded-md border px-4 py-3'
+                  >
                     <LinkedText
                       as='p'
                       text={faq.question || 'No question provided'}
-                      className='text-sm font-semibold text-slate-900'
+                      className='text-foreground text-sm font-semibold'
                     />
                     <LinkedText
                       as='p'
@@ -319,24 +411,33 @@ function ProductDetailsDialog({
             </section>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
 
 export default function AdminProductsTable() {
-  const token = useSelector((state: any) => state.auth?.token || '')
+  const token = useSelector((state: RootState) => state.auth?.token || '')
   const [products, setProducts] = useState<Product[]>([])
+  const [websites, setWebsites] = useState<WebsiteOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(limit)
   const [totalPages, setTotalPages] = useState(1)
   const [totalProducts, setTotalProducts] = useState(0)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [brandFilter, setBrandFilter] = useState('all')
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState('all')
+  const [refreshTick, setRefreshTick] = useState(0)
+  const [statsOpen, setStatsOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+
+  const selectedWebsite = useMemo(
+    () => websites.find((website) => website.id === selectedWebsiteId) || null,
+    [selectedWebsiteId, websites]
+  )
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -347,6 +448,65 @@ export default function AdminProductsTable() {
   }, [search])
 
   useEffect(() => {
+    if (!token) {
+      setWebsites([])
+      setSelectedWebsiteId('all')
+      return
+    }
+
+    const fetchWebsites = async () => {
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+
+        const options: WebsiteOption[] = (response.data?.data || [])
+          .map((website: any) => {
+            const websiteName = String(
+              website?.name ||
+                website?.business_name ||
+                website?.website_slug ||
+                website?.template_name ||
+                website?.template_key ||
+                'Website'
+            ).trim()
+            const vendorName = String(
+              website?.vendor_name ||
+                website?.vendor_business_name ||
+                website?.vendor_email ||
+                ''
+            ).trim()
+            const vendorId = String(
+              website?.vendor_id?._id || website?.vendor_id || ''
+            ).trim()
+
+            return {
+              id: String(website?._id || website?.id || '').trim(),
+              label: vendorName ? `${websiteName} - ${vendorName}` : websiteName,
+              vendorId,
+            }
+          })
+          .filter((item: WebsiteOption) => item.id && item.vendorId)
+
+        setWebsites(options)
+        setSelectedWebsiteId((current) =>
+          current !== 'all' && !options.some((item) => item.id === current)
+            ? 'all'
+            : current
+        )
+      } catch {
+        setWebsites([])
+        setSelectedWebsiteId('all')
+      }
+    }
+
+    void fetchWebsites()
+  }, [token])
+
+  useEffect(() => {
     const controller = new AbortController()
     const fetchProducts = async () => {
       try {
@@ -354,17 +514,26 @@ export default function AdminProductsTable() {
         setError('')
         const params = new URLSearchParams({
           page: String(page),
-          limit: String(limit),
+          limit: String(pageSize),
           includeUnavailable: 'true',
         })
         if (debouncedSearch) params.set('search', debouncedSearch)
         if (statusFilter !== 'all') params.set('status', statusFilter)
-        if (brandFilter !== 'all') params.set('brand', brandFilter)
+        if (selectedWebsiteId !== 'all') {
+          params.set('website_id', selectedWebsiteId)
+          const ownerId = selectedWebsite?.vendorId || ''
+          if (ownerId) {
+            params.set('ownerId', ownerId)
+          }
+        }
 
-        const response = await fetch(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/all?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal,
-        })
+        const response = await fetch(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/all?${params.toString()}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }
+        )
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
         const data = await response.json()
@@ -382,15 +551,20 @@ export default function AdminProductsTable() {
 
     fetchProducts()
     return () => controller.abort()
-  }, [brandFilter, debouncedSearch, page, statusFilter, token])
+  }, [
+    debouncedSearch,
+    page,
+    pageSize,
+    refreshTick,
+    selectedWebsite?.vendorId,
+    selectedWebsiteId,
+    statusFilter,
+    token,
+  ])
 
-  const brandOptions = useMemo(
-    () =>
-      Array.from(new Set(products.map((product) => product.brand?.trim()).filter(Boolean) as string[])).sort((a, b) =>
-        a.localeCompare(b)
-      ),
-    [products]
-  )
+  useEffect(() => {
+    setPage(1)
+  }, [selectedWebsiteId, statusFilter, pageSize])
 
   const totalVariants = useMemo(
     () => products.reduce((sum, product) => sum + (product.variants?.length || 0), 0),
@@ -400,225 +574,262 @@ export default function AdminProductsTable() {
     () => products.reduce((sum, product) => sum + getTotalStock(product.variants), 0),
     [products]
   )
+  const verifiedProducts = useMemo(
+    () =>
+      products.filter((product) => (product.status || '').toLowerCase() === 'approved')
+        .length,
+    [products]
+  )
+  const needsReview = Math.max(products.length - verifiedProducts, 0)
 
-  const resetFilters = () => {
-    setSearch('')
-    setDebouncedSearch('')
-    setStatusFilter('all')
-    setBrandFilter('all')
-    setPage(1)
-  }
+  const statsItems = useMemo(
+    () => [
+      {
+        label: 'Total Products',
+        value: totalProducts,
+        helper: 'Products in current scope.',
+      },
+      {
+        label: 'Visible (Current Page)',
+        value: products.length,
+        helper: 'Rows visible in current table page.',
+      },
+      {
+        label: 'Verified (Current Page)',
+        value: verifiedProducts,
+        helper: 'Approved products in visible rows.',
+      },
+      {
+        label: 'Needs Review (Current Page)',
+        value: needsReview,
+        helper: 'Pending, draft, or rejected in visible rows.',
+      },
+      {
+        label: 'Variants (Current Page)',
+        value: totalVariants,
+        helper: 'Total variants in visible rows.',
+      },
+      {
+        label: 'Stock Units (Current Page)',
+        value: totalStock,
+        helper: 'Total stock units in visible rows.',
+      },
+    ],
+    [needsReview, products.length, totalProducts, totalStock, totalVariants, verifiedProducts]
+  )
 
   return (
-    <div className='flex min-h-screen flex-col'>
-      <Header fixed>
-        <Search />
-        <div className='ml-auto flex items-center gap-2'>
-          <ThemeSwitch />
-          <ConfigDrawer />
-          <ProfileDropdown />
-        </div>
-      </Header>
-
-      <Main className='space-y-6'>
-        <section className='rounded-[32px] border border-sky-100 bg-sky-50/50 px-6 py-8 shadow-sm'>
-          <div className='flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between'>
-            <div className='space-y-4'>
-              <Badge variant='outline' className='rounded-full border-sky-200 bg-white/80 px-4 py-1 text-[11px] uppercase tracking-[0.3em] text-sky-700'>
-                Catalog Control
-              </Badge>
-              <div className='space-y-2'>
-                <h1 className='text-4xl font-semibold tracking-tight text-slate-950'>Admin Product Inventory</h1>
-                <p className='max-w-3xl text-lg leading-8 text-slate-600'>
-                  Review product quality, pricing, stock, and verification status from one shared inventory view.
-                </p>
-              </div>
-              <div className='flex flex-wrap gap-2'>
-                <Badge variant='outline' className='rounded-full border-slate-200 bg-white px-3 py-1 text-slate-700'>
-                  {totalProducts || products.length} products
-                </Badge>
-                <Badge variant='outline' className='rounded-full border-slate-200 bg-white px-3 py-1 text-slate-700'>
-                  {totalVariants} visible variants
-                </Badge>
-                <Badge variant='outline' className='rounded-full border-slate-200 bg-white px-3 py-1 text-slate-700'>
-                  {totalStock} visible stock
-                </Badge>
-              </div>
-            </div>
-
-            <div className='flex flex-wrap gap-3'>
-              <Button asChild variant='outline' className='h-11 rounded-xl border-slate-200 px-5'>
-                <Link to='/upload-products'>Bulk Upload</Link>
-              </Button>
-              <Button asChild className='h-11 rounded-xl bg-slate-950 px-5 text-white hover:bg-slate-800'>
-                <Link to='/products/create-products'>Create Product</Link>
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        <section className='grid gap-4 md:grid-cols-3'>
-          {([
-            {
-              label: 'Catalog Products',
-              value: totalProducts || products.length,
-              Icon: Package,
-              iconClass: 'bg-sky-100 text-sky-700',
-            },
-            {
-              label: 'Visible Variants',
-              value: totalVariants,
-              Icon: Boxes,
-              iconClass: 'bg-emerald-100 text-emerald-700',
-            },
-            {
-              label: 'Visible Stock',
-              value: totalStock,
-              Icon: TrendingUp,
-              iconClass: 'bg-amber-100 text-amber-700',
-            },
-          ] satisfies SummaryCard[]).map(({ label, value, Icon, iconClass }) => (
-            <div key={label} className='rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm'>
-              <div className='flex items-start justify-between gap-4'>
-                <div>
-                  <p className='text-sm font-medium text-slate-500'>{label}</p>
-                  <p className='mt-3 text-4xl font-semibold tracking-tight text-slate-950'>{value}</p>
-                </div>
-                <div className={cn('rounded-2xl p-3', iconClass)}>
-                  <Icon className='h-6 w-6' />
-                </div>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <section className='rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm'>
-          <div className='grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_220px_220px_auto]'>
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder='Search by product, brand, SKU, or description'
-              className='h-11 rounded-xl border-slate-200 bg-white px-4 shadow-sm'
-            />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={selectClassName}>
-              <option value='all'>All status</option>
-              <option value='approved'>Verified</option>
-              <option value='pending'>Pending</option>
-              <option value='rejected'>Rejected</option>
-              <option value='draft'>Draft</option>
-            </select>
-            <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)} className={selectClassName}>
-              <option value='all'>All brands</option>
-              {brandOptions.map((brand) => (
-                <option key={brand} value={brand}>
-                  {brand}
-                </option>
-              ))}
-            </select>
-            <Button variant='outline' className='h-11 rounded-xl border-slate-200 px-5' onClick={resetFilters}>
-              Reset
-            </Button>
-          </div>
-        </section>
-
-        <section className='overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm'>
-          {error && <div className='border-b border-rose-200 bg-rose-50 px-6 py-3 text-sm font-medium text-rose-700'>{error}</div>}
-          <div className='relative overflow-x-auto'>
-            {loading && (
-              <div className='absolute inset-0 z-10 flex items-center justify-center bg-white/75 backdrop-blur-sm'>
-                <div className='flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm'>
-                  <Loader2 className='h-4 w-4 animate-spin' />
-                  Loading products
-                </div>
-              </div>
-            )}
-
-            <table className='min-w-full text-left'>
-              <thead className='bg-slate-50 text-xs uppercase tracking-[0.2em] text-slate-500'>
-                <tr>
-                  <th className='px-6 py-4 font-semibold'>Product</th>
-                  <th className='px-6 py-4 font-semibold'>Brand</th>
-                  <th className='px-6 py-4 font-semibold'>Variants</th>
-                  <th className='px-6 py-4 font-semibold'>Stock</th>
-                  <th className='px-6 py-4 font-semibold'>Price Range</th>
-                  <th className='px-6 py-4 font-semibold'>Status</th>
-                  <th className='px-6 py-4 font-semibold'>Actions</th>
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-slate-200'>
-                {!loading && products.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className='px-6 py-16'>
-                      <div className='flex flex-col items-center justify-center gap-3 text-center'>
-                        <div className='rounded-full bg-slate-100 p-4 text-slate-500'>
-                          <ScanSearch className='h-6 w-6' />
-                        </div>
-                        <h3 className='text-lg font-semibold text-slate-900'>No products found</h3>
-                        <p className='max-w-md text-sm text-slate-500'>Adjust the current filters or add new products to populate this inventory view.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  products.map((product) => (
-                    <tr key={product._id} className='transition-colors hover:bg-slate-50/80'>
-                      <td className='px-6 py-5'>
-                        <div className='flex items-center gap-4'>
-                          <ProductImage
-                            src={product.defaultImages?.[0]?.url}
-                            alt={product.productName || 'Product'}
-                            className='h-16 w-16 rounded-2xl border border-slate-200 object-cover'
-                          />
-                          <div className='min-w-0'>
-                            <p className='text-lg font-semibold text-slate-950'>{product.productName || 'Unnamed Product'}</p>
-                            <LinkedText
-                              as='p'
-                              text={product.shortDescription || 'No short description available.'}
-                              preserveWhitespace={false}
-                              className='max-w-md overflow-hidden text-ellipsis whitespace-nowrap text-sm text-slate-500'
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className='px-6 py-5'>
-                        <div className='flex items-center gap-2 text-slate-700'>
-                          <Tag className='h-4 w-4 text-slate-400' />
-                          <span className='font-medium'>{product.brand || 'Unavailable'}</span>
-                        </div>
-                      </td>
-                      <td className='px-6 py-5 text-base font-semibold text-slate-900'>{product.variants?.length || 0}</td>
-                      <td className='px-6 py-5 text-base font-semibold text-slate-900'>{getTotalStock(product.variants)} units</td>
-                      <td className='px-6 py-5 text-base font-semibold text-slate-900'>{getPriceRange(product.variants)}</td>
-                      <td className='px-6 py-5'>
-                        <Badge className={cn('rounded-full border px-3 py-1 text-xs font-semibold', getStatusClassName(product.status))}>
-                          {titleCase(product.status)}
-                        </Badge>
-                      </td>
-                      <td className='px-6 py-5'>
-                        <Button variant='outline' className='h-10 rounded-xl border-slate-200 px-4' onClick={() => setSelectedProduct(product)}>
-                          <Eye className='h-4 w-4' />
-                          View Details
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          onPageChange={(nextPage) => {
-            setPage(nextPage)
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-          }}
-          isLoading={loading}
+    <>
+      <TablePageHeader title='All Admin Products'>
+        <Input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder='Search by product, brand, SKU, or description'
+          className='h-10 w-72 shrink-0'
         />
+        <Select
+          value={selectedWebsiteId}
+          onValueChange={(value) => {
+            setSelectedWebsiteId(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className='h-10 w-72 shrink-0'>
+            <SelectValue placeholder='All websites' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>All websites</SelectItem>
+            {websites.map((website) => (
+              <SelectItem key={website.id} value={website.id}>
+                {website.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) => {
+            setStatusFilter(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className='h-10 w-44 shrink-0'>
+            <SelectValue placeholder='All status' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>All status</SelectItem>
+            <SelectItem value='approved'>Verified only</SelectItem>
+            <SelectItem value='pending'>Pending only</SelectItem>
+            <SelectItem value='rejected'>Rejected only</SelectItem>
+            <SelectItem value='draft'>Draft only</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant='outline'
+          className='h-10 shrink-0'
+          onClick={() => setStatsOpen(true)}
+        >
+          Statistics
+        </Button>
+        <Button
+          variant='outline'
+          className='h-10 shrink-0'
+          onClick={() => setRefreshTick((tick) => tick + 1)}
+          disabled={loading}
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </Button>
+        <Button asChild variant='outline' className='h-10 shrink-0'>
+          <Link to='/upload-products'>Bulk Upload</Link>
+        </Button>
+        <Button asChild className='h-10 shrink-0'>
+          <Link to='/products/create-products'>Create Product</Link>
+        </Button>
+      </TablePageHeader>
+
+      <Main className='flex flex-1 flex-col gap-4 md:gap-6'>
+        {error ? (
+          <div className='rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>
+            {error}
+          </div>
+        ) : null}
+
+        <TableShell
+          className='flex-1'
+          title='Product list'
+          description={
+            selectedWebsiteId === 'all'
+              ? ''
+              : `Website scope: ${selectedWebsite?.label || 'Selected website'}`
+          }
+          footer={
+            <ServerPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalProducts}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 30, 50]}
+              onPageChange={(nextPage) => {
+                setPage(nextPage)
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              onPageSizeChange={(nextSize) => {
+                setPageSize(nextSize)
+                setPage(1)
+              }}
+              disabled={loading}
+            />
+          }
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className='min-w-[280px]'>Product</TableHead>
+                <TableHead className='min-w-[160px]'>Brand</TableHead>
+                <TableHead className='min-w-[120px]'>Variants</TableHead>
+                <TableHead className='min-w-[130px]'>Stock</TableHead>
+                <TableHead className='min-w-[160px]'>Price Range</TableHead>
+                <TableHead className='min-w-[130px]'>Status</TableHead>
+                <TableHead className='text-right'>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className='h-24 text-center'>
+                    <div className='text-muted-foreground flex items-center justify-center gap-2 text-sm'>
+                      <Loader2 className='h-4 w-4 animate-spin' />
+                      Loading products...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : products.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className='text-muted-foreground h-24 text-center'
+                  >
+                    {selectedWebsiteId === 'all'
+                      ? 'No products found.'
+                      : 'No products found for this website.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                products.map((product) => (
+                  <TableRow key={product._id}>
+                    <TableCell>
+                      <div className='flex items-center gap-3'>
+                        <ProductImage
+                          src={getPrimaryProductImageUrl(product)}
+                          alt={product.productName || 'Product'}
+                          className='h-14 w-14 rounded-md border object-cover'
+                        />
+                        <div className='min-w-0'>
+                          <p className='truncate text-sm font-semibold text-slate-900'>
+                            {product.productName || 'Unnamed Product'}
+                          </p>
+                          <LinkedText
+                            as='p'
+                            text={product.shortDescription || 'No short description available.'}
+                            preserveWhitespace={false}
+                            className='text-muted-foreground max-w-[340px] truncate text-xs'
+                          />
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className='text-sm font-medium text-slate-700'>
+                      {product.brand || 'Unavailable'}
+                    </TableCell>
+                    <TableCell className='text-sm font-semibold text-slate-900'>
+                      {product.variants?.length || 0}
+                    </TableCell>
+                    <TableCell className='text-sm font-semibold text-slate-900'>
+                      {getTotalStock(product.variants)} units
+                    </TableCell>
+                    <TableCell className='text-sm font-semibold text-slate-900'>
+                      {getPriceRange(product.variants)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={cn(
+                          'rounded-full border px-3 py-1 text-xs font-semibold',
+                          getStatusClassName(product.status)
+                        )}
+                      >
+                        {titleCase(product.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className='text-right'>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='rounded-md'
+                        onClick={() => setSelectedProduct(product)}
+                      >
+                        <Eye className='mr-2 h-4 w-4' />
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableShell>
       </Main>
 
-      <ProductDetailsDialog product={selectedProduct} open={Boolean(selectedProduct)} onOpenChange={(open) => !open && setSelectedProduct(null)} />
-    </div>
+      <ProductDetailsDialog
+        product={selectedProduct}
+        open={Boolean(selectedProduct)}
+        onOpenChange={(open) => !open && setSelectedProduct(null)}
+      />
+      <StatisticsDialog
+        open={statsOpen}
+        onOpenChange={setStatsOpen}
+        title='Product statistics'
+        description='Summary for the current admin product scope.'
+        items={statsItems}
+      />
+    </>
   )
 }

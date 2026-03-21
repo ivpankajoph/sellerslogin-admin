@@ -109,6 +109,18 @@ export function UserDetails() {
     user.country ||
     addresses.find((address) => address?.country)?.country ||
     'Unknown'
+  const vendorName =
+    user.vendor_name ||
+    user.vendor_business_name ||
+    user.vendor_email ||
+    (user.is_main_website ? 'Main Website' : 'Unknown vendor')
+  const websiteName =
+    user.website_name ||
+    user.source_website_name ||
+    user.website_slug ||
+    (user.is_main_website ? 'Main Website' : 'Unknown website')
+  const sourceLabel =
+    user.source === 'template' ? 'Vendor Website' : 'Main Website'
 
   return (
     <>
@@ -161,6 +173,18 @@ export function UserDetails() {
                   <div className='grid gap-1'>
                     <p className='text-muted-foreground'>Country</p>
                     <p className='font-medium'>{country}</p>
+                  </div>
+                  <div className='grid gap-1'>
+                    <p className='text-muted-foreground'>Source</p>
+                    <p className='font-medium'>{sourceLabel}</p>
+                  </div>
+                  <div className='grid gap-1'>
+                    <p className='text-muted-foreground'>Vendor</p>
+                    <p className='font-medium'>{vendorName}</p>
+                  </div>
+                  <div className='grid gap-1'>
+                    <p className='text-muted-foreground'>Website</p>
+                    <p className='font-medium'>{websiteName}</p>
                   </div>
                   <div className='grid gap-1'>
                     <p className='text-muted-foreground'>Status</p>

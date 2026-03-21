@@ -26,6 +26,13 @@ const userSchema = z.object({
   phoneNumber: z.string(),
   status: userStatusSchema,
   role: userRoleSchema,
+  source: z.string().optional(),
+  vendorId: z.string().optional(),
+  vendorName: z.string().optional(),
+  websiteId: z.string().optional(),
+  websiteName: z.string().optional(),
+  websiteType: z.string().optional(),
+  isMainWebsite: z.boolean().optional(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })

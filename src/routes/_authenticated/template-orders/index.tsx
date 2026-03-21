@@ -77,6 +77,9 @@ type Order = {
   template_id?: string
   template_key?: string
   template_name?: string
+  website_id?: string
+  website_name?: string
+  website_slug?: string
   vendor_id?: {
     name?: string
     email?: string
@@ -107,10 +110,9 @@ type Order = {
   items: OrderItem[]
 }
 
-type TemplateOption = {
+type WebsiteOption = {
   id: string
-  name: string
-  key?: string
+  label: string
 }
 
 const DEFAULT_PAGE_SIZE = 10
@@ -118,15 +120,16 @@ const DEFAULT_PAGE_SIZE = 10
 function TemplateOrdersPage() {
   const BORZO_QUOTE_DEBOUNCE_MS = 600
   const user = useSelector((state: RootState) => state.auth?.user)
+  const token = useSelector((state: RootState) => state.auth?.token)
   const role = String(user?.role || '').toLowerCase()
   const isVendor = role === 'vendor'
-  const vendorId = String(user?._id || user?.id || '')
+  const vendorId = String(user?.vendor_id || user?._id || user?.id || '')
   const { isProviderVisible } = useVendorIntegrations()
   const canUseBorzo = !isVendor || isProviderVisible('borzo')
 
   const [orders, setOrders] = useState<Order[]>([])
   const [summary, setSummary] = useState<OrderSummary | null>(null)
-  const [templates, setTemplates] = useState<TemplateOption[]>([])
+  const [websites, setWebsites] = useState<WebsiteOption[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
@@ -135,13 +138,13 @@ function TemplateOrdersPage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState('all')
-  const [templateFilter, setTemplateFilter] = useState('all')
+  const [websiteFilter, setWebsiteFilter] = useState('all')
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const filtersRef = useRef({
     status: 'all',
-    template: 'all',
+    website: 'all',
     search: '',
     limit: DEFAULT_PAGE_SIZE,
   })
@@ -171,6 +174,14 @@ function TemplateOrdersPage() {
   const totalPages = Math.max(Math.ceil(total / limit), 1)
 
   const formatMoney = (value?: number) => formatINR(value)
+  const getWebsiteLabel = (order?: Order | null) =>
+    String(
+      order?.website_name ||
+        order?.website_slug ||
+        order?.template_name ||
+        order?.template_key ||
+        ''
+    ).trim() || 'Unknown website'
 
   const FALLBACK_IMAGE =
     'data:image/svg+xml;utf8,' +
@@ -276,7 +287,7 @@ function TemplateOrdersPage() {
           limit,
           search: debouncedSearch || undefined,
           status: status === 'all' ? undefined : status,
-          template_id: templateFilter === 'all' ? undefined : templateFilter,
+          website_id: websiteFilter === 'all' ? undefined : websiteFilter,
         },
       })
       const data = res.data || {}
@@ -305,13 +316,13 @@ function TemplateOrdersPage() {
   useEffect(() => {
     const nextFilters = {
       status,
-      template: templateFilter,
+      website: websiteFilter,
       search: debouncedSearch,
       limit,
     }
     const filtersChanged =
       nextFilters.status !== filtersRef.current.status ||
-      nextFilters.template !== filtersRef.current.template ||
+      nextFilters.website !== filtersRef.current.website ||
       nextFilters.search !== filtersRef.current.search ||
       nextFilters.limit !== filtersRef.current.limit
 
@@ -325,41 +336,75 @@ function TemplateOrdersPage() {
 
     loadOrders()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, status, templateFilter, debouncedSearch, limit])
+  }, [page, status, websiteFilter, debouncedSearch, limit])
 
   useEffect(() => {
-    const fetchTemplates = async () => {
-      if (!isVendor || !vendorId) {
-        setTemplates([])
+    const fetchWebsites = async () => {
+      if (!token) {
+        setWebsites([])
+        setWebsiteFilter('all')
         return
       }
+
+      if (isVendor && !vendorId) {
+        setWebsites([])
+        return
+      }
+
       try {
         const res = await axios.get(
           `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`,
           {
-            params: { vendor_id: vendorId },
+            params: {
+              ...(isVendor ? { vendor_id: vendorId } : {}),
+            },
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           }
         )
         const data = res.data?.data || []
-        const options = data.map((template: any) => ({
-          id: String(template?._id || template?.id || ''),
-          key: template?.template_key || template?.key,
-          name:
-            template?.template_name ||
-            template?.name ||
-            template?.business_name ||
-            template?.template_key ||
-            template?.key ||
-            'Template',
-        }))
-        setTemplates(options.filter((item: TemplateOption) => item.id))
+        const options: WebsiteOption[] = data
+          .map((website: any) => {
+            const websiteName = String(
+              website?.name ||
+                website?.business_name ||
+                website?.website_slug ||
+                website?.template_name ||
+                website?.template_key ||
+                'Website'
+            ).trim()
+            const vendorName = String(
+              website?.vendor_name ||
+                website?.vendor_business_name ||
+                website?.vendor_email ||
+                ''
+            ).trim()
+
+            return {
+              id: String(website?._id || website?.id || ''),
+              label:
+                !isVendor && vendorName
+                  ? `${websiteName} - ${vendorName}`
+                  : websiteName,
+            }
+          })
+          .filter((item: WebsiteOption) => item.id)
+
+        setWebsites(options)
+        setWebsiteFilter((current) =>
+          current !== 'all' && !options.some((item) => item.id === current)
+            ? 'all'
+            : current
+        )
       } catch {
-        setTemplates([])
+        setWebsites([])
+        setWebsiteFilter('all')
       }
     }
 
-    fetchTemplates()
-  }, [isVendor, vendorId])
+    fetchWebsites()
+  }, [isVendor, vendorId, token])
 
   useEffect(() => {
     setBorzoError('')
@@ -579,22 +624,22 @@ function TemplateOrdersPage() {
 
   return (
     <>
-      <TablePageHeader title='Order - Template Data'>
+      <TablePageHeader title='Order - Website Data'>
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder='Search order number or customer'
           className='h-10 w-64 shrink-0'
         />
-        <Select value={templateFilter} onValueChange={setTemplateFilter}>
+        <Select value={websiteFilter} onValueChange={setWebsiteFilter}>
           <SelectTrigger className='w-44 shrink-0'>
-            <SelectValue placeholder='All templates' />
+            <SelectValue placeholder='All websites' />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value='all'>All templates</SelectItem>
-            {templates.map((template) => (
-              <SelectItem key={template.id} value={template.id}>
-                {template.name}
+            <SelectItem value='all'>All websites</SelectItem>
+            {websites.map((website) => (
+              <SelectItem key={website.id} value={website.id}>
+                {website.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -651,7 +696,7 @@ function TemplateOrdersPage() {
                   <TableHead className='min-w-[180px]'>Vendor</TableHead>
                 )}
                 <TableHead>Status</TableHead>
-                <TableHead className='min-w-[140px]'>Template</TableHead>
+                <TableHead className='min-w-[160px]'>Website</TableHead>
                 <TableHead className='min-w-[120px]'>Items</TableHead>
                 <TableHead className='min-w-[140px]'>Total</TableHead>
                 <TableHead className='min-w-[160px]'>Created</TableHead>
@@ -718,7 +763,7 @@ function TemplateOrdersPage() {
                     )}
                     <TableCell>{statusBadge(order.status)}</TableCell>
                     <TableCell className='text-muted-foreground text-sm'>
-                      {order.template_name || order.template_key || 'Template'}
+                      {getWebsiteLabel(order)}
                     </TableCell>
                     <TableCell className='text-muted-foreground text-sm'>
                       {order.items?.length || 0} items
@@ -778,11 +823,9 @@ function TemplateOrdersPage() {
                   </p>
                 </div>
                 <div>
-                  <p className='text-muted-foreground text-xs'>Template</p>
+                  <p className='text-muted-foreground text-xs'>Website</p>
                   <p className='font-semibold'>
-                    {selectedOrder.template_name ||
-                      selectedOrder.template_key ||
-                      'Template'}
+                    {getWebsiteLabel(selectedOrder)}
                   </p>
                 </div>
                 <div className='flex flex-wrap items-center gap-2'>

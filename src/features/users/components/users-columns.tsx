@@ -46,6 +46,32 @@ export const usersColumns: ColumnDef<User>[] = [
     meta: { className: 'w-36' },
   },
   {
+    accessorKey: 'vendorName',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='Vendor' />
+    ),
+    cell: ({ row }) => (
+      <LongText className='max-w-40'>
+        {row.original.vendorName ||
+          (row.original.isMainWebsite ? 'Main Website' : 'Unknown vendor')}
+      </LongText>
+    ),
+    enableSorting: false,
+  },
+  {
+    accessorKey: 'websiteName',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='Website' />
+    ),
+    cell: ({ row }) => (
+      <LongText className='max-w-44'>
+        {row.original.websiteName ||
+          (row.original.isMainWebsite ? 'Main Website' : 'Unknown website')}
+      </LongText>
+    ),
+    enableSorting: false,
+  },
+  {
     accessorKey: 'email',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Email' />

@@ -64,6 +64,9 @@ type Transaction = {
     template_id?: string
     template_key?: string
     template_name?: string
+    website_id?: string
+    website_name?: string
+    website_slug?: string
     source?: string
   }
 }
@@ -80,6 +83,11 @@ type AdminWalletResponse = {
 type VendorWalletResponse = {
   wallet: Wallet
   transactions: Transaction[]
+}
+
+type WebsiteOption = {
+  id: string
+  label: string
 }
 
 const FALLBACK_IMAGE =
@@ -103,7 +111,7 @@ function TemplateWalletPage() {
   const token = useSelector((state: RootState) => state.auth?.token)
   const authUser = useSelector((state: RootState) => state.auth?.user)
   const vendorId = useMemo(
-    () => authUser?._id || authUser?.id || '',
+    () => String(authUser?.vendor_id || authUser?._id || authUser?.id || ''),
     [authUser]
   )
   const [loading, setLoading] = useState(true)
@@ -116,16 +124,26 @@ function TemplateWalletPage() {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [vendors, setVendors] = useState<any[]>([])
-  const [templates, setTemplates] = useState<any[]>([])
+  const [websites, setWebsites] = useState<WebsiteOption[]>([])
   const [selectedVendor, setSelectedVendor] = useState<string>('all')
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('all')
+  const [selectedWebsite, setSelectedWebsite] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
   const fetchWallet = async () => {
     try {
       setLoading(true)
-      const res = await api.get('/wallet/template')
+      const res = await api.get('/wallet/template', {
+        params: {
+          limit: 500,
+          ...(!isVendor && selectedVendor !== 'all'
+            ? { vendor_id: selectedVendor }
+            : {}),
+          ...(selectedWebsite !== 'all'
+            ? { website_id: selectedWebsite }
+            : {}),
+        },
+      })
       const data = res.data as AdminWalletResponse | VendorWalletResponse
       setSummary(
         !isVendor ? (data as AdminWalletResponse).summary || null : null
@@ -142,7 +160,7 @@ function TemplateWalletPage() {
   useEffect(() => {
     fetchWallet()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isVendor, selectedVendor, selectedWebsite])
 
   useEffect(() => {
     const fetchVendors = async () => {
@@ -177,69 +195,103 @@ function TemplateWalletPage() {
   }, [authUser, isVendor, token, vendorId])
 
   useEffect(() => {
-    const fetchTemplates = async () => {
-      if (selectedVendor === 'all') {
-        setTemplates([])
-        setSelectedTemplate('all')
+    const fetchWebsites = async () => {
+      if (!token) {
+        setWebsites([])
+        setSelectedWebsite('all')
         return
       }
+
+      if (isVendor && !vendorId) {
+        setWebsites([])
+        setSelectedWebsite('all')
+        return
+      }
+
       try {
         const res = await axios.get(
           `${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`,
           {
-            params: { vendor_id: selectedVendor },
+            params: {
+              ...(!isVendor && selectedVendor !== 'all'
+                ? { vendor_id: selectedVendor }
+                : {}),
+              ...(isVendor ? { vendor_id: vendorId } : {}),
+            },
+            headers: token
+              ? { Authorization: `Bearer ${token}` }
+              : undefined,
           }
         )
-        setTemplates(res.data?.data || [])
+
+        const options: WebsiteOption[] = (res.data?.data || [])
+          .map((website: any) => {
+            const websiteName = String(
+              website?.name ||
+                website?.business_name ||
+                website?.website_slug ||
+                website?.template_name ||
+                website?.template_key ||
+                'Website'
+            ).trim()
+            const vendorName = String(
+              website?.vendor_name ||
+                website?.vendor_business_name ||
+                website?.vendor_email ||
+                ''
+            ).trim()
+
+            return {
+              id: String(website?._id || website?.id || ''),
+              label:
+                !isVendor && vendorName && selectedVendor === 'all'
+                  ? `${websiteName} - ${vendorName}`
+                  : websiteName,
+            }
+          })
+          .filter((item: WebsiteOption) => item.id)
+
+        setWebsites(options)
+        setSelectedWebsite((current) =>
+          current !== 'all' && !options.some((item) => item.id === current)
+            ? 'all'
+            : current
+        )
       } catch {
-        setTemplates([])
+        setWebsites([])
+        setSelectedWebsite('all')
       }
     }
-    fetchTemplates()
-  }, [selectedVendor])
+    fetchWebsites()
+  }, [isVendor, selectedVendor, token, vendorId])
 
   const formatMoney = (value?: number) => formatINR(value)
-
-  const sourceFiltered = useMemo(
-    () =>
-      transactions.filter(
-        (tx) => String(tx.meta?.source || '') === 'template-storefront'
-      ),
-    [transactions]
-  )
-
-  const vendorFiltered = useMemo(() => {
-    if (selectedVendor === 'all') return sourceFiltered
-    return sourceFiltered.filter(
-      (tx) => String(tx.meta?.vendor_id || '') === selectedVendor
-    )
-  }, [selectedVendor, sourceFiltered])
-
-  const templateFiltered = useMemo(() => {
-    if (selectedTemplate === 'all') return vendorFiltered
-    return vendorFiltered.filter((tx) => {
-      const templateId = String(tx.meta?.template_id || '')
-      const templateKey = String(tx.meta?.template_key || '')
-      return templateId === selectedTemplate || templateKey === selectedTemplate
-    })
-  }, [selectedTemplate, vendorFiltered])
+  const getWebsiteLabel = (tx?: Transaction | null) =>
+    String(
+      tx?.meta?.website_name ||
+        tx?.meta?.website_slug ||
+        tx?.meta?.template_name ||
+        tx?.meta?.template_key ||
+        ''
+    ).trim() || 'Unknown website'
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return templateFiltered
+    if (!search.trim()) return transactions
     const query = search.toLowerCase()
-    return templateFiltered.filter((tx) =>
+    return transactions.filter((tx) =>
       [
         tx.meta?.order_number,
-        tx.meta?.vendor_id,
         tx.meta?.source,
         tx.meta?.product_name,
+        tx.meta?.vendor_id,
+        getWebsiteLabel(tx),
         tx.meta?.template_name,
         tx.meta?.template_key,
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query))
     )
-  }, [search, templateFiltered])
+  }, [getWebsiteLabel, search, transactions])
 
   const totalPages = Math.max(Math.ceil(filtered.length / pageSize), 1)
   const paginatedTransactions = useMemo(() => {
@@ -249,7 +301,7 @@ function TemplateWalletPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, selectedVendor, selectedTemplate, pageSize])
+  }, [search, selectedVendor, selectedWebsite, pageSize])
 
   useEffect(() => {
     if (page > totalPages) {
@@ -273,24 +325,24 @@ function TemplateWalletPage() {
   )
 
   const derivedBalance = useMemo(() => {
-    return templateFiltered.reduce((sum, tx) => {
+    return transactions.reduce((sum, tx) => {
       const amount = Number(tx.amount || 0)
       return tx.direction === 'debit' ? sum - amount : sum + amount
     }, 0)
-  }, [templateFiltered])
+  }, [transactions])
 
   const derivedSummary = useMemo(() => {
-    if (selectedVendor === 'all' && selectedTemplate === 'all') return summary
-    const commissionTotal = templateFiltered.reduce(
+    if (!isVendor && summary) return summary
+    const commissionTotal = transactions.reduce(
       (sum, tx) => sum + Number(tx.meta?.commission_amount || 0),
       0
     )
-    const vendorPayoutTotal = templateFiltered.reduce(
+    const vendorPayoutTotal = transactions.reduce(
       (sum, tx) => sum + Number(tx.meta?.net_amount || 0),
       0
     )
     return { commissionTotal, vendorPayoutTotal }
-  }, [selectedTemplate, selectedVendor, summary, templateFiltered])
+  }, [isVendor, summary, transactions])
 
   const vendorOptions = useMemo(() => {
     if (isVendor && vendorId) {
@@ -340,24 +392,11 @@ function TemplateWalletPage() {
     return map
   }, [vendorOptions])
 
-  const templateOptions = useMemo(() => {
-    return templates.map((template) => ({
-      id: String(template?._id || template?.id || ''),
-      key: String(template?.template_key || ''),
-      label:
-        template?.template_name ||
-        template?.name ||
-        template?.business_name ||
-        template?.template_key ||
-        'Template',
-    }))
-  }, [templates])
-
   const statsItems = [
     {
       label: 'Wallet Balance',
       value: formatMoney(derivedBalance),
-      helper: 'Balance for the selected vendor and template scope.',
+      helper: 'Balance for the selected vendor and website scope.',
     },
     {
       label: 'Visible Transactions',
@@ -377,12 +416,12 @@ function TemplateWalletPage() {
     {
       label: 'Total Commission',
       value: formatMoney(derivedSummary?.commissionTotal),
-      helper: 'Commission across the selected template scope.',
+      helper: 'Commission across the selected website scope.',
     },
     {
       label: 'Vendor Payouts',
       value: formatMoney(derivedSummary?.vendorPayoutTotal),
-      helper: 'Vendor payouts across the selected template scope.',
+      helper: 'Vendor payouts across the selected website scope.',
     },
     {
       label: 'Visible Credit Value',
@@ -402,13 +441,13 @@ function TemplateWalletPage() {
 
   return (
     <>
-      <TablePageHeader title='Template Wallet'>
+      <TablePageHeader title='Website Wallet'>
         {!isVendor && (
           <Select
             value={selectedVendor}
             onValueChange={(value) => {
               setSelectedVendor(value)
-              setSelectedTemplate('all')
+              setSelectedWebsite('all')
             }}
           >
             <SelectTrigger className='h-10 w-52 shrink-0'>
@@ -426,20 +465,16 @@ function TemplateWalletPage() {
         )}
 
         <Select
-          value={selectedTemplate}
-          onValueChange={setSelectedTemplate}
-          disabled={selectedVendor === 'all'}
+          value={selectedWebsite}
+          onValueChange={setSelectedWebsite}
         >
           <SelectTrigger className='h-10 w-52 shrink-0'>
-            <SelectValue placeholder='All templates' />
+            <SelectValue placeholder='All websites' />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value='all'>All templates</SelectItem>
-            {templateOptions.map((option) => (
-              <SelectItem
-                key={option.id || option.key}
-                value={option.id || option.key}
-              >
+            <SelectItem value='all'>All websites</SelectItem>
+            {websites.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
                 {option.label}
               </SelectItem>
             ))}
@@ -450,7 +485,9 @@ function TemplateWalletPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={
-            isVendor ? 'Search order or product' : 'Search order or vendor'
+            isVendor
+              ? 'Search order, product, or website'
+              : 'Search order, vendor, or website'
           }
           className='h-10 w-64 shrink-0'
         />
@@ -490,7 +527,7 @@ function TemplateWalletPage() {
                 {!isVendor && (
                   <TableHead className='min-w-[170px]'>Vendor</TableHead>
                 )}
-                <TableHead className='min-w-[180px]'>Template</TableHead>
+                <TableHead className='min-w-[180px]'>Website</TableHead>
                 <TableHead className='min-w-[220px]'>Product</TableHead>
                 <TableHead className='min-w-[140px]'>Amount</TableHead>
                 <TableHead className='min-w-[140px]'>Balance After</TableHead>
@@ -523,10 +560,6 @@ function TemplateWalletPage() {
                   const vendorLabel = vendorLabelMap.get(
                     String(tx.meta?.vendor_id || '')
                   )
-                  const templateLabel =
-                    tx.meta?.template_name ||
-                    tx.meta?.template_key ||
-                    'Template'
                   return (
                     <TableRow key={tx._id}>
                       <TableCell>
@@ -545,7 +578,7 @@ function TemplateWalletPage() {
                         </TableCell>
                       )}
                       <TableCell className='text-muted-foreground text-sm'>
-                        {templateLabel}
+                        {getWebsiteLabel(tx)}
                       </TableCell>
                       <TableCell>
                         <div className='text-sm font-medium'>
@@ -592,7 +625,7 @@ function TemplateWalletPage() {
           <DialogHeader className='text-left'>
             <DialogTitle>Transaction details</DialogTitle>
             <DialogDescription>
-              Review product, template, commission, and payout details.
+              Review product, website, commission, and payout details.
             </DialogDescription>
           </DialogHeader>
           {!selectedTx ? (
@@ -647,11 +680,9 @@ function TemplateWalletPage() {
                   </div>
                 )}
                 <div className='rounded-none border p-3 text-sm'>
-                  <p className='text-muted-foreground text-xs'>Template</p>
+                  <p className='text-muted-foreground text-xs'>Website</p>
                   <p className='mt-1 font-semibold text-slate-900'>
-                    {selectedTx.meta?.template_name ||
-                      selectedTx.meta?.template_key ||
-                      'Template'}
+                    {getWebsiteLabel(selectedTx)}
                   </p>
                 </div>
               </div>
@@ -715,7 +746,7 @@ function TemplateWalletPage() {
       <StatisticsDialog
         open={statsOpen}
         onOpenChange={setStatsOpen}
-        title='Template wallet statistics'
+        title='Website wallet statistics'
         description='Summary for the current wallet filters.'
         items={statsItems}
       />

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { isLikelyRichTextHtml, stripRichTextToPlainText } from '@/lib/rich-text'
 import { cn } from '@/lib/utils'
 
 type LinkedTextProps = {
@@ -12,6 +13,48 @@ const markdownLinkPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi
 const urlPattern = /https?:\/\/[^\s]+/gi
 const linkClassName =
   'font-medium text-blue-600 underline decoration-blue-400 underline-offset-4 transition-colors hover:text-blue-700'
+
+const encodedHtmlTagPattern = /&lt;\/?[a-z][^&]*&gt;/i
+const pseudoTagPrefixPattern =
+  /^\s*\/?(?:p|div|li|ul|ol|h[1-6]|blockquote|br|hr)\b(?:\s+[a-zA-Z_:][-a-zA-Z0-9_:.]*=(?:"[^"]*"|'[^']*'|[^\s"'>]+))*\s*/i
+const pseudoTagOnlyLinePattern =
+  /^\s*\/?(?:p|div|li|ul|ol|h[1-6]|blockquote|br|hr)\s*$/i
+
+const decodeHtmlEntities = (value: string) =>
+  String(value || '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+
+const stripPseudoRichTextArtifacts = (value: string) =>
+  String(value || '')
+    .split(/\r?\n/)
+    .map((line) => {
+      const withoutPrefix = line.replace(pseudoTagPrefixPattern, '').trim()
+      return pseudoTagOnlyLinePattern.test(withoutPrefix) ? '' : withoutPrefix
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+const normalizeLinkedTextInput = (value: string) => {
+  const source = String(value || '')
+  if (!source.trim()) return ''
+
+  const decoded =
+    encodedHtmlTagPattern.test(source) || source.includes('&nbsp;')
+      ? decodeHtmlEntities(source)
+      : source
+
+  const plainFromHtml = isLikelyRichTextHtml(decoded)
+    ? stripRichTextToPlainText(decoded)
+    : decoded
+
+  return stripPseudoRichTextArtifacts(plainFromHtml)
+}
 
 const stripTrailingPunctuation = (value: string) => {
   const match = value.match(/[.,!?;:]+$/)
@@ -105,6 +148,7 @@ export function LinkedText({
   preserveWhitespace = true,
 }: LinkedTextProps) {
   const Comp = as
+  const normalizedText = normalizeLinkedTextInput(text)
 
   return (
     <Comp
@@ -113,7 +157,7 @@ export function LinkedText({
         className
       )}
     >
-      {renderLinkedContent(text)}
+      {renderLinkedContent(normalizedText)}
     </Comp>
   )
 }

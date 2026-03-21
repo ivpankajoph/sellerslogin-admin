@@ -25,6 +25,7 @@ import {
   formatDate,
   formatMoney,
   formatTime,
+  getBorzoOrderWebsiteLabel,
   getMapEmbedUrl,
   statusPillClass,
   type BorzoCourier,
@@ -70,7 +71,7 @@ function BorzoOrderDetailsPage() {
       }
       setError('')
 
-      const reportData = await fetchBorzoReportData(isVendor)
+      const reportData = await fetchBorzoReportData({ isVendor })
       const localMatch =
         reportData.orders.find((item) => Number(item.order_id) === parsedOrderId) || null
 
@@ -283,6 +284,9 @@ function BorzoOrderDetailsPage() {
                 </p>
                 <p className='text-lg font-semibold text-slate-900'>
                   Charge: {formatMoney(order.payment_amount)}
+                </p>
+                <p className='text-sm text-slate-600'>
+                  Website: {getBorzoOrderWebsiteLabel(order)}
                 </p>
                 {trackingUrl && (
                   <a

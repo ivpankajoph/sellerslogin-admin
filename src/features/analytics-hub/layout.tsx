@@ -21,6 +21,8 @@ import axios from "axios";
 type WebsiteOption = {
   id: string;
   label: string;
+  source: "ophmart" | "template";
+  isMainWebsite?: boolean;
 };
 
 function StorefrontSelect() {
@@ -128,13 +130,31 @@ function AnalyticsHubShell() {
   const authUser = useSelector((state: any) => state.auth?.user);
   const vendorId = authUser?._id || authUser?.id || "";
   const token = useSelector((state: any) => state.auth?.token);
-  const { source, websiteId, setWebsiteId } = useAnalyticsSource();
+  const { source, setSource, websiteId, setWebsiteId } = useAnalyticsSource();
   const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([]);
   const style: CSSProperties = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   } as CSSProperties;
-  const shouldShowWebsiteSelect = role === "vendor" || source === "template";
+  const isAdmin = role === "admin" || role === "superadmin";
+  const shouldShowWebsiteSelect = role === "vendor" || isAdmin;
+
+  const handleWebsiteChange = (value: string) => {
+    if (value === "all") {
+      setWebsiteId("all");
+      if (role !== "vendor") {
+        setSource("all");
+      }
+      return;
+    }
+
+    const selectedOption = websiteOptions.find((option) => option.id === value);
+    setWebsiteId(value);
+
+    if (selectedOption && role !== "vendor") {
+      setSource(selectedOption.source);
+    }
+  };
 
   useEffect(() => {
     if (!shouldShowWebsiteSelect || !token) {
@@ -150,14 +170,19 @@ function AnalyticsHubShell() {
     const fetchWebsites = async () => {
       try {
         const res = await axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/templates/by-vendor`, {
-          params: role === "vendor" ? { vendor_id: vendorId } : undefined,
+          params: {
+            ...(role === "vendor" ? { vendor_id: vendorId } : {}),
+            ...(role !== "vendor" ? { include_main_website: "true" } : {}),
+          },
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         const rows = res.data?.data || [];
         const options = rows
           .map((website: any) => {
+            const isMainWebsite = Boolean(website?.is_main_website);
             const websiteName = String(
-              website?.name ||
+              (isMainWebsite ? website?.name || "Main Website" : "") ||
+                website?.name ||
                 website?.business_name ||
                 website?.website_slug ||
                 website?.template_name ||
@@ -171,8 +196,9 @@ function AnalyticsHubShell() {
                 ""
             ).trim();
             const templateName = String(website?.template_name || "").trim();
-            const secondaryLabel =
-              role === "vendor"
+            const secondaryLabel = isMainWebsite
+              ? vendorName
+              : role === "vendor"
                 ? templateName && templateName !== websiteName
                   ? templateName
                   : ""
@@ -184,6 +210,8 @@ function AnalyticsHubShell() {
               label: secondaryLabel
                 ? `${websiteName} - ${secondaryLabel}`
                 : websiteName,
+              source: isMainWebsite ? "ophmart" : "template",
+              isMainWebsite,
             };
           })
           .filter((option: WebsiteOption) => option.id);
@@ -192,6 +220,9 @@ function AnalyticsHubShell() {
 
         if (options.length === 1 && websiteId === "all") {
           setWebsiteId(options[0].id);
+          if (role !== "vendor") {
+            setSource(options[0].source);
+          }
           return;
         }
 
@@ -207,7 +238,25 @@ function AnalyticsHubShell() {
     };
 
     fetchWebsites();
-  }, [role, vendorId, token, shouldShowWebsiteSelect, websiteId, setWebsiteId]);
+  }, [role, vendorId, token, shouldShowWebsiteSelect, websiteId, setSource, setWebsiteId]);
+
+  useEffect(() => {
+    if (role === "vendor") return;
+    if (!websiteOptions.length) return;
+    if (websiteId === "all") return;
+
+    const selectedOption = websiteOptions.find((option) => option.id === websiteId);
+    if (!selectedOption) return;
+
+    if (source === "ophmart" && selectedOption.source !== "ophmart") {
+      setWebsiteId("all");
+      return;
+    }
+
+    if (source === "template" && selectedOption.source !== "template") {
+      setWebsiteId("all");
+    }
+  }, [role, source, websiteId, websiteOptions, setWebsiteId]);
 
   return (
     <SidebarProvider style={style}>
@@ -224,9 +273,9 @@ function AnalyticsHubShell() {
               {shouldShowWebsiteSelect && (
                 <WebsiteSelect
                   value={websiteId}
-                  onValueChange={setWebsiteId}
+                  onValueChange={handleWebsiteChange}
                   options={websiteOptions}
-                  placeholder={role === "vendor" ? "All websites" : "All vendor websites"}
+                  placeholder={role === "vendor" ? "All websites" : "All storefronts"}
                 />
               )}
             </div>

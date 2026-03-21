@@ -1,4 +1,7 @@
-﻿import api from '@/lib/axios'
+import api from '@/lib/axios'
+
+export const MAIN_WEBSITE_OPTION_ID = 'main-website'
+export const MAIN_WEBSITE_LABEL = 'Main Website'
 
 export type ReportSummary = {
   totalOrders: number
@@ -31,6 +34,10 @@ export type BorzoOrder = {
   created_datetime?: string
   finish_datetime?: string
   courier?: BorzoCourier
+  source_type?: 'main_website' | 'vendor_website'
+  website_id?: string
+  website_name?: string
+  vendor_name?: string
   points?: Array<{
     address?: string
     tracking_url?: string
@@ -46,6 +53,22 @@ type VendorLocalOrder = {
   shipping_fee?: number
   status?: string
   createdAt?: string
+  template_id?: string
+  template_key?: string
+  template_name?: string
+  website_id?: string
+  website_name?: string
+  website_slug?: string
+  vendor_id?:
+    | string
+    | {
+        name?: string
+        email?: string
+        businessName?: string
+        business_name?: string
+        storeName?: string
+        vendor_business_name?: string
+      }
   shipping_address?: {
     line1?: string
     line2?: string
@@ -62,6 +85,24 @@ type VendorLocalOrder = {
   }
 }
 
+type FetchBorzoReportOptions = {
+  isVendor: boolean
+  websiteId?: string
+}
+
+type MapLocalOrderMeta = {
+  sourceType: 'main_website' | 'vendor_website'
+  websiteId: string
+  websiteName: string
+  vendorName?: string
+}
+
+const createEmptySummary = (): ReportSummary => ({
+  totalOrders: 0,
+  totalRevenue: 0,
+  statusCounts: {},
+})
+
 export type StatusTab = 'all' | 'active' | 'completed' | 'drafts'
 
 export const STATUS_TABS: Array<{ key: StatusTab; label: string }> = [
@@ -71,13 +112,18 @@ export const STATUS_TABS: Array<{ key: StatusTab; label: string }> = [
   { key: 'drafts', label: 'Drafts' },
 ]
 
-export const normalizeStatus = (status?: string) => String(status || 'unknown').toLowerCase()
+export const normalizeStatus = (status?: string) =>
+  String(status || 'unknown').toLowerCase()
 
 export const getStatusBucket = (status?: string): StatusTab => {
   const key = normalizeStatus(status)
   if (['completed', 'delivered', 'finished'].includes(key)) return 'completed'
   if (['draft', 'new', 'created', 'pending'].includes(key)) return 'drafts'
-  if (['searching', 'executing', 'active', 'courier_assigned', 'in_progress'].includes(key)) {
+  if (
+    ['searching', 'executing', 'active', 'courier_assigned', 'in_progress'].includes(
+      key
+    )
+  ) {
     return 'active'
   }
   return 'active'
@@ -114,7 +160,37 @@ export const formatTime = (value?: string) => {
   })
 }
 
-const mapLocalToBorzoOrder = (order: VendorLocalOrder): BorzoOrder | null => {
+export const getBorzoOrderWebsiteLabel = (order?: BorzoOrder | null) =>
+  String(order?.website_name || '').trim() ||
+  (order?.website_id === MAIN_WEBSITE_OPTION_ID ||
+  order?.source_type === 'main_website'
+    ? MAIN_WEBSITE_LABEL
+    : 'Unknown website')
+
+const getVendorLabel = (order: VendorLocalOrder) =>
+  String(
+    (typeof order?.vendor_id === 'object' &&
+      (order.vendor_id?.businessName ||
+        order.vendor_id?.business_name ||
+        order.vendor_id?.storeName ||
+        order.vendor_id?.name ||
+        order.vendor_id?.email)) ||
+      ''
+  ).trim()
+
+const getWebsiteLabelFromLocal = (order: VendorLocalOrder) =>
+  String(
+    order?.website_name ||
+      order?.website_slug ||
+      order?.template_name ||
+      order?.template_key ||
+      ''
+  ).trim() || 'Unknown website'
+
+const mapLocalToBorzoOrder = (
+  order: VendorLocalOrder,
+  meta: MapLocalOrderMeta
+): BorzoOrder | null => {
   if (!order?.borzo?.order_id) return null
 
   const address = [
@@ -135,6 +211,10 @@ const mapLocalToBorzoOrder = (order: VendorLocalOrder): BorzoOrder | null => {
     payment_amount: String(Number(order.shipping_fee || 0).toFixed(2)),
     created_datetime: order.createdAt,
     courier: order.borzo.courier,
+    source_type: meta.sourceType,
+    website_id: meta.websiteId,
+    website_name: meta.websiteName,
+    vendor_name: meta.vendorName,
     points: [
       { address: 'Vendor pickup' },
       {
@@ -147,64 +227,101 @@ const mapLocalToBorzoOrder = (order: VendorLocalOrder): BorzoOrder | null => {
 }
 
 const buildSummary = (orders: VendorLocalOrder[]): ReportSummary => {
-  return orders.reduce(
-    (acc, order) => {
-      if (!order?.borzo?.order_id) return acc
-      const status = order?.borzo?.status || order?.status || 'unknown'
-      acc.totalOrders += 1
-      acc.totalRevenue += Number(order?.total || 0)
-      acc.statusCounts[status] = (acc.statusCounts[status] || 0) + 1
-      return acc
-    },
-    { totalOrders: 0, totalRevenue: 0, statusCounts: {} } as ReportSummary,
-  )
+  return orders.reduce((acc, order) => {
+    if (!order?.borzo?.order_id) return acc
+    const status = order?.borzo?.status || order?.status || 'unknown'
+    acc.totalOrders += 1
+    acc.totalRevenue += Number(order?.total || 0)
+    acc.statusCounts[status] = (acc.statusCounts[status] || 0) + 1
+    return acc
+  }, createEmptySummary())
 }
 
-export const fetchBorzoReportData = async (
-  isVendor: boolean,
-): Promise<{ report: BorzoReport | null; orders: BorzoOrder[] }> => {
-  if (isVendor) {
-    const [ophmateRes, templateRes] = await Promise.all([
-      api.get('/orders', { params: { limit: 100 } }),
-      api.get('/template-orders', { params: { limit: 100 } }),
-    ])
+export const fetchBorzoReportData = async ({
+  isVendor,
+  websiteId = 'all',
+}: FetchBorzoReportOptions): Promise<{
+  report: BorzoReport
+  orders: BorzoOrder[]
+}> => {
+  const normalizedWebsiteId = String(websiteId || 'all').trim() || 'all'
+  const includeMainOrders =
+    !isVendor &&
+    (normalizedWebsiteId === 'all' ||
+      normalizedWebsiteId === MAIN_WEBSITE_OPTION_ID)
+  const includeTemplateOrders =
+    isVendor || normalizedWebsiteId !== MAIN_WEBSITE_OPTION_ID
 
-    const ophmateOrders = Array.isArray(ophmateRes?.data?.orders)
+  const [ophmateRes, templateRes] = await Promise.all([
+    includeMainOrders
+      ? api.get('/orders', {
+          params: {
+            limit: 500,
+            has_borzo: 'true',
+          },
+        })
+      : Promise.resolve(null),
+    includeTemplateOrders
+      ? api.get('/template-orders', {
+          params: {
+            limit: 500,
+            has_borzo: 'true',
+            ...(normalizedWebsiteId !== 'all' &&
+            normalizedWebsiteId !== MAIN_WEBSITE_OPTION_ID
+              ? { website_id: normalizedWebsiteId }
+              : {}),
+          },
+        })
+      : Promise.resolve(null),
+  ])
+
+  const ophmateOrders =
+    includeMainOrders && Array.isArray(ophmateRes?.data?.orders)
       ? ophmateRes.data.orders
       : []
-    const templateOrders = Array.isArray(templateRes?.data?.orders)
+  const templateOrders =
+    includeTemplateOrders && Array.isArray(templateRes?.data?.orders)
       ? templateRes.data.orders
       : []
 
-    const mappedOrders = [...ophmateOrders, ...templateOrders]
-      .map((order) => mapLocalToBorzoOrder(order))
-      .filter(Boolean) as BorzoOrder[]
+  const mappedMainOrders = includeMainOrders
+    ? ophmateOrders
+        .map((order: VendorLocalOrder) =>
+          mapLocalToBorzoOrder(order, {
+            sourceType: 'main_website',
+            websiteId: MAIN_WEBSITE_OPTION_ID,
+            websiteName: MAIN_WEBSITE_LABEL,
+          })
+        )
+        .filter(Boolean)
+    : []
 
-    return {
-      report: {
-        ophmate: buildSummary(ophmateOrders),
-        template: buildSummary(templateOrders),
-      },
-      orders: mappedOrders,
-    }
+  const mappedTemplateOrders = templateOrders
+    .map((order: VendorLocalOrder) =>
+      mapLocalToBorzoOrder(order, {
+        sourceType: 'vendor_website',
+        websiteId: String(order?.website_id || order?.template_id || '').trim(),
+        websiteName: getWebsiteLabelFromLocal(order),
+        vendorName: getVendorLabel(order),
+      })
+    )
+    .filter(Boolean)
+
+  return {
+    report: {
+      ophmate: includeMainOrders ? buildSummary(ophmateOrders) : createEmptySummary(),
+      template: includeTemplateOrders
+        ? buildSummary(templateOrders)
+        : createEmptySummary(),
+    },
+    orders: [...mappedMainOrders, ...mappedTemplateOrders] as BorzoOrder[],
   }
-
-  const res = await api.get('/borzo/report', {
-    params: { include_borzo: 'true' },
-  })
-
-  const data = res.data || {}
-  const report = data.report || null
-  const borzo = data.borzo || {}
-  const orders = Array.isArray(borzo.orders) ? borzo.orders : []
-
-  return { report, orders }
 }
 
 export const fetchBorzoOrderDetailsById = async (
   orderId: number,
   isVendor: boolean,
-  fallbackOrders: BorzoOrder[] = [],
+  fallbackOrders: BorzoOrder[] = []
 ): Promise<{ order: BorzoOrder | null; courier: BorzoCourier | null }> => {
   if (!Number.isFinite(orderId) || orderId <= 0) {
     return { order: null, courier: null }
@@ -241,7 +358,9 @@ export const fetchBorzoOrderDetailsById = async (
         : []
 
     remoteOrder =
-      orders.find((order: BorzoOrder) => Number(order?.order_id) === orderId) || orders[0] || null
+      orders.find((order: BorzoOrder) => Number(order?.order_id) === orderId) ||
+      orders[0] ||
+      null
   }
 
   if (courierResult.status === 'fulfilled') {
@@ -261,10 +380,12 @@ export const getMapEmbedUrl = (courier?: BorzoCourier | null) => {
 
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
     const offset = 0.08
-    const bbox = [lng - offset, lat - offset, lng + offset, lat + offset].join(',')
+    const bbox = [lng - offset, lat - offset, lng + offset, lat + offset].join(
+      ','
+    )
 
     return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(
-      bbox,
+      bbox
     )}&layer=mapnik&marker=${lat}%2C${lng}`
   }
 

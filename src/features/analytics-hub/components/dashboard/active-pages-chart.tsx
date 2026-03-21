@@ -7,6 +7,25 @@ interface ActivePagesChartProps {
   isLoading?: boolean;
 }
 
+const STOREFRONT_BASE_URL = String(
+  import.meta.env.VITE_PUBLIC_STOREFRONT_URL ||
+    import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND ||
+    ""
+)
+  .trim()
+  .replace(/\/+$/, "");
+
+const resolvePageHref = (value?: string) => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+  if (/^https?:\/\//i.test(rawValue)) return rawValue;
+
+  const normalizedPath = rawValue.startsWith("/") ? rawValue : `/${rawValue}`;
+  return STOREFRONT_BASE_URL
+    ? `${STOREFRONT_BASE_URL}${normalizedPath}`
+    : normalizedPath;
+};
+
 export function ActivePagesChart({ pages, isLoading }: ActivePagesChartProps) {
   const maxUsers = Math.max(...pages.map(p => p.users), 1);
   const totalUsers = pages.reduce((sum, p) => sum + p.users, 0);
@@ -47,15 +66,29 @@ export function ActivePagesChart({ pages, isLoading }: ActivePagesChartProps) {
           </div>
         ) : (
           pages.slice(0, 8).map((page, index) => {
+            const pagePath = page.page || "/";
+            const pageHref = resolvePageHref(pagePath);
             const percentage = (page.users / maxUsers) * 100;
             const userPercentage = totalUsers > 0 ? ((page.users / totalUsers) * 100).toFixed(1) : 0;
             
             return (
               <div key={index} className="space-y-1.5" data-testid={`active-page-${index}`}>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium truncate max-w-[200px]" title={page.page}>
-                    {page.page || '/'}
-                  </span>
+                  {pageHref ? (
+                    <a
+                      href={pageHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="max-w-[200px] truncate font-medium text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
+                      title={pageHref}
+                    >
+                      {pagePath}
+                    </a>
+                  ) : (
+                    <span className="max-w-[200px] truncate font-medium" title={pagePath}>
+                      {pagePath}
+                    </span>
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground tabular-nums">{page.users}</span>
                     <span className="text-xs text-muted-foreground/70 w-10 text-right">
