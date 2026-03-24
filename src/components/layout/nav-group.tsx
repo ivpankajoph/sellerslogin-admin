@@ -43,7 +43,7 @@ const ICON_ACCENTS = [
   { chip: 'bg-fuchsia-100 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-600 dark:text-fuchsia-300' },
 ]
 
-const NAV_ITEM_TEXT_CLASS = 'flex-1 min-w-0 break-words leading-snug text-start'
+const NAV_ITEM_TEXT_CLASS = 'flex-1 min-w-0 whitespace-nowrap leading-none text-start'
 
 const iconAccentByKey = (key: string) => {
   const code = Array.from(String(key || '')).reduce((acc, char) => acc + char.charCodeAt(0), 0)
@@ -103,9 +103,20 @@ function SidebarItemIcon({
 
 function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
   const { setOpenMobile } = useSidebar()
-  const isActive = checkIsActive(href, item)
+  const isActive = item.disabled ? false : checkIsActive(href, item)
   return (
     <SidebarMenuItem>
+      {item.disabled ? (
+        <SidebarMenuButton
+          disabled
+          tooltip={item.title}
+          className='text-sidebar-foreground/90 data-[active=true]:text-sidebar-accent-foreground'
+        >
+          <SidebarItemIcon icon={item.icon} seed={item.title} />
+          <span className={NAV_ITEM_TEXT_CLASS}>{item.title}</span>
+          {item.badge && <NavBadge>{item.badge}</NavBadge>}
+        </SidebarMenuButton>
+      ) : (
           <SidebarMenuButton
             asChild
             isActive={isActive}
@@ -118,6 +129,7 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
               {item.badge && <NavBadge>{item.badge}</NavBadge>}
             </Link>
           </SidebarMenuButton>
+      )}
     </SidebarMenuItem>
   )
 }
@@ -154,17 +166,28 @@ function SidebarMenuCollapsible({
           <SidebarMenuSub>
             {item.items.map((subItem) => (
               <SidebarMenuSubItem key={subItem.title}>
-                <SidebarMenuSubButton
-                  asChild
-                  isActive={checkIsActive(href, subItem)}
-                  className='text-sidebar-foreground/85 data-[active=true]:text-sidebar-accent-foreground'
-                >
-                  <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
+                {subItem.disabled ? (
+                  <SidebarMenuSubButton
+                    disabled
+                    className='text-sidebar-foreground/85 data-[active=true]:text-sidebar-accent-foreground'
+                  >
                     <SidebarItemIcon icon={subItem.icon} seed={subItem.title} />
                     <span className={NAV_ITEM_TEXT_CLASS}>{subItem.title}</span>
                     {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
-                  </Link>
-                </SidebarMenuSubButton>
+                  </SidebarMenuSubButton>
+                ) : (
+                  <SidebarMenuSubButton
+                    asChild
+                    isActive={checkIsActive(href, subItem)}
+                    className='text-sidebar-foreground/85 data-[active=true]:text-sidebar-accent-foreground'
+                  >
+                    <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
+                      <SidebarItemIcon icon={subItem.icon} seed={subItem.title} />
+                      <span className={NAV_ITEM_TEXT_CLASS}>{subItem.title}</span>
+                      {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
+                    </Link>
+                  </SidebarMenuSubButton>
+                )}
               </SidebarMenuSubItem>
             ))}
           </SidebarMenuSub>
@@ -203,17 +226,31 @@ function SidebarMenuCollapsedDropdown({
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {item.items.map((sub) => (
-            <DropdownMenuItem key={`${sub.title}-${sub.url}`} asChild>
-              <Link
-                to={sub.url}
-                className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
-              >
-                {sub.icon && <sub.icon />}
-                <span className='max-w-52 text-wrap'>{sub.title}</span>
-                {sub.badge && (
-                  <span className='ms-auto text-xs'>{sub.badge}</span>
-                )}
-              </Link>
+            <DropdownMenuItem
+              key={`${sub.title}-${sub.url}`}
+              disabled={sub.disabled}
+              asChild={!sub.disabled}
+            >
+              {sub.disabled ? (
+                <>
+                  {sub.icon && <sub.icon />}
+                  <span className='max-w-52 text-wrap'>{sub.title}</span>
+                  {sub.badge && (
+                    <span className='ms-auto text-xs'>{sub.badge}</span>
+                  )}
+                </>
+              ) : (
+                <Link
+                  to={sub.url}
+                  className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
+                >
+                  {sub.icon && <sub.icon />}
+                  <span className='max-w-52 text-wrap'>{sub.title}</span>
+                  {sub.badge && (
+                    <span className='ms-auto text-xs'>{sub.badge}</span>
+                  )}
+                </Link>
+              )}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

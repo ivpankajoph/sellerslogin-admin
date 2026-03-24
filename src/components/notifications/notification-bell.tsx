@@ -79,11 +79,12 @@ export function NotificationBell({ className }: { className?: string }) {
       return Array.isArray(res.data?.notifications) ? res.data.notifications : []
     },
     enabled: open,
+    refetchInterval: open ? 30_000 : false,
   })
 
-  const markAllReadMutation = useMutation({
-    mutationFn: async () => {
-      await api.patch('/notifications/read-all')
+  const markReadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.patch(`/notifications/${id}/read`)
     },
     onSuccess: async () => {
       await Promise.all([
@@ -105,21 +106,21 @@ export function NotificationBell({ className }: { className?: string }) {
   return (
     <DropdownMenu
       open={open}
-      onOpenChange={(next) => {
-        setOpen(next)
-        if (next) markAllReadMutation.mutate()
-      }}
+      onOpenChange={setOpen}
     >
       <DropdownMenuTrigger asChild>
         <Button
           variant='outline'
           size='icon'
-          className={cn('relative', className)}
+          className={cn(
+            'relative rounded-none border-[#f3d5c7] bg-[#fff4ee] text-[#ef5b5b] shadow-sm hover:bg-[#ffe9de] hover:text-[#e54848]',
+            className
+          )}
           aria-label='Notifications'
         >
           <Bell className='h-4 w-4' />
           {hasUnread && (
-            <span className='absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white'>
+            <span className='absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white bg-red-500 px-1 text-[9px] font-semibold leading-none text-white shadow-sm'>
               {badgeLabel}
             </span>
           )}
@@ -143,6 +144,9 @@ export function NotificationBell({ className }: { className?: string }) {
                   className='flex cursor-pointer flex-col items-start gap-1 px-3 py-2'
                   onSelect={(e) => {
                     e.preventDefault()
+                    if (!n.read) {
+                      markReadMutation.mutate(n._id)
+                    }
                     const url = resolveActionUrl(n)
                     if (url) {
                       setOpen(false)

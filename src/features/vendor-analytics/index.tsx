@@ -200,7 +200,7 @@ export default function VendorAnalytics() {
         <div className='flex flex-wrap items-end justify-between gap-3'>
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>
-              Storefront Analytics
+              Store Management Analytics
             </h2>
             <p className='text-muted-foreground'>
               Track visitor activity for your template storefront.

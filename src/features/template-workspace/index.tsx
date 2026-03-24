@@ -377,6 +377,7 @@ export default function TemplateWorkspace() {
   const [creating, setCreating] = useState(false)
   const [createWebsiteStep, setCreateWebsiteStep] =
     useState<CreateWebsiteStep>('audience')
+  const [openingCreateDialog, setOpeningCreateDialog] = useState(false)
   const [selectedTemplateAudience, setSelectedTemplateAudience] =
     useState<TemplateAudience>('b2b')
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('')
@@ -735,12 +736,43 @@ export default function TemplateWorkspace() {
         : availableTemplates.find(
             (template) => template.audience === nextAudience
           ) || availableTemplates[0]
+    setOpeningCreateDialog(true)
 
-    setWebsiteName('')
-    setSelectedTemplateAudience(nextAudience)
-    setSelectedTemplateKey(nextTemplate?.key || '')
-    setCreateWebsiteStep('audience')
-    setDialogOpen(true)
+    const runOpen = () => {
+      const currentTemplate = availableTemplates.find(
+        (template) => template.key === selectedTemplateKey
+      )
+      const fallbackAudience = normalizeTemplateAudience(
+        currentTemplate?.audience,
+        currentTemplate?.key
+      )
+      const nextAudience = currentTemplate?.key
+        ? fallbackAudience
+        : normalizeTemplateAudience(
+            availableTemplates[0]?.audience,
+            availableTemplates[0]?.key
+          )
+      const nextTemplate =
+        currentTemplate?.key && currentTemplate.audience === nextAudience
+          ? currentTemplate
+          : availableTemplates.find(
+              (template) => template.audience === nextAudience
+            ) || availableTemplates[0]
+
+      setWebsiteName('')
+      setSelectedTemplateAudience(nextAudience)
+      setSelectedTemplateKey(nextTemplate?.key || '')
+      setCreateWebsiteStep('audience')
+      setDialogOpen(true)
+      setOpeningCreateDialog(false)
+    }
+
+    if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+      window.requestAnimationFrame(runOpen)
+      return
+    }
+
+    setTimeout(runOpen, 0)
   }
 
   const handleCreateDialogOpenChange = (open: boolean) => {
@@ -1015,8 +1047,13 @@ export default function TemplateWorkspace() {
             type='button'
             className='h-11 shrink-0 rounded-xl'
             onClick={openCreateDialog}
+            disabled={openingCreateDialog}
           >
-            <Plus className='h-4 w-4' />
+            {openingCreateDialog ? (
+              <Loader2 className='h-4 w-4 animate-spin' />
+            ) : (
+              <Plus className='h-4 w-4' />
+            )}
             Create Website
           </Button>
         ) : null}

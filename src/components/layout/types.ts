@@ -20,6 +20,7 @@ type BaseNavItem = {
   roles?: ("admin" | "vendor")[]
   requiresIntegration?: IntegrationProviderId
   pageKey?: string
+  disabled?: boolean
 }
 
 type NavLink = BaseNavItem & {

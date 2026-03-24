@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { type AppDispatch } from '@/store'
 import { logout } from '@/store/slices/authSlice'
 import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
-import { UserRound } from 'lucide-react'
+import { KeyRound, UserRound } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -75,6 +75,14 @@ export function ProfileDropdown() {
 
     navigate({ to: '/sign-in' })
   }
+
+  const handleChangePassword = async () => {
+    await navigate({ to: '/profile' })
+    if (typeof window !== 'undefined') {
+      window.location.hash = 'change-password'
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    }
+  }
   return (
     <>
       <DropdownMenu modal={false}>
@@ -102,6 +110,10 @@ export function ProfileDropdown() {
             <UserRound />
             Profile
             <DropdownMenuShortcut>Ctrl+P</DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => void handleChangePassword()}>
+            <KeyRound />
+            Change Password
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>
