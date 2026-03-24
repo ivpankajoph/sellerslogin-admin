@@ -1,6 +1,16 @@
-import { createFileRoute } from '@tanstack/react-router'
-import MetaPixelDashboard from '@/features/meta-pixel'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 export const Route = createFileRoute('/_authenticated/meta-pixel/')({
-  component: MetaPixelDashboard,
+  component: MetaPixelRedirect,
 })
+
+function MetaPixelRedirect() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    navigate({ to: '/meta-pixel/connect' })
+  }, [navigate])
+
+  return null
+}

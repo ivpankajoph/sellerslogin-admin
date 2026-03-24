@@ -335,10 +335,22 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
         },
         {
           title: 'Meta Pixel',
-          url: '/meta-pixel',
           icon: Activity,
           roles: [ROLES.VENDOR],
-          pageKey: 'my_websites',
+          items: [
+            {
+              title: 'Connect With Meta Pixel',
+              url: '/meta-pixel/connect',
+              roles: [ROLES.VENDOR],
+              pageKey: 'my_websites',
+            },
+            {
+              title: 'Pixel Analytics',
+              url: '/meta-pixel/analytics',
+              roles: [ROLES.VENDOR],
+              pageKey: 'my_websites',
+            },
+          ],
         },
       ],
     },

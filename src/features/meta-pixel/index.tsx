@@ -2,18 +2,24 @@ import { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import {
   Activity,
+  BarChart3,
+  DollarSign,
   CheckCircle2,
   Code2,
   Copy,
+  Eye,
   ExternalLink,
   Globe,
   LayoutTemplate,
   Loader2,
+  MousePointerClick,
   RefreshCw,
   Search,
+  ShoppingCart,
   Trash2,
+  Users,
 } from 'lucide-react'
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
@@ -30,6 +36,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import {
   Table,
@@ -44,8 +57,10 @@ import {
   setStoredActiveWebsite,
   useActiveWebsiteSelection,
 } from '@/features/vendor-template/components/websiteStudioStorage'
+import { formatINR } from '@/lib/currency'
 import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
 import { cn } from '@/lib/utils'
+import { MetaPixelAnalyticsView } from './MetaPixelAnalyticsView'
 
 type MetaPixelConfig = {
   pixel_id?: string
@@ -68,6 +83,147 @@ type WebsiteRow = {
     status?: string
     ssl_status?: string
   }
+}
+
+type MetaAnalyticsSummary = {
+  totalUsers?: number
+  totalSessions?: number
+  totalPageViews?: number
+  totalRevenue?: number
+  totalOrders?: number
+  conversionRate?: number
+  funnel?: {
+    addToCarts?: number
+    checkouts?: number
+    purchases?: number
+  }
+}
+
+type MetaRealtimeEvent = {
+  id: string
+  eventType?: string | null
+  pageTitle?: string | null
+  pageUrl?: string | null
+  productName?: string | null
+  cartTotal?: number | null
+  source?: string | null
+  city?: string | null
+  country?: string | null
+  timestamp?: string | null
+}
+
+type MetaRealtimeAnalytics = {
+  liveUsers?: number
+  liveAddToCart?: number
+  liveRevenue?: number
+  activePages?: Array<{
+    page?: string | null
+    users?: number | null
+  }>
+  recentEvents?: MetaRealtimeEvent[]
+}
+
+type MetaTrafficDatum = {
+  count?: number
+  source?: string
+  country?: string
+  device?: string
+  browser?: string
+}
+
+type MetaTopPage = {
+  page?: string
+  views?: number
+  avgTime?: number
+}
+
+type MetaTopProduct = {
+  productId?: string
+  name?: string
+  revenue?: number
+  sales?: number
+}
+
+type MetaAnalyticsOverview = MetaAnalyticsSummary & {
+  newUsers?: number
+  returningUsers?: number
+  avgSessionDuration?: number
+  bounceRate?: number
+  trafficBySource?: MetaTrafficDatum[]
+  trafficByCountry?: MetaTrafficDatum[]
+  trafficByDevice?: MetaTrafficDatum[]
+  trafficByBrowser?: MetaTrafficDatum[]
+  topPages?: MetaTopPage[]
+  topProducts?: MetaTopProduct[]
+  dropOffPages?: Array<{
+    page?: string
+    exitRate?: number
+  }>
+}
+
+type MetaAnalyticsInsights = {
+  totals?: {
+    pageViews?: number
+    uniqueVisitors?: number
+    sessions?: number
+    avgTimeOnPageMs?: number
+  }
+  topPages?: Array<{
+    path?: string
+    views?: number
+  }>
+  topReferrers?: Array<{
+    referrer?: string
+    visits?: number
+  }>
+  topBrowsers?: Array<{
+    browser?: string
+    visits?: number
+  }>
+  topDevices?: Array<{
+    device?: string
+    visits?: number
+  }>
+  topCountries?: Array<{
+    country?: string
+    visits?: number
+  }>
+  timeline?: Array<{
+    date?: string
+    views?: number
+  }>
+}
+
+type MetaTrackedEvent = {
+  _id?: string
+  eventType?: string
+  path?: string
+  fullUrl?: string
+  title?: string
+  productName?: string
+  cartTotal?: number
+  source?: string
+  device?: string
+  browser?: string
+  city?: string
+  country?: string
+  createdAt?: string
+}
+
+type MetaAnalyticsVisitor = {
+  key?: string
+  type?: string
+  visits?: number
+  lastSeen?: string
+  user?: {
+    name?: string
+    email?: string
+    phone?: string
+  }
+}
+
+type MetaPixelDashboardProps = {
+  view?: 'connect' | 'analytics'
 }
 
 const cardClass = 'rounded-2xl border border-border bg-card shadow-sm'
@@ -132,6 +288,23 @@ const resolveWebsiteName = (website?: WebsiteRow | null) =>
       'Untitled website'
   ).trim()
 
+const isWebsitePixelActive = (website?: WebsiteRow | null) =>
+  Boolean(website?.meta_pixel?.pixel_id) &&
+  website?.meta_pixel?.is_active !== false
+
+const formatEventTypeLabel = (value?: string | null) => {
+  const normalized = String(value || '').trim()
+  if (!normalized) return 'Unknown event'
+
+  return normalized
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+const formatPercentage = (value?: number | null) =>
+  `${Number(value || 0).toFixed(2)}%`
+
 const getPixelStatusMeta = (website?: WebsiteRow | null) => {
   const hasPixel = Boolean(website?.meta_pixel?.pixel_id)
   const isActive = hasPixel && website?.meta_pixel?.is_active !== false
@@ -156,7 +329,9 @@ const getPixelStatusMeta = (website?: WebsiteRow | null) => {
   }
 }
 
-export default function MetaPixelDashboard() {
+export default function MetaPixelDashboard({
+  view = 'connect',
+}: MetaPixelDashboardProps) {
   const navigate = useNavigate()
   const authUser = useSelector((state: any) => state.auth?.user || null)
   const token = useSelector((state: any) => state.auth?.token)
@@ -181,6 +356,18 @@ export default function MetaPixelDashboard() {
   const [editorIsActive, setEditorIsActive] = useState(true)
   const [statisticsOpen, setStatisticsOpen] = useState(false)
   const [statisticsWebsiteId, setStatisticsWebsiteId] = useState('')
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [analyticsError, setAnalyticsError] = useState('')
+  const [analyticsRange, setAnalyticsRange] = useState('30d')
+  const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0)
+  const [analyticsRealtime, setAnalyticsRealtime] =
+    useState<MetaRealtimeAnalytics | null>(null)
+  const [analyticsOverview, setAnalyticsOverview] =
+    useState<MetaAnalyticsOverview | null>(null)
+  const [analyticsInsights, setAnalyticsInsights] =
+    useState<MetaAnalyticsInsights | null>(null)
+  const [analyticsEvents, setAnalyticsEvents] = useState<MetaTrackedEvent[]>([])
+  const [analyticsVisitors, setAnalyticsVisitors] = useState<MetaAnalyticsVisitor[]>([])
 
   const filteredWebsites = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -201,12 +388,19 @@ export default function MetaPixelDashboard() {
     })
   }, [search, websites])
 
+  const analyticsWebsites = useMemo(
+    () => websites.filter((website) => isWebsitePixelActive(website)),
+    [websites]
+  )
+
   const selectedWebsite = useMemo(
     () =>
       websites.find((website) => resolveWebsiteId(website) === selectedWebsiteId) ||
       null,
     [selectedWebsiteId, websites]
   )
+
+  const selectedWebsiteHasActivePixel = isWebsitePixelActive(selectedWebsite)
 
   const editorWebsite = useMemo(
     () =>
@@ -222,6 +416,61 @@ export default function MetaPixelDashboard() {
       ) || selectedWebsite,
     [selectedWebsite, statisticsWebsiteId, websites]
   )
+
+  const performanceCards = useMemo(
+    () => [
+      {
+        label: 'Page Views',
+        value: analyticsOverview?.totalPageViews ?? 0,
+        helper: 'Tracked page visits for the selected website.',
+        icon: Eye,
+      },
+      {
+        label: 'Live Users',
+        value: analyticsRealtime?.liveUsers ?? 0,
+        helper: 'Approximate active sessions in the last few minutes.',
+        icon: Users,
+      },
+      {
+        label: 'Add to Cart',
+        value:
+          analyticsOverview?.funnel?.addToCarts ??
+          analyticsRealtime?.liveAddToCart ??
+          0,
+        helper: 'Cart intent captured from storefront tracking.',
+        icon: ShoppingCart,
+      },
+      {
+        label: 'Orders',
+        value: analyticsOverview?.totalOrders ?? 0,
+        helper: 'Successful purchase events received by your analytics pipeline.',
+        icon: CheckCircle2,
+      },
+      {
+        label: 'Revenue',
+        value: formatINR(analyticsOverview?.totalRevenue, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        helper: 'Purchase value tracked from storefront events.',
+        icon: DollarSign,
+      },
+      {
+        label: 'Conversion Rate',
+        value: formatPercentage(analyticsOverview?.conversionRate),
+        helper: 'Orders divided by total product/page visits.',
+        icon: MousePointerClick,
+      },
+    ],
+    [analyticsOverview, analyticsRealtime?.liveAddToCart, analyticsRealtime?.liveUsers]
+  )
+
+  const activePages = analyticsRealtime?.activePages || []
+
+  const analyticsWebsiteOptions = useMemo(() => {
+    if (!analyticsWebsites.length) return []
+    return analyticsWebsites
+  }, [analyticsWebsites])
 
   const buildPreviewUrl = (website?: WebsiteRow | null) => {
     if (!website) return undefined
@@ -270,6 +519,8 @@ export default function MetaPixelDashboard() {
 
   const pausedPixelsCount = configuredPixelsCount - activePixelsCount
   const notConnectedCount = Math.max(websites.length - configuredPixelsCount, 0)
+  const isConnectView = view === 'connect'
+  const isAnalyticsView = view === 'analytics'
 
   const statisticsItems = useMemo(() => {
     const website = statisticsWebsite
@@ -381,6 +632,13 @@ export default function MetaPixelDashboard() {
           return activeWebsiteId
         }
 
+        const connectedWebsite = nextWebsites.find((website: WebsiteRow) =>
+          isWebsitePixelActive(website)
+        )
+        if (connectedWebsite) {
+          return resolveWebsiteId(connectedWebsite)
+        }
+
         return resolveWebsiteId(nextWebsites[0]) || ''
       })
     } catch (error: any) {
@@ -397,7 +655,175 @@ export default function MetaPixelDashboard() {
 
   useEffect(() => {
     void fetchWebsites()
-  }, [token, vendorId, activeWebsiteId])
+  }, [activeWebsiteId, token, vendorId, view])
+
+  useEffect(() => {
+    if (!vendorId || !selectedWebsiteId) return
+
+    const selectedWebsiteRow = websites.find(
+      (website) => resolveWebsiteId(website) === selectedWebsiteId
+    )
+    if (!selectedWebsiteRow) return
+
+    setStoredActiveWebsite(vendorId, {
+      id: selectedWebsiteId,
+      name: resolveWebsiteName(selectedWebsiteRow),
+      templateKey: String(selectedWebsiteRow.template_key || '').trim(),
+      websiteSlug:
+        String(selectedWebsiteRow.website_slug || '').trim() || selectedWebsiteId,
+    })
+  }, [selectedWebsiteId, vendorId, websites])
+
+  useEffect(() => {
+    if (!isAnalyticsView) return
+
+    if (!analyticsWebsites.length) {
+      if (selectedWebsiteId) {
+        setSelectedWebsiteId('')
+      }
+      return
+    }
+
+    if (
+      selectedWebsiteId &&
+      analyticsWebsites.some(
+        (website) => resolveWebsiteId(website) === selectedWebsiteId
+      )
+    ) {
+      return
+    }
+
+    if (
+      activeWebsiteId &&
+      analyticsWebsites.some(
+        (website) => resolveWebsiteId(website) === activeWebsiteId
+      )
+    ) {
+      setSelectedWebsiteId(activeWebsiteId)
+      return
+    }
+
+    setSelectedWebsiteId(resolveWebsiteId(analyticsWebsites[0]) || '')
+  }, [activeWebsiteId, analyticsWebsites, isAnalyticsView, selectedWebsiteId])
+
+  useEffect(() => {
+    if (view !== 'analytics') {
+      setAnalyticsRealtime(null)
+      setAnalyticsOverview(null)
+      setAnalyticsInsights(null)
+      setAnalyticsEvents([])
+      setAnalyticsVisitors([])
+      setAnalyticsError('')
+      setAnalyticsLoading(false)
+      return
+    }
+
+    if (!vendorId || !selectedWebsiteId || !selectedWebsiteHasActivePixel) {
+      setAnalyticsRealtime(null)
+      setAnalyticsOverview(null)
+      setAnalyticsInsights(null)
+      setAnalyticsEvents([])
+      setAnalyticsVisitors([])
+      setAnalyticsError(
+        selectedWebsiteId && !selectedWebsiteHasActivePixel
+          ? 'Connect an active Meta Pixel for this website to view analytics.'
+          : ''
+      )
+      return
+    }
+
+    let isActive = true
+
+    const loadAnalytics = async () => {
+      setAnalyticsLoading(true)
+      setAnalyticsError('')
+
+      try {
+        const params = {
+          vendor_id: vendorId,
+          source: 'template',
+          website_id: selectedWebsiteId,
+          range: analyticsRange,
+        }
+
+        const [dashboardResponse, realtimeResponse, insightsResponse, eventsResponse, visitorsResponse] =
+          await Promise.all([
+          axios.get(
+            `${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/dashboard/summary`,
+            { params }
+          ),
+          axios.get(
+            `${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/dashboard/realtime`,
+            { params }
+          ),
+          axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/summary`, {
+            params,
+          }),
+          axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/events`, {
+            params: {
+              ...params,
+              page: 1,
+              pageSize: 8,
+            },
+          }),
+          axios.get(`${import.meta.env.VITE_PUBLIC_API_URL}/v1/analytics/visitors`, {
+            params: {
+              ...params,
+              page: 1,
+              pageSize: 8,
+            },
+          }),
+        ])
+
+        if (!isActive) return
+
+        setAnalyticsRealtime((realtimeResponse?.data || null) as MetaRealtimeAnalytics | null)
+        setAnalyticsOverview(
+          (dashboardResponse?.data || null) as MetaAnalyticsOverview | null
+        )
+        setAnalyticsInsights(
+          (insightsResponse?.data || null) as MetaAnalyticsInsights | null
+        )
+        setAnalyticsEvents(
+          Array.isArray(eventsResponse?.data?.events) ? eventsResponse.data.events : []
+        )
+        setAnalyticsVisitors(
+          Array.isArray(visitorsResponse?.data?.visitors)
+            ? visitorsResponse.data.visitors
+            : []
+        )
+      } catch (error: any) {
+        if (!isActive) return
+        setAnalyticsRealtime(null)
+        setAnalyticsOverview(null)
+        setAnalyticsInsights(null)
+        setAnalyticsEvents([])
+        setAnalyticsVisitors([])
+        setAnalyticsError(
+          error?.response?.data?.message ||
+            error?.message ||
+            'Failed to load storefront performance data.'
+        )
+      } finally {
+        if (isActive) {
+          setAnalyticsLoading(false)
+        }
+      }
+    }
+
+    void loadAnalytics()
+
+    return () => {
+      isActive = false
+    }
+  }, [
+    analyticsRange,
+    analyticsRefreshKey,
+    selectedWebsiteHasActivePixel,
+    selectedWebsiteId,
+    vendorId,
+    view,
+  ])
 
   const openEditor = (websiteId = selectedWebsiteId) => {
     const website = websites.find(
@@ -554,6 +980,13 @@ export default function MetaPixelDashboard() {
     }
   }
 
+  const handleRefreshPage = async () => {
+    await fetchWebsites()
+    if (isAnalyticsView) {
+      setAnalyticsRefreshKey((current) => current + 1)
+    }
+  }
+
   if (role !== 'vendor') {
     return (
       <>
@@ -579,8 +1012,12 @@ export default function MetaPixelDashboard() {
 
   return (
     <>
-      <TablePageHeader title='Meta Pixel Dashboard' stackOnMobile>
-        <div className='relative w-full max-w-sm shrink-0 sm:w-80'>
+      <TablePageHeader
+        title={isConnectView ? 'Connect Meta Pixel' : 'Pixel Analytics'}
+        stackOnMobile
+      >
+        {isConnectView ? (
+        <div className='relative w-full min-w-0 sm:max-w-sm sm:w-80'>
           <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
           <Input
             value={search}
@@ -589,14 +1026,45 @@ export default function MetaPixelDashboard() {
             className='h-10 w-full rounded-xl pl-10'
           />
         </div>
+        ) : null}
+        {isAnalyticsView ? (
+          <Select value={selectedWebsiteId} onValueChange={setSelectedWebsiteId}>
+            <SelectTrigger className='h-10 min-w-[240px] rounded-xl bg-background'>
+              <SelectValue placeholder='Select website' />
+            </SelectTrigger>
+            <SelectContent>
+              {analyticsWebsiteOptions.map((website) => {
+                const websiteId = resolveWebsiteId(website)
+                return (
+                  <SelectItem key={websiteId} value={websiteId}>
+                    {resolveWebsiteName(website)}
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+        ) : null}
+        {isAnalyticsView ? (
+          <Select value={analyticsRange} onValueChange={setAnalyticsRange}>
+            <SelectTrigger className='h-10 min-w-[160px] rounded-xl bg-background'>
+              <SelectValue placeholder='Select range' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='7d'>Last 7 days</SelectItem>
+              <SelectItem value='30d'>Last 30 days</SelectItem>
+              <SelectItem value='90d'>Last 90 days</SelectItem>
+              <SelectItem value='all'>All time</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : null}
         <Button
           type='button'
           variant='outline'
           className='h-10 rounded-xl'
-          onClick={() => void fetchWebsites()}
-          disabled={loading}
+          onClick={() => void handleRefreshPage()}
+          disabled={loading || analyticsLoading}
         >
-          {loading ? (
+          {loading || analyticsLoading ? (
             <Loader2 className='h-4 w-4 animate-spin' />
           ) : (
             <RefreshCw className='h-4 w-4' />
@@ -606,6 +1074,33 @@ export default function MetaPixelDashboard() {
       </TablePageHeader>
 
       <Main className='space-y-6'>
+        <section className={`${cardClass} p-3`}>
+          <div className='flex flex-wrap gap-3'>
+            <Button
+              type='button'
+              asChild
+              variant={isConnectView ? 'default' : 'outline'}
+              className='rounded-xl'
+            >
+              <Link to='/meta-pixel/connect'>
+                <Code2 className='h-4 w-4' />
+                Connect With Meta Pixel
+              </Link>
+            </Button>
+            <Button
+              type='button'
+              asChild
+              variant={isAnalyticsView ? 'default' : 'outline'}
+              className='rounded-xl'
+            >
+              <Link to='/meta-pixel/analytics'>
+                <BarChart3 className='h-4 w-4' />
+                Pixel Analytics
+              </Link>
+            </Button>
+          </div>
+        </section>
+
         {!loading && !websites.length ? (
           <section className='rounded-2xl border border-dashed border-border bg-card px-8 py-12 text-center shadow-sm'>
             <Globe className='mx-auto h-10 w-10 text-muted-foreground' />
@@ -626,6 +1121,27 @@ export default function MetaPixelDashboard() {
           </section>
         ) : (
           <>
+            {isAnalyticsView ? (
+              <MetaPixelAnalyticsView
+                analyticsError={analyticsError}
+                analyticsEvents={analyticsEvents}
+                analyticsInsights={analyticsInsights}
+                analyticsLoading={analyticsLoading}
+                analyticsOverview={analyticsOverview}
+                analyticsVisitors={analyticsVisitors}
+                activePages={activePages}
+                formatDateTime={formatDateTime}
+                formatEventTypeLabel={formatEventTypeLabel}
+                hasConnectedWebsite={analyticsWebsites.length > 0}
+                performanceCards={performanceCards}
+                resolveWebsiteName={resolveWebsiteName}
+                selectedStatusMeta={getPixelStatusMeta(selectedWebsite)}
+                selectedWebsite={selectedWebsite}
+                selectedWebsiteId={selectedWebsiteId}
+              />
+            ) : null}
+
+            {isConnectView ? (
             <section className={`${cardClass} overflow-hidden`}>
               <div className='flex flex-col gap-2 border-b border-border px-5 py-4'>
                 <h2 className='text-lg font-semibold text-foreground'>
@@ -797,6 +1313,7 @@ export default function MetaPixelDashboard() {
                 </TableBody>
               </Table>
             </section>
+            ) : null}
           </>
         )}
       </Main>
@@ -1020,7 +1537,7 @@ export default function MetaPixelDashboard() {
             ? `${resolveWebsiteName(statisticsWebsite)} statistics`
             : 'Meta Pixel statistics'
         }
-        description='This dialog shows saved setup data inside SellersLogin. Live event counts still come from Meta Events Manager.'
+        description='This dialog shows saved setup data inside SellersLogin. Live storefront event activity is now available directly on this dashboard.'
         items={statisticsItems}
       />
     </>

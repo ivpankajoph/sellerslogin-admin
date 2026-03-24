@@ -25,6 +25,7 @@ import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-pas
 import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
 import { Route as ClerkAuthenticatedRouteRouteImport } from './routes/clerk/_authenticated/route'
 import { Route as ClerkauthRouteRouteImport } from './routes/clerk/(auth)/route'
+import { Route as AuthenticatedMetaPixelRouteRouteImport } from './routes/_authenticated/meta-pixel/route'
 import { Route as AuthenticatedAnalyticsRouteRouteImport } from './routes/_authenticated/analytics/route'
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
 import { Route as AuthenticatedVendorIndexRouteImport } from './routes/_authenticated/vendor/index'
@@ -71,6 +72,8 @@ import { Route as AuthenticatedVendorTemplateTemplateKeyRouteImport } from './ro
 import { Route as AuthenticatedUsersUserIdRouteImport } from './routes/_authenticated/users/$userId'
 import { Route as AuthenticatedSeoSitemapsRouteImport } from './routes/_authenticated/seo/sitemaps'
 import { Route as AuthenticatedSeoEntitiesRouteImport } from './routes/_authenticated/seo/entities'
+import { Route as AuthenticatedMetaPixelConnectRouteImport } from './routes/_authenticated/meta-pixel/connect'
+import { Route as AuthenticatedMetaPixelAnalyticsRouteImport } from './routes/_authenticated/meta-pixel/analytics'
 import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedBorzoReportOrderIdRouteImport } from './routes/_authenticated/borzo-report/$orderId'
@@ -161,6 +164,12 @@ const ClerkauthRouteRoute = ClerkauthRouteRouteImport.update({
   id: '/(auth)',
   getParentRoute: () => ClerkRouteRoute,
 } as any)
+const AuthenticatedMetaPixelRouteRoute =
+  AuthenticatedMetaPixelRouteRouteImport.update({
+    id: '/meta-pixel',
+    path: '/meta-pixel',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAnalyticsRouteRoute =
   AuthenticatedAnalyticsRouteRouteImport.update({
     id: '/analytics',
@@ -309,9 +318,9 @@ const AuthenticatedOrderIndexRoute = AuthenticatedOrderIndexRouteImport.update({
 } as any)
 const AuthenticatedMetaPixelIndexRoute =
   AuthenticatedMetaPixelIndexRouteImport.update({
-    id: '/meta-pixel/',
-    path: '/meta-pixel/',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedMetaPixelRouteRoute,
   } as any)
 const AuthenticatedLocationWorkspaceIndexRoute =
   AuthenticatedLocationWorkspaceIndexRouteImport.update({
@@ -430,6 +439,18 @@ const AuthenticatedSeoEntitiesRoute =
     path: '/seo/entities',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMetaPixelConnectRoute =
+  AuthenticatedMetaPixelConnectRouteImport.update({
+    id: '/connect',
+    path: '/connect',
+    getParentRoute: () => AuthenticatedMetaPixelRouteRoute,
+  } as any)
+const AuthenticatedMetaPixelAnalyticsRoute =
+  AuthenticatedMetaPixelAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
+    getParentRoute: () => AuthenticatedMetaPixelRouteRoute,
+  } as any)
 const AuthenticatedIntegrationsProviderRoute =
   AuthenticatedIntegrationsProviderRouteImport.update({
     id: '/integrations/$provider',
@@ -500,6 +521,7 @@ const AuthenticatedCategoryCreateCategoryIndexRoute =
 export interface FileRoutesByFullPath {
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/analytics': typeof AuthenticatedAnalyticsRouteRouteWithChildren
+  '/meta-pixel': typeof AuthenticatedMetaPixelRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
@@ -520,6 +542,8 @@ export interface FileRoutesByFullPath {
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
+  '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
+  '/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
   '/seo/sitemaps': typeof AuthenticatedSeoSitemapsRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
@@ -540,7 +564,7 @@ export interface FileRoutesByFullPath {
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/location-workspace': typeof AuthenticatedLocationWorkspaceIndexRoute
-  '/meta-pixel': typeof AuthenticatedMetaPixelIndexRoute
+  '/meta-pixel/': typeof AuthenticatedMetaPixelIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
   '/plans': typeof AuthenticatedPlansIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
@@ -591,6 +615,8 @@ export interface FileRoutesByTo {
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
+  '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
+  '/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
   '/seo/sitemaps': typeof AuthenticatedSeoSitemapsRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
@@ -645,6 +671,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/clerk': typeof ClerkRouteRouteWithChildren
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRouteRouteWithChildren
+  '/_authenticated/meta-pixel': typeof AuthenticatedMetaPixelRouteRouteWithChildren
   '/clerk/(auth)': typeof ClerkauthRouteRouteWithChildren
   '/clerk/_authenticated': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
@@ -667,6 +694,8 @@ export interface FileRoutesById {
   '/_authenticated/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
+  '/_authenticated/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
+  '/_authenticated/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
   '/_authenticated/seo/entities': typeof AuthenticatedSeoEntitiesRoute
   '/_authenticated/seo/sitemaps': typeof AuthenticatedSeoSitemapsRoute
   '/_authenticated/users/$userId': typeof AuthenticatedUsersUserIdRoute
@@ -721,6 +750,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/clerk'
     | '/analytics'
+    | '/meta-pixel'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
@@ -741,6 +771,8 @@ export interface FileRouteTypes {
     | '/borzo-report/$orderId'
     | '/errors/$error'
     | '/integrations/$provider'
+    | '/meta-pixel/analytics'
+    | '/meta-pixel/connect'
     | '/seo/entities'
     | '/seo/sitemaps'
     | '/users/$userId'
@@ -761,7 +793,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/inventory-management'
     | '/location-workspace'
-    | '/meta-pixel'
+    | '/meta-pixel/'
     | '/order'
     | '/plans'
     | '/products'
@@ -812,6 +844,8 @@ export interface FileRouteTypes {
     | '/borzo-report/$orderId'
     | '/errors/$error'
     | '/integrations/$provider'
+    | '/meta-pixel/analytics'
+    | '/meta-pixel/connect'
     | '/seo/entities'
     | '/seo/sitemaps'
     | '/users/$userId'
@@ -865,6 +899,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/clerk'
     | '/_authenticated/analytics'
+    | '/_authenticated/meta-pixel'
     | '/clerk/(auth)'
     | '/clerk/_authenticated'
     | '/(auth)/forgot-password'
@@ -887,6 +922,8 @@ export interface FileRouteTypes {
     | '/_authenticated/borzo-report/$orderId'
     | '/_authenticated/errors/$error'
     | '/_authenticated/integrations/$provider'
+    | '/_authenticated/meta-pixel/analytics'
+    | '/_authenticated/meta-pixel/connect'
     | '/_authenticated/seo/entities'
     | '/_authenticated/seo/sitemaps'
     | '/_authenticated/users/$userId'
@@ -1066,6 +1103,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClerkauthRouteRouteImport
       parentRoute: typeof ClerkRouteRoute
     }
+    '/_authenticated/meta-pixel': {
+      id: '/_authenticated/meta-pixel'
+      path: '/meta-pixel'
+      fullPath: '/meta-pixel'
+      preLoaderRoute: typeof AuthenticatedMetaPixelRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/analytics': {
       id: '/_authenticated/analytics'
       path: '/analytics'
@@ -1243,10 +1287,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/meta-pixel/': {
       id: '/_authenticated/meta-pixel/'
-      path: '/meta-pixel'
-      fullPath: '/meta-pixel'
+      path: '/'
+      fullPath: '/meta-pixel/'
       preLoaderRoute: typeof AuthenticatedMetaPixelIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedMetaPixelRouteRoute
     }
     '/_authenticated/location-workspace/': {
       id: '/_authenticated/location-workspace/'
@@ -1388,6 +1432,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSeoEntitiesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/meta-pixel/connect': {
+      id: '/_authenticated/meta-pixel/connect'
+      path: '/connect'
+      fullPath: '/meta-pixel/connect'
+      preLoaderRoute: typeof AuthenticatedMetaPixelConnectRouteImport
+      parentRoute: typeof AuthenticatedMetaPixelRouteRoute
+    }
+    '/_authenticated/meta-pixel/analytics': {
+      id: '/_authenticated/meta-pixel/analytics'
+      path: '/analytics'
+      fullPath: '/meta-pixel/analytics'
+      preLoaderRoute: typeof AuthenticatedMetaPixelAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedMetaPixelRouteRoute
+    }
     '/_authenticated/integrations/$provider': {
       id: '/_authenticated/integrations/$provider'
       path: '/integrations/$provider'
@@ -1492,8 +1550,27 @@ const AuthenticatedAnalyticsRouteRouteWithChildren =
     AuthenticatedAnalyticsRouteRouteChildren,
   )
 
+interface AuthenticatedMetaPixelRouteRouteChildren {
+  AuthenticatedMetaPixelAnalyticsRoute: typeof AuthenticatedMetaPixelAnalyticsRoute
+  AuthenticatedMetaPixelConnectRoute: typeof AuthenticatedMetaPixelConnectRoute
+  AuthenticatedMetaPixelIndexRoute: typeof AuthenticatedMetaPixelIndexRoute
+}
+
+const AuthenticatedMetaPixelRouteRouteChildren: AuthenticatedMetaPixelRouteRouteChildren =
+  {
+    AuthenticatedMetaPixelAnalyticsRoute: AuthenticatedMetaPixelAnalyticsRoute,
+    AuthenticatedMetaPixelConnectRoute: AuthenticatedMetaPixelConnectRoute,
+    AuthenticatedMetaPixelIndexRoute: AuthenticatedMetaPixelIndexRoute,
+  }
+
+const AuthenticatedMetaPixelRouteRouteWithChildren =
+  AuthenticatedMetaPixelRouteRoute._addFileChildren(
+    AuthenticatedMetaPixelRouteRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalyticsRouteRoute: typeof AuthenticatedAnalyticsRouteRouteWithChildren
+  AuthenticatedMetaPixelRouteRoute: typeof AuthenticatedMetaPixelRouteRouteWithChildren
   AuthenticatedConnectBrevoRoute: typeof AuthenticatedConnectBrevoRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedBorzoReportOrderIdRoute: typeof AuthenticatedBorzoReportOrderIdRoute
@@ -1515,7 +1592,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
   AuthenticatedLocationWorkspaceIndexRoute: typeof AuthenticatedLocationWorkspaceIndexRoute
-  AuthenticatedMetaPixelIndexRoute: typeof AuthenticatedMetaPixelIndexRoute
   AuthenticatedOrderIndexRoute: typeof AuthenticatedOrderIndexRoute
   AuthenticatedPlansIndexRoute: typeof AuthenticatedPlansIndexRoute
   AuthenticatedProductsIndexRoute: typeof AuthenticatedProductsIndexRoute
@@ -1548,6 +1624,8 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnalyticsRouteRoute:
     AuthenticatedAnalyticsRouteRouteWithChildren,
+  AuthenticatedMetaPixelRouteRoute:
+    AuthenticatedMetaPixelRouteRouteWithChildren,
   AuthenticatedConnectBrevoRoute: AuthenticatedConnectBrevoRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedBorzoReportOrderIdRoute: AuthenticatedBorzoReportOrderIdRoute,
@@ -1576,7 +1654,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedInventoryManagementIndexRoute,
   AuthenticatedLocationWorkspaceIndexRoute:
     AuthenticatedLocationWorkspaceIndexRoute,
-  AuthenticatedMetaPixelIndexRoute: AuthenticatedMetaPixelIndexRoute,
   AuthenticatedOrderIndexRoute: AuthenticatedOrderIndexRoute,
   AuthenticatedPlansIndexRoute: AuthenticatedPlansIndexRoute,
   AuthenticatedProductsIndexRoute: AuthenticatedProductsIndexRoute,
