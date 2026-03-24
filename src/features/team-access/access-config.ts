@@ -33,12 +33,12 @@ export const VENDOR_PAGE_ACCESS_OPTIONS: VendorPageAccessOption[] = [
   {
     key: 'customers',
     label: 'Customers',
-    description: 'Open the customer list and customer records.',
+    description: 'Open customer list, inquiries, and reviews pages.',
   },
   {
     key: 'storefront_analytics',
-    label: 'Storefront Analytics',
-    description: 'View storefront performance and analytics pages.',
+    label: 'Store Management Analytics',
+    description: 'View store management performance and analytics pages.',
   },
   {
     key: 'orders',

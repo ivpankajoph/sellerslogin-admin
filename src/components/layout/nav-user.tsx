@@ -4,7 +4,7 @@ import { type AppDispatch, type RootState } from '@/store'
 import api from '@/lib/axios'
 import { logout } from '@/store/slices/authSlice'
 import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
-import { ChevronsUpDown, Crown, LogOut, UserRound } from 'lucide-react'
+import { ChevronsUpDown, Crown, KeyRound, LogOut, UserRound } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -134,6 +134,14 @@ export function NavUser() {
     // 3. Redirect to login page
     navigate({ to: '/sign-in' })
   }
+
+  const handleChangePassword = async () => {
+    await navigate({ to: '/profile' })
+    if (typeof window !== 'undefined') {
+      window.location.hash = 'change-password'
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    }
+  }
   return (
     <>
       <SidebarMenu>
@@ -218,6 +226,10 @@ export function NavUser() {
               <DropdownMenuItem onClick={() => navigate({ to: '/profile' })}>
                 <UserRound />
                 Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void handleChangePassword()}>
+                <KeyRound />
+                Change Password
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>

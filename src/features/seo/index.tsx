@@ -13,7 +13,6 @@ import {
   Store,
   Trash2,
 } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import api from '@/lib/axios'
 import { ConfigDrawer } from '@/components/config-drawer'
@@ -567,18 +566,6 @@ export default function SeoManagerPage({ section = 'rules' }: SeoManagerPageProp
               <Boxes className='text-muted-foreground h-5 w-5' />
             </CardContent>
           </Card>
-        </div>
-
-        <div className='flex flex-wrap gap-2'>
-          <Button asChild variant={isEntitySection ? 'outline' : 'default'}>
-            <Link to='/seo'>SEO Rules</Link>
-          </Button>
-          <Button asChild variant={isEntitySection ? 'default' : 'outline'}>
-            <Link to='/seo/entities'>Entity SEO</Link>
-          </Button>
-          <Button asChild variant='outline'>
-            <Link to='/seo/sitemaps'>Sitemap</Link>
-          </Button>
         </div>
 
         {!isEntitySection && (

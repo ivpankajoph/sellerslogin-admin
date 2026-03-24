@@ -190,6 +190,7 @@ export default function ProfilePage() {
   )
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const passwordSectionRef = useRef<HTMLDivElement | null>(null)
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
@@ -208,6 +209,27 @@ export default function ProfilePage() {
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState('')
   const [passwordError, setPasswordError] = useState('')
+
+  useEffect(() => {
+    const scrollToPasswordSection = () => {
+      if (typeof window === 'undefined') return
+      if (window.location.hash !== '#change-password') return
+
+      window.requestAnimationFrame(() => {
+        passwordSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      })
+    }
+
+    scrollToPasswordSection()
+    window.addEventListener('hashchange', scrollToPasswordSection)
+
+    return () => {
+      window.removeEventListener('hashchange', scrollToPasswordSection)
+    }
+  }, [])
 
   const summaryFields = useMemo(
     () => [
@@ -602,6 +624,7 @@ export default function ProfilePage() {
               )}
 
               {/* Security Section */}
+              <div id='change-password' ref={passwordSectionRef}>
               <Card>
                 <CardHeader>
                   <CardTitle>Security</CardTitle>
@@ -692,6 +715,7 @@ export default function ProfilePage() {
                   )}
                 </CardContent>
               </Card>
+              </div>
             </div>
           </div>
         </div>
