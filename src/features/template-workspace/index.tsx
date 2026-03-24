@@ -11,9 +11,10 @@ import {
   Globe,
   LayoutTemplate,
   Loader2,
-  MapPinned,
   Plus,
   RefreshCw,
+  Search,
+  Store,
   Trash2,
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
@@ -33,13 +34,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
 import { TablePageHeader } from '@/components/data-table/table-page-header'
@@ -50,6 +45,7 @@ import {
   getStoredActiveWebsiteId,
   useActiveWebsiteSelection,
 } from '@/features/vendor-template/components/websiteStudioStorage'
+import { DomainModal } from '@/features/vendor-template/components/DomainModel'
 
 type TemplateAudience = 'b2b' | 'b2c'
 type CreateWebsiteStep = 'audience' | 'template'
@@ -75,6 +71,11 @@ type WebsiteCard = {
   vendor_name?: string
   vendor_business_name?: string
   vendor_email?: string
+  custom_domain?: {
+    hostname?: string
+    status?: string
+    ssl_status?: string
+  }
 }
 
 type CityRow = {
@@ -381,13 +382,18 @@ export default function TemplateWorkspace() {
   const [selectedTemplateKey, setSelectedTemplateKey] = useState('')
   const [websiteName, setWebsiteName] = useState('')
   const [selectedCitySlug, setSelectedCitySlug] = useState('')
-  const [previewCityTouched, setPreviewCityTouched] = useState(false)
   const [statisticsOpen, setStatisticsOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<WebsiteCard | null>(null)
   const [deletingWebsiteId, setDeletingWebsiteId] = useState<string | null>(
     null
   )
-  const { activeWebsiteId } = useActiveWebsiteSelection(vendorId)
+  const [connectDomainListOpen, setConnectDomainListOpen] = useState(false)
+  const [setupMethodModalOpen, setSetupMethodModalOpen] = useState(false)
+  const [selectedWebsiteForMethod, setSelectedWebsiteForMethod] =
+    useState<WebsiteCard | null>(null)
+  const [setupMethod, setSetupMethod] = useState<'new' | 'existing'>('existing')
+  const [domainModalOpen, setDomainModalOpen] = useState(false)
+  const { activeWebsiteId, activeWebsite } = useActiveWebsiteSelection(vendorId)
 
   const availableTemplates = useMemo(
     () =>
@@ -403,6 +409,15 @@ export default function TemplateWorkspace() {
         (template) => template.audience === selectedTemplateAudience
       ),
     [availableTemplates, selectedTemplateAudience]
+  )
+
+  const unconnectedWebsites = useMemo(
+    () =>
+      websites.filter(
+        (w) =>
+          !w.custom_domain?.hostname || w.custom_domain?.status !== 'active'
+      ),
+    [websites]
   )
 
   const selectedTemplate = useMemo(
@@ -664,8 +679,6 @@ export default function TemplateWorkspace() {
   }, [dispatch, token, vendorProfile])
 
   useEffect(() => {
-    if (previewCityTouched) return
-
     const normalizedDefaultSlug = normalizeCitySlugValue(
       effectiveDefaultCitySlug
     )
@@ -684,7 +697,7 @@ export default function TemplateWorkspace() {
       'all'
 
     setSelectedCitySlug(nextCitySlug)
-  }, [effectiveDefaultCitySlug, previewCityTouched])
+  }, [effectiveDefaultCitySlug])
 
   useEffect(() => {
     if (!selectedCitySlug) return
@@ -692,6 +705,17 @@ export default function TemplateWorkspace() {
   }, [selectedCitySlug])
 
   const openCreateDialog = () => {
+    if (!isAdmin && vendorProfile) {
+      const sub = vendorProfile.subscription || {}
+      const isFree = sub.current_plan === 'free' || !sub.current_plan
+      if (isFree && websites.length >= 1) {
+        toast.error(
+          'Free plan allows only 1 website. Please upgrade to premium to create more.'
+        )
+        return
+      }
+    }
+
     const currentTemplate = availableTemplates.find(
       (template) => template.key === selectedTemplateKey
     )
@@ -894,6 +918,41 @@ export default function TemplateWorkspace() {
     }
   }
 
+  const handleSelectWebsiteForDomain = (website: WebsiteCard) => {
+    if (!vendorId) {
+      toast.error(
+        'Vendor profile is still loading. Please refresh and try again.'
+      )
+      return
+    }
+    setSelectedWebsiteForMethod(website)
+    setSetupMethodModalOpen(true)
+    setConnectDomainListOpen(false)
+  }
+
+  const handleContinueSetupMethod = () => {
+    if (setupMethod === 'new') {
+      window.open('https://www.godaddy.com/', '_blank')
+    } else {
+      if (!selectedWebsiteForMethod || !vendorId) return
+      const templateKey = String(
+        selectedWebsiteForMethod.template_key || ''
+      ).trim()
+      setStoredActiveWebsite(vendorId, {
+        id: selectedWebsiteForMethod._id,
+        name:
+          selectedWebsiteForMethod.name ||
+          selectedWebsiteForMethod.business_name ||
+          '',
+        templateKey,
+        websiteSlug:
+          selectedWebsiteForMethod.website_slug || selectedWebsiteForMethod._id,
+      })
+      setSetupMethodModalOpen(false)
+      setDomainModalOpen(true)
+    }
+  }
+
   const formatDate = (value?: string) => {
     if (!value) return 'Recently created'
     try {
@@ -913,38 +972,18 @@ export default function TemplateWorkspace() {
         title={isAdmin ? 'Show Websites' : 'My Websites'}
         stackOnMobile
       >
-        {!isAdmin && activeWebsiteId ? (
-          <div className='inline-flex h-12 min-w-[300px] shrink-0 items-center justify-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-emerald-50 to-white px-6 text-sm font-semibold text-emerald-700 shadow-sm'>
-            <span className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700'>
-              <Globe className='h-4 w-4 shrink-0' />
-            </span>
-            <span className='whitespace-nowrap'>Active website selected</span>
-          </div>
-        ) : null}
 
-        <div className='min-w-[240px] shrink-0 sm:min-w-[260px]'>
-          <Select
-            value={selectedCitySlug || 'all'}
-            onValueChange={(value) => {
-              setPreviewCityTouched(true)
-              setSelectedCitySlug(value)
-            }}
+
+        {!isAdmin && (
+          <Button
+            type='button'
+            className='h-11 shrink-0 rounded-xl bg-blue-600 font-semibold text-white transition hover:bg-blue-700 hover:text-white'
+            onClick={() => setConnectDomainListOpen(true)}
           >
-            <SelectTrigger className='h-11 rounded-xl'>
-              <div className='flex min-w-0 items-center gap-2 truncate'>
-                <MapPinned className='text-muted-foreground h-4 w-4 shrink-0' />
-                <SelectValue placeholder='Preview Location' />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {cityOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            <Globe className='mr-2 h-4 w-4' />
+            Connect Your Domain
+          </Button>
+        )}
 
         <Button
           type='button'
@@ -1097,18 +1136,33 @@ export default function TemplateWorkspace() {
                         ) : null}
                       </div>
 
-                      <div className='border-border bg-background/70 rounded-2xl border p-3'>
-                        <div className='text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-[0.16em] uppercase'>
-                          <Globe className='h-3.5 w-3.5' />
-                          Preview URL
+                      <div className='mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3'>
+                        <div className='flex items-center justify-between gap-2'>
+                          <span className='text-[10px] font-semibold tracking-wider text-slate-500 uppercase'>
+                            Domain Status
+                          </span>
+                          {website.custom_domain?.hostname && website.custom_domain?.status === 'active' ? (
+                            <span className='rounded bg-green-100 px-2 py-0.5 text-[10px] font-bold tracking-wide text-green-700'>
+                              Connected
+                            </span>
+                          ) : (
+                            <span className='rounded bg-red-100 px-2 py-0.5 text-[10px] font-bold tracking-wide text-red-700'>
+                              Not Connected
+                            </span>
+                          )}
                         </div>
-                        <div className='bg-muted text-muted-foreground mt-2 inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold'>
-                          <Building2 className='h-3 w-3' />
-                          {selectedCityOption.label}
-                        </div>
-                        <p className='text-foreground mt-2 text-sm leading-6 break-all'>
-                          {previewUrl || 'Preview not available'}
-                        </p>
+                        {website.custom_domain?.hostname && website.custom_domain?.status === 'active' ? (
+                          <div className='mt-2'>
+                            <a
+                              href={`https://${website.custom_domain.hostname}`}
+                              target='_blank'
+                              rel='noreferrer'
+                              className='inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition hover:text-blue-800 hover:underline'
+                            >
+                              {website.custom_domain.hostname} <ExternalLink className='h-3 w-3' />
+                            </a>
+                          </div>
+                        ) : null}
                       </div>
 
                       <div
@@ -1434,6 +1488,162 @@ export default function TemplateWorkspace() {
         cancelBtnText='Cancel'
         isLoading={Boolean(deletingWebsiteId)}
         handleConfirm={handleDeleteWebsite}
+      />
+
+      <Dialog
+        open={connectDomainListOpen}
+        onOpenChange={setConnectDomainListOpen}
+      >
+        <DialogContent className='max-h-[90vh] w-[90vw] max-w-md overflow-y-auto rounded-md p-6'>
+          <DialogHeader className='text-left'>
+            <DialogTitle className='text-xl font-semibold'>
+              Select Website to Connect
+            </DialogTitle>
+            <DialogDescription className='mt-2 text-sm'>
+              Choose a website to connect a custom domain.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3'>
+            {unconnectedWebsites.length === 0 ? (
+              <div className='col-span-full rounded-xl border border-dashed p-8 text-center text-sm text-slate-500'>
+                All your websites already have active domains connected.
+              </div>
+            ) : (
+              unconnectedWebsites.map((website) => (
+                <div
+                  key={website._id}
+                  role='button'
+                  tabIndex={0}
+                  onClick={() => handleSelectWebsiteForDomain(website)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleSelectWebsiteForDomain(website)
+                    }
+                  }}
+                  className='flex aspect-square cursor-pointer flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm transition-all hover:-translate-y-1 hover:border-blue-300 hover:bg-slate-50 hover:shadow-md'
+                >
+                  <Globe className='mb-3 h-8 w-8 text-slate-300' />
+                  <span className='line-clamp-2 px-1 text-sm font-semibold text-slate-900'>
+                    {website.name ||
+                      website.business_name ||
+                      'Untitled Website'}
+                  </span>
+                  <span className='mt-3 inline-block rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold tracking-wider text-slate-500 uppercase'>
+                    {website.template_name || website.template_key}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+          <div className='mt-4 flex justify-end'>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setConnectDomainListOpen(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={setupMethodModalOpen}
+        onOpenChange={setSetupMethodModalOpen}
+      >
+        <DialogContent className='w-[95vw] sm:max-w-[700px] overflow-hidden rounded-md p-6 sm:p-10'>
+          <DialogHeader className='text-left'>
+            <DialogTitle className='text-3xl font-semibold'>
+              Choose a way to set up your domain
+            </DialogTitle>
+            <DialogDescription className='mt-3 text-base text-slate-600'>
+              You'll need a custom domain, like example.com, to elevate your
+              brand and build trust with customers online.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2'>
+            <div
+              role='button'
+              tabIndex={0}
+              onClick={() => setSetupMethod('new')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') setSetupMethod('new')
+              }}
+              className={cn(
+                'flex cursor-pointer flex-col rounded-md border-2 bg-slate-50/50 p-6 transition-all hover:bg-slate-50',
+                setupMethod === 'new'
+                  ? 'border-blue-600 bg-blue-50/30'
+                  : 'border-slate-200'
+              )}
+            >
+              <div className='mb-6.5 inline-flex h-14 w-14 items-center justify-center rounded-md bg-white shadow-sm ring-1 ring-slate-200'>
+                <Search className='h-7 w-7 text-blue-500' />
+              </div>
+              <h3 className='text-xl font-medium text-slate-900'>
+                Get a new custom domain
+              </h3>
+              <p className='mt-1.5 text-sm text-slate-600'>
+                Buy a new domain and build your brand online
+              </p>
+            </div>
+
+            <div
+              role='button'
+              tabIndex={0}
+              onClick={() => setSetupMethod('existing')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ')
+                  setSetupMethod('existing')
+              }}
+              className={cn(
+                'flex cursor-pointer flex-col rounded-md border-2 bg-slate-50/50 p-6 transition-all hover:bg-slate-50',
+                setupMethod === 'existing'
+                  ? 'border-blue-600 bg-blue-50/30'
+                  : 'border-slate-200'
+              )}
+            >
+              <div className='mb-6.5 inline-flex h-14 w-14 items-center justify-center rounded-md bg-white shadow-sm ring-1 ring-slate-200'>
+                <Store className='h-7 w-7 text-emerald-500' />
+              </div>
+              <h3 className='text-xl font-medium text-slate-900'>
+                Set up using your existing domain
+              </h3>
+              <p className='mt-1.5 text-sm text-slate-600'>
+                Use the domain you already own
+              </p>
+            </div>
+          </div>
+
+          <div className='mt-8 flex justify-end gap-3'>
+            <Button
+              type='button'
+              variant='outline'
+              className='h-11 rounded-full px-6'
+              onClick={() => {
+                setSetupMethodModalOpen(false)
+                setConnectDomainListOpen(true)
+              }}
+            >
+              Back
+            </Button>
+            <Button
+              type='button'
+              className='h-11 rounded-full bg-blue-600 px-8 font-semibold text-white transition hover:bg-blue-700 hover:text-white'
+              onClick={handleContinueSetupMethod}
+            >
+              Continue with this method
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <DomainModal
+        open={domainModalOpen}
+        setOpen={setDomainModalOpen}
+        activeWebsiteName={activeWebsite?.name || 'Selected Website'}
       />
     </>
   )

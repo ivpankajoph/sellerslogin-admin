@@ -7,6 +7,7 @@ import {
   Copy,
   ExternalLink,
   Globe,
+  LayoutTemplate,
   Loader2,
   RefreshCw,
   Search,
@@ -39,7 +40,10 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { useActiveWebsiteSelection } from '@/features/vendor-template/components/websiteStudioStorage'
+import {
+  setStoredActiveWebsite,
+  useActiveWebsiteSelection,
+} from '@/features/vendor-template/components/websiteStudioStorage'
 import { getVendorTemplatePreviewUrl } from '@/lib/storefront-url'
 import { cn } from '@/lib/utils'
 
@@ -59,6 +63,11 @@ type WebsiteRow = {
   business_name?: string
   website_slug?: string
   meta_pixel?: MetaPixelConfig
+  custom_domain?: {
+    hostname?: string
+    status?: string
+    ssl_status?: string
+  }
 }
 
 const cardClass = 'rounded-2xl border border-border bg-card shadow-sm'
@@ -571,9 +580,19 @@ export default function MetaPixelDashboard() {
   return (
     <>
       <TablePageHeader title='Meta Pixel Dashboard' stackOnMobile>
+        <div className='relative w-full max-w-sm shrink-0 sm:w-80'>
+          <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder='Search website, slug, template...'
+            className='h-10 w-full rounded-xl pl-10'
+          />
+        </div>
         <Button
           type='button'
           variant='outline'
+          className='h-10 rounded-xl'
           onClick={() => void fetchWebsites()}
           disabled={loading}
         >
@@ -608,26 +627,14 @@ export default function MetaPixelDashboard() {
         ) : (
           <>
             <section className={`${cardClass} overflow-hidden`}>
-              <div className='flex flex-col gap-4 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between'>
-                <div>
-                  <h2 className='text-lg font-semibold text-foreground'>
-                    Website table
-                  </h2>
-                  <p className='mt-1 text-sm text-muted-foreground'>
-                    Click a row to select a website. Use actions to edit code,
-                    open preview, or view statistics.
-                  </p>
-                </div>
-
-                <div className='relative w-full lg:max-w-sm'>
-                  <Search className='pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
-                  <Input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder='Search website, slug, template, or pixel'
-                    className='rounded-xl pl-10'
-                  />
-                </div>
+              <div className='flex flex-col gap-2 border-b border-border px-5 py-4'>
+                <h2 className='text-lg font-semibold text-foreground'>
+                  Website table
+                </h2>
+                <p className='text-sm text-muted-foreground'>
+                  Click a row to select a website. Use actions to edit code,
+                  open preview, or view statistics.
+                </p>
               </div>
 
               <Table>
@@ -699,52 +706,78 @@ export default function MetaPixelDashboard() {
                               {formatDateTime(website?.meta_pixel?.updated_at)}
                             </TableCell>
                             <TableCell className='px-4 py-4'>
-                              <div className='flex flex-wrap justify-end gap-2'>
-                                <Button
-                                  type='button'
-                                  variant='outline'
-                                  size='sm'
-                                  className='rounded-lg'
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    openEditor(websiteId)
-                                  }}
-                                >
-                                  <Code2 className='h-4 w-4' />
-                                  {website?.meta_pixel?.pixel_id ? 'Edit' : 'Add'}
-                                </Button>
-                                <Button
-                                  type='button'
-                                  variant='outline'
-                                  size='sm'
-                                  className='rounded-lg'
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    openStatistics(websiteId)
-                                  }}
-                                >
-                                  <Activity className='h-4 w-4' />
-                                  Statistics
-                                </Button>
-                                {previewUrl ? (
+                              <div className='flex items-center justify-end gap-2'>
+                                {website?.custom_domain?.hostname && website?.custom_domain?.status === 'active' ? (
+                                  <>
+                                    <Button
+                                      type='button'
+                                      variant='outline'
+                                      size='sm'
+                                      className='rounded-lg'
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                        openEditor(websiteId)
+                                      }}
+                                    >
+                                      <Code2 className='h-4 w-4' />
+                                      {website?.meta_pixel?.pixel_id ? 'Edit' : 'Add'}
+                                    </Button>
+                                    <Button
+                                      type='button'
+                                      variant='outline'
+                                      size='sm'
+                                      className='rounded-lg'
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                        openStatistics(websiteId)
+                                      }}
+                                    >
+                                      <Activity className='h-4 w-4' />
+                                      Statistics
+                                    </Button>
+                                    {previewUrl ? (
+                                      <Button
+                                        type='button'
+                                        variant='outline'
+                                        size='sm'
+                                        className='rounded-lg'
+                                        asChild
+                                      >
+                                        <a
+                                          href={previewUrl}
+                                          target='_blank'
+                                          rel='noreferrer'
+                                          onClick={(event) => event.stopPropagation()}
+                                        >
+                                          <ExternalLink className='h-4 w-4' />
+                                          Preview
+                                        </a>
+                                      </Button>
+                                    ) : null}
+                                  </>
+                                ) : (
                                   <Button
                                     type='button'
-                                    variant='outline'
                                     size='sm'
                                     className='rounded-lg'
-                                    asChild
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      const templateKey = String(website.template_key || '').trim()
+                                      if (!vendorId || !websiteId || !templateKey) return
+                                      
+                                      setStoredActiveWebsite(vendorId, {
+                                        id: websiteId,
+                                        name: resolveWebsiteName(website),
+                                        templateKey,
+                                        websiteSlug: website.website_slug || websiteId,
+                                      })
+                                      window.location.href = `/vendor-template/${templateKey}?domain=true`
+                                    }}
                                   >
-                                    <a
-                                      href={previewUrl}
-                                      target='_blank'
-                                      rel='noreferrer'
-                                      onClick={(event) => event.stopPropagation()}
-                                    >
-                                      <ExternalLink className='h-4 w-4' />
-                                      Preview
-                                    </a>
+                                    <Globe className='mr-2 h-4 w-4' />
+                                    Connect Domain First
                                   </Button>
-                                ) : null}
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -769,7 +802,7 @@ export default function MetaPixelDashboard() {
       </Main>
 
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent className='w-[min(96vw,960px)] max-h-[90vh] overflow-y-auto rounded-2xl p-0 sm:max-w-4xl'>
+        <DialogContent className='w-[min(96vw,960px)] max-h-[90vh] overflow-y-auto rounded-md p-0 sm:max-w-4xl'>
           <div className='border-b border-border px-6 py-5'>
             <DialogHeader className='text-left'>
               <DialogTitle className='text-2xl'>
@@ -785,62 +818,53 @@ export default function MetaPixelDashboard() {
             </DialogHeader>
           </div>
 
-          <div className='grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]'>
-            <div className='space-y-5'>
-              <div className='flex flex-col gap-3 rounded-2xl border border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between'>
-                <div>
-                  <p className='text-sm font-medium text-foreground'>
-                    Platform-managed installation
-                  </p>
-                  <p className='mt-1 text-sm text-muted-foreground'>
-                    Paste the full base code or just the Pixel ID. SellersLogin
-                    installs the script automatically in the website head.
-                  </p>
-                </div>
-                <div className='flex items-center gap-3'>
-                  <span className='text-sm font-medium text-foreground'>
-                    Tracking active
-                  </span>
-                  <Switch
-                    checked={editorIsActive}
-                    onCheckedChange={setEditorIsActive}
-                  />
-                </div>
+          <div className='grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]'>
+            <div className='space-y-4'>
+              <div className='flex items-center justify-between rounded-md border border-border bg-muted/20 p-4'>
+                <span className='font-medium text-foreground'>
+                  Tracking Active
+                </span>
+                <Switch
+                  checked={editorIsActive}
+                  onCheckedChange={setEditorIsActive}
+                />
               </div>
 
               <div>
-                <label className='text-sm font-medium text-foreground'>
+                <label className='font-medium text-foreground'>
                   Meta Pixel base code or Pixel ID
                 </label>
                 <Textarea
                   value={editorPixelInput}
                   onChange={(event) => setEditorPixelInput(event.target.value)}
                   placeholder="Example: fbq('init', '123456789012345'); or paste 123456789012345"
-                  className='mt-3 min-h-[220px] rounded-2xl px-4 py-3 text-sm leading-7'
+                  className='mt-2 min-h-[160px] rounded-md px-4 py-3 font-mono text-sm leading-6'
                 />
               </div>
 
               <div className='grid gap-3 md:grid-cols-2'>
-                <div className='rounded-2xl border border-border bg-background p-4'>
-                  <p className='text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground'>
+                <div className='rounded-md border border-border bg-background p-4'>
+                  <p className='text-xs font-semibold uppercase tracking-wider text-muted-foreground'>
                     Extracted Pixel ID
                   </p>
-                  <p className='mt-3 text-lg font-semibold text-foreground'>
-                    {extractedPixelId || editorWebsite?.meta_pixel?.pixel_id || 'Waiting for valid code'}
+                  <p className='mt-2 text-lg font-semibold text-foreground'>
+                    {extractedPixelId ||
+                      editorWebsite?.meta_pixel?.pixel_id ||
+                      'Waiting for code'}
                   </p>
                 </div>
 
-                <div className='rounded-2xl border border-border bg-background p-4'>
-                  <p className='text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground'>
-                    Standard events
+                <div className='rounded-md border border-border bg-background p-4'>
+                  <p className='text-xs font-semibold uppercase tracking-wider text-muted-foreground'>
+                    Events Enabled
                   </p>
-                  <p className='mt-3 text-sm font-medium text-foreground'>
-                    PageView, AddToCart, InitiateCheckout, Purchase
+                  <p className='mt-2 text-sm font-medium text-foreground'>
+                    Standard Standard Events
                   </p>
                 </div>
               </div>
 
-              <div className='rounded-2xl border border-border bg-background p-4'>
+              <div className='rounded-md border border-border bg-background p-4'>
                 <div className='flex flex-wrap items-center justify-between gap-3'>
                   <div>
                     <p className='text-sm font-medium text-foreground'>
@@ -855,16 +879,16 @@ export default function MetaPixelDashboard() {
                     type='button'
                     variant='outline'
                     size='sm'
-                    className='rounded-lg'
+                    className='rounded-md'
                     disabled={!generatedCodeExample}
                     onClick={handleCopyCode}
                   >
-                    <Copy className='h-4 w-4' />
-                    Copy
+                    <Copy className='mr-1.5 h-4 w-4' />
+                    Copy Code
                   </Button>
                 </div>
 
-                <pre className='mt-4 max-h-[280px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-100'>
+                <pre className='mt-4 max-h-[220px] overflow-auto rounded-md bg-slate-950 p-4 text-xs leading-6 text-slate-100'>
                   <code>
                     {generatedCodeExample ||
                       'Paste a valid Meta Pixel code or ID to generate the website head preview.'}
@@ -874,64 +898,69 @@ export default function MetaPixelDashboard() {
             </div>
 
             <div className='space-y-4'>
-              <div className='rounded-2xl border border-border bg-muted/20 p-4'>
-                <p className='text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground'>
-                  Website summary
+              <div className='rounded-md border border-border bg-muted/20 p-5'>
+                <p className='text-xs font-semibold uppercase tracking-wider text-muted-foreground'>
+                  Website Information
                 </p>
-                <p className='mt-3 text-lg font-semibold text-foreground'>
-                  {editorWebsite ? resolveWebsiteName(editorWebsite) : 'No website selected'}
-                </p>
-                <p className='mt-1 text-sm text-muted-foreground'>
-                  Slug: /{editorWebsite?.website_slug || resolveWebsiteId(editorWebsite)}
-                </p>
-                <div className='mt-3 flex flex-wrap gap-2'>
+                <h3 className='mt-2 truncate text-xl font-bold text-foreground'>
+                  {editorWebsite
+                    ? resolveWebsiteName(editorWebsite)
+                    : 'No website selected'}
+                </h3>
+
+                <div className='mt-4 space-y-3'>
+                  <div className='flex items-center gap-2 text-sm text-foreground'>
+                    <Globe className='h-4 w-4 text-muted-foreground' />
+                    {editorWebsite?.custom_domain?.hostname &&
+                    editorWebsite?.custom_domain?.status === 'active' ? (
+                      <a
+                        href={`https://${editorWebsite.custom_domain.hostname}`}
+                        target='_blank'
+                        rel='noreferrer'
+                        className='text-blue-600 transition hover:text-blue-800 hover:underline'
+                      >
+                        {editorWebsite.custom_domain.hostname}
+                      </a>
+                    ) : (
+                      <span className='text-muted-foreground'>
+                        No active custom domain
+                      </span>
+                    )}
+                  </div>
+                  <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                    <LayoutTemplate className='h-4 w-4' />
+                    {editorWebsite?.template_name || editorWebsite?.template_key}
+                  </div>
+                </div>
+
+                <div className='mt-5 flex flex-wrap gap-2'>
                   <Badge
                     variant='outline'
-                    className={cn(
-                      'rounded-full px-3 py-1',
-                      getPixelStatusMeta(editorWebsite).className
-                    )}
+                    className={cn(getPixelStatusMeta(editorWebsite).className)}
                   >
                     {getPixelStatusMeta(editorWebsite).label}
                   </Badge>
-                  <Badge variant='outline' className='rounded-full px-3 py-1'>
-                    {editorWebsite?.template_name ||
-                      editorWebsite?.template_key ||
-                      'Template'}
-                  </Badge>
                 </div>
-                <p className='mt-4 text-sm text-muted-foreground'>
-                  Last updated: {formatDateTime(editorWebsite?.meta_pixel?.updated_at)}
-                </p>
-              </div>
 
-              <div className='rounded-2xl border border-border bg-muted/20 p-4'>
-                <p className='text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground'>
-                  Installation notes
+                <p className='mt-4 text-[13px] text-muted-foreground'>
+                  Last updated:{' '}
+                  {formatDateTime(editorWebsite?.meta_pixel?.updated_at)}
                 </p>
-                <ul className='mt-3 space-y-2 text-sm text-muted-foreground'>
-                  <li>Paste the base code between the {'<head>'} and {'</head>'} tags.</li>
-                  <li>The same base script is installed on every page of this website.</li>
-                  <li>Use Meta Events Manager to verify live incoming events.</li>
-                </ul>
               </div>
 
               {editorPreviewUrl ? (
-                <div className='rounded-2xl border border-border bg-muted/20 p-4'>
-                  <p className='text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground'>
-                    Preview link
-                  </p>
-                  <p className='mt-3 break-all text-sm text-foreground'>
-                    {editorPreviewUrl}
+                <div className='rounded-md border border-border bg-muted/20 p-5'>
+                  <p className='text-xs font-semibold uppercase tracking-wider text-muted-foreground'>
+                    Preview Storefront
                   </p>
                   <Button
                     type='button'
                     variant='outline'
-                    className='mt-4 rounded-xl'
+                    className='mt-3 w-full rounded-md bg-white'
                     asChild
                   >
                     <a href={editorPreviewUrl} target='_blank' rel='noreferrer'>
-                      <ExternalLink className='h-4 w-4' />
+                      <ExternalLink className='mr-2 h-4 w-4' />
                       Open Preview
                     </a>
                   </Button>
@@ -945,7 +974,7 @@ export default function MetaPixelDashboard() {
               <Button
                 type='button'
                 variant='outline'
-                className='rounded-xl'
+                className='rounded-md'
                 onClick={() => setEditorOpen(false)}
               >
                 Cancel
@@ -953,7 +982,7 @@ export default function MetaPixelDashboard() {
               <Button
                 type='button'
                 variant='outline'
-                className='rounded-xl'
+                className='rounded-md border-destructive text-destructive hover:bg-destructive hover:text-white'
                 disabled={removing || !editorWebsite?.meta_pixel?.pixel_id}
                 onClick={handleRemove}
               >
@@ -968,7 +997,7 @@ export default function MetaPixelDashboard() {
 
             <Button
               type='button'
-              className='rounded-xl'
+              className='rounded-md'
               disabled={saving || !editorPixelInput.trim()}
               onClick={handleSave}
             >

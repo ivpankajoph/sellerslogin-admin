@@ -206,11 +206,21 @@ export default function TemplateForm() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
-    if (!url.searchParams.has('template')) return
-    url.searchParams.delete('template')
-    const nextSearch = url.searchParams.toString()
-    const nextUrl = nextSearch ? `${url.pathname}?${nextSearch}` : url.pathname
-    window.history.replaceState(window.history.state, '', nextUrl)
+    let changed = false
+    if (url.searchParams.has('template')) {
+      url.searchParams.delete('template')
+      changed = true
+    }
+    if (url.searchParams.get('domain') === 'true') {
+      setDomainOpen(true)
+      url.searchParams.delete('domain')
+      changed = true
+    }
+    if (changed) {
+      const nextSearch = url.searchParams.toString()
+      const nextUrl = nextSearch ? `${url.pathname}?${nextSearch}` : url.pathname
+      window.history.replaceState(window.history.state, '', nextUrl)
+    }
   }, [pathname])
 
   useEffect(() => {
