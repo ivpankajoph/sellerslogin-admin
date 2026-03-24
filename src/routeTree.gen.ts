@@ -50,6 +50,7 @@ import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authent
 import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authenticated/products/index'
 import { Route as AuthenticatedPlansIndexRouteImport } from './routes/_authenticated/plans/index'
 import { Route as AuthenticatedOrderIndexRouteImport } from './routes/_authenticated/order/index'
+import { Route as AuthenticatedMetaPixelIndexRouteImport } from './routes/_authenticated/meta-pixel/index'
 import { Route as AuthenticatedLocationWorkspaceIndexRouteImport } from './routes/_authenticated/location-workspace/index'
 import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './routes/_authenticated/inventory-management/index'
 import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
@@ -306,6 +307,12 @@ const AuthenticatedOrderIndexRoute = AuthenticatedOrderIndexRouteImport.update({
   path: '/order/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMetaPixelIndexRoute =
+  AuthenticatedMetaPixelIndexRouteImport.update({
+    id: '/meta-pixel/',
+    path: '/meta-pixel/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedLocationWorkspaceIndexRoute =
   AuthenticatedLocationWorkspaceIndexRouteImport.update({
     id: '/location-workspace/',
@@ -533,6 +540,7 @@ export interface FileRoutesByFullPath {
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/location-workspace': typeof AuthenticatedLocationWorkspaceIndexRoute
+  '/meta-pixel': typeof AuthenticatedMetaPixelIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
   '/plans': typeof AuthenticatedPlansIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
@@ -603,6 +611,7 @@ export interface FileRoutesByTo {
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
   '/location-workspace': typeof AuthenticatedLocationWorkspaceIndexRoute
+  '/meta-pixel': typeof AuthenticatedMetaPixelIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
   '/plans': typeof AuthenticatedPlansIndexRoute
   '/products': typeof AuthenticatedProductsIndexRoute
@@ -678,6 +687,7 @@ export interface FileRoutesById {
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/inventory-management/': typeof AuthenticatedInventoryManagementIndexRoute
   '/_authenticated/location-workspace/': typeof AuthenticatedLocationWorkspaceIndexRoute
+  '/_authenticated/meta-pixel/': typeof AuthenticatedMetaPixelIndexRoute
   '/_authenticated/order/': typeof AuthenticatedOrderIndexRoute
   '/_authenticated/plans/': typeof AuthenticatedPlansIndexRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
@@ -751,6 +761,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/inventory-management'
     | '/location-workspace'
+    | '/meta-pixel'
     | '/order'
     | '/plans'
     | '/products'
@@ -821,6 +832,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/inventory-management'
     | '/location-workspace'
+    | '/meta-pixel'
     | '/order'
     | '/plans'
     | '/products'
@@ -895,6 +907,7 @@ export interface FileRouteTypes {
     | '/_authenticated/integrations/'
     | '/_authenticated/inventory-management/'
     | '/_authenticated/location-workspace/'
+    | '/_authenticated/meta-pixel/'
     | '/_authenticated/order/'
     | '/_authenticated/plans/'
     | '/_authenticated/products/'
@@ -1228,6 +1241,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOrderIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/meta-pixel/': {
+      id: '/_authenticated/meta-pixel/'
+      path: '/meta-pixel'
+      fullPath: '/meta-pixel'
+      preLoaderRoute: typeof AuthenticatedMetaPixelIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/location-workspace/': {
       id: '/_authenticated/location-workspace/'
       path: '/location-workspace'
@@ -1495,6 +1515,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
   AuthenticatedLocationWorkspaceIndexRoute: typeof AuthenticatedLocationWorkspaceIndexRoute
+  AuthenticatedMetaPixelIndexRoute: typeof AuthenticatedMetaPixelIndexRoute
   AuthenticatedOrderIndexRoute: typeof AuthenticatedOrderIndexRoute
   AuthenticatedPlansIndexRoute: typeof AuthenticatedPlansIndexRoute
   AuthenticatedProductsIndexRoute: typeof AuthenticatedProductsIndexRoute
@@ -1555,6 +1576,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedInventoryManagementIndexRoute,
   AuthenticatedLocationWorkspaceIndexRoute:
     AuthenticatedLocationWorkspaceIndexRoute,
+  AuthenticatedMetaPixelIndexRoute: AuthenticatedMetaPixelIndexRoute,
   AuthenticatedOrderIndexRoute: AuthenticatedOrderIndexRoute,
   AuthenticatedPlansIndexRoute: AuthenticatedPlansIndexRoute,
   AuthenticatedProductsIndexRoute: AuthenticatedProductsIndexRoute,

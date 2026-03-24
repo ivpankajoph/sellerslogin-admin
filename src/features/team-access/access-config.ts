@@ -134,6 +134,7 @@ const ROUTE_MATCHERS: RouteMatcher[] = [
     key: 'my_websites',
     prefixes: [
       '/template-workspace',
+      '/meta-pixel',
       '/vendor-template',
       '/vendor-template-about',
       '/vendor-template-contact',

@@ -333,6 +333,13 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
             },
           ],
         },
+        {
+          title: 'Meta Pixel',
+          url: '/meta-pixel',
+          icon: Activity,
+          roles: [ROLES.VENDOR],
+          pageKey: 'my_websites',
+        },
       ],
     },
     {
