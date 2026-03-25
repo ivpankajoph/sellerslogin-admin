@@ -168,7 +168,7 @@ function SidebarMenuCollapsible({
               <SidebarMenuSubItem key={subItem.title}>
                 {subItem.disabled ? (
                   <SidebarMenuSubButton
-                    disabled
+                    aria-disabled={true}
                     className='text-sidebar-foreground/85 data-[active=true]:text-sidebar-accent-foreground'
                   >
                     <SidebarItemIcon icon={subItem.icon} seed={subItem.title} />

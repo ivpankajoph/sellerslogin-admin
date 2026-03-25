@@ -9,7 +9,7 @@ import {
   SearchCheck,
   ShieldCheck,
   ShoppingCart,
-  Star,
+
   Truck,
   Users,
 } from 'lucide-react'

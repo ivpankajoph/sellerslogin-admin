@@ -717,25 +717,6 @@ export default function TemplateWorkspace() {
       }
     }
 
-    const currentTemplate = availableTemplates.find(
-      (template) => template.key === selectedTemplateKey
-    )
-    const fallbackAudience = normalizeTemplateAudience(
-      currentTemplate?.audience,
-      currentTemplate?.key
-    )
-    const nextAudience = currentTemplate?.key
-      ? fallbackAudience
-      : normalizeTemplateAudience(
-          availableTemplates[0]?.audience,
-          availableTemplates[0]?.key
-        )
-    const nextTemplate =
-      currentTemplate?.key && currentTemplate.audience === nextAudience
-        ? currentTemplate
-        : availableTemplates.find(
-            (template) => template.audience === nextAudience
-          ) || availableTemplates[0]
     setOpeningCreateDialog(true)
 
     const runOpen = () => {
