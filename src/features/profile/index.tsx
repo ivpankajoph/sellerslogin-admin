@@ -691,7 +691,7 @@ export default function ProfilePage() {
                     </ul>
                   </div>
 
-                  <div className='flex justify-end'>
+                  <div className='flex justify-right'>
                     <Button
                       onClick={handlePasswordUpdate}
                       disabled={

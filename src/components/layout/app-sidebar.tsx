@@ -100,6 +100,19 @@ export function AppSidebar() {
     }))
     .filter((group) => group.items.length > 0)
 
+  const orderedNavGroups =
+    effectiveRole === 'vendor'
+      ? [...filteredNavGroups].sort((a, b) => {
+          if (a.title === 'Storefront' && b.title === 'Product Management') {
+            return -1
+          }
+          if (a.title === 'Product Management' && b.title === 'Storefront') {
+            return 1
+          }
+          return 0
+        })
+      : filteredNavGroups
+
   return (
     <Sidebar
       collapsible={collapsible}
@@ -130,7 +143,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {filteredNavGroups.map((group: JSX.IntrinsicAttributes & SidebarNavGroup) => (
+        {orderedNavGroups.map((group: JSX.IntrinsicAttributes & SidebarNavGroup) => (
           <NavGroup key={group.title} {...group} />
         ))}
       </SidebarContent>
