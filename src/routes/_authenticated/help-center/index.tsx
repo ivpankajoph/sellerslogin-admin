@@ -7,10 +7,12 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
+import { createPortal } from 'react-dom'
 import axios from 'axios'
-import { Loader2, Plus, RefreshCw, Send, Star, Trash2 } from 'lucide-react'
+import { Loader2, Plus, RefreshCw, Send, Star, Trash2, X } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import api from '@/lib/axios'
@@ -48,6 +50,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+
 
 export const Route = createFileRoute('/_authenticated/help-center/')({
   component: HelpCenterPage,
@@ -174,10 +177,32 @@ const getVendorLabel = (value: Ticket['vendor_id']) => {
   return typeof value === 'string' && value.trim() ? value : 'N/A'
 }
 
-const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value)
+const resolveImageUrl = (value: string) => {
+  const normalized = String(value || '').trim()
+  if (!normalized) return ''
 
-const resolveImageUrl = (value: string) =>
-  isAbsoluteUrl(value) ? value : `${PUBLIC_BASE_URL}${value}`
+  if (/^(data|blob):/i.test(normalized)) {
+    return normalized
+  }
+
+  if (/^\/\//.test(normalized)) {
+    return `https:${normalized}`
+  }
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized
+  }
+
+  if (PUBLIC_BASE_URL) {
+    try {
+      return new URL(normalized, `${PUBLIC_BASE_URL}/`).toString()
+    } catch {
+      return normalized.startsWith('/') ? `${PUBLIC_BASE_URL}${normalized}` : `${PUBLIC_BASE_URL}/${normalized}`
+    }
+  }
+
+  return normalized
+}
 
 const uploadImagesToCloudinary = async (files: File[], folder: string) => {
   if (!files.length) return []
@@ -246,23 +271,137 @@ function MetaCard({
 function ImageGrid({
   images,
   altPrefix,
+  onPreviewOpenChange,
 }: {
   images?: string[]
   altPrefix: string
+  onPreviewOpenChange?: (open: boolean) => void
 }) {
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [scale, setScale] = useState(1)
+
+  const clampScale = (value: number) => Math.min(Math.max(value, 0.25), 5)
+  const closePreview = useCallback(() => {
+    setPreviewImage(null)
+    setScale(1)
+
+  }, [])
+
+  useEffect(() => {
+    onPreviewOpenChange?.(Boolean(previewImage))
+  }, [onPreviewOpenChange, previewImage])
+
+  useEffect(() => {
+    if (!previewImage) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closePreview()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [closePreview, previewImage])
+
   if (!images?.length) return null
 
   return (
-    <div className='mt-3 flex flex-wrap gap-3'>
-      {images.map((image, index) => (
-        <img
-          key={`${image}-${index}`}
-          src={resolveImageUrl(image)}
-          alt={`${altPrefix} ${index + 1}`}
-          className='h-20 w-20 rounded-md border object-cover'
-        />
-      ))}
-    </div>
+    <>
+      <div className='mt-3 flex flex-wrap gap-3'>
+        {images.map((image, index) => {
+          const resolvedUrl = resolveImageUrl(image)
+
+          return (
+            <button
+              key={`${image}-${index}`}
+              type='button'
+              onClick={() => {
+                setPreviewImage(resolvedUrl)
+                setScale(1)
+              }}
+              className='group relative overflow-hidden rounded-md border text-left'
+              title='Open attachment'
+            >
+              <img
+                src={resolvedUrl}
+                alt={`${altPrefix} ${index + 1}`}
+                className='h-20 w-20 object-cover transition-transform duration-200 group-hover:scale-105'
+                loading='lazy'
+              />
+              <span className='absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-[10px] font-medium tracking-wide text-white opacity-0 transition-opacity group-hover:opacity-100'>
+                View full image
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {previewImage && typeof document !== 'undefined'
+        ? createPortal(
+            <>
+              <div
+                className='fixed inset-0 z-[240] bg-black/70'
+                onClick={closePreview}
+              />
+              <div
+                className='fixed right-5 top-5 z-[9999] pointer-events-auto'
+                style={{ cursor: 'pointer' }}
+              >
+                <button
+                  type='button'
+                  aria-label='Close image preview'
+                  className='inline-flex h-14 w-14 items-center justify-center rounded-full bg-black/85 text-white shadow-lg transition hover:bg-black focus:outline-none focus:ring-2 focus:ring-white/60'
+                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                  onPointerDown={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                  }}
+                  onMouseUp={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    closePreview()
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    closePreview()
+                  }}
+                >
+                  <X className='h-8 w-8 pointer-events-none' />
+                </button>
+              </div>
+              <div
+                className='pointer-events-none fixed inset-0 z-[260] flex items-center justify-center p-0'
+              >
+                <div
+                  className='pointer-events-auto flex max-h-[92vh] max-w-[92vw] items-center justify-center overflow-hidden'
+                  onClick={(event) => {
+                    event.stopPropagation()
+                  }}
+                onWheel={(event) => {
+                  event.preventDefault()
+                  const delta = event.deltaY < 0 ? 0.15 : -0.15
+                  setScale((current) => clampScale(current + delta))
+                }}
+                >
+                  <img
+                    src={previewImage}
+                    alt={altPrefix}
+                    className='block max-h-[92vh] max-w-[92vw] object-contain transition-transform duration-100 select-none'
+                    style={{
+                      transform: `scale(${scale})`,
+                      transformOrigin: 'center center',
+                    }}
+                    draggable={false}
+                  />
+                </div>
+              </div>
+            </>,
+            document.body
+          )
+        : null}
+    </>
   )
 }
 
@@ -293,6 +432,8 @@ function HelpCenterPage() {
   const [selectedTicketId, setSelectedTicketId] = useState('')
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false)
+  const ignoreNextSheetCloseRef = useRef(false)
 
   const [reply, setReply] = useState('')
   const [replyFiles, setReplyFiles] = useState<File[]>([])
@@ -934,15 +1075,24 @@ function HelpCenterPage() {
       </Sheet>
 
       <Sheet
-        open={detailsOpen}
-        onOpenChange={(open) => {
-          setDetailsOpen(open)
-          if (!open) {
-            resetDetailsState()
-          }
-        }}
-      >
-        <SheetContent side='right' className='w-full gap-0 p-0 sm:max-w-3xl'>
+  open={detailsOpen}
+  onOpenChange={(open) => {
+    if (imagePreviewOpen && !open) {
+      return // Don't close sheet while image is previewing
+    }
+
+    setDetailsOpen(open)
+    if (!open) {
+      resetDetailsState()
+    }
+  }}
+>
+        <SheetContent
+          side='right'
+          className='w-full gap-0 p-0 sm:max-w-3xl'
+          showCloseButton={!imagePreviewOpen}
+         
+        >
           <SheetHeader className='border-b px-5 py-5 pr-14 text-left'>
             <SheetTitle>{selectedTicket?.subject || 'Ticket details'}</SheetTitle>
             <SheetDescription>
@@ -1065,10 +1215,13 @@ function HelpCenterPage() {
                 <div className='bg-muted/20 mt-4 rounded-md border p-4 text-sm leading-6 text-slate-700 whitespace-pre-wrap'>
                   {selectedTicket.description || 'No description provided.'}
                 </div>
-                <ImageGrid
-                  images={selectedTicket.images}
-                  altPrefix='Ticket attachment'
-                />
+               <ImageGrid
+  images={selectedTicket.images}
+  altPrefix='Ticket attachment'
+  onPreviewOpenChange={(open) => {
+    setImagePreviewOpen(open)
+  }}
+/>
               </section>
 
               <section className='bg-background mt-5 rounded-md border p-4 shadow-sm'>
@@ -1113,6 +1266,15 @@ function HelpCenterPage() {
                         <ImageGrid
                           images={message.images}
                           altPrefix='Reply attachment'
+                          onPreviewOpenChange={(open) => {
+                            setImagePreviewOpen(open)
+                            if (!open) {
+                              ignoreNextSheetCloseRef.current = true
+                              window.setTimeout(() => {
+                                ignoreNextSheetCloseRef.current = false
+                              }, 250)
+                            }
+                          }}
                         />
                       </div>
                     ))}

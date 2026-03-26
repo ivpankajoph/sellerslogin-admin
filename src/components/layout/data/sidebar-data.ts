@@ -105,14 +105,12 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               url: '/order',
               roles: [ROLES.ADMIN],
               pageKey: 'orders',
-              disabled: true,
             },
             {
               title: 'Website Orders',
               url: '/template-orders',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
               pageKey: 'orders',
-              disabled: true,
             },
           ],
         },
@@ -126,14 +124,12 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               url: '/wallet',
               roles: [ROLES.ADMIN],
               pageKey: 'wallets',
-              disabled: true,
             },
             {
               title: 'Website Wallet',
               url: '/template-wallet',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
               pageKey: 'wallets',
-              disabled: true,
             },
           ],
         },
@@ -152,7 +148,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
       ],
     },
     {
-      title: 'Catalog',
+      title: 'Product Management',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
