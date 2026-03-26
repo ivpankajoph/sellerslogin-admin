@@ -53,6 +53,7 @@ import { Route as AuthenticatedPlansIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedOrderIndexRouteImport } from './routes/_authenticated/order/index'
 import { Route as AuthenticatedMetaPixelIndexRouteImport } from './routes/_authenticated/meta-pixel/index'
 import { Route as AuthenticatedLocationWorkspaceIndexRouteImport } from './routes/_authenticated/location-workspace/index'
+import { Route as AuthenticatedLiveChatIndexRouteImport } from './routes/_authenticated/live-chat/index'
 import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './routes/_authenticated/inventory-management/index'
 import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
@@ -328,6 +329,12 @@ const AuthenticatedLocationWorkspaceIndexRoute =
     path: '/location-workspace/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedLiveChatIndexRoute =
+  AuthenticatedLiveChatIndexRouteImport.update({
+    id: '/live-chat/',
+    path: '/live-chat/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInventoryManagementIndexRoute =
   AuthenticatedInventoryManagementIndexRouteImport.update({
     id: '/inventory-management/',
@@ -563,6 +570,7 @@ export interface FileRoutesByFullPath {
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
+  '/live-chat': typeof AuthenticatedLiveChatIndexRoute
   '/location-workspace': typeof AuthenticatedLocationWorkspaceIndexRoute
   '/meta-pixel/': typeof AuthenticatedMetaPixelIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
@@ -636,6 +644,7 @@ export interface FileRoutesByTo {
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
+  '/live-chat': typeof AuthenticatedLiveChatIndexRoute
   '/location-workspace': typeof AuthenticatedLocationWorkspaceIndexRoute
   '/meta-pixel': typeof AuthenticatedMetaPixelIndexRoute
   '/order': typeof AuthenticatedOrderIndexRoute
@@ -715,6 +724,7 @@ export interface FileRoutesById {
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/inventory-management/': typeof AuthenticatedInventoryManagementIndexRoute
+  '/_authenticated/live-chat/': typeof AuthenticatedLiveChatIndexRoute
   '/_authenticated/location-workspace/': typeof AuthenticatedLocationWorkspaceIndexRoute
   '/_authenticated/meta-pixel/': typeof AuthenticatedMetaPixelIndexRoute
   '/_authenticated/order/': typeof AuthenticatedOrderIndexRoute
@@ -792,6 +802,7 @@ export interface FileRouteTypes {
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
+    | '/live-chat'
     | '/location-workspace'
     | '/meta-pixel/'
     | '/order'
@@ -865,6 +876,7 @@ export interface FileRouteTypes {
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
+    | '/live-chat'
     | '/location-workspace'
     | '/meta-pixel'
     | '/order'
@@ -943,6 +955,7 @@ export interface FileRouteTypes {
     | '/_authenticated/help-center/'
     | '/_authenticated/integrations/'
     | '/_authenticated/inventory-management/'
+    | '/_authenticated/live-chat/'
     | '/_authenticated/location-workspace/'
     | '/_authenticated/meta-pixel/'
     | '/_authenticated/order/'
@@ -1299,6 +1312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLocationWorkspaceIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/live-chat/': {
+      id: '/_authenticated/live-chat/'
+      path: '/live-chat'
+      fullPath: '/live-chat'
+      preLoaderRoute: typeof AuthenticatedLiveChatIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/inventory-management/': {
       id: '/_authenticated/inventory-management/'
       path: '/inventory-management'
@@ -1591,6 +1611,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
+  AuthenticatedLiveChatIndexRoute: typeof AuthenticatedLiveChatIndexRoute
   AuthenticatedLocationWorkspaceIndexRoute: typeof AuthenticatedLocationWorkspaceIndexRoute
   AuthenticatedOrderIndexRoute: typeof AuthenticatedOrderIndexRoute
   AuthenticatedPlansIndexRoute: typeof AuthenticatedPlansIndexRoute
@@ -1652,6 +1673,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,
   AuthenticatedInventoryManagementIndexRoute:
     AuthenticatedInventoryManagementIndexRoute,
+  AuthenticatedLiveChatIndexRoute: AuthenticatedLiveChatIndexRoute,
   AuthenticatedLocationWorkspaceIndexRoute:
     AuthenticatedLocationWorkspaceIndexRoute,
   AuthenticatedOrderIndexRoute: AuthenticatedOrderIndexRoute,

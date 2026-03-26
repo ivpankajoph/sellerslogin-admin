@@ -405,6 +405,13 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           pageKey: 'help_center',
         },
+        {
+          title: 'Live Chat',
+          url: '/live-chat',
+          icon: HelpCircle, // re-using HelpCircle for now, or use Activity
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          pageKey: 'live_chat',
+        },
       ],
     },
   ],
