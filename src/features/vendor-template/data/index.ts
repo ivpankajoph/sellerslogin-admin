@@ -3,6 +3,7 @@ export type TemplateData = {
   custom_pages?: Array<{
     id: string
     title: string
+    subtitle?: string
     slug: string
     isPublished?: boolean
     sections: Array<{
@@ -173,6 +174,7 @@ export type TemplateData = {
     custom_pages?: Array<{
       id: string
       title: string
+      subtitle?: string
       slug: string
       isPublished?: boolean
       sections: Array<{
@@ -406,8 +408,34 @@ export const initialData: TemplateData = {
         long: '',
       },
     },
-    social_page: undefined
-    ,
+    social_page: {
+      footer: {
+        blog_label: 'Blog',
+        blog_href: '/blog',
+        policy_primary_label: 'Privacy Policy',
+        policy_primary_href: '/privacy',
+        policy_secondary_label: 'Terms & Condition',
+        policy_secondary_href: '/terms',
+      },
+      blogs: [],
+      legal_pages: {
+        privacy: {
+          title: 'Privacy Policy',
+          subtitle: '',
+          content: '',
+        },
+        terms: {
+          title: 'Terms & Condition',
+          subtitle: '',
+          content: '',
+        },
+        shipping: {
+          title: 'Shipping & Return Policy',
+          subtitle: '',
+          content: '',
+        },
+      },
+    },
     custom_pages: []
   },
 }

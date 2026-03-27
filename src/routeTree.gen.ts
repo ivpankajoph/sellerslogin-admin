@@ -30,9 +30,11 @@ import { Route as AuthenticatedAnalyticsRouteRouteImport } from './routes/_authe
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
 import { Route as AuthenticatedVendorIndexRouteImport } from './routes/_authenticated/vendor/index'
 import { Route as AuthenticatedVendorTemplateIndexRouteImport } from './routes/_authenticated/vendor-template/index'
+import { Route as AuthenticatedVendorTemplatePolicyIndexRouteImport } from './routes/_authenticated/vendor-template-policy/index'
 import { Route as AuthenticatedVendorTemplatePagesIndexRouteImport } from './routes/_authenticated/vendor-template-pages/index'
 import { Route as AuthenticatedVendorTemplateOtherIndexRouteImport } from './routes/_authenticated/vendor-template-other/index'
 import { Route as AuthenticatedVendorTemplateContactIndexRouteImport } from './routes/_authenticated/vendor-template-contact/index'
+import { Route as AuthenticatedVendorTemplateBlogIndexRouteImport } from './routes/_authenticated/vendor-template-blog/index'
 import { Route as AuthenticatedVendorTemplateAboutIndexRouteImport } from './routes/_authenticated/vendor-template-about/index'
 import { Route as AuthenticatedVendorAnalyticsIndexRouteImport } from './routes/_authenticated/vendor-analytics/index'
 import { Route as AuthenticatedVendorAboutIndexRouteImport } from './routes/_authenticated/vendor-about/index'
@@ -195,6 +197,12 @@ const AuthenticatedVendorTemplateIndexRoute =
     path: '/vendor-template/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedVendorTemplatePolicyIndexRoute =
+  AuthenticatedVendorTemplatePolicyIndexRouteImport.update({
+    id: '/vendor-template-policy/',
+    path: '/vendor-template-policy/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVendorTemplatePagesIndexRoute =
   AuthenticatedVendorTemplatePagesIndexRouteImport.update({
     id: '/vendor-template-pages/',
@@ -211,6 +219,12 @@ const AuthenticatedVendorTemplateContactIndexRoute =
   AuthenticatedVendorTemplateContactIndexRouteImport.update({
     id: '/vendor-template-contact/',
     path: '/vendor-template-contact/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVendorTemplateBlogIndexRoute =
+  AuthenticatedVendorTemplateBlogIndexRouteImport.update({
+    id: '/vendor-template-blog/',
+    path: '/vendor-template-blog/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedVendorTemplateAboutIndexRoute =
@@ -591,9 +605,11 @@ export interface FileRoutesByFullPath {
   '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
   '/vendor-analytics': typeof AuthenticatedVendorAnalyticsIndexRoute
   '/vendor-template-about': typeof AuthenticatedVendorTemplateAboutIndexRoute
+  '/vendor-template-blog': typeof AuthenticatedVendorTemplateBlogIndexRoute
   '/vendor-template-contact': typeof AuthenticatedVendorTemplateContactIndexRoute
   '/vendor-template-other': typeof AuthenticatedVendorTemplateOtherIndexRoute
   '/vendor-template-pages': typeof AuthenticatedVendorTemplatePagesIndexRoute
+  '/vendor-template-policy': typeof AuthenticatedVendorTemplatePolicyIndexRoute
   '/vendor-template': typeof AuthenticatedVendorTemplateIndexRoute
   '/vendor': typeof AuthenticatedVendorIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
@@ -665,9 +681,11 @@ export interface FileRoutesByTo {
   '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
   '/vendor-analytics': typeof AuthenticatedVendorAnalyticsIndexRoute
   '/vendor-template-about': typeof AuthenticatedVendorTemplateAboutIndexRoute
+  '/vendor-template-blog': typeof AuthenticatedVendorTemplateBlogIndexRoute
   '/vendor-template-contact': typeof AuthenticatedVendorTemplateContactIndexRoute
   '/vendor-template-other': typeof AuthenticatedVendorTemplateOtherIndexRoute
   '/vendor-template-pages': typeof AuthenticatedVendorTemplatePagesIndexRoute
+  '/vendor-template-policy': typeof AuthenticatedVendorTemplatePolicyIndexRoute
   '/vendor-template': typeof AuthenticatedVendorTemplateIndexRoute
   '/vendor': typeof AuthenticatedVendorIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
@@ -745,9 +763,11 @@ export interface FileRoutesById {
   '/_authenticated/vendor-about/': typeof AuthenticatedVendorAboutIndexRoute
   '/_authenticated/vendor-analytics/': typeof AuthenticatedVendorAnalyticsIndexRoute
   '/_authenticated/vendor-template-about/': typeof AuthenticatedVendorTemplateAboutIndexRoute
+  '/_authenticated/vendor-template-blog/': typeof AuthenticatedVendorTemplateBlogIndexRoute
   '/_authenticated/vendor-template-contact/': typeof AuthenticatedVendorTemplateContactIndexRoute
   '/_authenticated/vendor-template-other/': typeof AuthenticatedVendorTemplateOtherIndexRoute
   '/_authenticated/vendor-template-pages/': typeof AuthenticatedVendorTemplatePagesIndexRoute
+  '/_authenticated/vendor-template-policy/': typeof AuthenticatedVendorTemplatePolicyIndexRoute
   '/_authenticated/vendor-template/': typeof AuthenticatedVendorTemplateIndexRoute
   '/_authenticated/vendor/': typeof AuthenticatedVendorIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
@@ -823,9 +843,11 @@ export interface FileRouteTypes {
     | '/vendor-about'
     | '/vendor-analytics'
     | '/vendor-template-about'
+    | '/vendor-template-blog'
     | '/vendor-template-contact'
     | '/vendor-template-other'
     | '/vendor-template-pages'
+    | '/vendor-template-policy'
     | '/vendor-template'
     | '/vendor'
     | '/wallet'
@@ -897,9 +919,11 @@ export interface FileRouteTypes {
     | '/vendor-about'
     | '/vendor-analytics'
     | '/vendor-template-about'
+    | '/vendor-template-blog'
     | '/vendor-template-contact'
     | '/vendor-template-other'
     | '/vendor-template-pages'
+    | '/vendor-template-policy'
     | '/vendor-template'
     | '/vendor'
     | '/wallet'
@@ -976,9 +1000,11 @@ export interface FileRouteTypes {
     | '/_authenticated/vendor-about/'
     | '/_authenticated/vendor-analytics/'
     | '/_authenticated/vendor-template-about/'
+    | '/_authenticated/vendor-template-blog/'
     | '/_authenticated/vendor-template-contact/'
     | '/_authenticated/vendor-template-other/'
     | '/_authenticated/vendor-template-pages/'
+    | '/_authenticated/vendor-template-policy/'
     | '/_authenticated/vendor-template/'
     | '/_authenticated/vendor/'
     | '/_authenticated/wallet/'
@@ -1151,6 +1177,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVendorTemplateIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/vendor-template-policy/': {
+      id: '/_authenticated/vendor-template-policy/'
+      path: '/vendor-template-policy'
+      fullPath: '/vendor-template-policy'
+      preLoaderRoute: typeof AuthenticatedVendorTemplatePolicyIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/vendor-template-pages/': {
       id: '/_authenticated/vendor-template-pages/'
       path: '/vendor-template-pages'
@@ -1170,6 +1203,13 @@ declare module '@tanstack/react-router' {
       path: '/vendor-template-contact'
       fullPath: '/vendor-template-contact'
       preLoaderRoute: typeof AuthenticatedVendorTemplateContactIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vendor-template-blog/': {
+      id: '/_authenticated/vendor-template-blog/'
+      path: '/vendor-template-blog'
+      fullPath: '/vendor-template-blog'
+      preLoaderRoute: typeof AuthenticatedVendorTemplateBlogIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/vendor-template-about/': {
@@ -1631,9 +1671,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVendorAboutIndexRoute: typeof AuthenticatedVendorAboutIndexRoute
   AuthenticatedVendorAnalyticsIndexRoute: typeof AuthenticatedVendorAnalyticsIndexRoute
   AuthenticatedVendorTemplateAboutIndexRoute: typeof AuthenticatedVendorTemplateAboutIndexRoute
+  AuthenticatedVendorTemplateBlogIndexRoute: typeof AuthenticatedVendorTemplateBlogIndexRoute
   AuthenticatedVendorTemplateContactIndexRoute: typeof AuthenticatedVendorTemplateContactIndexRoute
   AuthenticatedVendorTemplateOtherIndexRoute: typeof AuthenticatedVendorTemplateOtherIndexRoute
   AuthenticatedVendorTemplatePagesIndexRoute: typeof AuthenticatedVendorTemplatePagesIndexRoute
+  AuthenticatedVendorTemplatePolicyIndexRoute: typeof AuthenticatedVendorTemplatePolicyIndexRoute
   AuthenticatedVendorTemplateIndexRoute: typeof AuthenticatedVendorTemplateIndexRoute
   AuthenticatedVendorIndexRoute: typeof AuthenticatedVendorIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
@@ -1700,12 +1742,16 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedVendorAnalyticsIndexRoute,
   AuthenticatedVendorTemplateAboutIndexRoute:
     AuthenticatedVendorTemplateAboutIndexRoute,
+  AuthenticatedVendorTemplateBlogIndexRoute:
+    AuthenticatedVendorTemplateBlogIndexRoute,
   AuthenticatedVendorTemplateContactIndexRoute:
     AuthenticatedVendorTemplateContactIndexRoute,
   AuthenticatedVendorTemplateOtherIndexRoute:
     AuthenticatedVendorTemplateOtherIndexRoute,
   AuthenticatedVendorTemplatePagesIndexRoute:
     AuthenticatedVendorTemplatePagesIndexRoute,
+  AuthenticatedVendorTemplatePolicyIndexRoute:
+    AuthenticatedVendorTemplatePolicyIndexRoute,
   AuthenticatedVendorTemplateIndexRoute: AuthenticatedVendorTemplateIndexRoute,
   AuthenticatedVendorIndexRoute: AuthenticatedVendorIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,

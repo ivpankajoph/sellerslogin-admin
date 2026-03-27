@@ -3,10 +3,11 @@ import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Link2, Wand2 } from 'lucide-react'
+import { Toaster } from 'react-hot-toast'
 
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
 import { useSelector } from 'react-redux'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,7 +35,25 @@ import {
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
 
-const selectVendorId = (state: any): string | undefined => state?.auth?.user?.id
+const selectVendorId = (state: any): string => {
+  const authUser = state?.auth?.user || null
+  const vendorProfile =
+    state?.vendorprofile?.profile?.vendor ||
+    state?.vendorprofile?.profile?.data ||
+    state?.vendorprofile?.profile ||
+    null
+
+  return String(
+    authUser?.id ||
+      authUser?._id ||
+      authUser?.vendor_id ||
+      authUser?.vendorId ||
+      vendorProfile?._id ||
+      vendorProfile?.id ||
+      vendorProfile?.vendor_id ||
+      ''
+  ).trim()
+}
 
 const safeInitialData: TemplateData = {
   components: {
@@ -350,13 +369,19 @@ function VendorTemplateOther() {
     load()
   }, [activeWebsiteId, vendor_id, token])
 
-  const updateField = (path: string[], value: unknown) => {
+  const updateField = (
+    path: string[],
+    value: unknown,
+    options?: { markDirty?: boolean }
+  ) => {
     setData((prev) => updateFieldImmutable(prev, path, value))
+    if (options?.markDirty !== false) {
+      setInlineEditVersion((prev) => prev + 1)
+    }
   }
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
-    setInlineEditVersion((prev) => prev + 1)
   }
 
   const handleSave = useCallback(async (options?: { silent?: boolean }) => {
@@ -381,12 +406,15 @@ function VendorTemplateOther() {
 
       const response = await axios.put(
         `${BASE_URL}/v1/templates/social-faqs`,
-        payload
+        payload,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
       )
 
       if (response.data?.success) {
         if (!options?.silent) {
-          toast.success(response.data?.message || 'Saved successfully!')
+          toast.success('Template saved successfully')
         }
       } else {
         if (!options?.silent) {
@@ -414,6 +442,7 @@ function VendorTemplateOther() {
     data.components.theme,
     data.components.vendor_profile,
     sectionOrder,
+    token,
     vendor_id,
   ])
 
@@ -1058,6 +1087,7 @@ function VendorTemplateOther() {
           <ProfileDropdown />
         </div>
       </Header>
+      <Toaster position='top-right' />
       <TemplatePageLayout
         title='Social + FAQ Builder'
         description='Configure FAQ content and social channels that appear across the template. Reorder sections to control the flow.'

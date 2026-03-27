@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Link2, Wand2 } from 'lucide-react'
+import { Toaster } from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,6 +24,7 @@ import { uploadImage } from '../helper/fileupload'
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
 
 import { useSelector } from 'react-redux'
+import toast from 'react-hot-toast'
 import { initialData, type TemplateData } from '../data'
 import {
   getVendorTemplatePreviewUrl,
@@ -33,6 +35,26 @@ import {
 } from '../components/templateVariantParam'
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
+
+const selectVendorId = (state: any): string => {
+  const authUser = state?.auth?.user || null
+  const vendorProfile =
+    state?.vendorprofile?.profile?.vendor ||
+    state?.vendorprofile?.profile?.data ||
+    state?.vendorprofile?.profile ||
+    null
+
+  return String(
+    authUser?.id ||
+      authUser?._id ||
+      authUser?.vendor_id ||
+      authUser?.vendorId ||
+      vendorProfile?._id ||
+      vendorProfile?.id ||
+      vendorProfile?.vendor_id ||
+      ''
+  ).trim()
+}
 
 type PageSection = any
 
@@ -243,7 +265,7 @@ export default function VendorTemplatePages() {
   const [inlineEditVersion, setInlineEditVersion] = useState(0)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [domainOpen, setDomainOpen] = useState(false)
-  const vendor_id = useSelector((state: any) => state.auth?.user?.id)
+  const vendor_id = useSelector(selectVendorId)
   const token = useSelector((state: any) => state.auth?.token)
   const authDefaultCitySlug = useSelector(
     (state: any) => state.auth?.user?.default_city_slug || ''
@@ -504,20 +526,60 @@ export default function VendorTemplatePages() {
     }
   }
 
-  const handleSave = useCallback(async () => {
-    if (!vendor_id) return
+  const handleSave = useCallback(async (options?: { silent?: boolean }) => {
+    if (!vendor_id) {
+      if (!options?.silent) {
+        toast.error('Vendor ID is missing. Please log in again.')
+      }
+      return
+    }
+
     setIsSaving(true)
     try {
-      await axios.put(`${BASE_URL}/v1/templates/pages`, {
-        vendor_id,
-        website_id: activeWebsiteId,
-        custom_pages: pages,
-        theme: data.components.theme,
-      })
+      const response = await axios.put(
+        `${BASE_URL}/v1/templates/pages`,
+        {
+          vendor_id,
+          website_id: activeWebsiteId,
+          custom_pages: pages,
+          theme: data.components.theme,
+          vendor_profile: data.components.vendor_profile,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
+      )
+
+      if (response.data?.success === false) {
+        throw new Error(response.data?.message || 'Failed to save pages.')
+      }
+
+      if (!options?.silent) {
+        toast.success('Template saved successfully')
+      }
+    } catch (error: unknown) {
+      if (!options?.silent) {
+        if (axios.isAxiosError(error)) {
+          toast.error(
+            error.response?.data?.message || error.message || 'Failed to save pages.'
+          )
+        } else if (error instanceof Error) {
+          toast.error(error.message)
+        } else {
+          toast.error('Failed to save pages.')
+        }
+      }
     } finally {
       setIsSaving(false)
     }
-  }, [activeWebsiteId, data.components.theme, pages, vendor_id])
+  }, [
+    activeWebsiteId,
+    data.components.theme,
+    data.components.vendor_profile,
+    pages,
+    token,
+    vendor_id,
+  ])
   const headerActions = (
     <>
       <Button
@@ -528,11 +590,17 @@ export default function VendorTemplatePages() {
         <ArrowLeft className='h-4 w-4' /> My Websites
       </Button>
       <Button
-        onClick={handleSave}
-        disabled={isSaving}
+        onClick={() => {
+          void handleSave()
+        }}
+        disabled={isSaving || uploadingPaths.size > 0 || !vendor_id}
         className='h-9 shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-3 text-xs text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 sm:px-4 sm:text-sm'
       >
-        {isSaving ? 'Saving...' : 'Save Template'}
+        {uploadingPaths.size > 0
+          ? 'Uploading...'
+          : isSaving
+            ? 'Saving...'
+            : 'Save Template'}
       </Button>
       <Button
         variant='outline'
@@ -578,7 +646,7 @@ export default function VendorTemplatePages() {
   useEffect(() => {
     if (inlineEditVersion === 0 || uploadingPaths.size > 0) return
     const timeout = window.setTimeout(() => {
-      void handleSave()
+      void handleSave({ silent: true })
     }, 700)
     return () => window.clearTimeout(timeout)
   }, [inlineEditVersion, uploadingPaths, handleSave])
@@ -613,6 +681,7 @@ export default function VendorTemplatePages() {
           <ProfileDropdown />
         </div>
       </Header>
+      <Toaster position='top-right' />
 
       <TemplatePageLayout
         title='Custom Pages Builder'

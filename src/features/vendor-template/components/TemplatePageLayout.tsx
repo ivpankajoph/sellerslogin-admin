@@ -21,6 +21,12 @@ const navItems = [
   { key: 'contact', label: 'Contact', to: '/vendor-template-contact' },
   { key: 'pages', label: 'Pages', to: '/vendor-template-pages' },
   { key: 'other', label: 'Social + FAQ', to: '/vendor-template-other' },
+  { key: 'blog', label: 'Blog', to: '/vendor-template-blog' },
+  {
+    key: 'policy',
+    label: 'Privacy / Terms / Shipping Policy',
+    to: '/vendor-template-policy',
+  },
 ]
 
 const MIN_EDITOR_PANEL_WIDTH = 320

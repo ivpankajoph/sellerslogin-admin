@@ -4,6 +4,8 @@ import { JSX, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Link2, Wand2 } from 'lucide-react'
+import { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
 import L from 'leaflet'
@@ -36,9 +38,30 @@ import {
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
 
+const selectVendorId = (state: any): string => {
+  const authUser = state?.auth?.user || null
+  const vendorProfile =
+    state?.vendorprofile?.profile?.vendor ||
+    state?.vendorprofile?.profile?.data ||
+    state?.vendorprofile?.profile ||
+    null
+
+  return String(
+    authUser?.id ||
+      authUser?._id ||
+      authUser?.vendor_id ||
+      authUser?.vendorId ||
+      vendorProfile?._id ||
+      vendorProfile?.id ||
+      vendorProfile?.vendor_id ||
+      ''
+  ).trim()
+}
+
 function VendorTemplateContact() {
   const navigate = useNavigate()
   const [data, setData] = useState<TemplateData>(initialData)
+  const [isSaving, setIsSaving] = useState(false)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [inlineEditVersion, setInlineEditVersion] = useState(0)
@@ -50,7 +73,7 @@ function VendorTemplateContact() {
     'map',
     'vendor',
   ])
-  const vendor_id = useSelector((state: any) => state.auth?.user?.id)
+  const vendor_id = useSelector(selectVendorId)
   const token = useSelector((state: any) => state.auth?.token)
   const authDefaultCitySlug = useSelector(
     (state: any) => state.auth?.user?.default_city_slug || ''
@@ -349,18 +372,20 @@ function VendorTemplateContact() {
       )
       return uploadRes.data.secure_url
     } catch {
-      alert('Failed to upload image. Please try again.')
+      toast.error('Failed to upload image. Please try again.')
       return null
     }
   }
 
-  const updateField = (path: string[], value: any) => {
+  const updateField = (path: string[], value: any, options?: { markDirty?: boolean }) => {
     setData((prev: any) => updateFieldImmutable(prev, path, value))
+    if (options?.markDirty !== false) {
+      setInlineEditVersion((prev) => prev + 1)
+    }
   }
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
-    setInlineEditVersion((prev) => prev + 1)
   }
 
   const handleImageChange = async (path: string[], file: File | null) => {
@@ -389,22 +414,52 @@ function VendorTemplateContact() {
   }
 
   const handleSave = useCallback(async (options?: { silent?: boolean }) => {
+    if (!vendor_id) {
+      if (!options?.silent) {
+        toast.error('Vendor ID is missing. Please log in again.')
+      }
+      return
+    }
+
+    setIsSaving(true)
     try {
-      await axios.put(`${BASE_URL}/v1/templates/contact`, {
-        vendor_id,
-        website_id: activeWebsiteId,
-        components: data.components.contact_page,
-        vendor_profile: data.components.vendor_profile,
-        theme: data.components.theme,
-        section_order: sectionOrder,
-      })
-      if (!options?.silent) {
-        alert('Contact page saved successfully!')
+      const response = await axios.put(
+        `${BASE_URL}/v1/templates/contact`,
+        {
+          vendor_id,
+          website_id: activeWebsiteId,
+          components: data.components.contact_page,
+          vendor_profile: data.components.vendor_profile,
+          theme: data.components.theme,
+          section_order: sectionOrder,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
+      )
+
+      if (response.data?.success === false) {
+        throw new Error(response.data?.message || 'Failed to save contact page.')
       }
-    } catch {
       if (!options?.silent) {
-        alert('Failed to save contact page.')
+        toast.success('Template saved successfully')
       }
+    } catch (error: unknown) {
+      if (!options?.silent) {
+        if (axios.isAxiosError(error)) {
+          toast.error(
+            error.response?.data?.message ||
+              error.message ||
+              'Failed to save contact page.'
+          )
+        } else if (error instanceof Error) {
+          toast.error(error.message)
+        } else {
+          toast.error('Failed to save contact page.')
+        }
+      }
+    } finally {
+      setIsSaving(false)
     }
   }, [
     activeWebsiteId,
@@ -412,6 +467,7 @@ function VendorTemplateContact() {
     data.components.theme,
     data.components.vendor_profile,
     sectionOrder,
+    token,
     vendor_id,
   ])
 
@@ -456,10 +512,14 @@ function VendorTemplateContact() {
         onClick={() => {
           void handleSave()
         }}
-        disabled={uploadingPaths.size > 0}
+        disabled={isSaving || uploadingPaths.size > 0 || !vendor_id}
         className='h-9 shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-3 text-xs text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 sm:px-4 sm:text-sm'
       >
-        {uploadingPaths.size > 0 ? 'Uploading...' : 'Save Template'}
+        {uploadingPaths.size > 0
+          ? 'Uploading...'
+          : isSaving
+            ? 'Saving...'
+            : 'Save Template'}
       </Button>
       <Button
         variant='outline'
@@ -781,6 +841,7 @@ function VendorTemplateContact() {
           <ProfileDropdown />
         </div>
       </Header>
+      <Toaster position='top-right' />
       <TemplatePageLayout
         title='Contact Page Builder'
         description='Configure contact hero content, location messaging, and pin placement. Sync to preview how customers will reach you.'
@@ -807,6 +868,7 @@ function VendorTemplateContact() {
               { label: 'Login', path: '/login' },
             ]}
             onSync={handleSave}
+            isSyncing={isSaving}
             syncDisabled={uploadingPaths.size > 0}
             vendorId={vendor_id}
             page='contact'

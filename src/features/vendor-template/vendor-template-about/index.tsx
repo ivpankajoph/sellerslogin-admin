@@ -3,9 +3,11 @@ import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Link2, Wand2 } from 'lucide-react'
+import { Toaster } from 'react-hot-toast'
 
 import { BASE_URL } from '@/store/slices/vendor/productSlice'
 import { useSelector } from 'react-redux'
+import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,9 +37,30 @@ import {
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
 
+const selectVendorId = (state: any): string => {
+  const authUser = state?.auth?.user || null
+  const vendorProfile =
+    state?.vendorprofile?.profile?.vendor ||
+    state?.vendorprofile?.profile?.data ||
+    state?.vendorprofile?.profile ||
+    null
+
+  return String(
+    authUser?.id ||
+      authUser?._id ||
+      authUser?.vendor_id ||
+      authUser?.vendorId ||
+      vendorProfile?._id ||
+      vendorProfile?.id ||
+      vendorProfile?.vendor_id ||
+      ''
+  ).trim()
+}
+
 function VendorTemplateAbout() {
   const navigate = useNavigate()
   const [data, setData] = useState<TemplateData>(initialData)
+  const [isSaving, setIsSaving] = useState(false)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [inlineEditVersion, setInlineEditVersion] = useState(0)
@@ -51,7 +74,7 @@ function VendorTemplateAbout() {
     'vendorStories',
     'vendor',
   ])
-  const vendor_id = useSelector((state: any) => state.auth.user.id)
+  const vendor_id = useSelector(selectVendorId)
   const token = useSelector((state: any) => state.auth?.token)
   const authDefaultCitySlug = useSelector(
     (state: any) => state.auth?.user?.default_city_slug || ''
@@ -285,22 +308,54 @@ function VendorTemplateAbout() {
   }
 
   const handleSave = useCallback(async (options?: { silent?: boolean }) => {
+    if (!vendor_id) {
+      if (!options?.silent) {
+        toast.error('Vendor ID is missing. Please log in again.')
+      }
+      return
+    }
+
+    setIsSaving(true)
+
     try {
-      await axios.put(`${BASE_URL}/v1/templates/about`, {
-        vendor_id,
-        website_id: activeWebsiteId,
-        components: data.components.about_page,
-        vendor_profile: data.components.vendor_profile,
-        theme: data.components.theme,
-        section_order: sectionOrder,
-      })
-      if (!options?.silent) {
-        alert('About page saved successfully!')
+      const response = await axios.put(
+        `${BASE_URL}/v1/templates/about`,
+        {
+          vendor_id,
+          website_id: activeWebsiteId,
+          components: data.components.about_page,
+          vendor_profile: data.components.vendor_profile,
+          theme: data.components.theme,
+          section_order: sectionOrder,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
+      )
+
+      if (response.data?.success === false) {
+        throw new Error(response.data?.message || 'Failed to save about page.')
       }
-    } catch {
+
       if (!options?.silent) {
-        alert('Failed to save about page.')
+        toast.success('Template saved successfully')
       }
+    } catch (error: unknown) {
+      if (!options?.silent) {
+        if (axios.isAxiosError(error)) {
+          toast.error(
+            error.response?.data?.message ||
+              error.message ||
+              'Failed to save about page.'
+          )
+        } else if (error instanceof Error) {
+          toast.error(error.message)
+        } else {
+          toast.error('Failed to save about page.')
+        }
+      }
+    } finally {
+      setIsSaving(false)
     }
   }, [
     activeWebsiteId,
@@ -308,6 +363,7 @@ function VendorTemplateAbout() {
     data.components.theme,
     data.components.vendor_profile,
     sectionOrder,
+    token,
     vendor_id,
   ])
 
@@ -352,10 +408,14 @@ function VendorTemplateAbout() {
         onClick={() => {
           void handleSave()
         }}
-        disabled={uploadingPaths.size > 0}
+        disabled={isSaving || uploadingPaths.size > 0 || !vendor_id}
         className='h-9 shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-3 text-xs text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 sm:px-4 sm:text-sm'
       >
-        {uploadingPaths.size > 0 ? 'Uploading...' : 'Save Template'}
+        {uploadingPaths.size > 0
+          ? 'Uploading...'
+          : isSaving
+            ? 'Saving...'
+            : 'Save Template'}
       </Button>
       <Button
         variant='outline'
@@ -911,6 +971,7 @@ function VendorTemplateAbout() {
           <ProfileDropdown />
         </div>
       </Header>
+      <Toaster position='top-right' />
       <TemplatePageLayout
         title='About Page Builder'
         description='Tell your story, highlight your values, and introduce the team. Reorder sections to control how the narrative flows.'

@@ -281,20 +281,22 @@ export function useTemplateForm() {
         section_order: sectionOrder,
       }
 
-      const res = await axios.put(`${BASE_URL}/v1/templates/home`, payload)
+      const res = await axios.put(`${BASE_URL}/v1/templates/home`, payload, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      })
 
       if (res.status === 200 || res.status === 201) {
         setSubmitStatus('success')
         if (!options?.silent) {
-          toast.success('Template saved!')
+          toast.success('Template saved successfully')
         }
       } else {
         throw new Error()
       }
-    } catch {
+    } catch (error: any) {
       setSubmitStatus('error')
       if (!options?.silent) {
-        toast.error('Save failed')
+        toast.error(error?.response?.data?.message || 'Save failed')
       }
     } finally {
       setIsSubmitting(false)
