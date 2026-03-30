@@ -44,10 +44,10 @@ const selectVendorId = (state: any): string => {
     null
 
   return String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
       vendorProfile?.vendor_id ||
@@ -233,7 +233,7 @@ function VendorTemplateOther() {
   )
   const [data, setData] = useState<TemplateData>(initialData)
   const [isSaving, setIsSaving] = useState(false)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [, setInlineEditVersion] = useState(0)
   const [domainOpen, setDomainOpen] = useState(false)
   const [sectionOrder, setSectionOrder] = useState(['faqs', 'social', 'footer'])
   const selectedTemplateKey = useMemo(
@@ -445,14 +445,6 @@ function VendorTemplateOther() {
     token,
     vendor_id,
   ])
-
-  useEffect(() => {
-    if (inlineEditVersion === 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSave({ silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [inlineEditVersion, handleSave])
 
   const previewCity = useMemo(
     () =>

@@ -47,10 +47,10 @@ const selectVendorId = (state: any): string => {
     null
 
   return String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
       vendorProfile?.vendor_id ||
@@ -64,7 +64,7 @@ function VendorTemplateContact() {
   const [isSaving, setIsSaving] = useState(false)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [, setInlineEditVersion] = useState(0)
   const [isMapReady, setIsMapReady] = useState(false)
   const [domainOpen, setDomainOpen] = useState(false)
   const [sectionOrder, setSectionOrder] = useState([
@@ -470,14 +470,6 @@ function VendorTemplateContact() {
     token,
     vendor_id,
   ])
-
-  useEffect(() => {
-    if (inlineEditVersion === 0 || uploadingPaths.size > 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSave({ silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [inlineEditVersion, uploadingPaths, handleSave])
 
   const previewCity = useMemo(
     () =>

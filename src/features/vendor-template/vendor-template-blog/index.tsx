@@ -43,10 +43,10 @@ const selectVendorId = (state: any): string => {
     null
 
   return String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
       vendorProfile?.vendor_id ||
@@ -237,7 +237,7 @@ function VendorTemplateBlog() {
   )
   const [data, setData] = useState<TemplateData>(initialData)
   const [isSaving, setIsSaving] = useState(false)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [, setInlineEditVersion] = useState(0)
   const [domainOpen, setDomainOpen] = useState(false)
   const [uploadingBlogId, setUploadingBlogId] = useState<string | null>(null)
   const [testingCoverBlogId, setTestingCoverBlogId] = useState<string | null>(null)
@@ -586,14 +586,6 @@ function VendorTemplateBlog() {
     },
     [activeWebsiteId, data, token, vendor_id]
   )
-
-  useEffect(() => {
-    if (inlineEditVersion === 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSave({ silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [handleSave, inlineEditVersion])
 
   const previewCity = useMemo(
     () =>

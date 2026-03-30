@@ -45,10 +45,10 @@ const selectVendorId = (state: any): string => {
     null
 
   return String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
       vendorProfile?.vendor_id ||
@@ -262,7 +262,7 @@ export default function VendorTemplatePages() {
   const [data, setData] = useState<TemplateData>(initialData)
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [, setInlineEditVersion] = useState(0)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [domainOpen, setDomainOpen] = useState(false)
   const vendor_id = useSelector(selectVendorId)
@@ -642,14 +642,6 @@ export default function VendorTemplatePages() {
     updateField(path, value)
     setInlineEditVersion((prev) => prev + 1)
   }
-
-  useEffect(() => {
-    if (inlineEditVersion === 0 || uploadingPaths.size > 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSave({ silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [inlineEditVersion, uploadingPaths, handleSave])
 
   const sectionItems = useMemo(() => {
     const sections = (selectedPage?.sections as any[]) || []

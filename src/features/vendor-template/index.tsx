@@ -80,7 +80,7 @@ export default function TemplateForm() {
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
   const [isBuilderOpen, setIsBuilderOpen] = useState(false)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [, setInlineEditVersion] = useState(0)
   const [templateSearchTerm, setTemplateSearchTerm] = useState('')
   const [builderSearchTerm, setBuilderSearchTerm] = useState('')
   const [sectionOrder, setSectionOrder] = useState([
@@ -222,14 +222,6 @@ export default function TemplateForm() {
       window.history.replaceState(window.history.state, '', nextUrl)
     }
   }, [pathname])
-
-  useEffect(() => {
-    if (!isBuilderOpen || inlineEditVersion === 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSubmit(sectionOrder, { silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [inlineEditVersion, isBuilderOpen, handleSubmit, sectionOrder])
 
   const storefrontBaseUrl = getVendorTemplateBaseUrl(vendor_id)
   const previewCity = useMemo(
