@@ -9,6 +9,7 @@ import {
   HelpCircle,
   ImageIcon,
   Loader2,
+  Upload,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { formatINR } from '@/lib/currency'
@@ -16,6 +17,24 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -43,7 +62,14 @@ import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
 import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { TableShell } from '@/components/data-table/table-shell'
 import { Main } from '@/components/layout/main'
+import { Textarea } from '@/components/ui/textarea'
 import { LinkedText } from './components/linked-text'
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from './create-products/cloudinary'
+import { toast } from 'sonner'
+import { Pencil, Save, Trash2 } from 'lucide-react'
 
 type ProductCategoryRef =
   | string
@@ -79,6 +105,10 @@ type ProductVariant = {
   stockQuantity?: number
   variantsImageUrls?: Array<{ url?: string }>
   isActive?: boolean
+  variantMetaTitle?: string
+  variantMetaDescription?: string
+  variantMetaKeywords?: string[]
+  variantCanonicalUrl?: string
 }
 
 type Product = {
@@ -90,6 +120,7 @@ type Product = {
   defaultImages?: Array<{ url?: string }>
   variants?: ProductVariant[]
   status?: string
+  isAvailable?: boolean
   createdAt?: string
   specifications?: Array<Record<string, unknown>>
   faqs?: Array<{ question?: string; answer?: string }>
@@ -97,6 +128,40 @@ type Product = {
   productCategory?: ProductCategoryRef
   productCategories?: ProductCategoryRef[]
   productSubCategories?: ProductSubcategoryRef[]
+}
+
+type EditableVariant = {
+  _id?: string
+  variantSku: string
+  variantAttributes: Record<string, string>
+  actualPrice: string
+  finalPrice: string
+  stockQuantity: string
+  isActive: boolean
+  variantsImageUrls: Array<{
+    url?: string
+    publicId?: string
+    uploading?: boolean
+    tempId?: string
+  }>
+  variantMetaTitle: string
+  variantMetaDescription: string
+  variantMetaKeywords: string[]
+  variantCanonicalUrl: string
+}
+
+type EditableProductDraft = {
+  productId: string
+  productName: string
+  brand: string
+  shortDescription: string
+  description: string
+  mainCategory: string
+  productCategory: string
+  productSubCategories: string[]
+  status: string
+  isAvailable: boolean
+  variants: EditableVariant[]
 }
 
 type CategoryCatalogItem = {
@@ -364,6 +429,48 @@ const formatDate = (value?: string) => {
   }).format(parsed)
 }
 
+const buildEditableDraft = (product: Product): EditableProductDraft => ({
+  productId: product._id,
+  productName: String(product.productName || ''),
+  brand: String(product.brand || ''),
+  shortDescription: String(product.shortDescription || ''),
+  description: String(product.description || ''),
+  mainCategory: toRef(product.mainCategory).id,
+  productCategory: toRef(product.productCategory).id,
+  productSubCategories: uniqueRefs(product.productSubCategories || []).map(
+    (item) => toRef(item).id
+  ).filter(Boolean),
+  status: normalizeProductStatus(product.status) || 'pending',
+  isAvailable: product.isAvailable !== false,
+  variants: (product.variants || []).map((variant, variantIndex) => ({
+    _id: variant._id,
+    variantSku: String(variant.variantSku || ''),
+    variantAttributes: Object.fromEntries(
+      Object.entries(variant.variantAttributes || {}).map(([key, value]) => [
+        key,
+        String(value || ''),
+      ])
+    ),
+    actualPrice: String(variant.actualPrice ?? ''),
+    finalPrice: String(variant.finalPrice ?? ''),
+    stockQuantity: String(variant.stockQuantity ?? ''),
+    isActive: variant.isActive !== false,
+    variantsImageUrls: Array.isArray(variant.variantsImageUrls)
+      ? variant.variantsImageUrls.map((image, imageIndex) => ({
+          url: String(image?.url || ''),
+          publicId: String((image as { publicId?: string })?.publicId || ''),
+          tempId: `variants-${variantIndex + 1}-${imageIndex + 1}`,
+        }))
+      : [],
+    variantMetaTitle: String(variant.variantMetaTitle || ''),
+    variantMetaDescription: String(variant.variantMetaDescription || ''),
+    variantMetaKeywords: Array.isArray(variant.variantMetaKeywords)
+      ? variant.variantMetaKeywords.map((keyword) => String(keyword || '')).filter(Boolean)
+      : [],
+    variantCanonicalUrl: String(variant.variantCanonicalUrl || ''),
+  })),
+})
+
 const getTotalStock = (variants?: ProductVariant[]) =>
   Array.isArray(variants)
     ? variants.reduce((sum, item) => sum + Number(item?.stockQuantity || 0), 0)
@@ -553,6 +660,420 @@ function ProductBadgeList({
         </Badge>
       ))}
     </div>
+  )
+}
+
+function EditProductDialog({
+  open,
+  onOpenChange,
+  products,
+  categoryCatalog,
+  selectedProductId,
+  onProductSelect,
+  draft,
+  onDraftChange,
+  onVariantChange,
+  onSave,
+  onDelete,
+  onVariantImageUpload,
+  onVariantImageDelete,
+  saving,
+  deleting,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  products: Product[]
+  categoryCatalog: CategoryCatalogItem[]
+  selectedProductId: string
+  onProductSelect: (productId: string) => void
+  draft: EditableProductDraft | null
+  onDraftChange: (updater: (current: EditableProductDraft) => EditableProductDraft) => void
+  onVariantChange: (
+    index: number,
+    updater: (variant: EditableVariant) => EditableVariant
+  ) => void
+  onSave: () => void
+  onDelete: () => void
+  onVariantImageUpload: (
+    index: number,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => void
+  onVariantImageDelete: (index: number, imageIndex: number) => void
+  saving: boolean
+  deleting: boolean
+}) {
+  const selectedCategory = categoryCatalog.find(
+    (item) => toRef(item).id === draft?.productCategory
+  )
+  const subcategoryOptions = Array.isArray(selectedCategory?.subcategories)
+    ? selectedCategory.subcategories
+    : []
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-4xl'>
+        <DialogHeader>
+          <DialogTitle>Edit or delete product</DialogTitle>
+          <DialogDescription>
+            Product select karo, details update karo, aur zarurat ho to yahi se delete bhi kar do.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className='grid gap-5'>
+          <div className='grid gap-2'>
+            <p className='text-sm font-medium text-foreground'>Select product</p>
+            <Select value={selectedProductId} onValueChange={onProductSelect}>
+              <SelectTrigger>
+                <SelectValue placeholder='Select a product' />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map((product) => (
+                  <SelectItem key={product._id} value={product._id}>
+                    {product.productName || 'Unnamed Product'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {draft ? (
+            <>
+              <div className='grid gap-4 md:grid-cols-2'>
+                <div className='grid gap-2'>
+                  <p className='text-sm font-medium text-foreground'>Product name</p>
+                  <Input
+                    value={draft.productName}
+                    onChange={(event) =>
+                      onDraftChange((current) => ({
+                        ...current,
+                        productName: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className='grid gap-2'>
+                  <p className='text-sm font-medium text-foreground'>Brand</p>
+                  <Input
+                    value={draft.brand}
+                    onChange={(event) =>
+                      onDraftChange((current) => ({
+                        ...current,
+                        brand: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className='grid gap-2'>
+                  <p className='text-sm font-medium text-foreground'>Category</p>
+                  <Select
+                    value={draft.productCategory || undefined}
+                    onValueChange={(value) =>
+                      onDraftChange((current) => {
+                        const nextCategory = categoryCatalog.find(
+                          (item) => toRef(item).id === value
+                        )
+                        const nextMainCategory = toRef(nextCategory?.mainCategory).id
+                        const validSubcategoryIds = new Set(
+                          (Array.isArray(nextCategory?.subcategories)
+                            ? nextCategory.subcategories
+                            : []
+                          ).map((item) => toRef(item).id)
+                        )
+
+                        return {
+                          ...current,
+                          productCategory: value,
+                          mainCategory: nextMainCategory,
+                          productSubCategories: current.productSubCategories.filter((id) =>
+                            validSubcategoryIds.has(id)
+                          ),
+                        }
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select category' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoryCatalog.map((category) => {
+                        const categoryRef = toRef(category)
+                        return (
+                          <SelectItem key={categoryRef.id} value={categoryRef.id}>
+                            {categoryRef.name || 'Unnamed category'}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className='grid gap-2'>
+                  <p className='text-sm font-medium text-foreground'>Status</p>
+                  <Select
+                    value={draft.status}
+                    onValueChange={(value) =>
+                      onDraftChange((current) => ({ ...current, status: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select status' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='approved'>Verified</SelectItem>
+                      <SelectItem value='pending'>Pending</SelectItem>
+                      <SelectItem value='draft'>Draft</SelectItem>
+                      <SelectItem value='rejected'>Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className='grid gap-2'>
+                <p className='text-sm font-medium text-foreground'>Subcategory</p>
+                <Select
+                  value={draft.productSubCategories[0] || '__none__'}
+                  onValueChange={(value) =>
+                    onDraftChange((current) => ({
+                      ...current,
+                      productSubCategories: value === '__none__' ? [] : [value],
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='Select subcategory' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='__none__'>No subcategory</SelectItem>
+                    {subcategoryOptions.map((subcategory) => {
+                      const subRef = toRef(subcategory)
+                      return (
+                        <SelectItem key={subRef.id} value={subRef.id}>
+                          {subRef.name || 'Unnamed subcategory'}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className='grid gap-2'>
+                <p className='text-sm font-medium text-foreground'>Short description</p>
+                <Input
+                  value={draft.shortDescription}
+                  onChange={(event) =>
+                    onDraftChange((current) => ({
+                      ...current,
+                      shortDescription: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div className='grid gap-2'>
+                <p className='text-sm font-medium text-foreground'>Description</p>
+                <Textarea
+                  rows={5}
+                  value={draft.description}
+                  onChange={(event) =>
+                    onDraftChange((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div className='space-y-3'>
+                <div>
+                  <h3 className='text-sm font-semibold text-foreground'>Variant pricing and stock</h3>
+                  <p className='text-xs text-muted-foreground'>
+                    Yahin se price, stock units, aur active state update kar sakte ho.
+                  </p>
+                </div>
+                {draft.variants.map((variant, index) => (
+                  <div key={variant._id || variant.variantSku || index} className='rounded-md border p-4'>
+                    <div className='mb-3 flex flex-wrap gap-2'>
+                      <Badge variant='secondary' className='rounded-md'>
+                        {variant.variantSku || `Variant ${index + 1}`}
+                      </Badge>
+                      {Object.keys(variant.variantAttributes || {}).length ? (
+                        <Badge variant='outline' className='rounded-md'>
+                          {Object.entries(variant.variantAttributes)
+                            .map(([key, value]) => `${formatFieldLabel(key)}: ${value}`)
+                            .join(' | ')}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className='grid gap-4 md:grid-cols-4'>
+                      <div className='grid gap-2'>
+                        <p className='text-xs font-medium text-muted-foreground'>Actual price</p>
+                        <Input
+                          type='number'
+                          min='0'
+                          value={variant.actualPrice}
+                          onChange={(event) =>
+                            onVariantChange(index, (current) => ({
+                              ...current,
+                              actualPrice: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className='grid gap-2'>
+                        <p className='text-xs font-medium text-muted-foreground'>Final price</p>
+                        <Input
+                          type='number'
+                          min='0'
+                          value={variant.finalPrice}
+                          onChange={(event) =>
+                            onVariantChange(index, (current) => ({
+                              ...current,
+                              finalPrice: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className='grid gap-2'>
+                        <p className='text-xs font-medium text-muted-foreground'>Stock units</p>
+                        <Input
+                          type='number'
+                          min='0'
+                          value={variant.stockQuantity}
+                          onChange={(event) =>
+                            onVariantChange(index, (current) => ({
+                              ...current,
+                              stockQuantity: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className='grid gap-2'>
+                        <p className='text-xs font-medium text-muted-foreground'>Variant status</p>
+                        <Select
+                          value={variant.isActive ? 'active' : 'inactive'}
+                          onValueChange={(value) =>
+                            onVariantChange(index, (current) => ({
+                              ...current,
+                              isActive: value === 'active',
+                            }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='active'>Active</SelectItem>
+                            <SelectItem value='inactive'>Inactive</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className='mt-4 grid gap-3'>
+                      <div className='flex items-center justify-between gap-3'>
+                        <div>
+                          <p className='text-xs font-medium text-muted-foreground'>
+                            Variant images
+                          </p>
+                          <p className='text-xs text-muted-foreground'>
+                            Current images preview yahin dikhega. Nayi image add ya replace bhi kar sakte ho.
+                          </p>
+                        </div>
+                        <div>
+                          <input
+                            type='file'
+                            accept='image/*'
+                            multiple
+                            className='hidden'
+                            id={`edit-variant-image-upload-${index}`}
+                            onChange={(event) => onVariantImageUpload(index, event)}
+                          />
+                          <label htmlFor={`edit-variant-image-upload-${index}`}>
+                            <Button
+                              type='button'
+                              variant='outline'
+                              className='rounded-md'
+                              asChild
+                            >
+                              <span>
+                                <Upload className='mr-2 h-4 w-4' />
+                                {variant.variantsImageUrls.length ? 'Add or replace images' : 'Upload images'}
+                              </span>
+                            </Button>
+                          </label>
+                        </div>
+                      </div>
+
+                      {variant.variantsImageUrls.length ? (
+                        <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4'>
+                          {variant.variantsImageUrls.map((image, imageIndex) => (
+                            <div
+                              key={
+                                image.tempId ||
+                                image.publicId ||
+                                image.url ||
+                                `${index}-${imageIndex}`
+                              }
+                              className='relative overflow-hidden rounded-xl border bg-slate-50'
+                            >
+                              <ProductImage
+                                src={image.url}
+                                alt={`${variant.variantSku || `Variant ${index + 1}`} image ${imageIndex + 1}`}
+                                className={cn(
+                                  'h-28 w-full object-cover',
+                                  image.uploading ? 'opacity-50' : ''
+                                )}
+                              />
+                              {image.uploading ? (
+                                <div className='absolute inset-0 flex items-center justify-center bg-white/70'>
+                                  <Loader2 className='h-5 w-5 animate-spin text-slate-700' />
+                                </div>
+                              ) : (
+                                <Button
+                                  type='button'
+                                  variant='destructive'
+                                  size='icon'
+                                  className='absolute right-2 top-2 h-8 w-8 rounded-full'
+                                  onClick={() => onVariantImageDelete(index, imageIndex)}
+                                >
+                                  <Trash2 className='h-4 w-4' />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className='rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground'>
+                          Abhi koi variant image attached nahi hai.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className='rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground'>
+              Product select karte hi editable details yahan load ho jayengi.
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className='flex-col gap-2 sm:flex-row sm:justify-between'>
+          <Button
+            type='button'
+            variant='destructive'
+            onClick={onDelete}
+            disabled={!draft || saving || deleting}
+          >
+            <Trash2 className='mr-2 h-4 w-4' />
+            {deleting ? 'Deleting...' : 'Delete Product'}
+          </Button>
+          <Button type='button' onClick={onSave} disabled={!draft || saving || deleting}>
+            <Save className='mr-2 h-4 w-4' />
+            {saving ? 'Updating...' : 'Update Product'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -832,6 +1353,12 @@ export default function VendorProductsTable() {
   const [pageSize, setPageSize] = useState(10)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+  const [selectedEditProductId, setSelectedEditProductId] = useState('')
+  const [editDraft, setEditDraft] = useState<EditableProductDraft | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [deletingProduct, setDeletingProduct] = useState(false)
 
   const fetchData = useCallback(
     async (signal?: AbortSignal) => {
@@ -972,6 +1499,245 @@ export default function VendorProductsTable() {
     ]
   )
 
+  const handleOpenEditDialog = () => {
+    const firstProduct = filteredProducts[0] || products[0] || null
+    setSelectedEditProductId(firstProduct?._id || '')
+    setEditDraft(firstProduct ? buildEditableDraft(firstProduct) : null)
+    setEditDialogOpen(true)
+  }
+
+  const handleSelectEditProduct = (productId: string) => {
+    const nextProduct = products.find((product) => product._id === productId) || null
+    setSelectedEditProductId(productId)
+    setEditDraft(nextProduct ? buildEditableDraft(nextProduct) : null)
+  }
+
+  const handleSaveProduct = async () => {
+    if (!editDraft || !token) return
+
+    const payload = {
+      productName: editDraft.productName.trim(),
+      brand: editDraft.brand.trim(),
+      shortDescription: editDraft.shortDescription.trim(),
+      description: editDraft.description.trim(),
+      mainCategory: editDraft.mainCategory,
+      productCategory: editDraft.productCategory,
+      productSubCategories: editDraft.productSubCategories,
+      status: editDraft.status,
+      isAvailable: editDraft.isAvailable,
+      variants: editDraft.variants.map((variant) => ({
+        _id: variant._id,
+        variantSku: variant.variantSku.trim(),
+        variantAttributes: variant.variantAttributes,
+        actualPrice: Number(variant.actualPrice || 0),
+        finalPrice: Number(variant.finalPrice || 0),
+        stockQuantity: Number(variant.stockQuantity || 0),
+        isActive: variant.isActive,
+        variantsImageUrls: variant.variantsImageUrls,
+        variantMetaTitle: variant.variantMetaTitle,
+        variantMetaDescription: variant.variantMetaDescription,
+        variantMetaKeywords: variant.variantMetaKeywords,
+        variantCanonicalUrl: variant.variantCanonicalUrl,
+      })),
+    }
+
+    try {
+      setSavingEdit(true)
+      const response = await fetch(
+        `${API_BASE}/v1/products/${editDraft.productId}/content`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      )
+
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(result?.message || 'Failed to update product')
+      }
+
+      const updatedProduct = result?.data as Product | undefined
+      if (updatedProduct?._id) {
+        setProducts((prev) =>
+          prev.map((item) => (item._id === updatedProduct._id ? updatedProduct : item))
+        )
+        setSelectedProduct((current) =>
+          current?._id === updatedProduct._id ? updatedProduct : current
+        )
+        setEditDraft(buildEditableDraft(updatedProduct))
+      }
+
+      toast.success(result?.message || 'Product updated successfully')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update product')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete || !token) return
+
+    try {
+      setDeletingProduct(true)
+      const response = await fetch(`${API_BASE}/v1/products/${productToDelete._id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(result?.message || 'Failed to delete product')
+      }
+
+      setProducts((prev) => prev.filter((item) => item._id !== productToDelete._id))
+      setSelectedProduct((current) =>
+        current?._id === productToDelete._id ? null : current
+      )
+
+      const remainingProducts = products.filter((item) => item._id !== productToDelete._id)
+      const fallbackProduct = remainingProducts[0] || null
+      setSelectedEditProductId(fallbackProduct?._id || '')
+      setEditDraft(fallbackProduct ? buildEditableDraft(fallbackProduct) : null)
+      setProductToDelete(null)
+      setEditDialogOpen(Boolean(fallbackProduct))
+
+      toast.success(result?.message || 'Product deleted successfully')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to delete product')
+    } finally {
+      setDeletingProduct(false)
+    }
+  }
+
+  const handleEditVariantImageUpload = async (
+    variantIndex: number,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(event.target.files || []).filter((file) =>
+      file.type.startsWith('image/')
+    )
+    event.target.value = ''
+
+    if (!files.length) return
+
+    const placeholders = files.map((file, fileIndex) => ({
+      url: URL.createObjectURL(file),
+      publicId: '',
+      uploading: true,
+      tempId: `edit-variant-${variantIndex}-${Date.now()}-${fileIndex}`,
+    }))
+
+    setEditDraft((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        variants: current.variants.map((variant, index) =>
+          index === variantIndex
+            ? {
+                ...variant,
+                variantsImageUrls: [...variant.variantsImageUrls, ...placeholders],
+              }
+            : variant
+        ),
+      }
+    })
+
+    for (const placeholder of placeholders) {
+      try {
+        const matchedFile =
+          files[placeholders.findIndex((item) => item.tempId === placeholder.tempId)]
+        if (!matchedFile) continue
+
+        const uploadedImage = await uploadToCloudinary(matchedFile)
+        if (!uploadedImage?.url) {
+          throw new Error('Image upload failed')
+        }
+
+        setEditDraft((current) => {
+          if (!current) return current
+          return {
+            ...current,
+            variants: current.variants.map((variant, index) => {
+              if (index !== variantIndex) return variant
+
+              return {
+                ...variant,
+                variantsImageUrls: variant.variantsImageUrls.map((image) =>
+                  image.tempId === placeholder.tempId
+                    ? {
+                        url: uploadedImage.url,
+                        publicId: uploadedImage.publicId,
+                        uploading: false,
+                        tempId: placeholder.tempId,
+                      }
+                    : image
+                ),
+              }
+            }),
+          }
+        })
+      } catch (error) {
+        setEditDraft((current) => {
+          if (!current) return current
+          return {
+            ...current,
+            variants: current.variants.map((variant, index) => {
+              if (index !== variantIndex) return variant
+
+              return {
+                ...variant,
+                variantsImageUrls: variant.variantsImageUrls.filter(
+                  (image) => image.tempId !== placeholder.tempId
+                ),
+              }
+            }),
+          }
+        })
+        toast.error('Failed to upload variant image')
+      } finally {
+        URL.revokeObjectURL(placeholder.url || '')
+      }
+    }
+  }
+
+  const handleEditVariantImageDelete = async (
+    variantIndex: number,
+    imageIndex: number
+  ) => {
+    const targetImage = editDraft?.variants?.[variantIndex]?.variantsImageUrls?.[imageIndex]
+    if (!targetImage) return
+
+    if (targetImage.publicId) {
+      try {
+        await deleteFromCloudinary(targetImage.publicId)
+      } catch (error) {
+      }
+    }
+
+    setEditDraft((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        variants: current.variants.map((variant, index) => {
+          if (index !== variantIndex) return variant
+
+          return {
+            ...variant,
+            variantsImageUrls: variant.variantsImageUrls.filter(
+              (_image, currentImageIndex) => currentImageIndex !== imageIndex
+            ),
+          }
+        }),
+      }
+    })
+  }
+
   return (
     <>
       <TablePageHeader
@@ -1013,8 +1779,14 @@ export default function VendorProductsTable() {
         >
           {loading ? 'Refreshing...' : 'Refresh'}
         </Button>
-        <Button asChild variant='outline' className='h-10 shrink-0'>
-          <Link to='/upload-products'>Bulk Upload</Link>
+        <Button
+          variant='outline'
+          className='h-10 shrink-0'
+          onClick={handleOpenEditDialog}
+          disabled={loading || products.length === 0}
+        >
+          <Pencil className='mr-2 h-4 w-4' />
+          Edit/Update Product
         </Button>
         <Button asChild className='h-10 shrink-0'>
           <Link to='/products/create-products'>Create Product</Link>
@@ -1136,15 +1908,30 @@ export default function VendorProductsTable() {
                       </Badge>
                     </TableCell>
                     <TableCell className='text-right'>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='rounded-md'
-                        onClick={() => setSelectedProduct(product)}
-                      >
-                        <Eye className='mr-2 h-4 w-4' />
-                        View Details
-                      </Button>
+                      <div className='flex justify-end gap-2'>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          className='rounded-md'
+                          onClick={() => setSelectedProduct(product)}
+                        >
+                          <Eye className='mr-2 h-4 w-4' />
+                          View Details
+                        </Button>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          className='rounded-md'
+                          onClick={() => {
+                            setSelectedEditProductId(product._id)
+                            setEditDraft(buildEditableDraft(product))
+                            setEditDialogOpen(true)
+                          }}
+                        >
+                          <Pencil className='mr-2 h-4 w-4' />
+                          Edit
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -1160,6 +1947,71 @@ export default function VendorProductsTable() {
         open={Boolean(selectedProduct)}
         onOpenChange={(open) => !open && setSelectedProduct(null)}
       />
+
+      <EditProductDialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open)
+          if (!open) {
+            setProductToDelete(null)
+          }
+        }}
+        products={products}
+        categoryCatalog={categoryCatalog}
+        selectedProductId={selectedEditProductId}
+        onProductSelect={handleSelectEditProduct}
+        draft={editDraft}
+        onDraftChange={(updater) =>
+          setEditDraft((current) => (current ? updater(current) : current))
+        }
+        onVariantChange={(index, updater) =>
+          setEditDraft((current) => {
+            if (!current) return current
+            return {
+              ...current,
+              variants: current.variants.map((variant, variantIndex) =>
+                variantIndex === index ? updater(variant) : variant
+              ),
+            }
+          })
+        }
+        onSave={handleSaveProduct}
+        onDelete={() => {
+          const targetProduct =
+            products.find((item) => item._id === selectedEditProductId) || null
+          setProductToDelete(targetProduct)
+        }}
+        onVariantImageUpload={handleEditVariantImageUpload}
+        onVariantImageDelete={handleEditVariantImageDelete}
+        saving={savingEdit}
+        deleting={deletingProduct}
+      />
+
+      <AlertDialog
+        open={Boolean(productToDelete)}
+        onOpenChange={(open) => !open && setProductToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this product?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {productToDelete?.productName || 'This product'} catalog se remove ho jayega. Yeh action reverse nahi hoga.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingProduct}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault()
+                void handleDeleteProduct()
+              }}
+              disabled={deletingProduct}
+            >
+              {deletingProduct ? 'Deleting...' : 'Delete Product'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <StatisticsDialog
         open={statsOpen}

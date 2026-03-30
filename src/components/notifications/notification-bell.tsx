@@ -69,7 +69,7 @@ export function NotificationBell({ className }: { className?: string }) {
       const res = await api.get('/notifications/unread-count')
       return Number(res.data?.count || 0)
     },
-    refetchInterval: 30_000,
+    refetchInterval: 5_000,
   })
 
   const latestQuery = useQuery({
@@ -79,7 +79,7 @@ export function NotificationBell({ className }: { className?: string }) {
       return Array.isArray(res.data?.notifications) ? res.data.notifications : []
     },
     enabled: open,
-    refetchInterval: open ? 30_000 : false,
+    refetchInterval: open ? 5_000 : false,
   })
 
   const markReadMutation = useMutation({
