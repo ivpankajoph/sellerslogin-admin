@@ -393,6 +393,12 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               roles: [ROLES.ADMIN, ROLES.VENDOR],
               pageKey: 'seo_manager',
             },
+            {
+              title: 'SEO Edit Page',
+              url: '/seo/meta-tags',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              pageKey: 'seo_manager',
+            },
           ],
         },
         {
