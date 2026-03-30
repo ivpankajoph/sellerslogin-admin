@@ -3,6 +3,7 @@ import brevoLogo from '@/assets/toolkit-apps/brevo.svg'
 import cashfreeLogo from '@/assets/toolkit-apps/cashfree.png'
 import codLogo from '@/assets/toolkit-apps/cod.svg'
 import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
+import googleMerchantLogo from '@/assets/toolkit-apps/google-merchant.svg'
 import razorpayLogo from '@/assets/toolkit-apps/razorpay.png'
 
 export const INTEGRATION_PROVIDER_IDS = [
@@ -11,6 +12,7 @@ export const INTEGRATION_PROVIDER_IDS = [
   'cod',
   'borzo',
   'delhivery',
+  'google_merchant',
   'brevo',
 ] as const
 
@@ -120,6 +122,16 @@ export const INTEGRATION_PROVIDER_META: Record<
       },
     ],
   },
+  google_merchant: {
+    title: 'Google Merchant',
+    shortLabel: 'Merchant',
+    category: 'marketing',
+    description:
+      'Connect the vendor Google account with OAuth and choose which Merchant Center account to use.',
+    imageSrc: googleMerchantLogo,
+    docs: 'https://developers.google.com/merchant/api',
+    fields: [],
+  },
   brevo: {
     title: 'Brevo',
     shortLabel: 'Brevo',
@@ -137,7 +149,7 @@ const DELIVERY_PROVIDERS = new Set<DeliveryProviderId>(['none', 'borzo', 'delhiv
 const getProviderCategory = (provider: IntegrationProviderId): IntegrationCategory =>
   provider === 'borzo' || provider === 'delhivery'
     ? 'delivery'
-    : provider === 'brevo'
+    : provider === 'brevo' || provider === 'google_merchant'
       ? 'marketing'
       : 'payment'
 

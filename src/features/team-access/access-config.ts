@@ -123,7 +123,7 @@ const ROUTE_MATCHERS: RouteMatcher[] = [
   { key: 'team_access', exact: ['/team-access', '/team-access-analytics'] },
   { key: 'customers', exact: ['/users'] },
   { key: 'storefront_analytics', prefixes: ['/analytics'] },
-  { key: 'orders', exact: ['/order', '/template-orders'] },
+  { key: 'orders', exact: ['/order', '/template-orders'], prefixes: ['/courier'] },
   { key: 'wallets', exact: ['/wallet', '/template-wallet'] },
   {
     key: 'products',

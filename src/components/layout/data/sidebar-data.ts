@@ -148,6 +148,50 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
       ],
     },
     {
+      title: 'Courier',
+      roles: [ROLES.ADMIN, ROLES.VENDOR],
+      items: [
+        {
+          title: 'Courier Desk',
+          url: '/courier',
+          icon: Truck,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          pageKey: 'orders',
+        },
+        {
+          title: 'Courier Apps',
+          icon: Truck,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          items: [
+            {
+              title: 'Borzo',
+              url: '/courier/borzo',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              pageKey: 'orders',
+            },
+            {
+              title: 'Delhivery',
+              url: '/courier/delhivery',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              pageKey: 'orders',
+            },
+            {
+              title: 'NimbusPost',
+              url: '/courier/nimbuspost',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              pageKey: 'orders',
+            },
+            {
+              title: 'Porter',
+              url: '/courier/porter',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              pageKey: 'orders',
+            },
+          ],
+        },
+      ],
+    },
+    {
       title: 'Product Management',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
@@ -308,6 +352,13 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               url: '/integrations/delhivery',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
               requiresIntegration: 'delhivery',
+              pageKey: 'my_apps',
+            },
+            {
+              title: 'Google Merchant',
+              url: '/integrations/google_merchant',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              requiresIntegration: 'google_merchant',
               pageKey: 'my_apps',
             },
             {

@@ -2,7 +2,15 @@ import { createFileRoute } from '@tanstack/react-router'
 import BrevoConnectPage from '@/features/brevo-connect'
 import IntegrationsPage from '@/features/integrations'
 
-const supportedProviders = ['razorpay', 'cashfree', 'cod', 'borzo', 'delhivery', 'brevo'] as const
+const supportedProviders = [
+  'razorpay',
+  'cashfree',
+  'cod',
+  'borzo',
+  'delhivery',
+  'google_merchant',
+  'brevo',
+] as const
 
 type ProviderId = (typeof supportedProviders)[number]
 

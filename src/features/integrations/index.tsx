@@ -58,6 +58,7 @@ const providerAccentClass: Record<ProviderId, string> = {
   cod: 'border-amber-200 bg-amber-50',
   borzo: 'border-emerald-200 bg-emerald-50',
   delhivery: 'border-cyan-200 bg-cyan-50',
+  google_merchant: 'border-blue-200 bg-blue-50',
   brevo: 'border-emerald-200 bg-emerald-50',
 }
 
@@ -123,6 +124,34 @@ function getActionPath(role: string | undefined, vendorId: string | null, suffix
   return `/integrations${suffix}`
 }
 
+type GoogleMerchantAccount = {
+  account_id: string
+  name: string
+  account_name: string
+  homepage: string
+  adult_content: boolean
+}
+
+const parseGoogleMerchantAccounts = (value?: string) => {
+  if (!value) return [] as GoogleMerchantAccount[]
+
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return [] as GoogleMerchantAccount[]
+    return parsed
+      .map((account) => ({
+        account_id: String(account?.account_id || '').trim(),
+        name: String(account?.name || '').trim(),
+        account_name: String(account?.account_name || '').trim(),
+        homepage: String(account?.homepage || '').trim(),
+        adult_content: Boolean(account?.adult_content),
+      }))
+      .filter((account) => account.account_id)
+  } catch {
+    return [] as GoogleMerchantAccount[]
+  }
+}
+
 export default function IntegrationsPage({
   focusProvider,
 }: {
@@ -142,6 +171,7 @@ export default function IntegrationsPage({
     cod: {},
     borzo: {},
     delhivery: {},
+    google_merchant: {},
     brevo: {},
   })
   const [providerEnabled, setProviderEnabled] = useState<Record<ProviderId, boolean>>({
@@ -150,6 +180,7 @@ export default function IntegrationsPage({
     cod: true,
     borzo: false,
     delhivery: false,
+    google_merchant: false,
     brevo: false,
   })
   const [busyMap, setBusyMap] = useState<Record<string, boolean>>({})
@@ -178,6 +209,8 @@ export default function IntegrationsPage({
       return providerMeta[providerId].category === filter
     })
   }, [filter, focusProvider, visibleProviderOrder])
+
+  const focusedCategory = focusProvider ? providerMeta[focusProvider].category : null
 
   useEffect(() => {
     setFilter(focusProvider ? providerMeta[focusProvider].category : 'all')
@@ -210,6 +243,7 @@ export default function IntegrationsPage({
         cod: payload.providers.cod.enabled,
         borzo: payload.providers.borzo.enabled,
         delhivery: payload.providers.delhivery.enabled,
+        google_merchant: payload.providers.google_merchant.enabled,
         brevo: payload.providers.brevo.enabled,
       })
 
@@ -219,6 +253,7 @@ export default function IntegrationsPage({
         cod: {},
         borzo: {},
         delhivery: {},
+        google_merchant: {},
         brevo: {},
       }
 
@@ -233,6 +268,8 @@ export default function IntegrationsPage({
           }
         })
       })
+      nextDrafts.google_merchant.selected_account_id =
+        payload.providers.google_merchant.config?.selected_account_id || ''
       setDrafts(nextDrafts)
       return payload
     } catch (error: any) {
@@ -251,6 +288,30 @@ export default function IntegrationsPage({
     void loadIntegrations(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveRole])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+    const oauthState = url.searchParams.get('google_merchant_oauth')
+    const oauthMessage = url.searchParams.get('google_merchant_message')
+
+    if (!oauthState) return
+
+    if (oauthState === 'success') {
+      toast.success('Google Merchant connected. Select the Merchant Center account you want to use.')
+      void loadIntegrations()
+      void syncVendorToolkitContext()
+    } else {
+      toast.error(oauthMessage || 'Google Merchant OAuth failed')
+      void loadIntegrations()
+    }
+
+    url.searchParams.delete('google_merchant_oauth')
+    url.searchParams.delete('google_merchant_message')
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const setBusy = (key: string, value: boolean) =>
     setBusyMap((prev) => ({ ...prev, [key]: value }))
@@ -300,10 +361,76 @@ export default function IntegrationsPage({
     }))
   }
 
+  const validateProviderBeforeSubmit = (provider: ProviderId) => {
+    if (provider !== 'google_merchant') return true
+
+    const providerState = data?.providers?.google_merchant
+    const oauthConnected = providerState?.config?.oauth_connected === 'true'
+    const connectedAccounts = parseGoogleMerchantAccounts(
+      providerState?.config?.connected_accounts_json,
+    )
+    const selectedAccountId = String(drafts.google_merchant?.selected_account_id || '').trim()
+
+    if (!oauthConnected) {
+      toast.error('Connect Google Merchant with OAuth first.')
+      return false
+    }
+
+    if (!connectedAccounts.length) {
+      toast.error('This Google login does not have access to any Merchant Center accounts.')
+      return false
+    }
+
+    if (connectedAccounts.length > 1 && !selectedAccountId) {
+      toast.error('Select which Merchant Center account this vendor should use.')
+      return false
+    }
+
+    return true
+  }
+
+  const startGoogleMerchantOauth = async () => {
+    if (effectiveRole !== 'vendor') {
+      toast.error('Google Merchant OAuth connect is only available for the vendor owner.')
+      return
+    }
+
+    const busyKey = 'oauth-google_merchant'
+
+    try {
+      setBusy(busyKey, true)
+      const returnTo =
+        typeof window === 'undefined'
+          ? undefined
+          : `${window.location.origin}${window.location.pathname}`
+      const response = await api.get('/integrations/google-merchant/oauth/start', {
+        params: returnTo ? { return_to: returnTo } : undefined,
+      })
+      const authUrl = response?.data?.data?.auth_url
+
+      if (!authUrl) {
+        throw new Error('Missing Google OAuth redirect URL')
+      }
+
+      window.location.href = authUrl
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to start Google Merchant OAuth')
+    } finally {
+      setBusy(busyKey, false)
+    }
+  }
+
   const saveProvider = async (provider: ProviderId) => {
     const path = getActionPath(effectiveRole, resolvedVendorId, `/${provider}`)
     if (!path) {
       toast.error('Select a vendor first')
+      return
+    }
+    if (provider === 'google_merchant' && data?.providers?.google_merchant?.config?.oauth_connected !== 'true') {
+      await startGoogleMerchantOauth()
+      return
+    }
+    if (!validateProviderBeforeSubmit(provider)) {
       return
     }
     const busyKey = `save-${provider}`
@@ -317,6 +444,12 @@ export default function IntegrationsPage({
           config[field.key] = value.trim()
         }
       })
+      if (provider === 'google_merchant') {
+        const selectedAccountId = String(drafts.google_merchant?.selected_account_id || '').trim()
+        if (selectedAccountId) {
+          config.selected_account_id = selectedAccountId
+        }
+      }
 
       const hasCredentialInput = Object.keys(config).length > 0
       const shouldEnable =
@@ -347,6 +480,13 @@ export default function IntegrationsPage({
     const path = getActionPath(effectiveRole, resolvedVendorId, `/${provider}/test`)
     if (!path) {
       toast.error('Select a vendor first')
+      return
+    }
+    if (provider === 'google_merchant' && data?.providers?.google_merchant?.config?.oauth_connected !== 'true') {
+      toast.error('Connect Google Merchant with OAuth first.')
+      return
+    }
+    if (!validateProviderBeforeSubmit(provider)) {
       return
     }
     const busyKey = `test-${provider}`
@@ -692,61 +832,63 @@ export default function IntegrationsPage({
         </Card>
       )}
 
-      <Card className='border-slate-200 bg-white shadow-sm'>
-        <CardHeader className='space-y-2'>
-          <CardTitle className='text-base text-slate-950'>App settings</CardTitle>
-          <CardDescription>
-            Add credentials, enable or disable access, test the connection, and remove the app when needed.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className='grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end'>
-          <div className='space-y-2'>
-            <Label>Default payment app</Label>
-            <select
-              value={defaultPayment}
-              onChange={(event) =>
-                setDefaultPayment(event.target.value as 'cod' | 'razorpay' | 'cashfree')
-              }
-              className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
+      {focusedCategory !== 'marketing' && (
+        <Card className='border-slate-200 bg-white shadow-sm'>
+          <CardHeader className='space-y-2'>
+            <CardTitle className='text-base text-slate-950'>App settings</CardTitle>
+            <CardDescription>
+              Add credentials, enable or disable access, test the connection, and remove the app when needed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className='grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end'>
+            <div className='space-y-2'>
+              <Label>Default payment app</Label>
+              <select
+                value={defaultPayment}
+                onChange={(event) =>
+                  setDefaultPayment(event.target.value as 'cod' | 'razorpay' | 'cashfree')
+                }
+                className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
+              >
+                <option value='cod'>Cash on Delivery</option>
+                <option value='razorpay'>Razorpay</option>
+                <option value='cashfree'>Cashfree</option>
+              </select>
+            </div>
+            <div className='space-y-2'>
+              <Label>Default delivery app</Label>
+              <select
+                value={defaultDelivery}
+                onChange={(event) =>
+                  setDefaultDelivery(event.target.value as 'none' | 'borzo' | 'delhivery')
+                }
+                className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
+              >
+                <option value='none'>No auto-delivery</option>
+                <option value='borzo'>Borzo</option>
+                <option value='delhivery'>Delhivery</option>
+              </select>
+            </div>
+            <Button
+              onClick={() => saveDefaults()}
+              disabled={savingDefaults}
+              className='h-11 rounded-xl bg-slate-950 text-white hover:bg-slate-800'
             >
-              <option value='cod'>Cash on Delivery</option>
-              <option value='razorpay'>Razorpay</option>
-              <option value='cashfree'>Cashfree</option>
-            </select>
-          </div>
-          <div className='space-y-2'>
-            <Label>Default delivery app</Label>
-            <select
-              value={defaultDelivery}
-              onChange={(event) =>
-                setDefaultDelivery(event.target.value as 'none' | 'borzo' | 'delhivery')
-              }
-              className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
-            >
-              <option value='none'>No auto-delivery</option>
-              <option value='borzo'>Borzo</option>
-              <option value='delhivery'>Delhivery</option>
-            </select>
-          </div>
-          <Button
-            onClick={() => saveDefaults()}
-            disabled={savingDefaults}
-            className='h-11 rounded-xl bg-slate-950 text-white hover:bg-slate-800'
-          >
-            {savingDefaults ? (
-              <>
-                <Loader2 className='h-4 w-4 animate-spin' />
-                Saving
-              </>
-            ) : (
-              <>
-                <ShieldCheck className='h-4 w-4' />
-                Save Defaults
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+              {savingDefaults ? (
+                <>
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                  Saving
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className='h-4 w-4' />
+                  Save Defaults
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {loading ? (
         <Card className='border-slate-200 bg-white shadow-sm'>
@@ -775,11 +917,24 @@ export default function IntegrationsPage({
             const saveBusy = Boolean(busyMap[`save-${providerId}`])
             const testBusy = Boolean(busyMap[`test-${providerId}`])
             const disconnectBusy = Boolean(busyMap[`disconnect-${providerId}`])
-            const primaryLabel = provider?.connected
-              ? 'Save changes'
-              : meta.fields.length
-                ? 'Connect app'
-                : 'Enable app'
+            const oauthBusy = Boolean(busyMap['oauth-google_merchant'])
+            const googleMerchantAccounts =
+              providerId === 'google_merchant'
+                ? parseGoogleMerchantAccounts(provider?.config?.connected_accounts_json)
+                : []
+            const googleMerchantConnected =
+              providerId === 'google_merchant' &&
+              provider?.config?.oauth_connected === 'true'
+            const primaryLabel =
+              providerId === 'google_merchant'
+                ? googleMerchantConnected
+                  ? 'Save account selection'
+                  : 'Connect Google Merchant'
+                : provider?.connected
+                  ? 'Save changes'
+                  : meta.fields.length
+                    ? 'Connect app'
+                    : 'Enable app'
 
             return (
               <Card key={providerId} className='overflow-hidden border-slate-200 bg-white shadow-sm'>
@@ -902,17 +1057,92 @@ export default function IntegrationsPage({
                     </div>
                   )}
 
+                  {providerId === 'google_merchant' && (
+                    <>
+                      <div className='grid gap-3 md:grid-cols-3'>
+                        <div className='rounded-2xl border border-slate-200 bg-slate-50 p-3'>
+                          <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                            Connected Google login
+                          </div>
+                          <div className='mt-1 text-sm font-medium text-slate-900'>
+                            {provider?.config?.oauth_email || 'Not connected'}
+                          </div>
+                        </div>
+                        <div className='rounded-2xl border border-slate-200 bg-slate-50 p-3'>
+                          <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                            Accessible accounts
+                          </div>
+                          <div className='mt-1 text-sm font-medium text-slate-900'>
+                            {googleMerchantAccounts.length || 0}
+                          </div>
+                        </div>
+                        <div className='rounded-2xl border border-slate-200 bg-slate-50 p-3'>
+                          <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                            Selected account
+                          </div>
+                          <div className='mt-1 text-sm font-medium text-slate-900'>
+                            {provider?.config?.selected_account_name ||
+                              provider?.config?.selected_account_id ||
+                              'Not selected'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className='rounded-2xl border border-slate-200 bg-slate-50/70 p-4'>
+                        <div className='space-y-1'>
+                          <p className='text-sm font-medium text-slate-950'>
+                            OAuth-based Merchant Center access
+                          </p>
+                          <p className='text-xs leading-5 text-slate-500'>
+                            The vendor connects their own Google account. Sellerslogin stores the
+                            OAuth tokens, lists Merchant Center accounts that Google grants access
+                            to, and lets the vendor choose one account for future sync work.
+                          </p>
+                        </div>
+                      </div>
+
+                      {googleMerchantConnected && googleMerchantAccounts.length > 0 && (
+                        <div className='space-y-1.5'>
+                          <Label>Merchant Center account</Label>
+                          <select
+                            value={drafts.google_merchant?.selected_account_id || ''}
+                            onChange={(event) =>
+                              handleProviderDraftChange(
+                                'google_merchant',
+                                'selected_account_id',
+                                event.target.value,
+                              )
+                            }
+                            className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
+                          >
+                            {googleMerchantAccounts.length > 1 && (
+                              <option value=''>Select a Merchant Center account</option>
+                            )}
+                            {googleMerchantAccounts.map((account) => (
+                              <option key={account.account_id} value={account.account_id}>
+                                {account.account_name || account.account_id}
+                                {account.homepage ? ` - ${account.homepage}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   <div className='flex flex-wrap items-center gap-2'>
                     <Button
                       size='sm'
                       className='rounded-xl bg-slate-950 text-white hover:bg-slate-800'
                       onClick={() => saveProvider(providerId)}
-                      disabled={saveBusy}
+                      disabled={saveBusy || oauthBusy}
                     >
-                      {saveBusy ? (
+                      {saveBusy || oauthBusy ? (
                         <>
                           <Loader2 className='h-4 w-4 animate-spin' />
-                          Saving
+                          {providerId === 'google_merchant' && !googleMerchantConnected
+                            ? 'Redirecting'
+                            : 'Saving'}
                         </>
                       ) : (
                         <>
@@ -922,7 +1152,7 @@ export default function IntegrationsPage({
                       )}
                     </Button>
 
-                    {providerId !== 'cod' && (
+                    {providerId !== 'cod' && (providerId !== 'google_merchant' || googleMerchantConnected) && (
                       <Button
                         size='sm'
                         variant='outline'
@@ -939,6 +1169,28 @@ export default function IntegrationsPage({
                           <>
                             <Settings2 className='h-4 w-4' />
                             Test only
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {providerId === 'google_merchant' && googleMerchantConnected && (
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        className='rounded-xl border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'
+                        onClick={() => startGoogleMerchantOauth()}
+                        disabled={oauthBusy}
+                      >
+                        {oauthBusy ? (
+                          <>
+                            <Loader2 className='h-4 w-4 animate-spin' />
+                            Redirecting
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCcw className='h-4 w-4' />
+                            Reconnect Google
                           </>
                         )}
                       </Button>
@@ -964,14 +1216,16 @@ export default function IntegrationsPage({
                       )}
                     </Button>
 
-                    <Button
-                      size='sm'
-                      variant='ghost'
-                      className='rounded-xl text-indigo-700 hover:bg-indigo-50'
-                      onClick={() => setAsDefault(providerId)}
-                    >
-                      Set as default
-                    </Button>
+                    {meta.category !== 'marketing' && (
+                      <Button
+                        size='sm'
+                        variant='ghost'
+                        className='rounded-xl text-indigo-700 hover:bg-indigo-50'
+                        onClick={() => setAsDefault(providerId)}
+                      >
+                        Set as default
+                      </Button>
+                    )}
                   </div>
 
                   {meta.docs && (

@@ -62,6 +62,7 @@ import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedDeliveryChargesIndexRouteImport } from './routes/_authenticated/delivery-charges/index'
 import { Route as AuthenticatedCustomerReviewsIndexRouteImport } from './routes/_authenticated/customer-reviews/index'
 import { Route as AuthenticatedCustomerQueriesIndexRouteImport } from './routes/_authenticated/customer-queries/index'
+import { Route as AuthenticatedCourierIndexRouteImport } from './routes/_authenticated/courier/index'
 import { Route as AuthenticatedCommissionIndexRouteImport } from './routes/_authenticated/commission/index'
 import { Route as AuthenticatedCitiesIndexRouteImport } from './routes/_authenticated/cities/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
@@ -79,6 +80,7 @@ import { Route as AuthenticatedMetaPixelConnectRouteImport } from './routes/_aut
 import { Route as AuthenticatedMetaPixelAnalyticsRouteImport } from './routes/_authenticated/meta-pixel/analytics'
 import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
+import { Route as AuthenticatedCourierPartnerRouteImport } from './routes/_authenticated/courier/$partner'
 import { Route as AuthenticatedBorzoReportOrderIdRouteImport } from './routes/_authenticated/borzo-report/$orderId'
 import { Route as AuthenticatedAnalyticsTrafficRouteImport } from './routes/_authenticated/analytics/traffic'
 import { Route as AuthenticatedAnalyticsReportsRouteImport } from './routes/_authenticated/analytics/reports'
@@ -385,6 +387,12 @@ const AuthenticatedCustomerQueriesIndexRoute =
     path: '/customer-queries/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCourierIndexRoute =
+  AuthenticatedCourierIndexRouteImport.update({
+    id: '/courier/',
+    path: '/courier/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCommissionIndexRoute =
   AuthenticatedCommissionIndexRouteImport.update({
     id: '/commission/',
@@ -484,6 +492,12 @@ const AuthenticatedErrorsErrorRoute =
     path: '/errors/$error',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCourierPartnerRoute =
+  AuthenticatedCourierPartnerRouteImport.update({
+    id: '/courier/$partner',
+    path: '/courier/$partner',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedBorzoReportOrderIdRoute =
   AuthenticatedBorzoReportOrderIdRouteImport.update({
     id: '/borzo-report/$orderId',
@@ -561,6 +575,7 @@ export interface FileRoutesByFullPath {
   '/analytics/reports': typeof AuthenticatedAnalyticsReportsRoute
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
+  '/courier/$partner': typeof AuthenticatedCourierPartnerRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
@@ -578,6 +593,7 @@ export interface FileRoutesByFullPath {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/cities': typeof AuthenticatedCitiesIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
+  '/courier': typeof AuthenticatedCourierIndexRoute
   '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
@@ -637,6 +653,7 @@ export interface FileRoutesByTo {
   '/analytics/reports': typeof AuthenticatedAnalyticsReportsRoute
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
+  '/courier/$partner': typeof AuthenticatedCourierPartnerRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
@@ -654,6 +671,7 @@ export interface FileRoutesByTo {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/cities': typeof AuthenticatedCitiesIndexRoute
   '/commission': typeof AuthenticatedCommissionIndexRoute
+  '/courier': typeof AuthenticatedCourierIndexRoute
   '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
@@ -719,6 +737,7 @@ export interface FileRoutesById {
   '/_authenticated/analytics/reports': typeof AuthenticatedAnalyticsReportsRoute
   '/_authenticated/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/_authenticated/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
+  '/_authenticated/courier/$partner': typeof AuthenticatedCourierPartnerRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/_authenticated/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
@@ -736,6 +755,7 @@ export interface FileRoutesById {
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/cities/': typeof AuthenticatedCitiesIndexRoute
   '/_authenticated/commission/': typeof AuthenticatedCommissionIndexRoute
+  '/_authenticated/courier/': typeof AuthenticatedCourierIndexRoute
   '/_authenticated/customer-queries/': typeof AuthenticatedCustomerQueriesIndexRoute
   '/_authenticated/customer-reviews/': typeof AuthenticatedCustomerReviewsIndexRoute
   '/_authenticated/delivery-charges/': typeof AuthenticatedDeliveryChargesIndexRoute
@@ -799,6 +819,7 @@ export interface FileRouteTypes {
     | '/analytics/reports'
     | '/analytics/traffic'
     | '/borzo-report/$orderId'
+    | '/courier/$partner'
     | '/errors/$error'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
@@ -816,6 +837,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/cities'
     | '/commission'
+    | '/courier'
     | '/customer-queries'
     | '/customer-reviews'
     | '/delivery-charges'
@@ -875,6 +897,7 @@ export interface FileRouteTypes {
     | '/analytics/reports'
     | '/analytics/traffic'
     | '/borzo-report/$orderId'
+    | '/courier/$partner'
     | '/errors/$error'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
@@ -892,6 +915,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/cities'
     | '/commission'
+    | '/courier'
     | '/customer-queries'
     | '/customer-reviews'
     | '/delivery-charges'
@@ -956,6 +980,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analytics/reports'
     | '/_authenticated/analytics/traffic'
     | '/_authenticated/borzo-report/$orderId'
+    | '/_authenticated/courier/$partner'
     | '/_authenticated/errors/$error'
     | '/_authenticated/integrations/$provider'
     | '/_authenticated/meta-pixel/analytics'
@@ -973,6 +998,7 @@ export interface FileRouteTypes {
     | '/_authenticated/chats/'
     | '/_authenticated/cities/'
     | '/_authenticated/commission/'
+    | '/_authenticated/courier/'
     | '/_authenticated/customer-queries/'
     | '/_authenticated/customer-reviews/'
     | '/_authenticated/delivery-charges/'
@@ -1401,6 +1427,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomerQueriesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/courier/': {
+      id: '/_authenticated/courier/'
+      path: '/courier'
+      fullPath: '/courier'
+      preLoaderRoute: typeof AuthenticatedCourierIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/commission/': {
       id: '/_authenticated/commission/'
       path: '/commission'
@@ -1520,6 +1553,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedErrorsErrorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/courier/$partner': {
+      id: '/_authenticated/courier/$partner'
+      path: '/courier/$partner'
+      fullPath: '/courier/$partner'
+      preLoaderRoute: typeof AuthenticatedCourierPartnerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/borzo-report/$orderId': {
       id: '/_authenticated/borzo-report/$orderId'
       path: '/borzo-report/$orderId'
@@ -1634,6 +1674,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedConnectBrevoRoute: typeof AuthenticatedConnectBrevoRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedBorzoReportOrderIdRoute: typeof AuthenticatedBorzoReportOrderIdRoute
+  AuthenticatedCourierPartnerRoute: typeof AuthenticatedCourierPartnerRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
   AuthenticatedSeoEntitiesRoute: typeof AuthenticatedSeoEntitiesRoute
@@ -1645,6 +1686,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedCitiesIndexRoute: typeof AuthenticatedCitiesIndexRoute
   AuthenticatedCommissionIndexRoute: typeof AuthenticatedCommissionIndexRoute
+  AuthenticatedCourierIndexRoute: typeof AuthenticatedCourierIndexRoute
   AuthenticatedCustomerQueriesIndexRoute: typeof AuthenticatedCustomerQueriesIndexRoute
   AuthenticatedCustomerReviewsIndexRoute: typeof AuthenticatedCustomerReviewsIndexRoute
   AuthenticatedDeliveryChargesIndexRoute: typeof AuthenticatedDeliveryChargesIndexRoute
@@ -1692,6 +1734,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConnectBrevoRoute: AuthenticatedConnectBrevoRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedBorzoReportOrderIdRoute: AuthenticatedBorzoReportOrderIdRoute,
+  AuthenticatedCourierPartnerRoute: AuthenticatedCourierPartnerRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedIntegrationsProviderRoute:
     AuthenticatedIntegrationsProviderRoute,
@@ -1705,6 +1748,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedCitiesIndexRoute: AuthenticatedCitiesIndexRoute,
   AuthenticatedCommissionIndexRoute: AuthenticatedCommissionIndexRoute,
+  AuthenticatedCourierIndexRoute: AuthenticatedCourierIndexRoute,
   AuthenticatedCustomerQueriesIndexRoute:
     AuthenticatedCustomerQueriesIndexRoute,
   AuthenticatedCustomerReviewsIndexRoute:
