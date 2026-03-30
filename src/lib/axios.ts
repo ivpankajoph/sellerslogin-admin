@@ -44,11 +44,15 @@ const shouldInvalidateSession = (error: any): boolean => {
   const status = Number(error?.response?.status || 0);
   if (![401, 403, 404].includes(status)) return false;
 
+  const requestUrl = String(error?.config?.url || "").toLowerCase();
+  if (requestUrl.includes("/chat")) {
+    return false;
+  }
+
   if (status === 401) return true;
 
   const role = String(store.getState()?.auth?.user?.role || "").toLowerCase();
   const message = getErrorMessage(error);
-  const requestUrl = String(error?.config?.url || "").toLowerCase();
 
   const isProfileRequest =
     requestUrl.endsWith("/profile") ||
