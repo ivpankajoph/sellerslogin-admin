@@ -75,6 +75,7 @@ import { Route as ClerkauthSignInRouteImport } from './routes/clerk/(auth)/sign-
 import { Route as AuthenticatedVendorTemplateTemplateKeyRouteImport } from './routes/_authenticated/vendor-template/$templateKey'
 import { Route as AuthenticatedUsersUserIdRouteImport } from './routes/_authenticated/users/$userId'
 import { Route as AuthenticatedSeoSitemapsRouteImport } from './routes/_authenticated/seo/sitemaps'
+import { Route as AuthenticatedSeoMetaTagsRouteImport } from './routes/_authenticated/seo/meta-tags'
 import { Route as AuthenticatedSeoEntitiesRouteImport } from './routes/_authenticated/seo/entities'
 import { Route as AuthenticatedMetaPixelConnectRouteImport } from './routes/_authenticated/meta-pixel/connect'
 import { Route as AuthenticatedMetaPixelAnalyticsRouteImport } from './routes/_authenticated/meta-pixel/analytics'
@@ -462,6 +463,12 @@ const AuthenticatedSeoSitemapsRoute =
     path: '/seo/sitemaps',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSeoMetaTagsRoute =
+  AuthenticatedSeoMetaTagsRouteImport.update({
+    id: '/seo/meta-tags',
+    path: '/seo/meta-tags',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSeoEntitiesRoute =
   AuthenticatedSeoEntitiesRouteImport.update({
     id: '/seo/entities',
@@ -581,6 +588,7 @@ export interface FileRoutesByFullPath {
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
   '/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
+  '/seo/meta-tags': typeof AuthenticatedSeoMetaTagsRoute
   '/seo/sitemaps': typeof AuthenticatedSeoSitemapsRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/vendor-template/$templateKey': typeof AuthenticatedVendorTemplateTemplateKeyRoute
@@ -659,6 +667,7 @@ export interface FileRoutesByTo {
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
   '/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
   '/seo/entities': typeof AuthenticatedSeoEntitiesRoute
+  '/seo/meta-tags': typeof AuthenticatedSeoMetaTagsRoute
   '/seo/sitemaps': typeof AuthenticatedSeoSitemapsRoute
   '/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/vendor-template/$templateKey': typeof AuthenticatedVendorTemplateTemplateKeyRoute
@@ -743,6 +752,7 @@ export interface FileRoutesById {
   '/_authenticated/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
   '/_authenticated/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
   '/_authenticated/seo/entities': typeof AuthenticatedSeoEntitiesRoute
+  '/_authenticated/seo/meta-tags': typeof AuthenticatedSeoMetaTagsRoute
   '/_authenticated/seo/sitemaps': typeof AuthenticatedSeoSitemapsRoute
   '/_authenticated/users/$userId': typeof AuthenticatedUsersUserIdRoute
   '/_authenticated/vendor-template/$templateKey': typeof AuthenticatedVendorTemplateTemplateKeyRoute
@@ -825,6 +835,7 @@ export interface FileRouteTypes {
     | '/meta-pixel/analytics'
     | '/meta-pixel/connect'
     | '/seo/entities'
+    | '/seo/meta-tags'
     | '/seo/sitemaps'
     | '/users/$userId'
     | '/vendor-template/$templateKey'
@@ -903,6 +914,7 @@ export interface FileRouteTypes {
     | '/meta-pixel/analytics'
     | '/meta-pixel/connect'
     | '/seo/entities'
+    | '/seo/meta-tags'
     | '/seo/sitemaps'
     | '/users/$userId'
     | '/vendor-template/$templateKey'
@@ -986,6 +998,7 @@ export interface FileRouteTypes {
     | '/_authenticated/meta-pixel/analytics'
     | '/_authenticated/meta-pixel/connect'
     | '/_authenticated/seo/entities'
+    | '/_authenticated/seo/meta-tags'
     | '/_authenticated/seo/sitemaps'
     | '/_authenticated/users/$userId'
     | '/_authenticated/vendor-template/$templateKey'
@@ -1518,6 +1531,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSeoSitemapsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/seo/meta-tags': {
+      id: '/_authenticated/seo/meta-tags'
+      path: '/seo/meta-tags'
+      fullPath: '/seo/meta-tags'
+      preLoaderRoute: typeof AuthenticatedSeoMetaTagsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/seo/entities': {
       id: '/_authenticated/seo/entities'
       path: '/seo/entities'
@@ -1678,6 +1698,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
   AuthenticatedSeoEntitiesRoute: typeof AuthenticatedSeoEntitiesRoute
+  AuthenticatedSeoMetaTagsRoute: typeof AuthenticatedSeoMetaTagsRoute
   AuthenticatedSeoSitemapsRoute: typeof AuthenticatedSeoSitemapsRoute
   AuthenticatedUsersUserIdRoute: typeof AuthenticatedUsersUserIdRoute
   AuthenticatedVendorTemplateTemplateKeyRoute: typeof AuthenticatedVendorTemplateTemplateKeyRoute
@@ -1739,6 +1760,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIntegrationsProviderRoute:
     AuthenticatedIntegrationsProviderRoute,
   AuthenticatedSeoEntitiesRoute: AuthenticatedSeoEntitiesRoute,
+  AuthenticatedSeoMetaTagsRoute: AuthenticatedSeoMetaTagsRoute,
   AuthenticatedSeoSitemapsRoute: AuthenticatedSeoSitemapsRoute,
   AuthenticatedUsersUserIdRoute: AuthenticatedUsersUserIdRoute,
   AuthenticatedVendorTemplateTemplateKeyRoute:
