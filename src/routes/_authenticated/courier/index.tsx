@@ -42,20 +42,55 @@ function CourierWorkspacePage() {
     try {
       setLoading(true)
       setError('')
-      const endpoint = isVendor ? '/template-orders' : '/orders'
-      const response = await api.get(endpoint, {
-        params: {
-          page: 1,
-          limit: 50,
-        },
-      })
-      const source = isVendor ? 'template-orders' : 'orders'
-      const nextOrders = (Array.isArray(response?.data?.orders) ? response.data.orders : [])
-        .map((order: unknown) => normalizeCourierOrder(order, source))
-        .filter(Boolean) as CourierOrderSummary[]
+      const params = {
+        page: 1,
+        limit: 50,
+      }
 
-      setOrders(nextOrders)
-      setSelectedOrderId((current) => current || nextOrders[0]?.id || '')
+      const orderSources = isVendor
+        ? [
+            { endpoint: '/vendor/orders', source: 'orders' as const },
+            { endpoint: '/template-orders', source: 'template-orders' as const },
+          ]
+        : [{ endpoint: '/orders', source: 'orders' as const }]
+
+      const responses = await Promise.allSettled(
+        orderSources.map(({ endpoint }) => api.get(endpoint, { params }))
+      )
+
+      const nextOrders = responses.flatMap((result, index) => {
+        if (result.status !== 'fulfilled') return []
+
+        const source = orderSources[index]?.source || 'orders'
+        const rows = Array.isArray(result.value?.data?.orders)
+          ? result.value.data.orders
+          : []
+
+        return rows
+          .map((order: unknown) => normalizeCourierOrder(order, source))
+          .filter(Boolean) as CourierOrderSummary[]
+      })
+
+      const dedupedOrders = Array.from(
+        new Map(nextOrders.map((order) => [order.id, order])).values()
+      ).sort((left, right) => {
+        const leftTime = new Date(left.createdAt || 0).getTime()
+        const rightTime = new Date(right.createdAt || 0).getTime()
+        return rightTime - leftTime
+      })
+
+      if (!dedupedOrders.length && responses.every((result) => result.status === 'rejected')) {
+        const firstError = responses.find((result) => result.status === 'rejected')
+        throw firstError?.reason
+      }
+
+      setOrders(dedupedOrders)
+      setSelectedOrderId((current) => {
+        if (current && dedupedOrders.some((order) => order.id === current)) {
+          return current
+        }
+        return dedupedOrders[0]?.id || ''
+      })
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load courier order workspace')
     } finally {
@@ -332,7 +367,6 @@ function CourierWorkspacePage() {
                               <div className='flex items-center justify-between gap-3'>
                                 <div>
                                   <p className='font-semibold text-slate-950'>{partner.title}</p>
-                                  <p className='text-xs text-slate-500'>{partner.description}</p>
                                 </div>
                                 <Badge className='border-slate-200 bg-slate-100 text-slate-700'>
                                   {connected ? 'Integrated' : partner.live ? 'Manual ready' : 'Static app'}
