@@ -17,6 +17,7 @@ import { Header } from '@/components/layout/header'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { DomainModal } from '../components/DomainModel'
+import { SelectedFieldEditor } from '../components/SelectedFieldEditor'
 import { TemplatePageLayout } from '../components/TemplatePageLayout'
 import { TemplatePreviewPanel } from '../components/TemplatePreviewPanel'
 import { ThemeSettingsSection } from '../components/form/ThemeSettingsSection'
@@ -29,6 +30,11 @@ import {
 import { getStoredEditingTemplateKey } from '../components/templateVariantParam'
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
+import {
+  consumePendingEditorSelection,
+  resolveEditorRouteFromComponent,
+  setPendingEditorSelection,
+} from '../components/previewSelection'
 
 const selectVendorId = (state: any): string => {
   const authUser = state?.auth?.user || null
@@ -376,6 +382,7 @@ function VendorTemplatePolicy() {
   )
   const [data, setData] = useState<TemplateData>(initialData)
   const [isSaving, setIsSaving] = useState(false)
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
   const [, setInlineEditVersion] = useState(0)
   const [domainOpen, setDomainOpen] = useState(false)
   const [activePreviewPath, setActivePreviewPath] = useState('/privacy')
@@ -552,7 +559,26 @@ function VendorTemplatePolicy() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setSelectedComponent(path.join('.'))
   }
+
+  const handlePreviewSelect = (_sectionId: string, componentId?: string) => {
+    const route = resolveEditorRouteFromComponent(componentId, selectedTemplateKey)
+    setPendingEditorSelection({
+      route: route || '/vendor-template-policy',
+      componentId: componentId || null,
+    })
+    if (route && route !== '/vendor-template-policy') {
+      void navigate({ to: route })
+    }
+    setSelectedComponent(componentId || null)
+  }
+
+  useEffect(() => {
+    const pendingSelection = consumePendingEditorSelection('/vendor-template-policy')
+    if (!pendingSelection?.componentId) return
+    setSelectedComponent(pendingSelection.componentId)
+  }, [])
 
   const updatePolicyPageTitle = (
     policyKey: (typeof POLICY_SECTIONS)[number]['key'],
@@ -880,10 +906,17 @@ function VendorTemplatePolicy() {
             vendorId={vendor_id}
             page='full'
             previewData={data}
+            onSelectSection={handlePreviewSelect}
             onInlineEdit={handleInlineEdit}
           />
         }
       >
+        <SelectedFieldEditor
+          data={data}
+          selectedComponent={selectedComponent}
+          updateField={updateField}
+        />
+
         <ThemeSettingsSection data={data} updateField={updateField} />
 
         <div className='space-y-6'>

@@ -38,7 +38,29 @@ export function DescriptionSection({
   const advantageImagePath = 'components.home_page.advantage.image'
   const advantageBadgeValuePath = 'components.home_page.advantage.badgeValue'
   const advantageBadgeLabelPath = 'components.home_page.advantage.badgeLabel'
+  const industryKickerPath = 'components.home_page.industries.kicker'
+  const industryHeadingPath = 'components.home_page.industries.heading'
+  const industrySubtitlePath = 'components.home_page.industries.subtitle'
   const isUploadingAdvantageImage = uploadingPaths.has(advantageImagePath)
+  const heroStats = Array.from({ length: 4 }, (_, index) => {
+    const stats = Array.isArray(data.components.home_page.heroStats)
+      ? data.components.home_page.heroStats
+      : []
+    const current = stats[index] || {}
+    return {
+      value: current?.value || '',
+      label: current?.label || '',
+    }
+  })
+  const industries = data.components.home_page.industries || {}
+  const industryItems = Array.from({ length: 4 }, (_, index) => {
+    const items = Array.isArray(industries.items) ? industries.items : []
+    const current = items[index] || {}
+    return {
+      title: current?.title || '',
+      description: current?.description || '',
+    }
+  })
 
   const benefitCards = Array.from({ length: 3 }, (_, index) => {
     const cards = Array.isArray(benefits.cards) ? benefits.cards : []
@@ -251,6 +273,74 @@ export function DescriptionSection({
 
       <div className='mt-8 rounded-2xl border border-slate-200 bg-slate-50/70 p-4'>
         <h3 className='text-base font-semibold text-slate-900'>
+          Hero Stats (Poupqz Home)
+        </h3>
+        <p className='mt-1 text-xs text-slate-500'>
+          Controls the four stat cards shown below the hero banner.
+        </p>
+
+        <div className='mt-4 grid gap-4 lg:grid-cols-2'>
+          {heroStats.map((stat, index) => {
+            const valuePath = `components.home_page.heroStats.${index}.value`
+            const labelPath = `components.home_page.heroStats.${index}.label`
+            return (
+              <div
+                key={`hero-stat-${index}`}
+                className='rounded-xl border border-slate-200 bg-white p-3'
+              >
+                <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+                  Stat {index + 1}
+                </p>
+                <div
+                  className={cn(
+                    'mt-2 space-y-2',
+                    selectedComponent === valuePath &&
+                      'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                  )}
+                  data-editor-component={valuePath}
+                >
+                  <label className='text-sm font-medium text-gray-700'>Value</label>
+                  <Input
+                    placeholder='500+'
+                    value={stat.value}
+                    onChange={(e) =>
+                      updateField(
+                        ['components', 'home_page', 'heroStats', `${index}`, 'value'],
+                        e.target.value
+                      )
+                    }
+                    className='h-11'
+                  />
+                </div>
+                <div
+                  className={cn(
+                    'mt-3 space-y-2',
+                    selectedComponent === labelPath &&
+                      'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                  )}
+                  data-editor-component={labelPath}
+                >
+                  <label className='text-sm font-medium text-gray-700'>Label</label>
+                  <Input
+                    placeholder='Project Delivered'
+                    value={stat.label}
+                    onChange={(e) =>
+                      updateField(
+                        ['components', 'home_page', 'heroStats', `${index}`, 'label'],
+                        e.target.value
+                      )
+                    }
+                    className='h-11'
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className='mt-8 rounded-2xl border border-slate-200 bg-slate-50/70 p-4'>
+        <h3 className='text-base font-semibold text-slate-900'>
           Benefits Section (Home)
         </h3>
         <p className='mt-1 text-xs text-slate-500'>
@@ -385,6 +475,156 @@ export function DescriptionSection({
                           'home_page',
                           'benefits',
                           'cards',
+                          `${index}`,
+                          'description',
+                        ],
+                        e.target.value
+                      )
+                    }
+                    className='min-h-[90px]'
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className='mt-8 rounded-2xl border border-slate-200 bg-slate-50/70 p-4'>
+        <h3 className='text-base font-semibold text-slate-900'>
+          Industries Section (Poupqz Home)
+        </h3>
+        <p className='mt-1 text-xs text-slate-500'>
+          Controls the "Strategic Sectors" heading and the 4 industry cards.
+        </p>
+
+        <div className='mt-4 grid gap-4 md:grid-cols-2'>
+          <div
+            className={cn(
+              'space-y-2',
+              selectedComponent === industryKickerPath &&
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component={industryKickerPath}
+          >
+            <label className='text-sm font-medium text-gray-700'>
+              Industries Kicker
+            </label>
+            <Input
+              placeholder='Strategic Sectors'
+              value={industries?.kicker || ''}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'industries', 'kicker'],
+                  e.target.value
+                )
+              }
+              className='h-12'
+            />
+          </div>
+          <div
+            className={cn(
+              'space-y-2',
+              selectedComponent === industryHeadingPath &&
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component={industryHeadingPath}
+          >
+            <label className='text-sm font-medium text-gray-700'>
+              Industries Heading
+            </label>
+            <Input
+              placeholder='Industries We Deal With'
+              value={industries?.heading || ''}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'industries', 'heading'],
+                  e.target.value
+                )
+              }
+              className='h-12'
+            />
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            'mt-4 space-y-2',
+            selectedComponent === industrySubtitlePath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={industrySubtitlePath}
+        >
+          <label className='text-sm font-medium text-gray-700'>
+            Industries Subtitle
+          </label>
+          <Textarea
+            placeholder='Our advanced and reliable storage solutions are designed to meet the needs of industries across India.'
+            value={industries?.subtitle || ''}
+            onChange={(e) =>
+              updateField(
+                ['components', 'home_page', 'industries', 'subtitle'],
+                e.target.value
+              )
+            }
+            className='min-h-[92px]'
+          />
+        </div>
+
+        <div className='mt-4 grid gap-4 lg:grid-cols-2'>
+          {industryItems.map((item, index) => {
+            const titlePath = `components.home_page.industries.items.${index}.title`
+            const descriptionPath = `components.home_page.industries.items.${index}.description`
+            return (
+              <div
+                key={`industry-item-${index}`}
+                className='rounded-xl border border-slate-200 bg-white p-3'
+              >
+                <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+                  Industry {index + 1}
+                </p>
+                <div
+                  className={cn(
+                    'mt-2 space-y-2',
+                    selectedComponent === titlePath &&
+                      'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                  )}
+                  data-editor-component={titlePath}
+                >
+                  <label className='text-sm font-medium text-gray-700'>Title</label>
+                  <Input
+                    placeholder='Warehousing'
+                    value={item.title}
+                    onChange={(e) =>
+                      updateField(
+                        ['components', 'home_page', 'industries', 'items', `${index}`, 'title'],
+                        e.target.value
+                      )
+                    }
+                    className='h-11'
+                  />
+                </div>
+                <div
+                  className={cn(
+                    'mt-3 space-y-2',
+                    selectedComponent === descriptionPath &&
+                      'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                  )}
+                  data-editor-component={descriptionPath}
+                >
+                  <label className='text-sm font-medium text-gray-700'>
+                    Description
+                  </label>
+                  <Textarea
+                    placeholder='Describe this industry use case'
+                    value={item.description}
+                    onChange={(e) =>
+                      updateField(
+                        [
+                          'components',
+                          'home_page',
+                          'industries',
+                          'items',
                           `${index}`,
                           'description',
                         ],

@@ -14,6 +14,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { DomainModal } from '../components/DomainModel'
+import { SelectedFieldEditor } from '../components/SelectedFieldEditor'
 import { TemplatePageLayout } from '../components/TemplatePageLayout'
 import { TemplatePreviewPanel } from '../components/TemplatePreviewPanel'
 import { TemplateSectionOrder } from '../components/TemplateSectionOrder'
@@ -35,6 +36,11 @@ import {
 } from '../components/templateVariantParam'
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
+import {
+  consumePendingEditorSelection,
+  resolveEditorRouteFromComponent,
+  setPendingEditorSelection,
+} from '../components/previewSelection'
 
 const selectVendorId = (state: any): string => {
   const authUser = state?.auth?.user || null
@@ -261,6 +267,7 @@ export default function VendorTemplatePages() {
   const navigate = useNavigate()
   const [data, setData] = useState<TemplateData>(initialData)
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [, setInlineEditVersion] = useState(0)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
@@ -640,8 +647,27 @@ export default function VendorTemplatePages() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setSelectedComponent(path.join('.'))
     setInlineEditVersion((prev) => prev + 1)
   }
+
+  const handlePreviewSelect = (_sectionId: string, componentId?: string) => {
+    const route = resolveEditorRouteFromComponent(componentId, selectedTemplateKey)
+    setPendingEditorSelection({
+      route: route || '/vendor-template-pages',
+      componentId: componentId || null,
+    })
+    if (route && route !== '/vendor-template-pages') {
+      void navigate({ to: route })
+    }
+    setSelectedComponent(componentId || null)
+  }
+
+  useEffect(() => {
+    const pendingSelection = consumePendingEditorSelection('/vendor-template-pages')
+    if (!pendingSelection?.componentId) return
+    setSelectedComponent(pendingSelection.componentId)
+  }, [])
 
   const sectionItems = useMemo(() => {
     const sections = (selectedPage?.sections as any[]) || []
@@ -697,6 +723,7 @@ export default function VendorTemplatePages() {
             title='Live Page Preview'
             subtitle={`Custom pages render in the storefront. Default city: ${previewCity.label}`}
             baseSrc={previewBaseUrl}
+            previewQuery='?previewChrome=content-only'
             defaultPath={previewPath}
             pageOptions={[
               { label: 'Home', path: '' },
@@ -716,10 +743,17 @@ export default function VendorTemplatePages() {
             page='home'
             previewData={data}
             sectionOrder={sectionOrder}
+            onSelectSection={handlePreviewSelect}
             onInlineEdit={handleInlineEdit}
           />
         }
       >
+        <SelectedFieldEditor
+          data={data}
+          selectedComponent={selectedComponent}
+          updateField={updateField}
+        />
+
         <ThemeSettingsSection data={data} updateField={updateField} />
 
         <div className='grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]'>
