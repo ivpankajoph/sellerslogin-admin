@@ -40,6 +40,19 @@ const getErrorMessage = (error: any): string => {
   return String(raw).trim().toLowerCase();
 };
 
+const isAuthErrorMessage = (message: string): boolean =>
+  [
+    "invalid token",
+    "jwt malformed",
+    "jwt expired",
+    "token expired",
+    "session expired",
+    "authentication failed",
+    "login again",
+    "unauthorized access",
+    "unauthorized request",
+  ].some((entry) => message.includes(entry));
+
 const shouldInvalidateSession = (error: any): boolean => {
   const status = Number(error?.response?.status || 0);
   if (![401, 403, 404].includes(status)) return false;
@@ -49,8 +62,6 @@ const shouldInvalidateSession = (error: any): boolean => {
     return false;
   }
 
-  if (status === 401) return true;
-
   const role = String(store.getState()?.auth?.user?.role || "").toLowerCase();
   const message = getErrorMessage(error);
 
@@ -59,6 +70,10 @@ const shouldInvalidateSession = (error: any): boolean => {
     requestUrl.includes("/vendor/profile") ||
     requestUrl.includes("/admin/profile") ||
     requestUrl.includes("/profile/admin");
+
+  if (status === 401) {
+    return isProfileRequest || isAuthErrorMessage(message);
+  }
 
   if (
     isProfileRequest &&

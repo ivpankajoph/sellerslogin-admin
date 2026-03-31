@@ -8,6 +8,7 @@ const supportedProviders = [
   'cod',
   'borzo',
   'delhivery',
+  'nimbuspost',
   'google_merchant',
   'brevo',
 ] as const

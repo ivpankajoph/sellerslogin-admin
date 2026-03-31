@@ -36,6 +36,49 @@ export type CourierOrderSummary = {
   trackingUrl: string
   externalDeliveryId: string
   websiteLabel: string
+  items: Array<{
+    productName: string
+    imageUrl: string
+    quantity: number
+    unitPrice: number
+    totalPrice: number
+    variantSummary: string
+  }>
+  borzo?: {
+    order_id?: number
+    status?: string
+    tracking_url?: string
+    updated_at?: string
+  }
+  delhivery?: {
+    order_id?: string
+    waybill?: string
+    waybills?: string[]
+    pickup_location?: string
+    payment_mode?: string
+    status?: string
+    status_description?: string
+    package_count?: number
+    scans?: Array<{
+      status?: string
+      status_type?: string
+      description?: string
+      location?: string
+      time?: string
+    }>
+    updated_at?: string
+  }
+  nimbuspost?: {
+    order_id?: number
+    shipment_id?: number
+    awb_number?: string
+    courier_name?: string
+    status?: string
+    label_url?: string
+    manifest_url?: string
+    last_quote_amount?: number
+    updated_at?: string
+  }
 }
 
 export type CourierQuote = {
@@ -92,11 +135,11 @@ export const COURIER_PARTNERS: CourierPartner[] = [
     id: 'nimbuspost',
     title: 'NimbusPost',
     shortLabel: 'NimbusPost',
-    description: 'Static app card for multi-courier routing. Integration can be added later.',
+    description: 'Multi-courier shipping with live rate, shipment, tracking, manifest, and NDR actions.',
     imageSrc: nimbuspostLogo,
     themeClass: 'border-blue-200 bg-blue-50',
     etaLabel: '1-4 days',
-    live: false,
+    live: true,
     reportPath: '/courier/nimbuspost',
   },
   {
@@ -118,13 +161,35 @@ export const COURIER_PARTNER_MAP = Object.fromEntries(
 
 const toText = (value: unknown) => String(value ?? '').trim()
 
+const formatVariantSummary = (value: unknown): string => {
+  if (!value) return ''
+  if (typeof value === 'string') return toText(value)
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => formatVariantSummary(entry))
+      .filter(Boolean)
+      .join(' / ')
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, entry]) => {
+        const nextValue = toText(entry)
+        if (!nextValue) return ''
+        return `${key}: ${nextValue}`
+      })
+      .filter(Boolean)
+      .join(' / ')
+  }
+  return toText(value)
+}
+
 const safeWindow = () =>
   typeof window !== 'undefined' && window?.localStorage ? window : null
 
 const trackingStatusByPartner: Record<CourierPartnerId, string> = {
   borzo: 'Request queued',
   delhivery: 'Pickup requested',
-  nimbuspost: 'Awaiting API integration',
+  nimbuspost: 'Shipment booked',
   porter: 'Dispatcher review',
 }
 
@@ -195,9 +260,77 @@ export const normalizeCourierOrder = (
     pincode: toText(order?.shipping_address?.pincode),
     status: toText(order?.status) || 'pending',
     deliveryProvider: toText(order?.delivery_provider),
-    trackingUrl: toText(order?.borzo?.tracking_url),
-    externalDeliveryId: toText(order?.borzo?.order_id),
+    trackingUrl: toText(order?.borzo?.tracking_url || order?.nimbuspost?.label_url),
+    externalDeliveryId: toText(
+      order?.borzo?.order_id ||
+        order?.delhivery?.waybill ||
+        order?.nimbuspost?.awb_number ||
+        order?.nimbuspost?.shipment_id
+    ),
     websiteLabel,
+    items: items.map((item: any) => ({
+      productName: toText(item?.product_name) || 'Product',
+      imageUrl: toText(item?.image_url),
+      quantity: Number(item?.quantity || 0) || 1,
+      unitPrice: Number(item?.unit_price || 0),
+      totalPrice: Number(item?.total_price || 0),
+      variantSummary: formatVariantSummary(item?.variant_attributes),
+    })),
+    borzo: order?.borzo
+      ? {
+          order_id: Number(order?.borzo?.order_id || 0) || undefined,
+          status: toText(order?.borzo?.status),
+          tracking_url: toText(order?.borzo?.tracking_url),
+          updated_at: toText(order?.borzo?.updated_at),
+        }
+      : undefined,
+    delhivery: order?.delhivery
+      ? {
+          order_id: toText(order?.delhivery?.order_id),
+          waybill: toText(order?.delhivery?.waybill),
+          waybills: Array.isArray(order?.delhivery?.waybills)
+            ? order.delhivery.waybills.map((entry: unknown) => toText(entry)).filter(Boolean)
+            : [],
+          pickup_location: toText(order?.delhivery?.pickup_location),
+          payment_mode: toText(order?.delhivery?.payment_mode),
+          status: toText(order?.delhivery?.status),
+          status_description: toText(order?.delhivery?.status_description),
+          package_count: Number(order?.delhivery?.package_count || 0) || undefined,
+          scans: Array.isArray(order?.delhivery?.scans)
+            ? order.delhivery.scans
+                .map((entry: any) => ({
+                  status: toText(entry?.status),
+                  status_type: toText(entry?.status_type),
+                  description: toText(entry?.description),
+                  location: toText(entry?.location),
+                  time: toText(entry?.time),
+                }))
+                .filter(
+                  (entry: any) =>
+                    entry.status || entry.description || entry.location || entry.time
+                )
+            : [],
+          updated_at: toText(order?.delhivery?.updated_at),
+        }
+      : undefined,
+    nimbuspost: order?.nimbuspost
+      ? {
+          order_id: Number(order?.nimbuspost?.order_id || 0) || undefined,
+          shipment_id: Number(order?.nimbuspost?.shipment_id || 0) || undefined,
+          awb_number: toText(order?.nimbuspost?.awb_number),
+          courier_name: toText(order?.nimbuspost?.courier_name),
+          status: toText(order?.nimbuspost?.status),
+          label_url: toText(order?.nimbuspost?.label_url),
+          manifest_url: toText(order?.nimbuspost?.manifest_url),
+          last_quote_amount:
+            Number(
+              order?.nimbuspost?.last_quote?.total_charges ??
+                order?.nimbuspost?.last_quote?.freight_charges ??
+                0
+            ) || undefined,
+          updated_at: toText(order?.nimbuspost?.updated_at),
+        }
+      : undefined,
   }
 }
 
@@ -298,3 +431,78 @@ export const saveCourierAssignment = (
 
 export const getCourierAssignmentForOrder = (orderId: string) =>
   readCourierAssignments().find((assignment) => assignment.orderId === orderId) || null
+
+export const getRemoteCourierAssignment = (
+  order: CourierOrderSummary | null | undefined
+): CourierAssignment | null => {
+  if (!order) return null
+
+  if (order.delhivery?.waybill || order.delhivery?.waybills?.length) {
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      source: order.source,
+      partnerId: 'delhivery',
+      partnerName: COURIER_PARTNER_MAP.delhivery.title,
+      amount: 0,
+      etaLabel: COURIER_PARTNER_MAP.delhivery.etaLabel,
+      assignedAt: order.delhivery?.updated_at || order.createdAt,
+      trackingStatus: order.delhivery?.status || trackingStatusByPartner.delhivery,
+      trackingCode:
+        order.delhivery?.waybill ||
+        order.delhivery?.waybills?.[0] ||
+        `${trackingPrefixByPartner.delhivery}-${order.id.slice(-6).toUpperCase()}`,
+      trackingUrl: '',
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      total: order.total,
+      websiteLabel: order.websiteLabel,
+    }
+  }
+
+  if (order.nimbuspost?.shipment_id || order.nimbuspost?.awb_number) {
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      source: order.source,
+      partnerId: 'nimbuspost',
+      partnerName: COURIER_PARTNER_MAP.nimbuspost.title,
+      amount: Number(order.nimbuspost?.last_quote_amount || 0),
+      etaLabel: COURIER_PARTNER_MAP.nimbuspost.etaLabel,
+      assignedAt: order.nimbuspost?.updated_at || order.createdAt,
+      trackingStatus: order.nimbuspost?.status || trackingStatusByPartner.nimbuspost,
+      trackingCode:
+        order.nimbuspost?.awb_number ||
+        `${trackingPrefixByPartner.nimbuspost}-${order.id.slice(-6).toUpperCase()}`,
+      trackingUrl: order.nimbuspost?.label_url || '',
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      total: order.total,
+      websiteLabel: order.websiteLabel,
+    }
+  }
+
+  if (order.borzo?.order_id) {
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      source: order.source,
+      partnerId: 'borzo',
+      partnerName: COURIER_PARTNER_MAP.borzo.title,
+      amount: 0,
+      etaLabel: COURIER_PARTNER_MAP.borzo.etaLabel,
+      assignedAt: order.borzo?.updated_at || order.createdAt,
+      trackingStatus: order.borzo?.status || trackingStatusByPartner.borzo,
+      trackingCode:
+        String(order.borzo?.order_id || '') ||
+        `${trackingPrefixByPartner.borzo}-${order.id.slice(-6).toUpperCase()}`,
+      trackingUrl: order.borzo?.tracking_url || '',
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      total: order.total,
+      websiteLabel: order.websiteLabel,
+    }
+  }
+
+  return null
+}

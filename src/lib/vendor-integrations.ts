@@ -4,6 +4,7 @@ import cashfreeLogo from '@/assets/toolkit-apps/cashfree.png'
 import codLogo from '@/assets/toolkit-apps/cod.svg'
 import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
 import googleMerchantLogo from '@/assets/toolkit-apps/google-merchant.svg'
+import nimbuspostLogo from '@/assets/toolkit-apps/nimbuspost.svg'
 import razorpayLogo from '@/assets/toolkit-apps/razorpay.png'
 
 export const INTEGRATION_PROVIDER_IDS = [
@@ -12,13 +13,14 @@ export const INTEGRATION_PROVIDER_IDS = [
   'cod',
   'borzo',
   'delhivery',
+  'nimbuspost',
   'google_merchant',
   'brevo',
 ] as const
 
 export type IntegrationProviderId = (typeof INTEGRATION_PROVIDER_IDS)[number]
 export type PaymentProviderId = 'cod' | 'razorpay' | 'cashfree'
-export type DeliveryProviderId = 'none' | 'borzo' | 'delhivery'
+export type DeliveryProviderId = 'none' | 'borzo' | 'delhivery' | 'nimbuspost'
 export type IntegrationCategory = 'payment' | 'delivery' | 'marketing'
 export type IntegrationProviderField = {
   key: string
@@ -122,6 +124,15 @@ export const INTEGRATION_PROVIDER_META: Record<
       },
     ],
   },
+  nimbuspost: {
+    title: 'NimbusPost',
+    shortLabel: 'NimbusPost',
+    category: 'delivery',
+    description: 'Multi-courier shipment, tracking, manifest, and NDR workflows.',
+    imageSrc: nimbuspostLogo,
+    docs: 'https://api.nimbuspost.com/v1/',
+    fields: [],
+  },
   google_merchant: {
     title: 'Google Merchant',
     shortLabel: 'Merchant',
@@ -144,10 +155,15 @@ export const INTEGRATION_PROVIDER_META: Record<
 }
 
 const PAYMENT_PROVIDERS = new Set<PaymentProviderId>(['cod', 'razorpay', 'cashfree'])
-const DELIVERY_PROVIDERS = new Set<DeliveryProviderId>(['none', 'borzo', 'delhivery'])
+const DELIVERY_PROVIDERS = new Set<DeliveryProviderId>([
+  'none',
+  'borzo',
+  'delhivery',
+  'nimbuspost',
+])
 
 const getProviderCategory = (provider: IntegrationProviderId): IntegrationCategory =>
-  provider === 'borzo' || provider === 'delhivery'
+  provider === 'borzo' || provider === 'delhivery' || provider === 'nimbuspost'
     ? 'delivery'
     : provider === 'brevo' || provider === 'google_merchant'
       ? 'marketing'

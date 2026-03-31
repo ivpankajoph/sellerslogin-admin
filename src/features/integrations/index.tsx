@@ -58,6 +58,7 @@ const providerAccentClass: Record<ProviderId, string> = {
   cod: 'border-amber-200 bg-amber-50',
   borzo: 'border-emerald-200 bg-emerald-50',
   delhivery: 'border-cyan-200 bg-cyan-50',
+  nimbuspost: 'border-blue-200 bg-blue-50',
   google_merchant: 'border-blue-200 bg-blue-50',
   brevo: 'border-emerald-200 bg-emerald-50',
 }
@@ -171,6 +172,7 @@ export default function IntegrationsPage({
     cod: {},
     borzo: {},
     delhivery: {},
+    nimbuspost: {},
     google_merchant: {},
     brevo: {},
   })
@@ -180,12 +182,15 @@ export default function IntegrationsPage({
     cod: true,
     borzo: false,
     delhivery: false,
+    nimbuspost: false,
     google_merchant: false,
     brevo: false,
   })
   const [busyMap, setBusyMap] = useState<Record<string, boolean>>({})
   const [defaultPayment, setDefaultPayment] = useState<'cod' | 'razorpay' | 'cashfree'>('cod')
-  const [defaultDelivery, setDefaultDelivery] = useState<'none' | 'borzo' | 'delhivery'>('none')
+  const [defaultDelivery, setDefaultDelivery] = useState<
+    'none' | 'borzo' | 'delhivery' | 'nimbuspost'
+  >('none')
   const [filter, setFilter] = useState<'all' | ProviderCategory>(
     focusProvider ? providerMeta[focusProvider].category : 'all',
   )
@@ -243,6 +248,7 @@ export default function IntegrationsPage({
         cod: payload.providers.cod.enabled,
         borzo: payload.providers.borzo.enabled,
         delhivery: payload.providers.delhivery.enabled,
+        nimbuspost: payload.providers.nimbuspost.enabled,
         google_merchant: payload.providers.google_merchant.enabled,
         brevo: payload.providers.brevo.enabled,
       })
@@ -253,6 +259,7 @@ export default function IntegrationsPage({
         cod: {},
         borzo: {},
         delhivery: {},
+        nimbuspost: {},
         google_merchant: {},
         brevo: {},
       }
@@ -323,7 +330,7 @@ export default function IntegrationsPage({
 
   const saveDefaults = async (overrides?: {
     payment?: 'cod' | 'razorpay' | 'cashfree'
-    delivery?: 'none' | 'borzo' | 'delhivery'
+    delivery?: 'none' | 'borzo' | 'delhivery' | 'nimbuspost'
   }) => {
     const path = getActionPath(effectiveRole, resolvedVendorId, '/defaults')
     if (!path) {
@@ -546,7 +553,7 @@ export default function IntegrationsPage({
       nextPayment = provider as 'cod' | 'razorpay' | 'cashfree'
       setDefaultPayment(nextPayment)
     } else {
-      nextDelivery = provider as 'borzo' | 'delhivery'
+      nextDelivery = provider as 'borzo' | 'delhivery' | 'nimbuspost'
       setDefaultDelivery(nextDelivery)
     }
     await saveDefaults({
@@ -860,13 +867,16 @@ export default function IntegrationsPage({
               <select
                 value={defaultDelivery}
                 onChange={(event) =>
-                  setDefaultDelivery(event.target.value as 'none' | 'borzo' | 'delhivery')
+                  setDefaultDelivery(
+                    event.target.value as 'none' | 'borzo' | 'delhivery' | 'nimbuspost'
+                  )
                 }
                 className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
               >
                 <option value='none'>No auto-delivery</option>
                 <option value='borzo'>Borzo</option>
                 <option value='delhivery'>Delhivery</option>
+                <option value='nimbuspost'>NimbusPost</option>
               </select>
             </div>
             <Button

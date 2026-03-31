@@ -355,6 +355,13 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               pageKey: 'my_apps',
             },
             {
+              title: 'NimbusPost',
+              url: '/integrations/nimbuspost',
+              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              requiresIntegration: 'nimbuspost',
+              pageKey: 'my_apps',
+            },
+            {
               title: 'Google Merchant',
               url: '/integrations/google_merchant',
               roles: [ROLES.ADMIN, ROLES.VENDOR],

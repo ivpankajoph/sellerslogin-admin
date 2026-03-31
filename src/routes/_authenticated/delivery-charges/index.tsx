@@ -35,7 +35,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import type { RootState } from '@/store'
 
-type DeliveryProvider = 'none' | 'borzo' | 'delhivery'
+type DeliveryProvider = 'none' | 'borzo' | 'delhivery' | 'nimbuspost'
 type AppSource = 'ophmate_frontend' | 'vendor_template_frontend'
 
 type ProviderConfig = {
@@ -71,7 +71,7 @@ type WebsiteOption = {
 const MAIN_WEBSITE_OPTION_ID = 'main-website'
 const MAIN_WEBSITE_LABEL = 'Main Website'
 const APP_SOURCES: AppSource[] = ['ophmate_frontend', 'vendor_template_frontend']
-const PROVIDERS: DeliveryProvider[] = ['none', 'borzo', 'delhivery']
+const PROVIDERS: DeliveryProvider[] = ['none', 'borzo', 'delhivery', 'nimbuspost']
 
 const APP_LABELS: Record<AppSource, string> = {
   ophmate_frontend: 'Main Website Checkout',
@@ -104,6 +104,7 @@ const PROVIDER_LABELS: Record<DeliveryProvider, string> = {
   none: 'None',
   borzo: 'Borzo',
   delhivery: 'Delhivery',
+  nimbuspost: 'NimbusPost',
 }
 
 const PROVIDER_META: Record<
@@ -125,6 +126,10 @@ const PROVIDER_META: Record<
     badgeClass: 'bg-amber-100 text-amber-700 border-amber-200',
     hint: 'National delivery and logistics support.',
   },
+  nimbuspost: {
+    badgeClass: 'bg-blue-100 text-blue-700 border-blue-200',
+    hint: 'Multi-courier parcel routing with manifest and NDR support.',
+  },
 }
 
 const createDefaultProvider = (provider: DeliveryProvider): ProviderConfig => ({
@@ -138,6 +143,7 @@ const createDefaultApp = (): AppConfig => ({
     none: createDefaultProvider('none'),
     borzo: createDefaultProvider('borzo'),
     delhivery: createDefaultProvider('delhivery'),
+    nimbuspost: createDefaultProvider('nimbuspost'),
   },
 })
 
@@ -182,6 +188,7 @@ const normalizeConfig = (input: any): DeliveryChargeConfig => {
         none: appDefault.providers.none,
         borzo: appDefault.providers.borzo,
         delhivery: appDefault.providers.delhivery,
+        nimbuspost: appDefault.providers.nimbuspost,
       },
     }
 
