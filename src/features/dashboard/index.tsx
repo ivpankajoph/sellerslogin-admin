@@ -25,7 +25,7 @@ export function Dashboard() {
   const isVendorTeamUser =
     isVendor && String(user?.account_type || '').toLowerCase() === 'vendor_user'
   const pageAccess = normalizeVendorPageAccess(user?.page_access)
-  const canAccessMyWebsites = !isVendorTeamUser || pageAccess.has('my_websites')
+  const canAccessMyWebsites = isVendor && (!isVendorTeamUser || pageAccess.has('my_websites'))
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false)
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
 

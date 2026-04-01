@@ -122,6 +122,11 @@ export const INTEGRATION_PROVIDER_META: Record<
         label: 'Base URL (domain only)',
         placeholder: 'https://track.delhivery.com',
       },
+      {
+        key: 'pickup_location',
+        label: 'Pickup Location',
+        placeholder: 'warehouse_name',
+      },
     ],
   },
   nimbuspost: {

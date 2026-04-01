@@ -54,7 +54,15 @@ export type CourierOrderSummary = {
     order_id?: string
     waybill?: string
     waybills?: string[]
+    label_url?: string
     pickup_location?: string
+    pickup_request_id?: string
+    pickup_request_status?: string
+    pickup_request_message?: string
+    pickup_request_date?: string
+    pickup_request_time?: string
+    pickup_request_packages?: number
+    pickup_requested_at?: string
     payment_mode?: string
     status?: string
     status_description?: string
@@ -291,7 +299,16 @@ export const normalizeCourierOrder = (
           waybills: Array.isArray(order?.delhivery?.waybills)
             ? order.delhivery.waybills.map((entry: unknown) => toText(entry)).filter(Boolean)
             : [],
+          label_url: toText(order?.delhivery?.label_url),
           pickup_location: toText(order?.delhivery?.pickup_location),
+          pickup_request_id: toText(order?.delhivery?.pickup_request_id),
+          pickup_request_status: toText(order?.delhivery?.pickup_request_status),
+          pickup_request_message: toText(order?.delhivery?.pickup_request_message),
+          pickup_request_date: toText(order?.delhivery?.pickup_request_date),
+          pickup_request_time: toText(order?.delhivery?.pickup_request_time),
+          pickup_request_packages:
+            Number(order?.delhivery?.pickup_request_packages || 0) || undefined,
+          pickup_requested_at: toText(order?.delhivery?.pickup_requested_at),
           payment_mode: toText(order?.delhivery?.payment_mode),
           status: toText(order?.delhivery?.status),
           status_description: toText(order?.delhivery?.status_description),
@@ -452,7 +469,7 @@ export const getRemoteCourierAssignment = (
         order.delhivery?.waybill ||
         order.delhivery?.waybills?.[0] ||
         `${trackingPrefixByPartner.delhivery}-${order.id.slice(-6).toUpperCase()}`,
-      trackingUrl: '',
+      trackingUrl: order.delhivery?.label_url || '',
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       total: order.total,

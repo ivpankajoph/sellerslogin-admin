@@ -125,12 +125,35 @@ function getActionPath(role: string | undefined, vendorId: string | null, suffix
   return `/integrations${suffix}`
 }
 
+function getDelhiveryActionPath(role: string | undefined, suffix = '') {
+  if (role === 'admin') {
+    return `/admin/delhivery${suffix}`
+  }
+  return `/delhivery${suffix}`
+}
+
 type GoogleMerchantAccount = {
   account_id: string
   name: string
   account_name: string
   homepage: string
   adult_content: boolean
+}
+
+type DelhiveryWarehouseDraft = {
+  name: string
+  registered_name: string
+  phone: string
+  email: string
+  address: string
+  city: string
+  pin: string
+  country: string
+  return_address: string
+  return_city: string
+  return_pin: string
+  return_state: string
+  return_country: string
 }
 
 const parseGoogleMerchantAccounts = (value?: string) => {
@@ -150,6 +173,18 @@ const parseGoogleMerchantAccounts = (value?: string) => {
       .filter((account) => account.account_id)
   } catch {
     return [] as GoogleMerchantAccount[]
+  }
+}
+
+const parseStringList = (value?: string) => {
+  if (!value) return [] as string[]
+
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return [] as string[]
+    return parsed.map((entry) => String(entry || '').trim()).filter(Boolean)
+  } catch {
+    return [] as string[]
   }
 }
 
@@ -185,6 +220,22 @@ export default function IntegrationsPage({
     nimbuspost: false,
     google_merchant: false,
     brevo: false,
+  })
+  const [delhiveryWaybillCount, setDelhiveryWaybillCount] = useState('25')
+  const [delhiveryWarehouseDraft, setDelhiveryWarehouseDraft] = useState<DelhiveryWarehouseDraft>({
+    name: '',
+    registered_name: '',
+    phone: '',
+    email: '',
+    address: '',
+    city: '',
+    pin: '',
+    country: 'India',
+    return_address: '',
+    return_city: '',
+    return_pin: '',
+    return_state: '',
+    return_country: 'India',
   })
   const [busyMap, setBusyMap] = useState<Record<string, boolean>>({})
   const [defaultPayment, setDefaultPayment] = useState<'cod' | 'razorpay' | 'cashfree'>('cod')
@@ -319,6 +370,16 @@ export default function IntegrationsPage({
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const pickupLocation = String(data?.providers?.delhivery?.config?.pickup_location || '').trim()
+    setDelhiveryWarehouseDraft((prev) => ({
+      ...prev,
+      name: pickupLocation || prev.name,
+      country: prev.country || 'India',
+      return_country: prev.return_country || 'India',
+    }))
+  }, [data?.providers?.delhivery?.config?.pickup_location])
 
   const setBusy = (key: string, value: boolean) =>
     setBusyMap((prev) => ({ ...prev, [key]: value }))
@@ -513,6 +574,197 @@ export default function IntegrationsPage({
       )
     } catch (error: any) {
       toast.error(error?.response?.data?.message || `Connection test failed for ${provider}`)
+    } finally {
+      setBusy(busyKey, false)
+    }
+  }
+
+  const fetchDelhiveryWaybills = async (mode: 'single' | 'bulk') => {
+    const path = getDelhiveryActionPath(
+      effectiveRole,
+      mode === 'bulk' ? '/waybill/bulk' : '/waybill/single',
+    )
+    const busyKey = `delhivery-waybill-${mode}`
+
+    if (effectiveRole === 'admin' && !resolvedVendorId) {
+      toast.error('Select a vendor first')
+      return
+    }
+
+    try {
+      setBusy(busyKey, true)
+      const payload: Record<string, string | number | boolean> = {
+        store: true,
+      }
+
+      if (effectiveRole === 'admin' && resolvedVendorId) {
+        payload.vendor_id = resolvedVendorId
+      }
+
+      if (mode === 'bulk') {
+        const count = Number(delhiveryWaybillCount)
+        if (!Number.isInteger(count) || count <= 0 || count > 10000) {
+          toast.error('Bulk waybill count must be between 1 and 10000')
+          return
+        }
+        payload.count = count
+      }
+
+      const response = await api.post(path, payload)
+      const fetchedCount = Number(response?.data?.waybills?.fetched_count || 0) || 0
+      const storedCount = Number(response?.data?.stored?.stored_count || 0) || 0
+      const duplicateCount = Number(response?.data?.stored?.duplicate_count || 0) || 0
+
+      toast.success(
+        mode === 'bulk'
+          ? `Fetched ${fetchedCount} Delhivery waybills. Stored ${storedCount}${duplicateCount ? `, skipped ${duplicateCount} duplicates` : ''}.`
+          : `Fetched 1 Delhivery waybill. Stored ${storedCount || fetchedCount}.`,
+      )
+
+      await loadIntegrations()
+      await syncVendorToolkitContext()
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          `Failed to fetch Delhivery ${mode === 'bulk' ? 'bulk ' : ''}waybills`,
+      )
+    } finally {
+      setBusy(busyKey, false)
+    }
+  }
+
+  const handleDelhiveryWarehouseDraftChange = (
+    key: keyof DelhiveryWarehouseDraft,
+    value: string,
+  ) => {
+    setDelhiveryWarehouseDraft((prev) => ({
+      ...prev,
+      [key]: value,
+    }))
+  }
+
+  const createDelhiveryWarehouse = async () => {
+    const path = getDelhiveryActionPath(effectiveRole, '/warehouse')
+    const busyKey = 'delhivery-warehouse-create'
+
+    if (effectiveRole === 'admin' && !resolvedVendorId) {
+      toast.error('Select a vendor first')
+      return
+    }
+
+    const payload: Record<string, string> = {}
+    ;(
+      Object.entries(delhiveryWarehouseDraft) as Array<
+        [keyof DelhiveryWarehouseDraft, string]
+      >
+    ).forEach(([key, value]) => {
+      const nextValue = String(value || '').trim()
+      if (nextValue) payload[key] = nextValue
+    })
+
+    if (!payload.name) {
+      toast.error('Warehouse name is required')
+      return
+    }
+
+    if (!payload.phone) {
+      toast.error('Warehouse phone is required')
+      return
+    }
+
+    if (!payload.pin) {
+      toast.error('Warehouse pincode is required')
+      return
+    }
+
+    if (!payload.return_address) {
+      toast.error('Return address is required')
+      return
+    }
+
+    if (effectiveRole === 'admin' && resolvedVendorId) {
+      payload.vendor_id = resolvedVendorId
+    }
+
+    try {
+      setBusy(busyKey, true)
+      const response = await api.post(path, payload)
+      const pickupLocation = String(
+        response?.data?.pickup_location || response?.data?.warehouse?.name || payload.name || '',
+      ).trim()
+
+      if (pickupLocation) {
+        handleProviderDraftChange('delhivery', 'pickup_location', pickupLocation)
+        setDelhiveryWarehouseDraft((prev) => ({
+          ...prev,
+          name: pickupLocation,
+        }))
+      }
+
+      toast.success(
+        String(
+          response?.data?.warehouse?.message ||
+            response?.data?.response?.message ||
+            `Delhivery warehouse ${pickupLocation || payload.name} created`,
+        ).trim(),
+      )
+
+      await loadIntegrations()
+      await syncVendorToolkitContext()
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to create Delhivery warehouse')
+    } finally {
+      setBusy(busyKey, false)
+    }
+  }
+
+  const updateDelhiveryWarehouse = async () => {
+    const path = getDelhiveryActionPath(effectiveRole, '/warehouse/edit')
+    const busyKey = 'delhivery-warehouse-update'
+
+    if (effectiveRole === 'admin' && !resolvedVendorId) {
+      toast.error('Select a vendor first')
+      return
+    }
+
+    const name = String(delhiveryWarehouseDraft.name || '').trim()
+    const address = String(delhiveryWarehouseDraft.address || '').trim()
+    const pin = String(delhiveryWarehouseDraft.pin || '').trim()
+    const phone = String(delhiveryWarehouseDraft.phone || '').trim()
+
+    if (!name) {
+      toast.error('Warehouse name is required')
+      return
+    }
+
+    if (!address && !pin && !phone) {
+      toast.error('Provide address, pincode, or phone to update')
+      return
+    }
+
+    const payload: Record<string, string> = { name }
+    if (address) payload.address = address
+    if (pin) payload.pin = pin
+    if (phone) payload.phone = phone
+
+    if (effectiveRole === 'admin' && resolvedVendorId) {
+      payload.vendor_id = resolvedVendorId
+    }
+
+    try {
+      setBusy(busyKey, true)
+      const response = await api.post(path, payload)
+      toast.success(
+        String(
+          response?.data?.warehouse?.message ||
+            response?.data?.response?.message ||
+            `Delhivery warehouse ${name} updated`,
+        ).trim(),
+      )
+      await loadIntegrations()
+      await syncVendorToolkitContext()
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to update Delhivery warehouse')
     } finally {
       setBusy(busyKey, false)
     }
@@ -928,6 +1180,10 @@ export default function IntegrationsPage({
             const testBusy = Boolean(busyMap[`test-${providerId}`])
             const disconnectBusy = Boolean(busyMap[`disconnect-${providerId}`])
             const oauthBusy = Boolean(busyMap['oauth-google_merchant'])
+            const delhiverySingleWaybillBusy = Boolean(busyMap['delhivery-waybill-single'])
+            const delhiveryBulkWaybillBusy = Boolean(busyMap['delhivery-waybill-bulk'])
+            const delhiveryWarehouseBusy = Boolean(busyMap['delhivery-warehouse-create'])
+            const delhiveryWarehouseUpdateBusy = Boolean(busyMap['delhivery-warehouse-update'])
             const googleMerchantAccounts =
               providerId === 'google_merchant'
                 ? parseGoogleMerchantAccounts(provider?.config?.connected_accounts_json)
@@ -935,6 +1191,20 @@ export default function IntegrationsPage({
             const googleMerchantConnected =
               providerId === 'google_merchant' &&
               provider?.config?.oauth_connected === 'true'
+            const delhiveryWaybillPoolCount =
+              providerId === 'delhivery'
+                ? Number(provider?.config?.waybill_pool_count || 0) || 0
+                : 0
+            const delhiveryWaybillLastFetchedCount =
+              providerId === 'delhivery'
+                ? Number(provider?.config?.waybill_last_fetched_count || 0) || 0
+                : 0
+            const delhiveryWaybillPreview =
+              providerId === 'delhivery'
+                ? parseStringList(provider?.config?.waybill_preview_json)
+                : []
+            const delhiveryWaybillLastFetchedAt =
+              providerId === 'delhivery' ? provider?.config?.waybill_last_fetched_at || '' : ''
             const primaryLabel =
               providerId === 'google_merchant'
                 ? googleMerchantConnected
@@ -1138,6 +1408,351 @@ export default function IntegrationsPage({
                         </div>
                       )}
                     </>
+                  )}
+
+                  {providerId === 'delhivery' && (
+                    <div className='space-y-4 rounded-2xl border border-cyan-200 bg-cyan-50/60 p-4'>
+                      <div className='space-y-1'>
+                        <p className='text-sm font-medium text-slate-950'>Client warehouse</p>
+                        <p className='text-xs leading-5 text-slate-600'>
+                          Register the pickup warehouse in Delhivery first. The exact warehouse
+                          name is case-sensitive and will be reused as the pickup location for
+                          shipment creation.
+                        </p>
+                      </div>
+
+                      <div className='grid gap-3 md:grid-cols-2'>
+                        <div className='space-y-1.5'>
+                          <Label>Warehouse name</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.name}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange('name', event.target.value)
+                            }
+                            placeholder='warehouse_name'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>Registered name</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.registered_name}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange(
+                                'registered_name',
+                                event.target.value,
+                              )
+                            }
+                            placeholder='Registered account name'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>Phone</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.phone}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange('phone', event.target.value)
+                            }
+                            placeholder='9999999999'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>Email</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.email}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange('email', event.target.value)
+                            }
+                            placeholder='warehouse@example.com'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5 md:col-span-2'>
+                          <Label>Pickup address</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.address}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange('address', event.target.value)
+                            }
+                            placeholder='Complete warehouse address'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>City</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.city}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange('city', event.target.value)
+                            }
+                            placeholder='Kota'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>Pincode</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.pin}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange('pin', event.target.value)
+                            }
+                            placeholder='110042'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>Country</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.country}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange('country', event.target.value)
+                            }
+                            placeholder='India'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5 md:col-span-2'>
+                          <Label>Return address</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.return_address}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange(
+                                'return_address',
+                                event.target.value,
+                              )
+                            }
+                            placeholder='Complete return address'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>Return city</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.return_city}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange(
+                                'return_city',
+                                event.target.value,
+                              )
+                            }
+                            placeholder='Kota'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>Return pincode</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.return_pin}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange(
+                                'return_pin',
+                                event.target.value,
+                              )
+                            }
+                            placeholder='110042'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>Return state</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.return_state}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange(
+                                'return_state',
+                                event.target.value,
+                              )
+                            }
+                            placeholder='Delhi'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <Label>Return country</Label>
+                          <Input
+                            value={delhiveryWarehouseDraft.return_country}
+                            onChange={(event) =>
+                              handleDelhiveryWarehouseDraftChange(
+                                'return_country',
+                                event.target.value,
+                              )
+                            }
+                            placeholder='India'
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                      </div>
+
+                      <div className='flex flex-wrap items-center gap-2'>
+                        <Button
+                          size='sm'
+                          variant='outline'
+                          className='rounded-xl border-cyan-200 bg-white text-cyan-800 hover:bg-cyan-100'
+                          onClick={() => {
+                            void createDelhiveryWarehouse()
+                          }}
+                          disabled={delhiveryWarehouseBusy}
+                        >
+                          {delhiveryWarehouseBusy ? (
+                            <>
+                              <Loader2 className='h-4 w-4 animate-spin' />
+                              Creating warehouse
+                            </>
+                          ) : (
+                            <>
+                              <Store className='h-4 w-4' />
+                              Create warehouse
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size='sm'
+                          variant='outline'
+                          className='rounded-xl border-cyan-200 bg-white text-cyan-800 hover:bg-cyan-100'
+                          onClick={() => {
+                            void updateDelhiveryWarehouse()
+                          }}
+                          disabled={delhiveryWarehouseUpdateBusy}
+                        >
+                          {delhiveryWarehouseUpdateBusy ? (
+                            <>
+                              <Loader2 className='h-4 w-4 animate-spin' />
+                              Updating warehouse
+                            </>
+                          ) : (
+                            <>
+                              <Settings2 className='h-4 w-4' />
+                              Update warehouse
+                            </>
+                          )}
+                        </Button>
+                        <p className='text-xs text-slate-600'>
+                          Current pickup location:{' '}
+                          <span className='font-medium text-slate-900'>
+                            {drafts.delhivery?.pickup_location || 'Not set'}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className='h-px bg-cyan-200/80' />
+
+                      <div className='space-y-1'>
+                        <p className='text-sm font-medium text-slate-950'>Stored waybill pool</p>
+                        <p className='text-xs leading-5 text-slate-600'>
+                          Fetch waybills in advance and keep them stored. Shipment creation will
+                          auto-use one stored waybill when you do not pass a manual waybill.
+                        </p>
+                      </div>
+
+                      <div className='grid gap-3 md:grid-cols-3'>
+                        <div className='rounded-2xl border border-cyan-200 bg-white p-3'>
+                          <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                            Available
+                          </div>
+                          <div className='mt-1 text-lg font-semibold text-slate-950'>
+                            {delhiveryWaybillPoolCount}
+                          </div>
+                        </div>
+                        <div className='rounded-2xl border border-cyan-200 bg-white p-3'>
+                          <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                            Last fetch size
+                          </div>
+                          <div className='mt-1 text-lg font-semibold text-slate-950'>
+                            {delhiveryWaybillLastFetchedCount}
+                          </div>
+                        </div>
+                        <div className='rounded-2xl border border-cyan-200 bg-white p-3'>
+                          <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                            Last fetched
+                          </div>
+                          <div className='mt-1 text-sm font-medium text-slate-900'>
+                            {toReadableTime(delhiveryWaybillLastFetchedAt || null)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className='grid gap-3 md:grid-cols-[180px_1fr] md:items-end'>
+                        <div className='space-y-1.5'>
+                          <Label>Bulk fetch count</Label>
+                          <Input
+                            type='number'
+                            min='1'
+                            max='10000'
+                            value={delhiveryWaybillCount}
+                            onChange={(event) => setDelhiveryWaybillCount(event.target.value)}
+                            className='h-11 rounded-xl border-cyan-200 bg-white'
+                          />
+                        </div>
+                        <div className='flex flex-wrap gap-2'>
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            className='rounded-xl border-cyan-200 bg-white text-cyan-800 hover:bg-cyan-100'
+                            onClick={() => {
+                              void fetchDelhiveryWaybills('bulk')
+                            }}
+                            disabled={delhiveryBulkWaybillBusy}
+                          >
+                            {delhiveryBulkWaybillBusy ? (
+                              <>
+                                <Loader2 className='h-4 w-4 animate-spin' />
+                                Fetching bulk
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCcw className='h-4 w-4' />
+                                Fetch bulk waybills
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            className='rounded-xl border-cyan-200 bg-white text-cyan-800 hover:bg-cyan-100'
+                            onClick={() => {
+                              void fetchDelhiveryWaybills('single')
+                            }}
+                            disabled={delhiverySingleWaybillBusy}
+                          >
+                            {delhiverySingleWaybillBusy ? (
+                              <>
+                                <Loader2 className='h-4 w-4 animate-spin' />
+                                Fetching one
+                              </>
+                            ) : (
+                              <>
+                                <Truck className='h-4 w-4' />
+                                Fetch single waybill
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className='space-y-2'>
+                        <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                          Pool preview
+                        </p>
+                        {delhiveryWaybillPreview.length ? (
+                          <div className='flex flex-wrap gap-2'>
+                            {delhiveryWaybillPreview.map((waybill) => (
+                              <Badge
+                                key={waybill}
+                                className='border-cyan-200 bg-white text-cyan-800'
+                              >
+                                {waybill}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className='text-sm text-slate-600'>
+                            No stored Delhivery waybills yet.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   )}
 
                   <div className='flex flex-wrap items-center gap-2'>

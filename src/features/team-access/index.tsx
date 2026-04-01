@@ -26,6 +26,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -122,6 +128,64 @@ const chunk = <T,>(items: T[], size: number) =>
     groups[groups.length - 1]?.push(item)
     return groups
   }, [])
+
+type CompactAccessProps = {
+  items: string[]
+  labels: Record<string, string>
+  max?: number
+  emptyText?: string
+}
+
+function CompactAccessBadges({
+  items,
+  labels,
+  max = 3,
+  emptyText = 'None',
+}: CompactAccessProps) {
+  if (!items.length) {
+    return <span className='text-sm text-muted-foreground'>{emptyText}</span>
+  }
+
+  const visible = items.slice(0, max)
+  const remaining = items.slice(max)
+
+  return (
+    <div className='flex flex-wrap gap-1.5'>
+      {visible.map((key) => (
+        <Badge key={key} variant='outline' className='rounded-md whitespace-nowrap'>
+          {labels[key] || key}
+        </Badge>
+      ))}
+      {remaining.length > 0 && (
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant='secondary'
+                className='cursor-default rounded-md whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-100'
+              >
+                +{remaining.length} more
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side='top' className='max-w-xs p-3 shadow-xl'>
+              <div className='flex flex-wrap gap-1.5'>
+                {remaining.map((key) => (
+                  <Badge
+                    key={key}
+                    variant='outline'
+                    className='bg-background rounded-md text-[10px] font-medium transition-none'
+                  >
+                    {labels[key] || key}
+                  </Badge>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  )
+}
 
 type TeamAccessPageProps = {
   initialTab?: 'members' | 'activity'
@@ -478,25 +542,24 @@ export default function TeamAccessPage({
                             </Badge>
                           </TableCell>
                           <TableCell className='align-top'>
-                            <div className='flex max-w-sm flex-wrap gap-2'>
-                              {member.allowed_page_keys.map((key) => (
-                                <Badge key={key} variant='outline'>
-                                  {pageOptionsByKey[key]?.label || key}
-                                </Badge>
-                              ))}
+                            <div className='max-w-[240px]'>
+                              <CompactAccessBadges
+                                items={member.allowed_page_keys}
+                                labels={Object.fromEntries(
+                                  pageOptions.map((o) => [o.key, o.label])
+                                )}
+                              />
                             </div>
                           </TableCell>
                           <TableCell className='align-top'>
-                            <div className='flex max-w-sm flex-wrap gap-2'>
-                              {member.allowed_websites.length ? (
-                                member.allowed_websites.map((website) => (
-                                  <Badge key={website.id} variant='outline'>
-                                    {website.name}
-                                  </Badge>
-                                ))
-                              ) : (
-                                <span className='text-sm text-muted-foreground'>No websites</span>
-                              )}
+                            <div className='max-w-[240px]'>
+                              <CompactAccessBadges
+                                items={member.allowed_website_ids}
+                                labels={Object.fromEntries(
+                                  member.allowed_websites.map((w) => [w.id, w.name])
+                                )}
+                                emptyText='No websites'
+                              />
                             </div>
                           </TableCell>
                           <TableCell className='align-top text-sm text-muted-foreground'>

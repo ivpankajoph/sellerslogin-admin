@@ -638,9 +638,12 @@ async function fetchVendorProducts(vendorId: string, token: string) {
   let totalPages = 1
 
   do {
-    const response = await fetch(
-      `${API_BASE}/v1/products/vendor/${vendorId}?page=${page}&limit=${FETCH_LIMIT}&includeUnavailable=true`,
-      {
+    const url =
+      vendorId === 'all'
+        ? `${API_BASE}/v1/products/all?page=${page}&limit=${FETCH_LIMIT}&includeUnavailable=true`
+        : `${API_BASE}/v1/products/vendor/${vendorId}?page=${page}&limit=${FETCH_LIMIT}&includeUnavailable=true`
+
+    const response = await fetch(url, {
         headers: getReadHeaders(token),
       }
     )
@@ -694,17 +697,19 @@ async function fetchVendorOptions() {
 
   const body = await response.json()
   const vendors = Array.isArray(body?.vendors) ? body.vendors : []
+  const options = vendors.map((vendor: any) => ({
+    value: normalizeText(vendor?._id || vendor?.id),
+    label: resolveVendorLabel(vendor),
+  }))
 
-  return vendors
-    .map((vendor: any) => ({
-      value: normalizeText(vendor?._id || vendor?.id),
-      label: resolveVendorLabel(vendor),
-    }))
+  return options
     .filter((item: VendorOption) => item.value)
     .sort((a: VendorOption, b: VendorOption) => a.label.localeCompare(b.label))
 }
 
 async function fetchVendorWebsites(vendorId: string, token: string) {
+  if (vendorId === 'all') return []
+
   const response = await fetch(
     `${API_BASE}/v1/templates/by-vendor?vendor_id=${encodeURIComponent(vendorId)}`,
     {
@@ -733,9 +738,12 @@ async function fetchVendorWebsites(vendorId: string, token: string) {
 }
 
 async function fetchInventoryAdjustments(vendorId: string, token: string) {
-  const response = await fetch(
-    `${API_BASE}/v1/products/inventory/adjustments?vendor_id=${encodeURIComponent(vendorId)}&limit=80`,
-    {
+  const url =
+    vendorId === 'all'
+      ? `${API_BASE}/v1/products/inventory/adjustments?limit=80`
+      : `${API_BASE}/v1/products/inventory/adjustments?vendor_id=${encodeURIComponent(vendorId)}&limit=80`
+
+  const response = await fetch(url, {
       headers: getReadHeaders(token),
     }
   )
@@ -757,7 +765,7 @@ export default function InventoryDashboard() {
 
   const [vendorOptions, setVendorOptions] = useState<VendorOption[]>([])
   const [selectedVendorId, setSelectedVendorId] = useState(
-    isAdmin ? '' : authVendorId
+    isAdmin ? 'all' : authVendorId
   )
   const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([])
   const [products, setProducts] = useState<VendorProduct[]>([])
@@ -802,7 +810,10 @@ export default function InventoryDashboard() {
 
     try {
       const options = await fetchVendorOptions()
-      setVendorOptions(options)
+      const finalOptions = isAdmin
+        ? [{ value: 'all', label: 'All Vendors (Master)' }, ...options]
+        : options
+      setVendorOptions(finalOptions)
     } catch (vendorError: any) {
       setVendorOptions([])
       setError(vendorError?.message || 'Failed to load vendors.')
@@ -815,7 +826,8 @@ export default function InventoryDashboard() {
 
   useEffect(() => {
     if (isAdmin && !selectedVendorId && vendorOptions.length) {
-      setSelectedVendorId(vendorOptions[0].value)
+      const defaultValue = vendorOptions.find(o => o.value === 'all') ? 'all' : vendorOptions[0].value
+      setSelectedVendorId(defaultValue)
     }
   }, [isAdmin, selectedVendorId, vendorOptions])
 
@@ -1492,12 +1504,6 @@ export default function InventoryDashboard() {
                                 <div className='truncate text-sm font-semibold'>
                                   {row.productName}
                                 </div>
-                                <div className='text-muted-foreground text-xs'>
-                                  {row.attributeSummary}
-                                </div>
-                                <div className='text-muted-foreground text-xs'>
-                                  {row.brand || 'No brand'}
-                                </div>
                               </div>
                             </div>
                           </TableCell>
@@ -1681,9 +1687,6 @@ export default function InventoryDashboard() {
                     <div className='min-w-0 space-y-1'>
                       <div className='truncate text-lg font-semibold'>
                         {selectedRow.productName}
-                      </div>
-                      <div className='text-muted-foreground text-sm'>
-                        {selectedRow.attributeSummary}
                       </div>
                       <div className='text-muted-foreground text-xs'>
                         Variant SKU: {selectedRow.variantSku}

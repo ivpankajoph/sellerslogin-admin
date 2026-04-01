@@ -39,11 +39,13 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Main } from '@/components/layout/main'
 import {
+  createDelhiveryPickupRequest,
   cancelDelhiveryShipment,
   cancelNimbuspostShipment,
   createNimbuspostManifest,
   editDelhiveryShipment,
   fetchNimbuspostNdrList,
+  generateDelhiveryLabel,
   getAssignedCourierForOrder,
   loadCourierOrders,
   trackDelhiveryShipment,
@@ -79,6 +81,19 @@ type DelhiveryEditForm = {
   shipment_length: string
 }
 
+const getLocalDateValue = (value = new Date()) => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getLocalTimeValue = (value = new Date()) => {
+  const hours = String(value.getHours()).padStart(2, '0')
+  const minutes = String(value.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}:00`
+}
+
 function CourierPartnerPage() {
   const { partner } = Route.useParams()
   const role = String(useSelector((state: RootState) => state.auth?.user?.role || '')).toLowerCase()
@@ -92,7 +107,9 @@ function CourierPartnerPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [busyOrderId, setBusyOrderId] = useState('')
-  const [busyAction, setBusyAction] = useState<'track' | 'manifest' | 'cancel' | 'edit' | ''>('')
+  const [busyAction, setBusyAction] = useState<
+    'track' | 'manifest' | 'cancel' | 'edit' | 'label' | 'pickup' | ''
+  >('')
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<CourierOrderSummary | null>(null)
   const [editForm, setEditForm] = useState<DelhiveryEditForm>({
@@ -237,6 +254,97 @@ function CourierPartnerPage() {
       setRefreshKey((current) => current + 1)
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to refresh Delhivery tracking')
+    } finally {
+      setBusyOrderId('')
+      setBusyAction('')
+    }
+  }
+
+  const handleGenerateDelhiveryLabel = async (order: CourierOrderSummary | null) => {
+    if (!order || partnerId !== 'delhivery') return
+    try {
+      setBusyOrderId(order.id)
+      setBusyAction('label')
+      const response = await generateDelhiveryLabel(order, { pdf: true, pdf_size: '4R' })
+      const labelUrl = String(
+        response?.label?.label_url || response?.order?.delhivery?.label_url || ''
+      ).trim()
+      if (labelUrl && typeof window !== 'undefined') {
+        window.open(labelUrl, '_blank', 'noopener,noreferrer')
+      }
+      toast.success(`Delhivery label generated for ${order.orderNumber}`)
+      setRefreshKey((current) => current + 1)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to generate Delhivery label')
+    } finally {
+      setBusyOrderId('')
+      setBusyAction('')
+    }
+  }
+
+  const handleCreateDelhiveryPickupRequest = async (order: CourierOrderSummary | null) => {
+    if (!order || partnerId !== 'delhivery') return
+    if (!order?.delhivery?.waybill && !order?.delhivery?.waybills?.length) {
+      toast.error('Manifest Delhivery shipment before creating pickup request')
+      return
+    }
+
+    const defaultLocation = String(order?.delhivery?.pickup_location || '').trim()
+    const pickupLocation = window.prompt(
+      'Pickup location',
+      defaultLocation
+    )
+    if (pickupLocation === null) return
+
+    const pickupDate = window.prompt(
+      'Pickup date (YYYY-MM-DD)',
+      String(order?.delhivery?.pickup_request_date || getLocalDateValue()).trim()
+    )
+    if (pickupDate === null) return
+
+    const pickupTime = window.prompt(
+      'Pickup time (HH:mm:ss)',
+      String(order?.delhivery?.pickup_request_time || getLocalTimeValue()).trim()
+    )
+    if (pickupTime === null) return
+
+    const defaultPackageCount = String(
+      order?.delhivery?.pickup_request_packages ||
+        order?.delhivery?.package_count ||
+        order?.delhivery?.waybills?.length ||
+        order?.items?.length ||
+        1
+    ).trim()
+    const packageCountInput = window.prompt(
+      'Expected package count',
+      defaultPackageCount
+    )
+    if (packageCountInput === null) return
+
+    const expectedPackageCount = Number(packageCountInput)
+    if (!Number.isInteger(expectedPackageCount) || expectedPackageCount <= 0) {
+      toast.error('Expected package count must be a positive integer')
+      return
+    }
+
+    try {
+      setBusyOrderId(order.id)
+      setBusyAction('pickup')
+      const response = await createDelhiveryPickupRequest(order, {
+        pickup_location: pickupLocation.trim(),
+        pickup_date: pickupDate.trim(),
+        pickup_time: pickupTime.trim(),
+        expected_package_count: expectedPackageCount,
+      })
+      const message = String(
+        response?.pickup_request?.message ||
+          response?.pickup_request?.status ||
+          'Delhivery pickup request created'
+      ).trim()
+      toast.success(`${message} for ${order.orderNumber}`)
+      setRefreshKey((current) => current + 1)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create Delhivery pickup request')
     } finally {
       setBusyOrderId('')
       setBusyAction('')
@@ -497,11 +605,30 @@ function CourierPartnerPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className='space-y-1'>
-                            <p className='text-sm font-medium text-slate-900'>
-                              {assignment.trackingCode}
-                            </p>
+                            <div className='space-y-1'>
+                              <p className='text-sm font-medium text-slate-900'>
+                                {assignment.trackingCode}
+                              </p>
+                              {partnerId === 'delhivery' &&
+                              order?.delhivery?.pickup_request_date ? (
+                                <p className='text-xs text-slate-500'>
+                                  Pickup request: {order.delhivery.pickup_request_date}{' '}
+                                  {order.delhivery.pickup_request_time || ''} |{' '}
+                                  {order.delhivery.pickup_request_packages || 0} pkg
+                                </p>
+                              ) : null}
                             <div className='flex flex-wrap gap-3 text-xs'>
+                              {partnerId === 'delhivery' && order?.delhivery?.label_url ? (
+                                <a
+                                  href={order.delhivery.label_url}
+                                  target='_blank'
+                                  rel='noreferrer'
+                                  className='inline-flex items-center gap-1 font-medium text-indigo-600 hover:underline'
+                                >
+                                  Shipping label
+                                  <ExternalLink className='h-3 w-3' />
+                                </a>
+                              ) : null}
                               {order?.nimbuspost?.label_url ? (
                                 <a
                                   href={order.nimbuspost.label_url}
@@ -616,6 +743,32 @@ function CourierPartnerPage() {
                                         : 'Cancel'}
                                     </Button>
                                   ) : null}
+                                  <Button
+                                    size='sm'
+                                    variant='outline'
+                                    className='border-slate-200 bg-white hover:bg-slate-50'
+                                    disabled={busyOrderId === order?.id || !order}
+                                    onClick={() => {
+                                      void handleGenerateDelhiveryLabel(order)
+                                    }}
+                                  >
+                                    {busyOrderId === order?.id && busyAction === 'label'
+                                      ? 'Generating'
+                                      : 'Label'}
+                                  </Button>
+                                  <Button
+                                    size='sm'
+                                    variant='outline'
+                                    className='border-slate-200 bg-white hover:bg-slate-50'
+                                    disabled={busyOrderId === order?.id || !order}
+                                    onClick={() => {
+                                      void handleCreateDelhiveryPickupRequest(order)
+                                    }}
+                                  >
+                                    {busyOrderId === order?.id && busyAction === 'pickup'
+                                      ? 'Creating'
+                                      : 'Pickup request'}
+                                  </Button>
                                   <Button
                                     size='sm'
                                     variant='outline'

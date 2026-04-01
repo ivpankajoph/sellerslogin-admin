@@ -40,6 +40,7 @@ import { Route as AuthenticatedVendorAnalyticsIndexRouteImport } from './routes/
 import { Route as AuthenticatedVendorAboutIndexRouteImport } from './routes/_authenticated/vendor-about/index'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedUploadProductsIndexRouteImport } from './routes/_authenticated/upload-products/index'
+import { Route as AuthenticatedTukkaSubmissionsIndexRouteImport } from './routes/_authenticated/tukka-submissions/index'
 import { Route as AuthenticatedTemplateWorkspaceIndexRouteImport } from './routes/_authenticated/template-workspace/index'
 import { Route as AuthenticatedTemplateWalletIndexRouteImport } from './routes/_authenticated/template-wallet/index'
 import { Route as AuthenticatedTemplateOrdersIndexRouteImport } from './routes/_authenticated/template-orders/index'
@@ -257,6 +258,12 @@ const AuthenticatedUploadProductsIndexRoute =
   AuthenticatedUploadProductsIndexRouteImport.update({
     id: '/upload-products/',
     path: '/upload-products/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTukkaSubmissionsIndexRoute =
+  AuthenticatedTukkaSubmissionsIndexRouteImport.update({
+    id: '/tukka-submissions/',
+    path: '/tukka-submissions/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedTemplateWorkspaceIndexRoute =
@@ -624,6 +631,7 @@ export interface FileRoutesByFullPath {
   '/template-orders': typeof AuthenticatedTemplateOrdersIndexRoute
   '/template-wallet': typeof AuthenticatedTemplateWalletIndexRoute
   '/template-workspace': typeof AuthenticatedTemplateWorkspaceIndexRoute
+  '/tukka-submissions': typeof AuthenticatedTukkaSubmissionsIndexRoute
   '/upload-products': typeof AuthenticatedUploadProductsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
@@ -703,6 +711,7 @@ export interface FileRoutesByTo {
   '/template-orders': typeof AuthenticatedTemplateOrdersIndexRoute
   '/template-wallet': typeof AuthenticatedTemplateWalletIndexRoute
   '/template-workspace': typeof AuthenticatedTemplateWorkspaceIndexRoute
+  '/tukka-submissions': typeof AuthenticatedTukkaSubmissionsIndexRoute
   '/upload-products': typeof AuthenticatedUploadProductsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/vendor-about': typeof AuthenticatedVendorAboutIndexRoute
@@ -788,6 +797,7 @@ export interface FileRoutesById {
   '/_authenticated/template-orders/': typeof AuthenticatedTemplateOrdersIndexRoute
   '/_authenticated/template-wallet/': typeof AuthenticatedTemplateWalletIndexRoute
   '/_authenticated/template-workspace/': typeof AuthenticatedTemplateWorkspaceIndexRoute
+  '/_authenticated/tukka-submissions/': typeof AuthenticatedTukkaSubmissionsIndexRoute
   '/_authenticated/upload-products/': typeof AuthenticatedUploadProductsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/vendor-about/': typeof AuthenticatedVendorAboutIndexRoute
@@ -871,6 +881,7 @@ export interface FileRouteTypes {
     | '/template-orders'
     | '/template-wallet'
     | '/template-workspace'
+    | '/tukka-submissions'
     | '/upload-products'
     | '/users'
     | '/vendor-about'
@@ -950,6 +961,7 @@ export interface FileRouteTypes {
     | '/template-orders'
     | '/template-wallet'
     | '/template-workspace'
+    | '/tukka-submissions'
     | '/upload-products'
     | '/users'
     | '/vendor-about'
@@ -1034,6 +1046,7 @@ export interface FileRouteTypes {
     | '/_authenticated/template-orders/'
     | '/_authenticated/template-wallet/'
     | '/_authenticated/template-workspace/'
+    | '/_authenticated/tukka-submissions/'
     | '/_authenticated/upload-products/'
     | '/_authenticated/users/'
     | '/_authenticated/vendor-about/'
@@ -1284,6 +1297,13 @@ declare module '@tanstack/react-router' {
       path: '/upload-products'
       fullPath: '/upload-products'
       preLoaderRoute: typeof AuthenticatedUploadProductsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tukka-submissions/': {
+      id: '/_authenticated/tukka-submissions/'
+      path: '/tukka-submissions'
+      fullPath: '/tukka-submissions'
+      preLoaderRoute: typeof AuthenticatedTukkaSubmissionsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/template-workspace/': {
@@ -1729,6 +1749,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTemplateOrdersIndexRoute: typeof AuthenticatedTemplateOrdersIndexRoute
   AuthenticatedTemplateWalletIndexRoute: typeof AuthenticatedTemplateWalletIndexRoute
   AuthenticatedTemplateWorkspaceIndexRoute: typeof AuthenticatedTemplateWorkspaceIndexRoute
+  AuthenticatedTukkaSubmissionsIndexRoute: typeof AuthenticatedTukkaSubmissionsIndexRoute
   AuthenticatedUploadProductsIndexRoute: typeof AuthenticatedUploadProductsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedVendorAboutIndexRoute: typeof AuthenticatedVendorAboutIndexRoute
@@ -1801,6 +1822,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTemplateWalletIndexRoute: AuthenticatedTemplateWalletIndexRoute,
   AuthenticatedTemplateWorkspaceIndexRoute:
     AuthenticatedTemplateWorkspaceIndexRoute,
+  AuthenticatedTukkaSubmissionsIndexRoute:
+    AuthenticatedTukkaSubmissionsIndexRoute,
   AuthenticatedUploadProductsIndexRoute: AuthenticatedUploadProductsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
   AuthenticatedVendorAboutIndexRoute: AuthenticatedVendorAboutIndexRoute,

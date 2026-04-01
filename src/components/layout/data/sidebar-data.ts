@@ -261,6 +261,12 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           icon: Users,
           roles: [ROLES.ADMIN],
         },
+        {
+          title: 'Tukka Registrations',
+          url: '/tukka-submissions',
+          icon: Activity,
+          roles: [ROLES.ADMIN],
+        },
       ],
     },
     {
@@ -297,7 +303,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           title: 'Manage Locations',
           url: '/cities',
           icon: MapPinned,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          roles: [ROLES.VENDOR],
           pageKey: 'manage_cities',
         },
       ],

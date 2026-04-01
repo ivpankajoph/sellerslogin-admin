@@ -121,6 +121,31 @@ export const trackDelhiveryShipment = async (
   return res?.data
 }
 
+export const generateDelhiveryLabel = async (
+  order: CourierOrderSummary,
+  payload: {
+    pdf?: boolean
+    pdf_size?: 'A4' | '4R'
+    waybill?: string
+  } = {}
+) => {
+  const res = await api.post(`${getOrderBasePath(order)}/delhivery/label`, payload)
+  return res?.data
+}
+
+export const createDelhiveryPickupRequest = async (
+  order: CourierOrderSummary,
+  payload: {
+    pickup_date: string
+    pickup_time: string
+    pickup_location?: string
+    expected_package_count?: number
+  }
+) => {
+  const res = await api.post(`${getOrderBasePath(order)}/delhivery/pickup-request`, payload)
+  return res?.data
+}
+
 export const cancelNimbuspostShipment = async (order: CourierOrderSummary) => {
   const res = await api.post(`${getOrderBasePath(order)}/nimbuspost/cancel`)
   return res?.data
