@@ -9,6 +9,7 @@ export type VendorPageAccessKey =
   | 'my_websites'
   | 'location_workspace'
   | 'manage_cities'
+  | 'get_domain'
   | 'toolkit_store'
   | 'my_apps'
   | 'seo_manager'
@@ -76,6 +77,11 @@ export const VENDOR_PAGE_ACCESS_OPTIONS: VendorPageAccessOption[] = [
     description: 'Manage the cities available for the storefront.',
   },
   {
+    key: 'get_domain',
+    label: 'Get Domain',
+    description: 'Connect and manage website domain settings.',
+  },
+  {
     key: 'toolkit_store',
     label: 'Toolkit Store',
     description: 'Browse and install toolkit apps.',
@@ -134,6 +140,7 @@ const ROUTE_MATCHERS: RouteMatcher[] = [
     key: 'my_websites',
     prefixes: [
       '/template-workspace',
+      '/vendor-template/',
       '/meta-pixel',
       '/vendor-template',
       '/vendor-template-about',
@@ -166,6 +173,7 @@ const FIRST_PAGE_ROUTE_BY_KEY: Partial<Record<VendorPageAccessKey, string>> = {
   my_websites: '/template-workspace',
   location_workspace: '/location-workspace',
   manage_cities: '/cities',
+  get_domain: '/vendor-template',
   toolkit_store: '/integrations',
   my_apps: '/integrations',
   seo_manager: '/seo',
@@ -174,6 +182,11 @@ const FIRST_PAGE_ROUTE_BY_KEY: Partial<Record<VendorPageAccessKey, string>> = {
   help_center: '/help-center',
   sitemaps: '/sitemaps',
   team_access: '/team-access',
+}
+
+const PAGE_ACCESS_ALIASES: Partial<Record<VendorPageAccessKey, VendorPageAccessKey[]>> = {
+  my_websites: ['get_domain'],
+  get_domain: ['my_websites'],
 }
 
 export const normalizeVendorPageAccess = (
@@ -203,13 +216,21 @@ export const resolveVendorPageAccessKey = (
 export const getFirstAccessibleVendorRoute = (
   pageAccess: Iterable<VendorPageAccessKey>
 ): string => {
+  const normalizedAccess = new Set(pageAccess)
   for (const option of VENDOR_PAGE_ACCESS_OPTIONS) {
-    if (Array.from(pageAccess).includes(option.key)) {
+    if (hasVendorPageAccess(normalizedAccess, option.key)) {
       return FIRST_PAGE_ROUTE_BY_KEY[option.key] || '/'
     }
   }
   return '/'
 }
+
+export const hasVendorPageAccess = (
+  pageAccess: Set<VendorPageAccessKey>,
+  key: VendorPageAccessKey
+): boolean =>
+  pageAccess.has(key) ||
+  (PAGE_ACCESS_ALIASES[key] || []).some((alias) => pageAccess.has(alias))
 
 export const canAccessVendorPath = (
   pathname: string,
@@ -217,5 +238,5 @@ export const canAccessVendorPath = (
 ): boolean => {
   const key = resolveVendorPageAccessKey(pathname)
   if (!key) return true
-  return pageAccess.has(key)
+  return hasVendorPageAccess(pageAccess, key)
 }

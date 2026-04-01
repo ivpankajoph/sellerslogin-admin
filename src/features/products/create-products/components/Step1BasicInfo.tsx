@@ -96,8 +96,8 @@ interface Props {
   formData: any
   setFormData: React.Dispatch<React.SetStateAction<any>>
   mainCategories: any[]
-  selectedMainCategoryId: string
-  setSelectedMainCategoryId: React.Dispatch<React.SetStateAction<string>>
+  selectedMainCategoryIds: string[]
+  setSelectedMainCategoryIds: React.Dispatch<React.SetStateAction<string[]>>
   categories: any[]
   selectedCategoryIds: string[]
   setSelectedCategoryIds: React.Dispatch<React.SetStateAction<string[]>>
@@ -110,87 +110,6 @@ interface Props {
   onCreateMainCategory: (name: string) => Promise<void>
   onCreateCategory: (name: string) => Promise<void>
   onCreateSubcategory: (payload: { name: string; categoryId: string }) => Promise<void>
-}
-
-const SearchableSelect: React.FC<{
-  value: string
-  onChange: (value: string) => void
-  options: SelectOption[]
-  placeholder: string
-  disabled?: boolean
-  loading?: boolean
-}> = ({ value, onChange, options, placeholder, disabled, loading }) => {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const selectedOption = useMemo(
-    () => options.find((opt) => opt.value === value),
-    [options, value]
-  )
-  const visibleOptions = useMemo(
-    () => filterOptions(options, search),
-    [options, search]
-  )
-
-  return (
-    <Popover
-      open={open}
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen)
-        if (!nextOpen) setSearch('')
-      }}
-    >
-      <PopoverTrigger asChild>
-        <Button
-          variant='outline'
-          role='combobox'
-          aria-expanded={open}
-          disabled={disabled}
-          className={cn(
-            'h-11 w-full justify-between rounded-xl border-border bg-background text-left text-foreground shadow-sm hover:bg-secondary',
-            !selectedOption && 'text-muted-foreground'
-          )}
-        >
-          <span className='truncate'>
-            {loading ? 'Loading...' : selectedOption?.label || placeholder}
-          </span>
-          <ChevronsUpDown className='h-4 w-4 shrink-0 opacity-50' />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className='w-[--radix-popover-trigger-width] p-0' align='start'>
-        <Command shouldFilter={false}>
-          <CommandInput
-            value={search}
-            onValueChange={setSearch}
-            placeholder={`Search ${placeholder.toLowerCase()}...`}
-          />
-          <CommandList key={search || 'all'} className='max-h-72'>
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup>
-              {visibleOptions.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={`${option.label} ${option.value}`}
-                  onSelect={() => {
-                    onChange(option.value)
-                    setSearch('')
-                    setOpen(false)
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      value === option.value ? 'opacity-100' : 'opacity-0'
-                    )}
-                  />
-                  {option.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  )
 }
 
 const SearchableMultiSelect: React.FC<{
@@ -321,6 +240,11 @@ const SearchableMultiSelect: React.FC<{
                   <CommandItem
                     key={option.value}
                     value={`${option.label} ${option.value}`}
+                    onMouseDown={(event) => {
+                      // Keep focus inside the popover so vendors can pick
+                      // multiple categories without the menu collapsing.
+                      event.preventDefault()
+                    }}
                     onSelect={() => toggleValue(option.value)}
                   >
                     <Check
@@ -348,8 +272,8 @@ const Step1BasicInfo: React.FC<Props> = ({
   formData,
   setFormData,
   mainCategories,
-  selectedMainCategoryId,
-  setSelectedMainCategoryId,
+  selectedMainCategoryIds,
+  setSelectedMainCategoryIds,
   categories,
   selectedCategoryIds,
   setSelectedCategoryIds,
@@ -467,8 +391,8 @@ const Step1BasicInfo: React.FC<Props> = ({
 
   const handleCreateCategory = async () => {
     const trimmedName = newCategoryName.trim()
-    if (!selectedMainCategoryId) {
-      toast.error('Select a main category first.')
+    if (!selectedMainCategoryIds.length) {
+      toast.error('Select at least one main category first.')
       return
     }
     if (!trimmedName) {
@@ -589,21 +513,22 @@ const Step1BasicInfo: React.FC<Props> = ({
               required
               help='Choose the high-level catalog bucket first so the rest of the form can adapt correctly.'
             />
-          <SearchableSelect
-            value={selectedMainCategoryId}
-            onChange={(value) => {
-              setSelectedMainCategoryId(value)
+          <SearchableMultiSelect
+            values={selectedMainCategoryIds}
+            onChange={(values) => {
+              setSelectedMainCategoryIds(values)
               setSelectedCategoryIds([])
               setFormData((prev: any) => ({
                 ...prev,
-                mainCategory: value,
+                mainCategory: values[0] || '',
+                mainCategories: values,
                 productCategory: '',
                 productCategories: [],
                 productSubCategories: [],
               }))
             }}
             options={mainCategoryOptions}
-            placeholder='Select main category'
+            placeholder='Select one or more main categories'
             loading={isMainCategoryLoading}
           />
           <button
@@ -671,17 +596,17 @@ const Step1BasicInfo: React.FC<Props> = ({
             }}
             options={categoryOptions}
             placeholder={
-              selectedMainCategoryId
+              selectedMainCategoryIds.length
                 ? 'Select one or more categories'
                 : 'Select main category first'
             }
             loading={isCategoryLoading}
-            disabled={!selectedMainCategoryId}
+            disabled={!selectedMainCategoryIds.length}
           />
           <button
             type='button'
             onClick={() => setShowCategoryCreator((prev) => !prev)}
-            disabled={!selectedMainCategoryId}
+            disabled={!selectedMainCategoryIds.length}
             className='mt-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800 disabled:cursor-not-allowed disabled:text-muted-foreground'
           >
             <Plus className='h-3.5 w-3.5' />
@@ -700,7 +625,7 @@ const Step1BasicInfo: React.FC<Props> = ({
                   <Button
                     type='button'
                     onClick={handleCreateCategory}
-                    disabled={isCreatingCategory || !selectedMainCategoryId}
+                    disabled={isCreatingCategory || !selectedMainCategoryIds.length}
                     className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-cyan-700'
                   >
                     {isCreatingCategory ? (

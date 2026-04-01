@@ -6,12 +6,17 @@ export interface ImageUpload {
 }
 
 export interface Variant {
+  _id?: string
   variantAttributes: Record<string, string>
   actualPrice: number
   finalPrice: number
   stockQuantity: number
   variantsImageUrls: ImageUpload[]
   isActive: boolean
+  variantMetaTitle?: string
+  variantMetaDescription?: string
+  variantMetaKeywords?: string[]
+  variantCanonicalUrl?: string
 }
 
 export interface FAQ {
@@ -21,6 +26,7 @@ export interface FAQ {
 
 export interface ProductFormData {
   mainCategory: string
+  mainCategories: string[]
   productName: string
   productCategory: string
   productCategories: string[]

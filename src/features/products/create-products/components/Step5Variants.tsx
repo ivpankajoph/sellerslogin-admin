@@ -33,7 +33,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -150,8 +149,7 @@ const WebsiteMultiSelect: React.FC<{
   const buttonText = useMemo(() => {
     if (loading) return 'Loading websites...'
     if (!selectedLabels.length) return 'All websites'
-    if (selectedLabels.length <= 2) return selectedLabels.join(', ')
-    return `${selectedLabels[0]}, ${selectedLabels[1]} +${selectedLabels.length - 2} more`
+    return `${selectedLabels.length} website${selectedLabels.length > 1 ? 's' : ''} selected`
   }, [loading, selectedLabels])
 
   const toggleValue = (value: string) => {
@@ -264,6 +262,7 @@ const Step5Variants: React.FC<Props> = ({
   const [addVariantDialogOpen, setAddVariantDialogOpen] = useState(false)
   const [selectedSuggestedVariantKey, setSelectedSuggestedVariantKey] = useState('')
   const [newVariantCustomKey, setNewVariantCustomKey] = useState('')
+  const [showCustomVariantKeyInput, setShowCustomVariantKeyInput] = useState(false)
 
   const websiteSelectOptions = useMemo(
     () =>
@@ -285,11 +284,21 @@ const Step5Variants: React.FC<Props> = ({
   )
 
   const handleAddVariantClick = () => {
+    onGenerateSuggestedKeys(variants.length)
     setSelectedSuggestedVariantKey((currentValue) =>
       currentValue || suggestedVariantKeys[0] || ''
     )
     setAddVariantDialogOpen(true)
   }
+
+  useEffect(() => {
+    if (!addVariantDialogOpen) return
+    setSelectedSuggestedVariantKey((currentValue) =>
+      currentValue && suggestedVariantKeys.includes(currentValue)
+        ? currentValue
+        : suggestedVariantKeys[0] || ''
+    )
+  }, [addVariantDialogOpen, suggestedVariantKeys])
 
   const getVariantKeys = (variant: Variant) =>
     Object.keys(variant.variantAttributes || {})
@@ -300,6 +309,7 @@ const Step5Variants: React.FC<Props> = ({
     setAddVariantDialogOpen(false)
     setSelectedSuggestedVariantKey('')
     setNewVariantCustomKey('')
+    setShowCustomVariantKeyInput(false)
   }
 
   const handleAddVariantWithKeys = (keys: string[]) => {
@@ -404,52 +414,88 @@ const Step5Variants: React.FC<Props> = ({
             </div>
           </div>
 
-        <div className='mt-5 grid gap-4 xl:grid-cols-2'>
-          <div className='space-y-4'>
-            <div className={studioSubtleCardClass}>
-              <StudioFieldLabel
-                label='Availability'
-                help='Turn this off if the product should stay hidden even after approval.'
-              />
-              <div className='flex items-center justify-between gap-4 rounded-2xl bg-background/50 px-4 py-3'>
-                <div>
-                  <div className='text-sm font-medium text-foreground'>
-                    {isAvailable ? 'Visible' : 'Hidden'}
+        <div className='mt-5'>
+          <div className='rounded-3xl border border-border/70 bg-gradient-to-br from-background via-background to-cyan-50/30 p-4 shadow-sm'>
+            <div className='grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)] lg:items-start'>
+              <div className={cn(studioSubtleCardClass, 'h-full border-0 bg-background/70 shadow-none')}>
+                <StudioFieldLabel
+                  label='Availability'
+                  help='Turn this off if the product should stay hidden even after approval.'
+                />
+                <div className='mt-3 flex items-center justify-between gap-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3'>
+                  <div>
+                    <div className='text-sm font-medium text-foreground'>
+                      {isAvailable ? 'Visible' : 'Hidden'}
+                    </div>
+                    <p className='text-xs text-muted-foreground'>
+                      Product-level availability for the listing.
+                    </p>
                   </div>
-                  <p className='text-xs text-muted-foreground'>
-                    Product-level availability for the listing.
-                  </p>
-                </div>
-                <div className='flex items-center gap-3'>
-                  <ToggleLeft className='h-4 w-4 text-emerald-600' />
-                  <Switch checked={isAvailable} onCheckedChange={onToggleAvailable} />
+                  <div className='flex items-center gap-3'>
+                    <ToggleLeft className='h-4 w-4 text-emerald-600' />
+                    <Switch checked={isAvailable} onCheckedChange={onToggleAvailable} />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className={studioSubtleCardClass}>
-              <StudioFieldLabel
-                label='Show on websites'
-                help='Pick only the vendor websites where this product should appear. Leave empty to keep it available across all websites.'
-              />
-              {websiteSelectOptions.length ? (
-                <>
-                  <WebsiteMultiSelect
-                    values={selectedWebsiteIds}
-                    options={websiteSelectOptions}
-                    loading={isWebsiteLoading}
-                    onChange={onSelectedWebsiteIdsChange}
-                  />
-                  <p className='mt-3 text-xs leading-5 text-muted-foreground'>
-                    Multi-select supported. This only controls storefront website visibility.
-                  </p>
-                </>
-              ) : (
-                <div className='rounded-2xl bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
-                  No vendor websites found yet. Create a website first if you want to limit product
-                  visibility by storefront.
-                </div>
-              )}
+              <div className={cn(studioSubtleCardClass, 'h-full border-0 bg-background/70 shadow-none')}>
+                <StudioFieldLabel
+                  label='Show on websites'
+                  help='Pick only the vendor websites where this product should appear. Leave empty to keep it available across all websites.'
+                />
+                {websiteSelectOptions.length ? (
+                  <>
+                    <div className='mt-3 rounded-2xl border border-border/70 bg-background px-3 py-3'>
+                      <WebsiteMultiSelect
+                        values={selectedWebsiteIds}
+                        options={websiteSelectOptions}
+                        loading={isWebsiteLoading}
+                        onChange={onSelectedWebsiteIdsChange}
+                      />
+                    </div>
+                    {selectedWebsiteIds.length ? (
+                      <div className='mt-3 flex flex-wrap gap-2'>
+                        {selectedWebsiteIds
+                          .map(
+                            (websiteId) =>
+                              websiteSelectOptions.find(
+                                (option) => option.value === websiteId
+                              )?.label
+                          )
+                          .filter(Boolean)
+                          .map((label) => (
+                            <button
+                              key={label}
+                              type='button'
+                              onClick={() =>
+                                onSelectedWebsiteIdsChange(
+                                  selectedWebsiteIds.filter((websiteId) => {
+                                    const optionLabel = websiteSelectOptions.find(
+                                      (option) => option.value === websiteId
+                                    )?.label
+                                    return optionLabel !== label
+                                  })
+                                )
+                              }
+                              className='inline-flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-medium text-cyan-900 transition hover:border-cyan-300 hover:bg-cyan-100'
+                            >
+                              {label}
+                              <X className='h-3.5 w-3.5' />
+                            </button>
+                          ))}
+                      </div>
+                    ) : null}
+                    <p className='mt-3 text-xs leading-5 text-muted-foreground'>
+                      Multi-select supported. This only controls storefront website visibility.
+                    </p>
+                  </>
+                ) : (
+                  <div className='mt-3 rounded-2xl border border-dashed border-border/70 bg-background/50 px-4 py-3 text-sm text-muted-foreground'>
+                    No vendor websites found yet. Create a website first if you want to limit product
+                    visibility by storefront.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -504,8 +550,14 @@ const Step5Variants: React.FC<Props> = ({
                 : 'Choose product details, then set pricing, stock, and images.'
 
             return (
-              <article key={variantIndex} className={studioCardClass}>
-                <div className='mb-5 flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-start lg:justify-between'>
+              <article
+                key={variantIndex}
+                className={cn(
+                  studioCardClass,
+                  'overflow-hidden border-cyan-200/70 bg-gradient-to-br from-white via-cyan-50/20 to-slate-50/70 shadow-[0_16px_40px_-24px_rgba(8,145,178,0.35)]'
+                )}
+              >
+                <div className='-mx-5 -mt-5 mb-5 flex flex-col gap-4 border-b border-cyan-100 bg-gradient-to-r from-cyan-50/70 via-white to-white px-5 py-5 lg:flex-row lg:items-start lg:justify-between'>
                   <div>
                     <div className='mb-2 inline-flex items-center gap-2 border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300'>
                       {variantTitle}
@@ -517,7 +569,7 @@ const Step5Variants: React.FC<Props> = ({
                   </div>
 
                   <div className='flex flex-wrap items-center gap-3'>
-                    <div className='flex items-center gap-2 bg-background/60 px-3 py-2'>
+                    <div className='flex items-center gap-2 rounded-xl border border-cyan-100 bg-white/90 px-3 py-2 shadow-sm'>
                       <Switch
                         checked={variant.isActive}
                         onCheckedChange={(checked) =>
@@ -538,30 +590,17 @@ const Step5Variants: React.FC<Props> = ({
                       <Copy className='mr-2 h-4 w-4' />
                       Copy Above
                     </Button>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      onClick={handleAddVariantClick}
-                      className='h-11 border-cyan-500/20 bg-cyan-500/10 px-4 text-cyan-700 hover:bg-cyan-500/15 hover:text-cyan-800'
-                    >
-                      <Plus className='mr-2 h-4 w-4' />
-                      Add Variant
-                    </Button>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      onClick={() => onRemoveVariant(variantIndex)}
-                      className='h-11 border-red-500/25 bg-red-500/10 px-4 text-red-600 hover:bg-red-500/15 hover:text-red-700'
-                    >
-                      <Trash2 className='mr-2 h-4 w-4' />
-                      Remove
-                    </Button>
                   </div>
                 </div>
 
                 <div className='grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]'>
                   <div className='space-y-4'>
-                    <section className={studioSubtleCardClass}>
+                    <section
+                      className={cn(
+                        studioSubtleCardClass,
+                        'rounded-3xl border border-border/70 bg-white shadow-sm'
+                      )}
+                    >
                       <div className='mb-4 flex flex-col gap-3 border-b border-border/60 pb-4 xl:flex-row xl:items-start xl:justify-between'>
                         <div className='flex items-center gap-2 text-sm font-semibold text-foreground'>
                           <Tag className='h-4 w-4 text-cyan-600' />
@@ -787,7 +826,12 @@ const Step5Variants: React.FC<Props> = ({
                       </div>
                     </section>
 
-                    <section className={studioSubtleCardClass}>
+                    <section
+                      className={cn(
+                        studioSubtleCardClass,
+                        'rounded-3xl border border-border/70 bg-white shadow-sm'
+                      )}
+                    >
                       <div className='mb-4 flex items-center gap-2 text-sm font-semibold text-foreground'>
                         <Package2 className='h-4 w-4 text-emerald-600' />
                         Pricing and stock
@@ -847,7 +891,12 @@ const Step5Variants: React.FC<Props> = ({
                     </section>
                   </div>
 
-                  <section className={studioSubtleCardClass}>
+                  <section
+                    className={cn(
+                      studioSubtleCardClass,
+                      'rounded-3xl border border-border/70 bg-white shadow-sm'
+                    )}
+                  >
                     <div className='mb-4 flex items-center gap-2 text-sm font-semibold text-foreground'>
                       <Upload className='h-4 w-4 text-indigo-600' />
                       Variant images
@@ -939,9 +988,33 @@ const Step5Variants: React.FC<Props> = ({
                     )}
                   </section>
                 </div>
+
+                <div className='mt-6 flex justify-center border-t border-cyan-100 pt-5'>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={() => onRemoveVariant(variantIndex)}
+                    className='h-11 border-red-500/25 bg-red-500/10 px-6 text-red-600 hover:bg-red-500/15 hover:text-red-700'
+                  >
+                    <Trash2 className='mr-2 h-4 w-4' />
+                    Remove
+                  </Button>
+                </div>
               </article>
             )
           })}
+
+          <div className='flex justify-end pt-1'>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={handleAddVariantClick}
+              className='h-11 border-cyan-500/20 bg-cyan-500/10 px-5 text-cyan-700 hover:bg-cyan-500/15 hover:text-cyan-800'
+            >
+              <Plus className='mr-2 h-4 w-4' />
+              Add Variant
+            </Button>
+          </div>
         </div>
       )}
 
@@ -976,7 +1049,12 @@ const Step5Variants: React.FC<Props> = ({
                 help='These quick picks come from the selected category and the current product context.'
                 className='mb-0'
               />
-              {suggestedVariantKeys.length ? (
+              {aiLoading ? (
+                <div className='flex min-h-[72px] items-center gap-3 rounded-2xl border border-dashed border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
+                  <Loader2 className='h-4 w-4 animate-spin text-cyan-600' />
+                  Loading suggested keys...
+                </div>
+              ) : suggestedVariantKeys.length ? (
                 <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]'>
                   <Select
                     value={selectedSuggestedVariantKey}
@@ -1008,49 +1086,59 @@ const Step5Variants: React.FC<Props> = ({
                 </div>
               ) : (
                 <div className='border border-dashed border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
-                  No direct suggestions available for this category yet. Add a custom key below.
+                  No direct suggestions available for this category yet.
                 </div>
               )}
-            </div>
 
-            <div className='space-y-3'>
-              <StudioFieldLabel
-                label='Custom key'
-                help='Use your own label like Lens Power, Finish, Capacity, or Material.'
-                className='mb-0'
-              />
-              <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]'>
-                <input
-                  type='text'
-                  value={newVariantCustomKey}
-                  onChange={(event) => setNewVariantCustomKey(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      handleAddVariantWithCustomKey()
-                    }
-                  }}
-                  placeholder='Enter custom variant key'
-                  className={studioInputClass}
-                />
-                <Button
+              <div className='rounded-2xl bg-cyan-50/60 px-4 py-3 text-sm text-cyan-900'>
+                <button
                   type='button'
-                  variant='outline'
-                  onClick={handleAddVariantWithCustomKey}
-                  disabled={!String(newVariantCustomKey || '').trim()}
+                  onClick={() => setShowCustomVariantKeyInput((prev) => !prev)}
+                  className='font-medium underline decoration-cyan-300 underline-offset-4 transition hover:text-cyan-700'
                 >
-                  <Plus className='h-4 w-4' />
-                  Add Variant
-                </Button>
+                  Can&apos;t find it? Create your key variant.
+                </button>
               </div>
+
+              {showCustomVariantKeyInput ? (
+                <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]'>
+                  <input
+                    type='text'
+                    value={newVariantCustomKey}
+                    onChange={(event) => setNewVariantCustomKey(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        handleAddVariantWithCustomKey()
+                      }
+                    }}
+                    placeholder='Enter custom variant key'
+                    className={studioInputClass}
+                    autoFocus
+                  />
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={handleAddVariantWithCustomKey}
+                    disabled={!String(newVariantCustomKey || '').trim()}
+                  >
+                    <Plus className='h-4 w-4' />
+                    Add Variant
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={() => {
+                      setShowCustomVariantKeyInput(false)
+                      setNewVariantCustomKey('')
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </div>
-
-          <DialogFooter>
-            <Button type='button' variant='outline' onClick={closeAddVariantDialog}>
-              Cancel
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

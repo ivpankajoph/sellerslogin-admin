@@ -658,6 +658,20 @@ export default function TemplateWorkspace() {
   }, [vendorId, token])
 
   useEffect(() => {
+    if (typeof window === 'undefined' || isAdmin) return
+
+    const url = new URL(window.location.href)
+    const shouldOpenConnectDomain =
+      url.searchParams.get('openConnectDomain') === '1'
+
+    if (!shouldOpenConnectDomain) return
+
+    setConnectDomainListOpen(true)
+    url.searchParams.delete('openConnectDomain')
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [isAdmin])
+
+  useEffect(() => {
     if (!filteredTemplates.length) {
       if (selectedTemplateKey) {
         setSelectedTemplateKey('')

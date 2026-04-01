@@ -22,7 +22,10 @@ import { sidebarData } from './data/sidebar-data'
 import { NavGroup } from './nav-group'
 import type { NavCollapsible, NavGroup as SidebarNavGroup, NavItem } from './types'
 import { NavUser } from './nav-user'
-import { normalizeVendorPageAccess } from '@/features/team-access/access-config'
+import {
+  hasVendorPageAccess,
+  normalizeVendorPageAccess,
+} from '@/features/team-access/access-config'
 
 const hasChildren = (item: NavItem): item is NavCollapsible =>
   'items' in item && Array.isArray(item.items)
@@ -52,7 +55,7 @@ export function AppSidebar() {
   const canShowByPageAccess = (pageKey?: string) => {
     if (!isVendorTeamUser) return true
     if (!pageKey) return true
-    return pageAccess.has(pageKey as never)
+    return hasVendorPageAccess(pageAccess, pageKey as never)
   }
 
   const filteredNavGroups = sidebarData.navGroups

@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
+import { toast } from 'sonner'
 import api from '@/lib/axios'
 import { PASSWORD_REQUIREMENTS, isStrongPassword } from '@/lib/password-rules'
 import { cn } from '@/lib/utils'
@@ -20,7 +21,20 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from '@/components/ui/input-otp'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { TablePageHeader } from '@/components/data-table/table-page-header'
@@ -202,13 +216,15 @@ export default function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
 
   const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   })
-  const [passwordSaving, setPasswordSaving] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState('')
   const [passwordError, setPasswordError] = useState('')
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false)
+  const [passwordOtp, setPasswordOtp] = useState('')
+  const [passwordOtpSending, setPasswordOtpSending] = useState(false)
+  const [passwordOtpVerifying, setPasswordOtpVerifying] = useState(false)
 
   useEffect(() => {
     const scrollToPasswordSection = () => {
@@ -314,6 +330,7 @@ export default function ProfilePage() {
     readString(profile?.name || user?.name || user?.business_name) || 'Profile'
   const displayEmail = readString(profile?.email || user?.email) || '-'
   const displayPhone = readString(profile?.phone || user?.phone) || '-'
+  const registeredEmail = readString(profile?.email || user?.email).trim()
   const avatarInitials =
     displayName
       .split(/\s+/)
@@ -366,11 +383,55 @@ export default function ProfilePage() {
   }
 
   const handlePasswordUpdate = async () => {
+    if (!isVendor) {
+      setPasswordError('Password update OTP flow is only available for vendors.')
+      return
+    }
+
+    if (!registeredEmail) {
+      setPasswordError('Registered email not found.')
+      return
+    }
+
     try {
-      setPasswordSaving(true)
+      setPasswordOtpSending(true)
       setPasswordError('')
       setPasswordMessage('')
-      await api.put('/profile/password', passwordForm)
+      await api.post('/send-email-otp', {
+        email: registeredEmail,
+        purpose: 'password_change',
+      })
+      setPasswordOtp('')
+      setOtpDialogOpen(true)
+      setPasswordMessage('We have sent a code to your registered email.')
+    } catch (error: any) {
+      setPasswordError(
+        error?.response?.data?.message || 'Failed to send verification code.'
+      )
+    } finally {
+      setPasswordOtpSending(false)
+    }
+  }
+
+  const handleVerifyAndUpdatePassword = async () => {
+    if (!registeredEmail) {
+      setPasswordError('Registered email not found.')
+      return
+    }
+
+    try {
+      setPasswordOtpVerifying(true)
+      setPasswordError('')
+      setPasswordMessage('')
+      await api.post('/verify-email-otp', {
+        email: registeredEmail,
+        otp: passwordOtp,
+        purpose: 'password_change',
+      })
+      await api.put('/profile/password', {
+        newPassword: passwordForm.newPassword,
+        confirmPassword: passwordForm.confirmPassword,
+      })
       dispatch(
         setUser({
           ...user,
@@ -381,18 +442,20 @@ export default function ProfilePage() {
           show_password_change_reminder: false,
         })
       )
-      setPasswordMessage('Password updated successfully.')
+      setOtpDialogOpen(false)
+      setPasswordOtp('')
       setPasswordForm({
-        currentPassword: '',
         newPassword: '',
         confirmPassword: '',
       })
+      setPasswordMessage('')
+      toast.success('Password updated successfully.')
     } catch (error: any) {
       setPasswordError(
         error?.response?.data?.message || 'Password update failed.'
       )
     } finally {
-      setPasswordSaving(false)
+      setPasswordOtpVerifying(false)
     }
   }
 
@@ -632,18 +695,6 @@ export default function ProfilePage() {
                 <CardContent className='space-y-4'>
                   <div className='grid gap-4 md:grid-cols-2'>
                     <div className='space-y-2'>
-                      <Label>Current Password</Label>
-                      <PasswordInput
-                        value={passwordForm.currentPassword}
-                        onChange={(e) =>
-                          setPasswordForm((p) => ({
-                            ...p,
-                            currentPassword: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className='space-y-2'>
                       <Label>New Password</Label>
                       <PasswordInput
                         value={passwordForm.newPassword}
@@ -655,7 +706,7 @@ export default function ProfilePage() {
                         }
                       />
                     </div>
-                    <div className='space-y-2 md:col-span-2'>
+                    <div className='space-y-2'>
                       <Label>Confirm Password</Label>
                       <PasswordInput
                         value={passwordForm.confirmPassword}
@@ -695,14 +746,15 @@ export default function ProfilePage() {
                     <Button
                       onClick={handlePasswordUpdate}
                       disabled={
-                        passwordSaving ||
+                        passwordOtpSending ||
                         !isPasswordValid(passwordForm.newPassword) ||
                         passwordForm.newPassword !==
-                          passwordForm.confirmPassword
+                          passwordForm.confirmPassword ||
+                        !registeredEmail
                       }
                       className='bg-violet-700 hover:bg-violet-800'
                     >
-                      {passwordSaving ? 'Updating...' : 'Update Password'}
+                      {passwordOtpSending ? 'Sending Code...' : 'Update Password'}
                     </Button>
                   </div>
                   {passwordError && (
@@ -720,6 +772,143 @@ export default function ProfilePage() {
           </div>
         </div>
       </Main>
+      <Dialog
+        open={otpDialogOpen}
+        onOpenChange={(open) => {
+          if (!passwordOtpVerifying) {
+            setOtpDialogOpen(open)
+            if (!open) setPasswordOtp('')
+          }
+        }}
+      >
+        {/* <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>Update Your Password</DialogTitle>
+            <DialogDescription>
+              We have sent a code to your registered email{registeredEmail ? ` ${registeredEmail}` : ''}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='space-y-4'>
+            <div className='space-y-2'>
+              <Label>Enter Otp</Label>
+              <InputOTP
+                maxLength={6}
+                value={passwordOtp}
+                onChange={setPasswordOtp}
+                containerClassName='justify-center'
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+
+            <Button
+              type='button'
+              variant='outline'
+              onClick={handlePasswordUpdate}
+              disabled={passwordOtpSending || passwordOtpVerifying}
+              className='w-15'
+            >
+              {passwordOtpSending ? 'Resending...' : 'Resend Code'}
+            </Button>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setOtpDialogOpen(false)}
+              disabled={passwordOtpVerifying}
+            >
+              Cancel
+            </Button>
+            <Button
+              type='button'
+              onClick={handleVerifyAndUpdatePassword}
+              disabled={passwordOtpVerifying || passwordOtp.length !== 6}
+            >
+              {passwordOtpVerifying ? 'Verifying...' : 'Update Password'}
+            </Button>
+          </DialogFooter>
+        </DialogContent> */}
+
+        <DialogContent className='sm:max-w-[440px] p-6'>
+  <DialogHeader className="space-y-3">
+    <div className="mx-auto bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
+      <span className="text-xl">🔐</span>
+    </div>
+    <DialogTitle className="text-center text-2xl font-semibold tracking-tight">
+      Verification Required
+    </DialogTitle>
+    <DialogDescription className="text-center text-muted-foreground px-4">
+      We've sent a 6-digit security code to 
+      <span className="font-medium text-foreground block">
+        {registeredEmail || "your registered email"}
+      </span>
+    </DialogDescription>
+  </DialogHeader>
+
+  <div className='py-6 flex flex-col items-center space-y-6'>
+    <div className='space-y-4 w-full flex flex-col items-center'>
+      <InputOTP
+        maxLength={6}
+        value={passwordOtp}
+        onChange={setPasswordOtp}
+        containerClassName='group'
+      >
+        <InputOTPGroup className="gap-2">
+          {[0, 1, 2, 3, 4, 5].map((index) => (
+            <InputOTPSlot 
+              key={index} 
+              index={index} 
+              className="rounded-md border-2 border-muted transition-all focus:border-primary"
+            />
+          ))}
+        </InputOTPGroup>
+      </InputOTP>
+
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Didn't receive the code?</span>
+        <button
+          type='button'
+          onClick={handlePasswordUpdate}
+          disabled={passwordOtpSending || passwordOtpVerifying}
+          className='text-primary font-semibold hover:underline disabled:opacity-50'
+        >
+          {passwordOtpSending ? 'Sending...' : 'Resend Code'}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <DialogFooter className="sm:justify-between gap-3">
+    <Button
+      type='button'
+      variant='ghost'
+      className="flex-1"
+      onClick={() => setOtpDialogOpen(false)}
+      disabled={passwordOtpVerifying}
+    >
+      Cancel
+    </Button>
+    <Button
+      type='button'
+      className="flex-1 shadow-md transition-all active:scale-95"
+      onClick={handleVerifyAndUpdatePassword}
+      disabled={passwordOtpVerifying || passwordOtp.length !== 6}
+    >
+      {passwordOtpVerifying ? 'Verifying...' : 'Verify & Update'}
+    </Button>
+  </DialogFooter>
+</DialogContent>
+      </Dialog>
     </>
   )
 }
