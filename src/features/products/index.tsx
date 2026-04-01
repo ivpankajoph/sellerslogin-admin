@@ -10,7 +10,7 @@ import {
   ImageIcon,
   Loader2,
   Pencil,
-  Upload,
+
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { formatINR } from '@/lib/currency'

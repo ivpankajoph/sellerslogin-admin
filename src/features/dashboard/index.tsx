@@ -20,7 +20,7 @@ import api from '@/lib/axios'
 import type { RootState } from '@/store'
 import { setUser } from '@/store/slices/authSlice'
 import {
-  hasVendorPageAccess,
+
   normalizeVendorPageAccess,
 } from '@/features/team-access/access-config'
 import { UpgradePlanDialog } from './components/UpgradePlanDialog'
