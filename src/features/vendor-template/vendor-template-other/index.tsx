@@ -18,6 +18,7 @@ import { Header } from '@/components/layout/header'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { DomainModal } from '../components/DomainModel'
+import { SelectedFieldEditor } from '../components/SelectedFieldEditor'
 import { TemplatePageLayout } from '../components/TemplatePageLayout'
 import { TemplatePreviewPanel } from '../components/TemplatePreviewPanel'
 import { TemplateSectionOrder } from '../components/TemplateSectionOrder'
@@ -34,6 +35,11 @@ import {
 } from '../components/templateVariantParam'
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
+import {
+  consumePendingEditorSelection,
+  resolveEditorRouteFromComponent,
+  setPendingEditorSelection,
+} from '../components/previewSelection'
 
 const selectVendorId = (state: any): string => {
   const authUser = state?.auth?.user || null
@@ -44,10 +50,10 @@ const selectVendorId = (state: any): string => {
     null
 
   return String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
       vendorProfile?.vendor_id ||
@@ -233,7 +239,8 @@ function VendorTemplateOther() {
   )
   const [data, setData] = useState<TemplateData>(initialData)
   const [isSaving, setIsSaving] = useState(false)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
+  const [, setInlineEditVersion] = useState(0)
   const [domainOpen, setDomainOpen] = useState(false)
   const [sectionOrder, setSectionOrder] = useState(['faqs', 'social', 'footer'])
   const selectedTemplateKey = useMemo(
@@ -369,6 +376,12 @@ function VendorTemplateOther() {
     load()
   }, [activeWebsiteId, vendor_id, token])
 
+  useEffect(() => {
+    const pendingSelection = consumePendingEditorSelection('/vendor-template-other')
+    if (!pendingSelection?.componentId) return
+    setSelectedComponent(pendingSelection.componentId)
+  }, [])
+
   const updateField = (
     path: string[],
     value: unknown,
@@ -382,6 +395,19 @@ function VendorTemplateOther() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setSelectedComponent(path.join('.'))
+  }
+
+  const handlePreviewSelect = (_sectionId: string, componentId?: string) => {
+    const route = resolveEditorRouteFromComponent(componentId, selectedTemplateKey)
+    setPendingEditorSelection({
+      route: route || '/vendor-template-other',
+      componentId: componentId || null,
+    })
+    if (route) {
+      void navigate({ to: route })
+    }
+    setSelectedComponent(componentId || null)
   }
 
   const handleSave = useCallback(async (options?: { silent?: boolean }) => {
@@ -445,14 +471,6 @@ function VendorTemplateOther() {
     token,
     vendor_id,
   ])
-
-  useEffect(() => {
-    if (inlineEditVersion === 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSave({ silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [inlineEditVersion, handleSave])
 
   const previewCity = useMemo(
     () =>
@@ -1101,6 +1119,7 @@ function VendorTemplateOther() {
             title='Live Template Preview'
             subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
             baseSrc={previewBaseUrl}
+            previewQuery='?previewChrome=hide-nav'
             defaultPath=''
             pageOptions={[
               { label: 'Home', path: '' },
@@ -1120,10 +1139,17 @@ function VendorTemplateOther() {
             page='full'
             previewData={data}
             sectionOrder={sectionOrder}
+            onSelectSection={handlePreviewSelect}
             onInlineEdit={handleInlineEdit}
           />
         }
       >
+        <SelectedFieldEditor
+          data={data}
+          selectedComponent={selectedComponent}
+          updateField={updateField}
+        />
+
         <ThemeSettingsSection data={data} updateField={updateField} />
 
         <TemplateSectionOrder

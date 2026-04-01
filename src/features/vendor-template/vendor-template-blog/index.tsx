@@ -18,6 +18,7 @@ import { Header } from '@/components/layout/header'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { DomainModal } from '../components/DomainModel'
+import { SelectedFieldEditor } from '../components/SelectedFieldEditor'
 import { TemplatePageLayout } from '../components/TemplatePageLayout'
 import { TemplatePreviewPanel } from '../components/TemplatePreviewPanel'
 import { ThemeSettingsSection } from '../components/form/ThemeSettingsSection'
@@ -30,6 +31,11 @@ import {
 import { getStoredEditingTemplateKey } from '../components/templateVariantParam'
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
+import {
+  consumePendingEditorSelection,
+  resolveEditorRouteFromComponent,
+  setPendingEditorSelection,
+} from '../components/previewSelection'
 import { uploadImage } from '../helper/fileupload'
 
 const MAX_BLOG_COVER_SIZE_BYTES = 10 * 1024 * 1024
@@ -43,10 +49,10 @@ const selectVendorId = (state: any): string => {
     null
 
   return String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
       vendorProfile?.vendor_id ||
@@ -237,7 +243,8 @@ function VendorTemplateBlog() {
   )
   const [data, setData] = useState<TemplateData>(initialData)
   const [isSaving, setIsSaving] = useState(false)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
+  const [, setInlineEditVersion] = useState(0)
   const [domainOpen, setDomainOpen] = useState(false)
   const [uploadingBlogId, setUploadingBlogId] = useState<string | null>(null)
   const [testingCoverBlogId, setTestingCoverBlogId] = useState<string | null>(null)
@@ -368,7 +375,26 @@ function VendorTemplateBlog() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setSelectedComponent(path.join('.'))
   }
+
+  const handlePreviewSelect = (_sectionId: string, componentId?: string) => {
+    const route = resolveEditorRouteFromComponent(componentId, selectedTemplateKey)
+    setPendingEditorSelection({
+      route: route || '/vendor-template-blog',
+      componentId: componentId || null,
+    })
+    if (route && route !== '/vendor-template-blog') {
+      void navigate({ to: route })
+    }
+    setSelectedComponent(componentId || null)
+  }
+
+  useEffect(() => {
+    const pendingSelection = consumePendingEditorSelection('/vendor-template-blog')
+    if (!pendingSelection?.componentId) return
+    setSelectedComponent(pendingSelection.componentId)
+  }, [])
 
   const blogs = useMemo(
     () =>
@@ -587,14 +613,6 @@ function VendorTemplateBlog() {
     [activeWebsiteId, data, token, vendor_id]
   )
 
-  useEffect(() => {
-    if (inlineEditVersion === 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSave({ silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [handleSave, inlineEditVersion])
-
   const previewCity = useMemo(
     () =>
       resolvePreviewCityFromVendorProfile(
@@ -717,10 +735,17 @@ function VendorTemplateBlog() {
             vendorId={vendor_id}
             page='full'
             previewData={data}
+            onSelectSection={handlePreviewSelect}
             onInlineEdit={handleInlineEdit}
           />
         }
       >
+        <SelectedFieldEditor
+          data={data}
+          selectedComponent={selectedComponent}
+          updateField={updateField}
+        />
+
         <ThemeSettingsSection data={data} updateField={updateField} />
 
         <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>

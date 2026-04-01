@@ -103,6 +103,14 @@ const emptyForm: TeamMemberFormState = {
   allowed_website_ids: [],
 }
 
+const getBulkSelectablePageKeys = (
+  options: VendorPageAccessOption[],
+  hasWebsites: boolean
+) =>
+  options
+    .map((option) => option.key)
+    .filter((key) => hasWebsites || key !== 'my_websites')
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return 'Never'
   try {
@@ -330,6 +338,16 @@ export default function TeamAccessPage({
   )
 
   const websiteGrid = useMemo(() => chunk(websites, 2), [websites])
+  const selectablePageKeys = useMemo(
+    () => getBulkSelectablePageKeys(pageOptions, websites.length > 0),
+    [pageOptions, websites.length]
+  )
+  const allPagesSelected =
+    selectablePageKeys.length > 0 &&
+    selectablePageKeys.every((key) => form.allowed_page_keys.includes(key))
+  const allWebsitesSelected =
+    websites.length > 0 &&
+    websites.every((website) => form.allowed_website_ids.includes(website.id))
 
   const openCreateDialog = () => {
     setEditingMember(null)
@@ -381,6 +399,24 @@ export default function TeamAccessPage({
         allowed_website_ids: exists
           ? prev.allowed_website_ids.filter((item) => item !== websiteId)
           : [...prev.allowed_website_ids, websiteId],
+      }
+    })
+  }
+
+  const toggleAllPageAccess = () => {
+    setForm((prev) => {
+      if (allPagesSelected) {
+        return {
+          ...prev,
+          allowed_page_keys: [],
+          allowed_website_ids: [],
+        }
+      }
+
+      return {
+        ...prev,
+        allowed_page_keys: selectablePageKeys,
+        allowed_website_ids: websites.map((website) => website.id),
       }
     })
   }
@@ -746,7 +782,18 @@ export default function TeamAccessPage({
                     Choose which dashboard pages this user can open.
                   </p>
                 </div>
-                <Badge variant='outline'>{form.allowed_page_keys.length} selected</Badge>
+                <div className='flex items-center gap-2'>
+                  <Badge variant='outline'>{form.allowed_page_keys.length} selected</Badge>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={toggleAllPageAccess}
+                    disabled={!selectablePageKeys.length}
+                  >
+                    {allPagesSelected ? 'Clear All' : 'Select All'}
+                  </Button>
+                </div>
               </div>
 
               <div className='mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
@@ -780,7 +827,24 @@ export default function TeamAccessPage({
                     builder.
                   </p>
                 </div>
-                <Badge variant='outline'>{form.allowed_website_ids.length} selected</Badge>
+                <div className='flex items-center gap-2'>
+                  <Badge variant='outline'>{form.allowed_website_ids.length} selected</Badge>
+                  {form.allowed_page_keys.includes('my_websites') && websites.length ? (
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() =>
+                        updateForm(
+                          'allowed_website_ids',
+                          allWebsitesSelected ? [] : websites.map((website) => website.id)
+                        )
+                      }
+                    >
+                      {allWebsitesSelected ? 'Clear All' : 'Select All'}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
               {form.allowed_page_keys.includes('my_websites') ? (

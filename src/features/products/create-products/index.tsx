@@ -25,6 +25,7 @@ import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import { generateWithAI } from './aiHelpers'
 import { deleteFromCloudinary, uploadToCloudinary } from './cloudinary'
 import Step1BasicInfo from './components/Step1BasicInfo'
+import ProductPreviewDialog from './components/ProductPreviewDialog'
 import Step4SEO from './components/Step4SEO'
 import Step5Variants from './components/Step5Variants'
 import Step6FAQs from './components/Step6FAQs'
@@ -400,6 +401,7 @@ const VARIANT_KEY_CONTEXT_RULES: VariantContextRule[] = [
 
 const createInitialFormData = (): ProductFormData => ({
   mainCategory: '',
+  mainCategories: [],
   productName: '',
   productCategory: '',
   productCategories: [],
@@ -422,7 +424,7 @@ type ProductCreateDraft = {
   version: number
   savedAt: number
   formData: ProductFormData
-  selectedMainCategoryId: string
+  selectedMainCategoryIds: string[]
   selectedCategoryIds: string[]
   currentStep: number
   variantAttributeKeys: string[]
@@ -723,21 +725,87 @@ const sanitizeVariant = (value: unknown): Variant => {
   const raw = isRecord(value) ? value : {}
 
   return {
+    _id: toTrimmedText(raw._id),
     variantAttributes: sanitizeStringRecord(raw.variantAttributes),
     actualPrice: toNumberValue(raw.actualPrice),
     finalPrice: toNumberValue(raw.finalPrice),
     stockQuantity: toNumberValue(raw.stockQuantity),
     variantsImageUrls: sanitizeImageUploads(raw.variantsImageUrls),
     isActive: raw.isActive !== false,
+    variantMetaTitle: toText(raw.variantMetaTitle),
+    variantMetaDescription: toText(raw.variantMetaDescription),
+    variantMetaKeywords: sanitizeStringList(raw.variantMetaKeywords),
+    variantCanonicalUrl: toText(raw.variantCanonicalUrl),
   }
 }
 
+const getIdValue = (value: unknown) => {
+  if (typeof value === 'string') return value.trim()
+  if (isRecord(value)) {
+    return toTrimmedText(value._id ?? value.id)
+  }
+  return ''
+}
+
+const mapIdList = (value: unknown) =>
+  Array.isArray(value)
+    ? sanitizeStringList(value.map((item) => getIdValue(item)))
+    : []
+
+const buildEditModeHydratedFormData = (product: Record<string, unknown>): ProductFormData =>
+  sanitizeProductFormData({
+    mainCategory:
+      getIdValue(product.mainCategory) ||
+      getIdValue(product.mainCategoryData),
+    mainCategories:
+      mapIdList(product.mainCategories).length
+        ? mapIdList(product.mainCategories)
+        : [
+            getIdValue(product.mainCategory) || getIdValue(product.mainCategoryData),
+          ].filter(Boolean),
+    productName: product.productName,
+    productCategory:
+      getIdValue(product.productCategory) ||
+      getIdValue(product.productCategoryData),
+    productCategories:
+      mapIdList(product.productCategories).length
+        ? mapIdList(product.productCategories)
+        : [
+            getIdValue(product.productCategory) ||
+              getIdValue(product.productCategoryData),
+          ].filter(Boolean),
+    productSubCategories: mapIdList(product.productSubCategories),
+    availableCities: mapIdList(product.availableCities),
+    websiteIds: mapIdList(product.websiteIds),
+    brand: product.brand,
+    shortDescription: product.shortDescription,
+    description: product.description,
+    defaultImages: product.defaultImages,
+    isAvailable: product.isAvailable,
+    metaTitle: product.metaTitle,
+    metaDescription: product.metaDescription,
+    metaKeywords: product.metaKeywords,
+    variants: Array.isArray(product.variants)
+      ? product.variants.map((variant) =>
+          sanitizeVariant({
+            ...(isRecord(variant) ? variant : {}),
+            _id: isRecord(variant) ? variant._id : '',
+          })
+        )
+      : [],
+    faqs: product.faqs,
+  })
+
 const sanitizeProductFormData = (value: unknown): ProductFormData => {
   const raw = isRecord(value) ? value : {}
+  const sanitizedMainCategories = sanitizeStringList(
+    raw.mainCategories ?? raw.mainCategory
+  )
 
   return {
     ...createInitialFormData(),
-    mainCategory: toTrimmedText(raw.mainCategory),
+    mainCategory: sanitizedMainCategories[0] || toTrimmedText(raw.mainCategory),
+    mainCategories: sanitizedMainCategories,
     productName: toText(raw.productName),
     productCategory: toTrimmedText(raw.productCategory),
     productCategories: sanitizeStringList(raw.productCategories),
@@ -792,7 +860,9 @@ const sanitizeProductCreateDraft = (value: unknown): ProductCreateDraft | null =
     version: Number(value.version) || 0,
     savedAt: Number(value.savedAt) || 0,
     formData: sanitizeProductFormData(value.formData),
-    selectedMainCategoryId: toTrimmedText(value.selectedMainCategoryId),
+    selectedMainCategoryIds: sanitizeStringList(
+      value.selectedMainCategoryIds ?? value.selectedMainCategoryId
+    ),
     selectedCategoryIds: sanitizeStringList(value.selectedCategoryIds),
     currentStep: clampProductCreateStep(value.currentStep),
     variantAttributeKeys: sanitizeStringList(
@@ -815,8 +885,21 @@ const ProductCreateForm: React.FC = () => {
       null
   )
   const vendorId = String(authUser?.id || authUser?._id || '')
+  const initialEditorSearch = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return { mode: 'create', productId: '' }
+    }
+
+    const params = new URLSearchParams(window.location.search)
+    return {
+      mode: params.get('mode') === 'edit' ? 'edit' : 'create',
+      productId: String(params.get('productId') || '').trim(),
+    }
+  }, [])
+  const isEditMode =
+    initialEditorSearch.mode === 'edit' && Boolean(initialEditorSearch.productId)
   const draftStorageKey = vendorId
-    ? buildProductCreateDraftStorageKey(vendorId)
+    ? `${buildProductCreateDraftStorageKey(vendorId)}_${isEditMode ? `edit_${initialEditorSearch.productId}` : 'create'}`
     : ''
   const restoredVariantAttributeKeysRef = useRef<string[] | null>(null)
   const lastAutoAppliedVariantKeyContextRef = useRef('')
@@ -836,7 +919,7 @@ const ProductCreateForm: React.FC = () => {
   const [isCategoryLoading, setIsCategoryLoading] = useState(false)
   const [isWebsiteLoading, setIsWebsiteLoading] = useState(false)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
-  const [selectedMainCategoryId, setSelectedMainCategoryId] = useState('')
+  const [selectedMainCategoryIds, setSelectedMainCategoryIds] = useState<string[]>([])
   const [filteredSubcategories, setFilteredSubcategories] = useState<any[]>([])
   const [variantAttributeKeys, setVariantAttributeKeys] = useState<string[]>([])
   const [recommendedVariantKeys, setRecommendedVariantKeys] = useState<string[]>([])
@@ -854,11 +937,14 @@ const ProductCreateForm: React.FC = () => {
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
   const [successDialogMessage, setSuccessDialogMessage] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [isEditProductLoading, setIsEditProductLoading] = useState(false)
+  const primarySelectedMainCategoryId = selectedMainCategoryIds[0] || ''
 
   const resetDraftState = () => {
     restoredVariantAttributeKeysRef.current = null
     setFormData(createInitialFormData())
-    setSelectedMainCategoryId('')
+    setSelectedMainCategoryIds([])
     setSelectedCategoryIds([])
     setCategories([])
     setFilteredSubcategories([])
@@ -881,6 +967,10 @@ const ProductCreateForm: React.FC = () => {
 
   useEffect(() => {
     if (!vendorId || !draftStorageKey || typeof window === 'undefined') return
+    if (isEditMode) {
+      setIsDraftHydrated(true)
+      return
+    }
 
     setIsDraftHydrated(false)
 
@@ -911,8 +1001,12 @@ const ProductCreateForm: React.FC = () => {
         : null
 
       setFormData(parsedDraft.formData)
-      setSelectedMainCategoryId(
-        parsedDraft.selectedMainCategoryId || parsedDraft.formData.mainCategory
+      setSelectedMainCategoryIds(
+        parsedDraft.selectedMainCategoryIds.length
+          ? parsedDraft.selectedMainCategoryIds
+          : sanitizeStringList(
+              parsedDraft.formData.mainCategories ?? parsedDraft.formData.mainCategory
+            )
       )
       setSelectedCategoryIds(
         parsedDraft.selectedCategoryIds.length
@@ -933,7 +1027,7 @@ const ProductCreateForm: React.FC = () => {
     } finally {
       setIsDraftHydrated(true)
     }
-  }, [draftStorageKey, vendorId])
+  }, [draftStorageKey, isEditMode, vendorId])
 
   useEffect(() => {
     if (!isDraftHydrated || !vendorId || !draftStorageKey || typeof window === 'undefined') {
@@ -945,7 +1039,9 @@ const ProductCreateForm: React.FC = () => {
         version: PRODUCT_CREATE_DRAFT_VERSION,
         savedAt: Date.now(),
         formData: sanitizeProductFormData(formData),
-        selectedMainCategoryId: selectedMainCategoryId || formData.mainCategory,
+        selectedMainCategoryIds: selectedMainCategoryIds.length
+          ? selectedMainCategoryIds
+          : sanitizeStringList(formData.mainCategories ?? formData.mainCategory),
         selectedCategoryIds: selectedCategoryIds.length
           ? selectedCategoryIds
           : sanitizeStringList(formData.productCategories),
@@ -970,10 +1066,81 @@ const ProductCreateForm: React.FC = () => {
     isDraftHydrated,
     metaKeywordInput,
     selectedCategoryIds,
-    selectedMainCategoryId,
+    selectedMainCategoryIds,
     variantAttributeKeys,
     vendorId,
   ])
+
+  useEffect(() => {
+    if (!isEditMode || !initialEditorSearch.productId) return
+    if (!AUTH_TOKEN) return
+
+    let isCancelled = false
+
+    const loadProductForEditing = async () => {
+      setIsEditProductLoading(true)
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/${initialEditorSearch.productId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${AUTH_TOKEN}`,
+            },
+          }
+        )
+
+        const result = await response.json().catch(() => null)
+        if (!response.ok || !result?.product) {
+          throw new Error(result?.message || 'Failed to load product for editing')
+        }
+
+        const product = result.product as Record<string, unknown>
+        const nextFormData = buildEditModeHydratedFormData(product)
+        const nextMainCategoryIds = sanitizeStringList(
+          nextFormData.mainCategories.length
+            ? nextFormData.mainCategories
+            : [nextFormData.mainCategory]
+        )
+        const nextCategoryIds = sanitizeStringList(
+          nextFormData.productCategories.length
+            ? nextFormData.productCategories
+            : [nextFormData.productCategory]
+        )
+        const nextVariantKeys = sanitizeStringList(
+          nextFormData.variants.flatMap((variant) =>
+            Object.keys(variant.variantAttributes || {})
+          )
+        )
+
+        if (isCancelled) return
+
+        restoredVariantAttributeKeysRef.current = nextVariantKeys
+        setFormData(nextFormData)
+        setSelectedMainCategoryIds(nextMainCategoryIds)
+        setSelectedCategoryIds(nextCategoryIds)
+        setVariantAttributeKeys(nextVariantKeys)
+        setMetaKeywordInput('')
+        setCurrentStep(1)
+        setDraftSavedAt(null)
+        setIsDraftHydrated(true)
+      } catch (error: any) {
+        if (!isCancelled) {
+          toast.error(error?.message || 'Failed to load product for editing')
+          setIsDraftHydrated(true)
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsEditProductLoading(false)
+        }
+      }
+    }
+
+    void loadProductForEditing()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [AUTH_TOKEN, initialEditorSearch.productId, isEditMode])
 
   const lastSavedLabel = useMemo(() => {
     if (!draftSavedAt) return ''
@@ -997,10 +1164,21 @@ const ProductCreateForm: React.FC = () => {
 
   const selectedMainCategoryName = useMemo(() => {
     const current = mainCategories.find(
-      (category: any) => String(category?._id) === String(selectedMainCategoryId)
+      (category: any) => String(category?._id) === String(primarySelectedMainCategoryId)
     )
     return String(current?.name || '').trim()
-  }, [mainCategories, selectedMainCategoryId])
+  }, [mainCategories, primarySelectedMainCategoryId])
+
+  const selectedMainCategoryNames = useMemo(
+    () =>
+      mainCategories
+        .filter((category: any) =>
+          selectedMainCategoryIds.includes(String(category?._id || ''))
+        )
+        .map((category: any) => String(category?.name || '').trim())
+        .filter(Boolean),
+    [mainCategories, selectedMainCategoryIds]
+  )
 
   const selectedCategoryNames = useMemo(
     () =>
@@ -1021,6 +1199,42 @@ const ProductCreateForm: React.FC = () => {
         .filter(Boolean),
     [filteredSubcategories, formData.productSubCategories]
   )
+
+  const selectedWebsiteNames = useMemo(() => {
+    if (!formData.websiteIds.length) return []
+
+    const websiteMap = new Map(
+      websites.map((website) => [
+        String(website?._id || ''),
+        String(
+          website?.name ||
+            website?.business_name ||
+            website?.template_name ||
+            website?.template_key ||
+            ''
+        ).trim(),
+      ])
+    )
+
+    return sanitizeStringList(
+      formData.websiteIds.map((websiteId) => websiteMap.get(String(websiteId || '')) || '')
+    )
+  }, [formData.websiteIds, websites])
+
+  const selectedCityNames = useMemo(() => {
+    if (!formData.availableCities.length) return []
+
+    const cityMap = new Map(
+      cities.map((city: any) => [
+        String(city?._id || ''),
+        String(city?.name || city?.label || '').trim(),
+      ])
+    )
+
+    return sanitizeStringList(
+      formData.availableCities.map((cityId) => cityMap.get(String(cityId || '')) || '')
+    )
+  }, [cities, formData.availableCities])
 
   const variantContextNames = useMemo(
     () =>
@@ -1154,6 +1368,8 @@ const ProductCreateForm: React.FC = () => {
     ]
   )
 
+  const previewFormData = useMemo(() => sanitizeProductFormData(formData), [formData])
+
   const goToStep = (stepIndex: number) => {
     setCurrentStep(clampProductCreateStep(stepIndex))
 
@@ -1248,6 +1464,7 @@ const ProductCreateForm: React.FC = () => {
 
   useEffect(() => {
     if (!isDraftHydrated) return
+    if (isEditMode) return
 
     const allVisibleCityIds = cities
       .map((city: any) => String(city?._id || '').trim())
@@ -1267,7 +1484,7 @@ const ProductCreateForm: React.FC = () => {
         availableCities: allVisibleCityIds,
       }
     })
-  }, [cities, isDraftHydrated])
+  }, [cities, isDraftHydrated, isEditMode])
 
   useEffect(() => {
     if (!isDraftHydrated) return
@@ -1299,7 +1516,7 @@ const ProductCreateForm: React.FC = () => {
 
   useEffect(() => {
     if (!isDraftHydrated) return
-    if (!selectedMainCategoryId) {
+    if (!selectedMainCategoryIds.length) {
       setCategories([])
       setSelectedCategoryIds([])
       setFilteredSubcategories([])
@@ -1309,19 +1526,33 @@ const ProductCreateForm: React.FC = () => {
     const fetchCategories = async () => {
       setIsCategoryLoading(true)
       try {
-        const params = new URLSearchParams({
-          main_category_id: selectedMainCategoryId,
-          level: 'category',
-          limit: '500',
-        })
+        const responses = await Promise.all(
+          selectedMainCategoryIds.map((mainCategoryId) => {
+            const params = new URLSearchParams({
+              main_category_id: mainCategoryId,
+              level: 'category',
+              limit: '500',
+            })
 
-        const res = await fetch(
-          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/categories/getall?${params.toString()}`
+            return fetch(
+              `${import.meta.env.VITE_PUBLIC_API_URL}/v1/categories/getall?${params.toString()}`
+            )
+          })
         )
 
-        if (!res.ok) throw new Error('Failed to fetch categories')
-        const json = await res.json()
-        setCategories(Array.isArray(json?.data) ? json.data : [])
+        const merged: any[] = []
+        for (const response of responses) {
+          if (!response.ok) continue
+          const json = await response.json()
+          if (Array.isArray(json?.data)) {
+            merged.push(...json.data)
+          }
+        }
+
+        const unique = Array.from(
+          new Map(merged.map((category: any) => [String(category?._id || ''), category])).values()
+        )
+        setCategories(sortEntitiesByName(unique))
       } catch (err) {
         setCategories([])
       } finally {
@@ -1330,7 +1561,7 @@ const ProductCreateForm: React.FC = () => {
     }
 
     fetchCategories()
-  }, [isDraftHydrated, selectedMainCategoryId])
+  }, [isDraftHydrated, selectedMainCategoryIds])
 
   useEffect(() => {
     if (!isDraftHydrated) return
@@ -1416,13 +1647,18 @@ const ProductCreateForm: React.FC = () => {
 
     const created = payload.data
     setMainCategories((prev) => sortEntitiesByName(mergeEntityById(prev, created)))
-    setSelectedMainCategoryId(created._id)
+    setSelectedMainCategoryIds((prev) =>
+      prev.includes(created._id) ? prev : [...prev, created._id]
+    )
     setSelectedCategoryIds([])
     setCategories([])
     setFilteredSubcategories([])
     setFormData((prev: ProductFormData) => ({
       ...prev,
       mainCategory: created._id,
+      mainCategories: prev.mainCategories.includes(created._id)
+        ? prev.mainCategories
+        : [...prev.mainCategories, created._id],
       productCategory: '',
       productCategories: [],
       productSubCategories: [],
@@ -1434,15 +1670,15 @@ const ProductCreateForm: React.FC = () => {
     if (!trimmedName) {
       throw new Error('Category name is required.')
     }
-    if (!selectedMainCategoryId) {
-      throw new Error('Select a main category first.')
+    if (!primarySelectedMainCategoryId) {
+      throw new Error('Select at least one main category first.')
     }
     if (!AUTH_TOKEN) {
       throw new Error('Your session has expired. Please login again.')
     }
 
     const selectedMainCategory = mainCategories.find(
-      (category: any) => String(category?._id) === String(selectedMainCategoryId)
+      (category: any) => String(category?._id) === String(primarySelectedMainCategoryId)
     )
 
     const response = await fetch(
@@ -1455,7 +1691,7 @@ const ProductCreateForm: React.FC = () => {
         },
         body: JSON.stringify({
           name: trimmedName,
-          main_category_id: selectedMainCategoryId,
+          main_category_id: primarySelectedMainCategoryId,
           main_category_name: selectedMainCategory?.name || '',
         }),
       }
@@ -1510,7 +1746,7 @@ const ProductCreateForm: React.FC = () => {
     }
 
     const selectedMainCategory = mainCategories.find(
-      (category: any) => String(category?._id) === String(selectedMainCategoryId)
+      (category: any) => String(category?._id) === String(primarySelectedMainCategoryId)
     )
 
     const response = await fetch(
@@ -1525,7 +1761,7 @@ const ProductCreateForm: React.FC = () => {
           name: trimmedName,
           category_id: parentCategory._id,
           category_name: parentCategory.name,
-          main_category_id: selectedMainCategoryId,
+          main_category_id: primarySelectedMainCategoryId,
           main_category_name: selectedMainCategory?.name || '',
         }),
       }
@@ -1585,7 +1821,7 @@ const ProductCreateForm: React.FC = () => {
       restoredVariantAttributeKeysRef.current || []
     )
 
-    if (!selectedMainCategoryId) {
+    if (!primarySelectedMainCategoryId) {
       restoredVariantAttributeKeysRef.current = null
       lastAutoAppliedVariantKeyContextRef.current = ''
       setRecommendedVariantKeys([])
@@ -1596,7 +1832,7 @@ const ProductCreateForm: React.FC = () => {
     if (restoredKeys.length) {
       setVariantAttributeKeys(restoredKeys)
       lastAutoAppliedVariantKeyContextRef.current = [
-        selectedMainCategoryId,
+        primarySelectedMainCategoryId,
         ...selectedCategoryIds,
       ]
         .filter(Boolean)
@@ -1606,7 +1842,7 @@ const ProductCreateForm: React.FC = () => {
     }
 
     setVariantAttributeKeys([])
-  }, [isDraftHydrated, selectedMainCategoryId, selectedCategoryIds])
+  }, [isDraftHydrated, primarySelectedMainCategoryId, selectedCategoryIds])
 
   useEffect(() => {
     if (!isDraftHydrated) return
@@ -1619,7 +1855,7 @@ const ProductCreateForm: React.FC = () => {
     ]
     const fallbackKeys = buildRecommendedVariantKeysForContext([], suggestionContextNames)
     const variantKeyContextSignature = [
-      selectedMainCategoryId,
+      primarySelectedMainCategoryId,
       ...selectedCategoryIds,
       ...formData.productSubCategories,
       toTrimmedText(formData.productName),
@@ -1631,7 +1867,7 @@ const ProductCreateForm: React.FC = () => {
       !variantAttributeKeys.length &&
       lastAutoAppliedVariantKeyContextRef.current !== variantKeyContextSignature
 
-    if (!selectedMainCategoryId) {
+    if (!primarySelectedMainCategoryId) {
       setRecommendedVariantKeys(fallbackKeys)
       return
     }
@@ -1639,7 +1875,7 @@ const ProductCreateForm: React.FC = () => {
     const fetchRecommendedVariantKeys = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/specification-keys/main-category/${selectedMainCategoryId}`
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/specification-keys/main-category/${primarySelectedMainCategoryId}`
         )
 
         if (!res.ok) throw new Error('Failed to fetch variant keys')
@@ -1672,7 +1908,7 @@ const ProductCreateForm: React.FC = () => {
     isDraftHydrated,
     selectedCategoryIds,
     selectedCategoryNames,
-    selectedMainCategoryId,
+    primarySelectedMainCategoryId,
     selectedMainCategoryName,
     selectedSubcategoryNames,
     variantAttributeKeys.length,
@@ -1877,7 +2113,7 @@ const ProductCreateForm: React.FC = () => {
       .filter(Boolean)
       .join(', ')
     const suggestionContextSignature = [
-      selectedMainCategoryId,
+      primarySelectedMainCategoryId,
       ...selectedCategoryIds,
       ...formData.productSubCategories,
       toTrimmedText(formData.productName),
@@ -2244,26 +2480,36 @@ const ProductCreateForm: React.FC = () => {
       const autoAvailableCityIds = cities
         .map((city: any) => String(city?._id || '').trim())
         .filter(Boolean)
+      const nextAvailableCityIds = sanitizeStringList(formData.availableCities).length
+        ? sanitizeStringList(formData.availableCities)
+        : autoAvailableCityIds
 
       const payload = {
         ...formData,
-        mainCategory: selectedMainCategoryId || formData.mainCategory,
+        mainCategory: primarySelectedMainCategoryId || formData.mainCategory,
+        mainCategories: selectedMainCategoryIds.length
+          ? selectedMainCategoryIds
+          : sanitizeStringList(formData.mainCategories ?? formData.mainCategory),
         productCategory: selectedCategoryIds[0] || '',
         productCategories: selectedCategoryIds,
-        availableCities: autoAvailableCityIds,
+        availableCities: nextAvailableCityIds,
         websiteIds: sanitizeStringList(formData.websiteIds),
         variants: formData.variants.map((v) => ({
           ...v,
+          _id: toTrimmedText(v._id),
           actualPrice: !v.actualPrice ? 0 : Number(v.actualPrice),
           finalPrice: !v.finalPrice ? 0 : Number(v.finalPrice),
           stockQuantity: !v.stockQuantity ? 0 : Number(v.stockQuantity),
+          variantMetaKeywords: sanitizeStringList(v.variantMetaKeywords),
         })),
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/create`,
+        isEditMode
+          ? `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/${initialEditorSearch.productId}/content`
+          : `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/create`,
         {
-          method: 'POST',
+          method: isEditMode ? 'PATCH' : 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${AUTH_TOKEN}`,
@@ -2288,15 +2534,23 @@ const ProductCreateForm: React.FC = () => {
         throw new Error(String(backendMessage))
       }
 
-      const nextSuccessMessage =
-        responseBody?.message || 'Product created successfully!'
-      clearDraftStorage()
-      resetDraftState()
-      goToStep(1)
-      setSuccessDialogMessage(nextSuccessMessage)
-      setSuccessDialogOpen(true)
+      const nextSuccessMessage = responseBody?.message || (isEditMode
+        ? 'Product updated successfully!'
+        : 'Product created successfully!')
+
+      if (isEditMode) {
+        toast.success(nextSuccessMessage)
+      } else {
+        clearDraftStorage()
+        resetDraftState()
+        goToStep(1)
+        setSuccessDialogMessage(nextSuccessMessage)
+        setSuccessDialogOpen(true)
+      }
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to create product')
+      toast.error(
+        err?.message || (isEditMode ? 'Failed to update product' : 'Failed to create product')
+      )
     } finally {
       setLoading(false)
     }
@@ -2311,8 +2565,8 @@ const ProductCreateForm: React.FC = () => {
             formData={formData}
             setFormData={setFormData}
             mainCategories={mainCategories}
-            selectedMainCategoryId={selectedMainCategoryId}
-            setSelectedMainCategoryId={setSelectedMainCategoryId}
+            selectedMainCategoryIds={selectedMainCategoryIds}
+            setSelectedMainCategoryIds={setSelectedMainCategoryIds}
             categories={categories}
             selectedCategoryIds={selectedCategoryIds}
             setSelectedCategoryIds={setSelectedCategoryIds}
@@ -2517,13 +2771,15 @@ const ProductCreateForm: React.FC = () => {
           <div className='flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'>
             <div>
               <div className='text-sm font-medium text-muted-foreground'>
-                Products / Create product
+                Products / {isEditMode ? 'Update product' : 'Create product'}
               </div>
               <h1 className='mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl'>
-                Create product
+                {isEditMode ? 'Update product' : 'Create product'}
               </h1>
               <p className='mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base'>
-                Add product details, configure variants, and finish search content in
+                {isEditMode
+                  ? 'Edit product details, update variants, and review search content in the same step-by-step editor.'
+                  : 'Add product details, configure variants, and finish search content in'}
                 a cleaner step-by-step editor.
               </p>
             </div>
@@ -2549,6 +2805,14 @@ const ProductCreateForm: React.FC = () => {
                 type='button'
                 variant='outline'
                 onClick={() => {
+                  if (isEditMode) {
+                    if (typeof window !== 'undefined') {
+                      window.location.assign(
+                        `/products/create-products?mode=edit&productId=${encodeURIComponent(initialEditorSearch.productId)}`
+                      )
+                    }
+                    return
+                  }
                   if (
                     typeof window !== 'undefined' &&
                     !window.confirm('Clear the saved product draft for this vendor?')
@@ -2560,13 +2824,19 @@ const ProductCreateForm: React.FC = () => {
                 }}
                 className='h-10 rounded-full px-4'
               >
-                Reset Draft
+                {isEditMode ? 'Reset Changes' : 'Reset Draft'}
               </Button>
             </div>
           </div>
         </section>
 
         <div ref={formTopRef} className='rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6'>
+          {isEditProductLoading ? (
+            <div className='mb-6 flex items-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground'>
+              <Loader2 className='h-4 w-4 animate-spin' />
+              Loading product details...
+            </div>
+          ) : null}
           <div className='mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'>
             <div>
               <div className='rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground inline-flex'>
@@ -2648,20 +2918,47 @@ const ProductCreateForm: React.FC = () => {
                   <ArrowRight className='h-4 w-4' />
                 </button>
               ) : (
-                <button
-                  type='button'
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  className='inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70'
-                >
-                  {loading && <Loader2 className='h-4 w-4 animate-spin' />}
-                  Create Product
-                </button>
+                <div className='flex flex-wrap items-center gap-3'>
+                  <button
+                    type='button'
+                    onClick={() => setPreviewOpen(true)}
+                    className='inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-background px-5 text-sm font-semibold text-foreground transition hover:bg-secondary'
+                  >
+                    <Search className='h-4 w-4' />
+                    Product Preview
+                  </button>
+                  <button
+                    type='button'
+                    onClick={handleSubmit}
+                    disabled={loading || isEditProductLoading}
+                    className='inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70'
+                  >
+                    {loading && <Loader2 className='h-4 w-4 animate-spin' />}
+                    {isEditMode ? 'Update Product' : 'Create Product'}
+                  </button>
+                </div>
               )}
             </div>
           </form>
         </div>
       </div>
+
+      <ProductPreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        formData={previewFormData}
+        mainCategoryLabels={selectedMainCategoryNames}
+        categoryLabels={selectedCategoryNames}
+        subcategoryLabels={selectedSubcategoryNames}
+        websiteLabels={selectedWebsiteNames}
+        cityLabels={selectedCityNames}
+        searchPreviewTitle={formData.metaTitle?.trim() || defaultMetaTitle || 'Search title preview'}
+        searchPreviewDescription={
+          formData.metaDescription?.trim() ||
+          defaultMetaDescription ||
+          'Meta description will show here once the vendor fills Step 3.'
+        }
+      />
 
       <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
         <DialogContent className='max-w-md rounded-[28px] border-border p-0 shadow-2xl'>
@@ -2671,7 +2968,7 @@ const ProductCreateForm: React.FC = () => {
             </div>
             <DialogHeader className='text-left'>
               <DialogTitle className='text-2xl font-semibold text-foreground'>
-                Product Created
+                {isEditMode ? 'Product Updated' : 'Product Created'}
               </DialogTitle>
               <DialogDescription className='text-sm leading-6 text-muted-foreground'>
                 {successDialogMessage}

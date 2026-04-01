@@ -5,12 +5,17 @@ import { useLocation, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Link2, Search as SearchIcon, Wand2 } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
 import { DomainModal } from './components/DomainModel'
+import { SelectedFieldEditor } from './components/SelectedFieldEditor'
 import { TemplatePageLayout } from './components/TemplatePageLayout'
 import { TemplatePreviewPanel } from './components/TemplatePreviewPanel'
 import { TemplateSectionOrder } from './components/TemplateSectionOrder'
+import { ArrayField } from './components/form/ArrayField'
 import { BasicInfoSection } from './components/form/BasicInfoSection'
 import { DescriptionSection } from './components/form/DescriptionSection'
 import { HeroSection } from './components/form/HeroSection'
@@ -33,6 +38,11 @@ import {
   normalizeTemplateParam,
   setStoredEditingTemplateKey,
 } from './components/templateVariantParam'
+import {
+  consumePendingEditorSelection,
+  resolveEditorRouteFromComponent,
+  setPendingEditorSelection,
+} from './components/previewSelection'
 
 type BuilderSearchTarget = {
   id: string
@@ -80,13 +90,14 @@ export default function TemplateForm() {
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
   const [isBuilderOpen, setIsBuilderOpen] = useState(false)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [, setInlineEditVersion] = useState(0)
   const [templateSearchTerm, setTemplateSearchTerm] = useState('')
   const [builderSearchTerm, setBuilderSearchTerm] = useState('')
   const [sectionOrder, setSectionOrder] = useState([
     'branding',
     'hero',
     'description',
+    'faqs',
     'products',
   ])
   const pathnameTemplateKey = useMemo(() => {
@@ -101,7 +112,11 @@ export default function TemplateForm() {
 
   useEffect(() => {
     if (loadedSectionOrder.length) {
-      setSectionOrder(loadedSectionOrder)
+      const normalized = [...loadedSectionOrder]
+      ;['branding', 'hero', 'description', 'faqs', 'products'].forEach((id) => {
+        if (!normalized.includes(id)) normalized.push(id)
+      })
+      setSectionOrder(normalized)
     }
   }, [loadedSectionOrder])
 
@@ -146,6 +161,17 @@ export default function TemplateForm() {
       target.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [selectedComponent])
+
+  useEffect(() => {
+    const pendingSelection = consumePendingEditorSelection(pathname)
+    if (!pendingSelection) return
+    if (pendingSelection.sectionId) {
+      setSelectedSection(pendingSelection.sectionId)
+    }
+    if (pendingSelection.componentId) {
+      setSelectedComponent(pendingSelection.componentId)
+    }
+  }, [pathname])
 
   useEffect(() => {
     if (!vendor_id || !templateCatalog.length) return
@@ -223,14 +249,6 @@ export default function TemplateForm() {
     }
   }, [pathname])
 
-  useEffect(() => {
-    if (!isBuilderOpen || inlineEditVersion === 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSubmit(sectionOrder, { silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [inlineEditVersion, isBuilderOpen, handleSubmit, sectionOrder])
-
   const storefrontBaseUrl = getVendorTemplateBaseUrl(vendor_id)
   const previewCity = useMemo(
     () =>
@@ -256,11 +274,6 @@ export default function TemplateForm() {
 
   const handleSubmitWithOrder = () => handleSubmit(sectionOrder)
 
-  const handleSelectSection = (sectionId: string, componentId?: string) => {
-    setSelectedSection(sectionId)
-    setSelectedComponent(componentId || null)
-  }
-
   const handleTemplateSelect = (templateKey: string) => {
     setSelectedTemplateKey(templateKey)
     setStoredEditingTemplateKey(vendor_id, templateKey)
@@ -275,6 +288,21 @@ export default function TemplateForm() {
     setSelectedSection(target.sectionId)
     setSelectedComponent(target.componentId || null)
     setBuilderSearchTerm(target.label)
+  }
+
+  const handlePreviewSelect = (sectionId: string, componentId?: string) => {
+    const route = resolveEditorRouteFromComponent(componentId, selectedTemplateKey)
+    setPendingEditorSelection({
+      route: route || pathname,
+      sectionId,
+      componentId: componentId || null,
+    })
+    if (route && route !== pathname) {
+      void navigate({ to: route })
+      return
+    }
+    setSelectedSection(sectionId)
+    setSelectedComponent(componentId || null)
   }
 
   const sections = useMemo(
@@ -293,6 +321,11 @@ export default function TemplateForm() {
         id: 'description',
         title: 'Story + Metrics',
         description: 'Long-form description and highlight stats',
+      },
+      {
+        id: 'faqs',
+        title: 'FAQ Content',
+        description: 'Questions and answers shown on template pages',
       },
       {
         id: 'products',
@@ -459,6 +492,33 @@ export default function TemplateForm() {
         componentId: 'components.home_page.advantage.image',
       },
       {
+        id: 'hero-stat-1',
+        label: 'Hero Stat 1',
+        sectionId: 'description',
+        componentId: 'components.home_page.heroStats.0.value',
+        keywords: ['project delivered', 'metrics'],
+      },
+      {
+        id: 'industries-heading',
+        label: 'Industries Heading',
+        sectionId: 'description',
+        componentId: 'components.home_page.industries.heading',
+        keywords: ['strategic sectors', 'industries'],
+      },
+      {
+        id: 'faq-heading',
+        label: 'FAQ Heading',
+        sectionId: 'faqs',
+        componentId: 'components.social_page.faqs.heading',
+        keywords: ['faq', 'questions'],
+      },
+      {
+        id: 'faq-subheading',
+        label: 'FAQ Subheading',
+        sectionId: 'faqs',
+        componentId: 'components.social_page.faqs.subheading',
+      },
+      {
         id: 'products-kicker',
         label: 'Products Kicker',
         sectionId: 'products',
@@ -597,6 +657,118 @@ export default function TemplateForm() {
           uploadingPaths={uploadingPaths}
           selectedComponent={selectedComponent}
         />
+      </div>
+    ),
+    faqs: (
+      <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
+        <div className='space-y-4'>
+          <p className='text-xs font-semibold uppercase tracking-[0.3em] text-slate-400'>
+            FAQ Content
+          </p>
+          <h3 className='text-lg font-semibold text-slate-900'>
+            Questions & answers
+          </h3>
+
+          <div
+            className={cn(
+              'space-y-2',
+              selectedComponent === 'components.social_page.faqs.heading' &&
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component='components.social_page.faqs.heading'
+          >
+            <Label>FAQ Heading</Label>
+            <Input
+              value={data.components.social_page?.faqs?.heading || ''}
+              onChange={(e) =>
+                updateField(['components', 'social_page', 'faqs', 'heading'], e.target.value)
+              }
+              placeholder='Frequently Asked Questions'
+            />
+          </div>
+
+          <div
+            className={cn(
+              'space-y-2',
+              selectedComponent === 'components.social_page.faqs.subheading' &&
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component='components.social_page.faqs.subheading'
+          >
+            <Label>FAQ Subheading</Label>
+            <Textarea
+              value={data.components.social_page?.faqs?.subheading || ''}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'social_page', 'faqs', 'subheading'],
+                  e.target.value
+                )
+              }
+              placeholder='Quick answers to common shopper questions.'
+              className='min-h-[88px]'
+            />
+          </div>
+
+          <ArrayField
+            label='FAQ Items'
+            items={data.components.social_page?.faqs?.faqs || []}
+            onAdd={() => {
+              const list = [...(data.components.social_page?.faqs?.faqs || [])]
+              list.push({ question: '', answer: '' })
+              updateField(['components', 'social_page', 'faqs', 'faqs'], list)
+            }}
+            onRemove={(index) => {
+              const list = [...(data.components.social_page?.faqs?.faqs || [])]
+              list.splice(index, 1)
+              updateField(['components', 'social_page', 'faqs', 'faqs'], list)
+            }}
+            renderItem={(item: { question?: string; answer?: string }, index: number) => (
+              <div className='space-y-3'>
+                <div
+                  className={cn(
+                    'space-y-2',
+                    selectedComponent ===
+                      `components.social_page.faqs.faqs.${index}.question` &&
+                      'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                  )}
+                  data-editor-component={`components.social_page.faqs.faqs.${index}.question`}
+                >
+                  <Label>Question</Label>
+                  <Input
+                    value={item?.question || ''}
+                    onChange={(e) => {
+                      const list = [...(data.components.social_page?.faqs?.faqs || [])]
+                      list[index] = { ...(list[index] || {}), question: e.target.value }
+                      updateField(['components', 'social_page', 'faqs', 'faqs'], list)
+                    }}
+                    placeholder='Enter FAQ question'
+                  />
+                </div>
+                <div
+                  className={cn(
+                    'space-y-2',
+                    selectedComponent ===
+                      `components.social_page.faqs.faqs.${index}.answer` &&
+                      'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                  )}
+                  data-editor-component={`components.social_page.faqs.faqs.${index}.answer`}
+                >
+                  <Label>Answer</Label>
+                  <Textarea
+                    value={item?.answer || ''}
+                    onChange={(e) => {
+                      const list = [...(data.components.social_page?.faqs?.faqs || [])]
+                      list[index] = { ...(list[index] || {}), answer: e.target.value }
+                      updateField(['components', 'social_page', 'faqs', 'faqs'], list)
+                    }}
+                    placeholder='Enter FAQ answer'
+                    className='min-h-[92px]'
+                  />
+                </div>
+              </div>
+            )}
+          />
+        </div>
       </div>
     ),
     products: (
@@ -874,7 +1046,7 @@ export default function TemplateForm() {
               page='home'
               previewData={data}
               sectionOrder={sectionOrder}
-              onSelectSection={handleSelectSection}
+              onSelectSection={handlePreviewSelect}
               onInlineEdit={handleInlineEdit}
             />
           ) : undefined
@@ -932,6 +1104,13 @@ export default function TemplateForm() {
                 </p>
               )}
             </div>
+
+            <SelectedFieldEditor
+              data={data}
+              selectedComponent={selectedComponent}
+              updateField={updateField}
+              handleImageChange={handleImageChange}
+            />
 
             <ThemeSettingsSection data={data} updateField={updateField} />
 

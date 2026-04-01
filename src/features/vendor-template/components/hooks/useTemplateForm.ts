@@ -59,10 +59,10 @@ export function useTemplateForm() {
       null
   )
   const vendor_id = String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
       vendorProfile?.vendor_id ||
@@ -116,8 +116,49 @@ export function useTemplateForm() {
         merged.components.logo = payload.logo as string
       }
       if (payload.home_page) {
-        merged.components.home_page =
-          payload.home_page as typeof base.components.home_page
+        const incomingHome = payload.home_page as Record<string, any>
+        merged.components.home_page = {
+          ...base.components.home_page,
+          ...incomingHome,
+          description: {
+            ...base.components.home_page.description,
+            ...(incomingHome?.description || {}),
+            percent: {
+              ...base.components.home_page.description.percent,
+              ...(incomingHome?.description?.percent || {}),
+            },
+            sold: {
+              ...base.components.home_page.description.sold,
+              ...(incomingHome?.description?.sold || {}),
+            },
+          },
+          benefits: {
+            ...base.components.home_page.benefits,
+            ...(incomingHome?.benefits || {}),
+            cards:
+              incomingHome?.benefits?.cards ??
+              base.components.home_page.benefits?.cards,
+          },
+          advantage: {
+            ...base.components.home_page.advantage,
+            ...(incomingHome?.advantage || {}),
+            cards:
+              incomingHome?.advantage?.cards ??
+              base.components.home_page.advantage?.cards,
+            highlights:
+              incomingHome?.advantage?.highlights ??
+              base.components.home_page.advantage?.highlights,
+          },
+          heroStats:
+            incomingHome?.heroStats ?? base.components.home_page.heroStats,
+          industries: {
+            ...base.components.home_page.industries,
+            ...(incomingHome?.industries || {}),
+            items:
+              incomingHome?.industries?.items ??
+              base.components.home_page.industries?.items,
+          },
+        }
       }
       if (payload.about_page) {
         merged.components.about_page =
@@ -284,6 +325,21 @@ export function useTemplateForm() {
       const res = await axios.put(`${BASE_URL}/v1/templates/home`, payload, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       })
+
+      await axios.put(
+        `${BASE_URL}/v1/templates/social-faqs`,
+        {
+          vendor_id,
+          website_id: activeWebsiteId,
+          social_page: data.components.social_page,
+          vendor_profile: data.components.vendor_profile,
+          theme: data.components.theme,
+          section_order: sectionOrder,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
+      )
 
       if (res.status === 200 || res.status === 201) {
         setSubmitStatus('success')

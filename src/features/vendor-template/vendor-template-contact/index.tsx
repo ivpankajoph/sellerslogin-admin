@@ -20,6 +20,7 @@ import { Header } from '@/components/layout/header'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { DomainModal } from '../components/DomainModel'
+import { SelectedFieldEditor } from '../components/SelectedFieldEditor'
 import { TemplatePageLayout } from '../components/TemplatePageLayout'
 import { TemplatePreviewPanel } from '../components/TemplatePreviewPanel'
 import { TemplateSectionOrder } from '../components/TemplateSectionOrder'
@@ -37,6 +38,11 @@ import {
 } from '../components/templateVariantParam'
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
+import {
+  consumePendingEditorSelection,
+  resolveEditorRouteFromComponent,
+  setPendingEditorSelection,
+} from '../components/previewSelection'
 
 const selectVendorId = (state: any): string => {
   const authUser = state?.auth?.user || null
@@ -47,10 +53,10 @@ const selectVendorId = (state: any): string => {
     null
 
   return String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
       vendorProfile?.vendor_id ||
@@ -64,7 +70,8 @@ function VendorTemplateContact() {
   const [isSaving, setIsSaving] = useState(false)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
+  const [, setInlineEditVersion] = useState(0)
   const [isMapReady, setIsMapReady] = useState(false)
   const [domainOpen, setDomainOpen] = useState(false)
   const [sectionOrder, setSectionOrder] = useState([
@@ -203,6 +210,17 @@ function VendorTemplateContact() {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [selectedSection])
+
+  useEffect(() => {
+    const pendingSelection = consumePendingEditorSelection('/vendor-template-contact')
+    if (!pendingSelection) return
+    if (pendingSelection.sectionId) {
+      setSelectedSection(pendingSelection.sectionId)
+    }
+    if (pendingSelection.componentId) {
+      setSelectedComponent(pendingSelection.componentId)
+    }
+  }, [])
 
   const fetchSuggestions = async (query: string) => {
     if (!query.trim()) {
@@ -386,6 +404,22 @@ function VendorTemplateContact() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setSelectedComponent(path.join('.'))
+  }
+
+  const handlePreviewSelect = (sectionId: string, componentId?: string) => {
+    const route = resolveEditorRouteFromComponent(componentId, selectedTemplateKey)
+    setPendingEditorSelection({
+      route: route || '/vendor-template-contact',
+      sectionId,
+      componentId: componentId || null,
+    })
+    if (route && route !== '/vendor-template-contact') {
+      void navigate({ to: route })
+      return
+    }
+    setSelectedSection(sectionId)
+    setSelectedComponent(componentId || null)
   }
 
   const handleImageChange = async (path: string[], file: File | null) => {
@@ -470,14 +504,6 @@ function VendorTemplateContact() {
     token,
     vendor_id,
   ])
-
-  useEffect(() => {
-    if (inlineEditVersion === 0 || uploadingPaths.size > 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSave({ silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [inlineEditVersion, uploadingPaths, handleSave])
 
   const previewCity = useMemo(
     () =>
@@ -855,6 +881,7 @@ function VendorTemplateContact() {
             title='Live Contact Preview'
             subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
             baseSrc={previewBaseUrl}
+            previewQuery='?previewChrome=content-only'
             defaultPath='/contact'
             pageOptions={[
               { label: 'Home', path: '' },
@@ -874,11 +901,18 @@ function VendorTemplateContact() {
             page='contact'
             previewData={data}
             sectionOrder={sectionOrder}
-            onSelectSection={(sectionId) => setSelectedSection(sectionId)}
+            onSelectSection={handlePreviewSelect}
             onInlineEdit={handleInlineEdit}
           />
         }
       >
+        <SelectedFieldEditor
+          data={data}
+          selectedComponent={selectedComponent}
+          updateField={updateField}
+          handleImageChange={handleImageChange}
+        />
+
         <ThemeSettingsSection data={data} updateField={updateField} />
 
         <TemplateSectionOrder

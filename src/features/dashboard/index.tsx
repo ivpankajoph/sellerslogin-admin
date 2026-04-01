@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Crown, Sparkles } from 'lucide-react'
+import { ChevronDown, Crown, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
@@ -7,13 +7,22 @@ import { Main } from '@/components/layout/main'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import VendorDashboard from './components/VendorDashboard'
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import api from '@/lib/axios'
 import type { RootState } from '@/store'
 import { setUser } from '@/store/slices/authSlice'
-import { normalizeVendorPageAccess } from '@/features/team-access/access-config'
+import {
+  hasVendorPageAccess,
+  normalizeVendorPageAccess,
+} from '@/features/team-access/access-config'
 import { UpgradePlanDialog } from './components/UpgradePlanDialog'
 import type { BillingSummary } from '@/features/plans/shared'
 
@@ -26,6 +35,7 @@ export function Dashboard() {
     isVendor && String(user?.account_type || '').toLowerCase() === 'vendor_user'
   const pageAccess = normalizeVendorPageAccess(user?.page_access)
   const canAccessMyWebsites = isVendor && (!isVendorTeamUser || pageAccess.has('my_websites'))
+
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false)
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
 
@@ -64,6 +74,11 @@ export function Dashboard() {
     loadBillingSummary()
   }, [isVendor, isVendorTeamUser, user?.id])
 
+  const handleConnectDomainClick = () => {
+    if (typeof window === 'undefined') return
+    window.location.assign('/template-workspace?openConnectDomain=1')
+  }
+
   return (
     <>
       {/* ===== Top Heading ===== */}
@@ -84,6 +99,20 @@ export function Dashboard() {
                   </Link>
                 </Button>
               ) : null}
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant='outline' className='gap-2'>
+                    Domain&apos;s
+                    <ChevronDown className='h-4 w-4' />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='end' className='min-w-[200px]'>
+                  <DropdownMenuItem onClick={handleConnectDomainClick}>
+                    Connect Domain
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>Book Domain</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {isVendor && !isVendorTeamUser ? (
                 billingSummary?.plan?.is_premium_active ? (
                   <Button

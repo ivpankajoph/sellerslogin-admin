@@ -17,6 +17,7 @@ import { Header } from '@/components/layout/header'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { DomainModal } from '../components/DomainModel'
+import { SelectedFieldEditor } from '../components/SelectedFieldEditor'
 import { TemplatePageLayout } from '../components/TemplatePageLayout'
 import { TemplatePreviewPanel } from '../components/TemplatePreviewPanel'
 import { TemplateSectionOrder } from '../components/TemplateSectionOrder'
@@ -36,6 +37,11 @@ import {
 } from '../components/templateVariantParam'
 import { useActiveWebsiteSelection } from '../components/websiteStudioStorage'
 import { useConnectedTemplateDomain } from '../components/hooks/useConnectedTemplateDomain'
+import {
+  consumePendingEditorSelection,
+  resolveEditorRouteFromComponent,
+  setPendingEditorSelection,
+} from '../components/previewSelection'
 
 const selectVendorId = (state: any): string => {
   const authUser = state?.auth?.user || null
@@ -46,10 +52,10 @@ const selectVendorId = (state: any): string => {
     null
 
   return String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
       vendorProfile?.vendor_id ||
@@ -63,7 +69,8 @@ function VendorTemplateAbout() {
   const [isSaving, setIsSaving] = useState(false)
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
-  const [inlineEditVersion, setInlineEditVersion] = useState(0)
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
+  const [, setInlineEditVersion] = useState(0)
   const [domainOpen, setDomainOpen] = useState(false)
   const [sectionOrder, setSectionOrder] = useState([
     'hero',
@@ -271,13 +278,51 @@ function VendorTemplateAbout() {
     }
   }, [selectedSection])
 
+  useEffect(() => {
+    const pendingSelection = consumePendingEditorSelection('/vendor-template-about')
+    if (!pendingSelection) return
+    if (pendingSelection.sectionId) {
+      setSelectedSection(pendingSelection.sectionId)
+    }
+    if (pendingSelection.componentId) {
+      setSelectedComponent(pendingSelection.componentId)
+    }
+  }, [])
+
   const updateField = (path: string[], value: any) => {
     setData((prev) => updateFieldImmutable(prev, path, value))
   }
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
+    setSelectedComponent(path.join('.'))
     setInlineEditVersion((prev) => prev + 1)
+  }
+
+  const handlePreviewSelect = (sectionId: string, componentId?: string) => {
+    const route = resolveEditorRouteFromComponent(componentId, selectedTemplateKey)
+    setPendingEditorSelection({
+      route: route || '/vendor-template-about',
+      sectionId,
+      componentId: componentId || null,
+    })
+    if (route && route !== '/vendor-template-about') {
+      void navigate({ to: route })
+      return
+    }
+    setSelectedSection(sectionId)
+    setSelectedComponent(componentId || null)
+  }
+
+  const updateStoryParagraph = (index: number, value: string) => {
+    const paragraphs = Array.isArray(data.components.about_page.story.paragraphs)
+      ? [...data.components.about_page.story.paragraphs]
+      : []
+    while (paragraphs.length <= index) {
+      paragraphs.push('')
+    }
+    paragraphs[index] = value
+    updateField(['components', 'about_page', 'story', 'paragraphs'], paragraphs)
   }
 
   const handleImageChange = async (path: string[], file: File | null) => {
@@ -366,14 +411,6 @@ function VendorTemplateAbout() {
     token,
     vendor_id,
   ])
-
-  useEffect(() => {
-    if (inlineEditVersion === 0 || uploadingPaths.size > 0) return
-    const timeout = window.setTimeout(() => {
-      void handleSave({ silent: true })
-    }, 700)
-    return () => window.clearTimeout(timeout)
-  }, [inlineEditVersion, uploadingPaths, handleSave])
 
   const previewCity = useMemo(
     () =>
@@ -985,6 +1022,7 @@ function VendorTemplateAbout() {
             title='Live About Preview'
             subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
             baseSrc={previewBaseUrl}
+            previewQuery='?previewChrome=content-only'
             defaultPath='/about'
             pageOptions={[
               { label: 'Home', path: '' },
@@ -1003,11 +1041,218 @@ function VendorTemplateAbout() {
             page='about'
             previewData={data}
             sectionOrder={sectionOrder}
-            onSelectSection={(sectionId) => setSelectedSection(sectionId)}
+            onSelectSection={handlePreviewSelect}
             onInlineEdit={handleInlineEdit}
           />
         }
       >
+        <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
+          <div className='flex flex-col gap-2'>
+            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+              Quick About Editor
+            </p>
+            <h3 className='text-xl font-semibold text-slate-900'>
+              Edit the exact content vendors see in About preview
+            </h3>
+            <p className='text-sm text-slate-600'>
+              Blog editor ki tarah yahan se About page ka main heading, subtitle,
+              story, aur fallback business details directly edit kar sakte ho.
+              Agar About title/subtitle blank chhode jaate hain, preview vendor
+              profile details se auto-generate hota hai.
+            </p>
+          </div>
+
+          <div className='mt-6 grid gap-4 md:grid-cols-2'>
+            <div className='space-y-2'>
+              <Label>About Eyebrow</Label>
+              <Input
+                value={data.components.about_page.hero.kicker || ''}
+                onChange={(e) =>
+                  updateField(
+                    ['components', 'about_page', 'hero', 'kicker'],
+                    e.target.value
+                  )
+                }
+                placeholder='Warehouse Experts'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label>About Heading</Label>
+              <Input
+                value={data.components.about_page.hero.title || ''}
+                onChange={(e) =>
+                  updateField(
+                    ['components', 'about_page', 'hero', 'title'],
+                    e.target.value
+                  )
+                }
+                placeholder='About Cookmytech'
+              />
+            </div>
+          </div>
+
+          <div className='mt-4 space-y-2'>
+            <Label>About Subtitle</Label>
+            <Textarea
+              value={data.components.about_page.hero.subtitle || ''}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'about_page', 'hero', 'subtitle'],
+                  e.target.value
+                )
+              }
+              placeholder='Tell visitors what your business does and where you are based.'
+              className='min-h-[90px]'
+            />
+          </div>
+
+          <div className='mt-6 grid gap-4 md:grid-cols-2'>
+            <div className='space-y-2'>
+              <Label>Story Heading</Label>
+              <Input
+                value={data.components.about_page.story.heading || ''}
+                onChange={(e) =>
+                  updateField(
+                    ['components', 'about_page', 'story', 'heading'],
+                    e.target.value
+                  )
+                }
+                placeholder='Our Story'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label>Story Image</Label>
+              <ImageInput
+                label='Story Image'
+                name='aboutQuickStoryImage'
+                value={data.components.about_page.story.image}
+                onChange={(file) =>
+                  handleImageChange(
+                    ['components', 'about_page', 'story', 'image'],
+                    file
+                  )
+                }
+                isFileInput={true}
+                dimensions='1200 x 800'
+              />
+            </div>
+          </div>
+
+          <div className='mt-6 space-y-3'>
+            <Label>Main Story Content</Label>
+            {[0, 1, 2].map((index) => (
+              <Textarea
+                key={`about-story-para-${index}`}
+                value={data.components.about_page.story.paragraphs?.[index] || ''}
+                onChange={(e) => updateStoryParagraph(index, e.target.value)}
+                placeholder={`Story paragraph ${index + 1}`}
+                className='min-h-[100px]'
+              />
+            ))}
+          </div>
+
+          <div className='mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+            <div className='flex flex-col gap-2'>
+              <h4 className='text-sm font-semibold text-slate-900'>
+                Fallback Business Details
+              </h4>
+              <p className='text-xs text-slate-600'>
+                Ye details tab use hoti hain jab About content blank hota hai.
+                Isse auto-generated title/subtitle aur story text bhi better ho
+                jayega.
+              </p>
+            </div>
+
+            <div className='mt-4 grid gap-4 md:grid-cols-2'>
+              <div className='space-y-2'>
+                <Label>Store Display Name</Label>
+                <Input
+                  value={(data.components.vendor_profile as any)?.name || ''}
+                  onChange={(e) =>
+                    updateField(
+                      ['components', 'vendor_profile', 'name'],
+                      e.target.value
+                    )
+                  }
+                  placeholder='Cookmytech'
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>Business Name</Label>
+                <Input
+                  value={(data.components.vendor_profile as any)?.business_name || ''}
+                  onChange={(e) =>
+                    updateField(
+                      ['components', 'vendor_profile', 'business_name'],
+                      e.target.value
+                    )
+                  }
+                  placeholder='Cookmytech Private Limited'
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>Business Type</Label>
+                <Input
+                  value={(data.components.vendor_profile as any)?.business_type || ''}
+                  onChange={(e) =>
+                    updateField(
+                      ['components', 'vendor_profile', 'business_type'],
+                      e.target.value
+                    )
+                  }
+                  placeholder='Manufacturer / Retail / Wholesaler'
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>City</Label>
+                <Input
+                  value={(data.components.vendor_profile as any)?.city || ''}
+                  onChange={(e) =>
+                    updateField(
+                      ['components', 'vendor_profile', 'city'],
+                      e.target.value
+                    )
+                  }
+                  placeholder='Greater Noida'
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>State</Label>
+                <Input
+                  value={(data.components.vendor_profile as any)?.state || ''}
+                  onChange={(e) =>
+                    updateField(
+                      ['components', 'vendor_profile', 'state'],
+                      e.target.value
+                    )
+                  }
+                  placeholder='Uttar Pradesh'
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label>Country</Label>
+                <Input
+                  value={(data.components.vendor_profile as any)?.country || ''}
+                  onChange={(e) =>
+                    updateField(
+                      ['components', 'vendor_profile', 'country'],
+                      e.target.value
+                    )
+                  }
+                  placeholder='India'
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <SelectedFieldEditor
+          data={data}
+          selectedComponent={selectedComponent}
+          updateField={updateField}
+          handleImageChange={handleImageChange}
+        />
+
         <ThemeSettingsSection data={data} updateField={updateField} />
 
         <TemplateSectionOrder

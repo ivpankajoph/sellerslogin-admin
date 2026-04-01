@@ -88,6 +88,19 @@ export type TemplateData = {
           label?: string
         }>
       }
+      heroStats?: Array<{
+        value?: string
+        label?: string
+      }>
+      industries?: {
+        kicker?: string
+        heading?: string
+        subtitle?: string
+        items?: Array<{
+          title?: string
+          description?: string
+        }>
+      }
       description: {
         large_text: string
         summary: string
@@ -263,6 +276,23 @@ export const initialData: TemplateData = {
         highlights: [
           { value: '', label: '' },
           { value: '', label: '' },
+        ],
+      },
+      heroStats: [
+        { value: '', label: '' },
+        { value: '', label: '' },
+        { value: '', label: '' },
+        { value: '', label: '' },
+      ],
+      industries: {
+        kicker: '',
+        heading: '',
+        subtitle: '',
+        items: [
+          { title: '', description: '' },
+          { title: '', description: '' },
+          { title: '', description: '' },
+          { title: '', description: '' },
         ],
       },
       description: {
