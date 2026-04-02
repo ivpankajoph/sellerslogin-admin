@@ -726,6 +726,7 @@ const sanitizeVariant = (value: unknown): Variant => {
 
   return {
     _id: toTrimmedText(raw._id),
+    variantDisplayName: toText(raw.variantDisplayName),
     variantAttributes: sanitizeStringRecord(raw.variantAttributes),
     actualPrice: toNumberValue(raw.actualPrice),
     finalPrice: toNumberValue(raw.finalPrice),
@@ -2198,6 +2199,7 @@ const ProductCreateForm: React.FC = () => {
         variants: [
           ...prev.variants,
           {
+            variantDisplayName: '',
             variantAttributes: initialKeys.reduce<Record<string, string>>(
               (acc, key) => {
                 acc[key] = ''
@@ -2263,6 +2265,7 @@ const ProductCreateForm: React.FC = () => {
           },
           {}
         ),
+        variantDisplayName: toText(targetVariant.variantDisplayName || ''),
         actualPrice: previousVariant.actualPrice,
         finalPrice: previousVariant.finalPrice,
         stockQuantity: previousVariant.stockQuantity,
@@ -2584,6 +2587,7 @@ const ProductCreateForm: React.FC = () => {
       case 2:
         return (
           <Step5Variants
+            productName={formData.productName}
             variants={formData.variants}
             recommendedAttributeKeys={recommendedVariantKeys}
             variantKeySuggestions={addVariantKeySuggestions}

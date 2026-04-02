@@ -29,6 +29,28 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(Number.isFinite(value) ? value : 0)
 
+const getVariantDisplayName = (
+  variant: ProductFormData['variants'][number] | null,
+  index: number,
+  productName?: string
+) => {
+  if (index === 0) {
+    const baseProductName = String(productName || '').trim()
+    if (baseProductName) return baseProductName
+  }
+
+  const customName = String(variant?.variantDisplayName || '').trim()
+  if (customName) return customName
+
+  const summary = Object.values(variant?.variantAttributes || {})
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' / ')
+
+  if (summary) return summary
+  return `Variant ${index + 1}`
+}
+
 const ProductPreviewDialog: React.FC<Props> = ({
   open,
   onOpenChange,
@@ -48,6 +70,9 @@ const ProductPreviewDialog: React.FC<Props> = ({
 
   const selectedImage = images[selectedImageIndex] || images[0]
   const fallbackName = formData.productName || 'Untitled Product'
+  const selectedVariantLabel = selectedVariant
+    ? getVariantDisplayName(selectedVariant, selectedVariantIndex, formData.productName)
+    : ''
 
   const discountPercent = useMemo(() => {
     if (!selectedVariant?.actualPrice || !selectedVariant?.finalPrice) return 0
@@ -148,6 +173,11 @@ const ProductPreviewDialog: React.FC<Props> = ({
                     <h1 className='text-2xl font-bold text-gray-900 mt-1 leading-tight'>
                       {fallbackName}
                     </h1>
+                    {selectedVariantLabel ? (
+                      <p className='mt-2 text-sm font-medium text-gray-500'>
+                        {selectedVariantLabel}
+                      </p>
+                    ) : null}
                   </div>
 
                   {/* PRICE SECTION */}
@@ -179,7 +209,7 @@ const ProductPreviewDialog: React.FC<Props> = ({
                     <div className='space-y-3'>
                       <p className='text-xs font-bold text-gray-400 uppercase'>Select Variant</p>
                       <div className='flex flex-wrap gap-2'>
-                        {variants.map((_, i) => (
+                        {variants.map((variant, i) => (
                           <button
                             key={i}
                             onClick={() => {
@@ -192,7 +222,7 @@ const ProductPreviewDialog: React.FC<Props> = ({
                                 : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
                             }`}
                           >
-                            Variant {i + 1}
+                            {getVariantDisplayName(variant, i, formData.productName)}
                           </button>
                         ))}
                       </div>

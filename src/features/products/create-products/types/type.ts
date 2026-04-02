@@ -7,6 +7,7 @@ export interface ImageUpload {
 
 export interface Variant {
   _id?: string
+  variantDisplayName?: string
   variantAttributes: Record<string, string>
   actualPrice: number
   finalPrice: number

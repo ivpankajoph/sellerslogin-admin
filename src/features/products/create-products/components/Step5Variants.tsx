@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Check,
   ChevronsUpDown,
@@ -62,6 +62,7 @@ type WebsiteOption = {
 }
 
 interface Props {
+  productName: string
   variants: Variant[]
   recommendedAttributeKeys: string[]
   variantKeySuggestions: string[]
@@ -125,6 +126,28 @@ const filterOptions = (options: SelectOption[], search: string) => {
       normalizedValue.includes(normalizedSearch)
     )
   })
+}
+
+const getVariantDisplayName = (
+  variant: Variant,
+  variantIndex: number,
+  productName?: string
+) => {
+  if (variantIndex === 0) {
+    const baseProductName = String(productName || '').trim()
+    if (baseProductName) return baseProductName
+  }
+
+  const customName = String(variant.variantDisplayName || '').trim()
+  if (customName) return customName
+
+  const summary = Object.values(variant.variantAttributes || {})
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' / ')
+
+  if (summary) return summary
+  return `Variant ${variantIndex + 1}`
 }
 
 const WebsiteMultiSelect: React.FC<{
@@ -221,6 +244,7 @@ const WebsiteMultiSelect: React.FC<{
 }
 
 const Step5Variants: React.FC<Props> = ({
+  productName,
   variants,
   recommendedAttributeKeys,
   variantKeySuggestions,
@@ -282,6 +306,10 @@ const Step5Variants: React.FC<Props> = ({
     () => sanitizeKeyList(variantKeySuggestions).slice(0, 2),
     [variantKeySuggestions]
   )
+  const resolvedSuggestedVariantKey =
+    selectedSuggestedVariantKey && suggestedVariantKeys.includes(selectedSuggestedVariantKey)
+      ? selectedSuggestedVariantKey
+      : suggestedVariantKeys[0] || ''
 
   const handleAddVariantClick = () => {
     onGenerateSuggestedKeys(variants.length)
@@ -290,15 +318,6 @@ const Step5Variants: React.FC<Props> = ({
     )
     setAddVariantDialogOpen(true)
   }
-
-  useEffect(() => {
-    if (!addVariantDialogOpen) return
-    setSelectedSuggestedVariantKey((currentValue) =>
-      currentValue && suggestedVariantKeys.includes(currentValue)
-        ? currentValue
-        : suggestedVariantKeys[0] || ''
-    )
-  }, [addVariantDialogOpen, suggestedVariantKeys])
 
   const getVariantKeys = (variant: Variant) =>
     Object.keys(variant.variantAttributes || {})
@@ -322,19 +341,6 @@ const Step5Variants: React.FC<Props> = ({
   const handleAddVariantWithCustomKey = () => {
     handleAddVariantWithKeys([newVariantCustomKey])
   }
-
-  useEffect(() => {
-    const pruneStateEntries = <T,>(state: Record<number, T>): Record<number, T> =>
-      Object.fromEntries(
-        Object.entries(state).filter(([key]) => Number(key) < variants.length)
-      ) as Record<number, T>
-
-    setVariantCustomKeyInputs((prev) => pruneStateEntries(prev))
-    setVariantCustomInputOpen((prev) => pruneStateEntries(prev))
-    setVariantOptionPickerOpen((prev) => pruneStateEntries(prev))
-    setVariantOptionSearch((prev) => pruneStateEntries(prev))
-    setVariantOptionSelections((prev) => pruneStateEntries(prev))
-  }, [variants.length])
 
   const toggleRecommendedKeySelection = (variantIndex: number, key: string) => {
     setVariantOptionSelections((prev) => {
@@ -528,6 +534,8 @@ const Step5Variants: React.FC<Props> = ({
               .map((key) => variant.variantAttributes[key])
               .filter(Boolean)
               .join(' / ')
+            const customVariantName = String(variant.variantDisplayName || '').trim()
+            const isPrimaryVariant = variantIndex === 0
             const recommendedOptions = filterOptions(
               recommendedAttributeKeys
                 .map((key) => ({
@@ -543,6 +551,11 @@ const Step5Variants: React.FC<Props> = ({
             const variantTitle = primaryVariantKey
               ? `${primaryVariantKey} variant`
               : `Variant ${variantIndex + 1}`
+            const customerFacingVariantName = getVariantDisplayName(
+              variant,
+              variantIndex,
+              productName
+            )
             const variantSubtitle = summary
               ? summary
               : primaryVariantKey
@@ -562,6 +575,9 @@ const Step5Variants: React.FC<Props> = ({
                     <div className='mb-2 inline-flex items-center gap-2 border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300'>
                       {variantTitle}
                     </div>
+                    <h3 className='text-lg font-semibold text-foreground'>
+                      {customerFacingVariantName}
+                    </h3>
                     <p className='text-sm text-muted-foreground'>
                       Variant {variantIndex + 1}
                       {variantSubtitle ? ` • ${variantSubtitle}` : ''}
@@ -731,6 +747,49 @@ const Step5Variants: React.FC<Props> = ({
                           </Button>
                         </div>
                       </div>
+
+                      {isPrimaryVariant ? (
+                        <div className='mb-4 rounded-2xl border border-cyan-100 bg-cyan-50/40 p-4'>
+                          <StudioFieldLabel
+                            label='Variant Name'
+                            help='The first variant uses the main product name from Step 1 so vendors do not need to name the base variant separately.'
+                          />
+                          <div className='rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700'>
+                            {String(productName || '').trim() || 'This variant uses the main product name'}
+                          </div>
+                          <p className='mt-2 text-xs leading-5 text-muted-foreground'>
+                            The first variant always uses the product name from Step 1.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className='mb-4 rounded-2xl border border-cyan-100 bg-cyan-50/40 p-4'>
+                          <StudioFieldLabel
+                            label='Variant Name'
+                            help='This is the customer-facing variant name. Vendors can keep it simple, like Black 256 GB, Large Blue, or Matte Finish.'
+                          />
+                          <input
+                            type='text'
+                            value={variant.variantDisplayName || ''}
+                            onChange={(event) =>
+                              onVariantFieldChange(
+                                variantIndex,
+                                'variantDisplayName',
+                                event.target.value
+                              )
+                            }
+                            placeholder={
+                              customVariantName
+                                ? customVariantName
+                                : summary || `Variant ${variantIndex + 1}`
+                            }
+                            className={studioInputClass}
+                          />
+                          <p className='mt-2 text-xs leading-5 text-muted-foreground'>
+                            Customers will see this name. If left blank, we will use the selected
+                            variant details automatically.
+                          </p>
+                        </div>
+                      )}
 
                       {isCustomInputVisible ? (
                         <div className='mb-4 border border-dashed border-cyan-500/30 bg-cyan-500/5 p-4'>
@@ -1057,7 +1116,7 @@ const Step5Variants: React.FC<Props> = ({
               ) : suggestedVariantKeys.length ? (
                 <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]'>
                   <Select
-                    value={selectedSuggestedVariantKey}
+                    value={resolvedSuggestedVariantKey}
                     onValueChange={setSelectedSuggestedVariantKey}
                   >
                     <SelectTrigger className='h-11 w-full'>
@@ -1076,9 +1135,9 @@ const Step5Variants: React.FC<Props> = ({
                     type='button'
                     variant='outline'
                     onClick={() =>
-                      handleAddVariantWithKeys([selectedSuggestedVariantKey])
+                      handleAddVariantWithKeys([resolvedSuggestedVariantKey])
                     }
-                    disabled={!selectedSuggestedVariantKey}
+                    disabled={!resolvedSuggestedVariantKey}
                   >
                     <Plus className='h-4 w-4' />
                     Add Variant
