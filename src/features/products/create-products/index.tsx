@@ -2218,9 +2218,10 @@ const ProductCreateForm: React.FC = () => {
   }
 
   const handleRemoveVariant = (index: number) => {
-    const newVariants = [...formData.variants]
-    newVariants.splice(index, 1)
-    setFormData((prev: ProductFormData) => ({ ...prev, variants: newVariants }))
+    setFormData((prev: ProductFormData) => ({
+      ...prev,
+      variants: prev.variants.filter((_, variantIndex) => variantIndex !== index),
+    }))
   }
 
   const handleCopyVariantFromPrevious = (variantIndex: number) => {
@@ -2283,9 +2284,27 @@ const ProductCreateForm: React.FC = () => {
     field: keyof Variant,
     value: any
   ) => {
-    const newVariants = [...formData.variants]
-    newVariants[index] = { ...newVariants[index], [field]: value }
-    setFormData((prev: ProductFormData) => ({ ...prev, variants: newVariants }))
+    setFormData((prev: ProductFormData) => {
+      const targetVariant = prev.variants[index]
+      if (!targetVariant) return prev
+
+      const normalizedValue =
+        field === 'actualPrice' || field === 'finalPrice' || field === 'stockQuantity'
+          ? value === '' || value === null || value === undefined
+            ? 0
+            : Number(value)
+          : field === 'isActive'
+            ? Boolean(value)
+            : value
+
+      const variants = [...prev.variants]
+      variants[index] = {
+        ...targetVariant,
+        [field]: normalizedValue,
+      }
+
+      return { ...prev, variants }
+    })
   }
 
   const handleVariantAttributeChange = (

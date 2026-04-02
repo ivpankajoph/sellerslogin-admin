@@ -564,7 +564,7 @@ const Step5Variants: React.FC<Props> = ({
 
             return (
               <article
-                key={variantIndex}
+                key={variant._id || `variant-${variantIndex}`}
                 className={cn(
                   studioCardClass,
                   'overflow-hidden border-cyan-200/70 bg-gradient-to-br from-white via-cyan-50/20 to-slate-50/70 shadow-[0_16px_40px_-24px_rgba(8,145,178,0.35)]'
