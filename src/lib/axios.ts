@@ -8,29 +8,6 @@ const BASE_URL =
 
 let isSessionRedirectInProgress = false;
 
-const decodeJwtPayload = (token: string): { exp?: number } | null => {
-  try {
-    const payload = token.split(".")[1];
-    if (!payload) return null;
-
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(
-      normalized.length + ((4 - (normalized.length % 4)) % 4),
-      "="
-    );
-
-    return JSON.parse(atob(padded));
-  } catch {
-    return null;
-  }
-};
-
-const isJwtExpired = (token: string): boolean => {
-  const payload = decodeJwtPayload(token);
-  if (!payload?.exp) return false;
-  return payload.exp * 1000 <= Date.now() + 1000;
-};
-
 const getErrorMessage = (error: any): string => {
   const raw =
     error?.response?.data?.message ??
@@ -40,29 +17,28 @@ const getErrorMessage = (error: any): string => {
   return String(raw).trim().toLowerCase();
 };
 
-const isAuthErrorMessage = (message: string): boolean =>
+const isSessionErrorMessage = (message: string): boolean =>
   [
     "invalid token",
     "jwt malformed",
     "jwt expired",
     "token expired",
     "session expired",
-    "authentication failed",
     "login again",
-    "unauthorized access",
-    "unauthorized request",
+    "no token provided",
+    "unauthorized: account not found",
+    "account deleted because temporary password was not changed within 48 hours",
   ].some((entry) => message.includes(entry));
 
 const shouldInvalidateSession = (error: any): boolean => {
   const status = Number(error?.response?.status || 0);
-  if (![401, 403, 404].includes(status)) return false;
+  if (status !== 401) return false;
 
   const requestUrl = String(error?.config?.url || "").toLowerCase();
   if (requestUrl.includes("/chat")) {
     return false;
   }
 
-  const role = String(store.getState()?.auth?.user?.role || "").toLowerCase();
   const message = getErrorMessage(error);
 
   const isProfileRequest =
@@ -71,39 +47,9 @@ const shouldInvalidateSession = (error: any): boolean => {
     requestUrl.includes("/admin/profile") ||
     requestUrl.includes("/profile/admin");
 
-  if (status === 401) {
-    return isProfileRequest || isAuthErrorMessage(message);
-  }
+  if (!isProfileRequest) return false;
 
-  if (
-    isProfileRequest &&
-    (message.includes("not found") ||
-      message.includes("unauthorized") ||
-      message.includes("invalid token"))
-  ) {
-    return true;
-  }
-
-  if (
-    role === "vendor" &&
-    (message.includes("vendor not found") ||
-      message.includes("unauthorized: vendor not found"))
-  ) {
-    return true;
-  }
-
-  if (
-    (role === "admin" || role === "superadmin") &&
-    message.includes("admin not found")
-  ) {
-    return true;
-  }
-
-  if (message.includes("account not found")) {
-    return true;
-  }
-
-  return false;
+  return isSessionErrorMessage(message) || !message;
 };
 
 const handleExpiredSession = () => {
@@ -141,11 +87,6 @@ api.interceptors.request.use(
     const state = store.getState();
     const token = state.auth?.token;
     const role = String(state.auth?.user?.role || "").toLowerCase();
-
-    if (token && isJwtExpired(token)) {
-      handleExpiredSession();
-      return Promise.reject(new axios.Cancel("Session expired"));
-    }
 
     if (config.url && !config.url.startsWith("/auth") && !config.url.startsWith("/chat") && !config.url.includes("/login") && !config.url.includes("/support/queries") && !config.url.endsWith("/users/getall")) {
       const prefix = role === "vendor" ? "/vendor" : "/admin";

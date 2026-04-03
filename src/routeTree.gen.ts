@@ -82,6 +82,7 @@ import { Route as AuthenticatedMetaPixelConnectRouteImport } from './routes/_aut
 import { Route as AuthenticatedMetaPixelAnalyticsRouteImport } from './routes/_authenticated/meta-pixel/analytics'
 import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
+import { Route as AuthenticatedCourierListRouteImport } from './routes/_authenticated/courier/list'
 import { Route as AuthenticatedCourierPartnerRouteImport } from './routes/_authenticated/courier/$partner'
 import { Route as AuthenticatedBorzoReportOrderIdRouteImport } from './routes/_authenticated/borzo-report/$orderId'
 import { Route as AuthenticatedAnalyticsTrafficRouteImport } from './routes/_authenticated/analytics/traffic'
@@ -506,6 +507,12 @@ const AuthenticatedErrorsErrorRoute =
     path: '/errors/$error',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCourierListRoute =
+  AuthenticatedCourierListRouteImport.update({
+    id: '/courier/list',
+    path: '/courier/list',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCourierPartnerRoute =
   AuthenticatedCourierPartnerRouteImport.update({
     id: '/courier/$partner',
@@ -590,6 +597,7 @@ export interface FileRoutesByFullPath {
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/courier/$partner': typeof AuthenticatedCourierPartnerRoute
+  '/courier/list': typeof AuthenticatedCourierListRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
@@ -670,6 +678,7 @@ export interface FileRoutesByTo {
   '/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/courier/$partner': typeof AuthenticatedCourierPartnerRoute
+  '/courier/list': typeof AuthenticatedCourierListRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
@@ -756,6 +765,7 @@ export interface FileRoutesById {
   '/_authenticated/analytics/traffic': typeof AuthenticatedAnalyticsTrafficRoute
   '/_authenticated/borzo-report/$orderId': typeof AuthenticatedBorzoReportOrderIdRoute
   '/_authenticated/courier/$partner': typeof AuthenticatedCourierPartnerRoute
+  '/_authenticated/courier/list': typeof AuthenticatedCourierListRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/_authenticated/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
@@ -840,6 +850,7 @@ export interface FileRouteTypes {
     | '/analytics/traffic'
     | '/borzo-report/$orderId'
     | '/courier/$partner'
+    | '/courier/list'
     | '/errors/$error'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
@@ -920,6 +931,7 @@ export interface FileRouteTypes {
     | '/analytics/traffic'
     | '/borzo-report/$orderId'
     | '/courier/$partner'
+    | '/courier/list'
     | '/errors/$error'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
@@ -1005,6 +1017,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analytics/traffic'
     | '/_authenticated/borzo-report/$orderId'
     | '/_authenticated/courier/$partner'
+    | '/_authenticated/courier/list'
     | '/_authenticated/errors/$error'
     | '/_authenticated/integrations/$provider'
     | '/_authenticated/meta-pixel/analytics'
@@ -1593,6 +1606,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedErrorsErrorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/courier/list': {
+      id: '/_authenticated/courier/list'
+      path: '/courier/list'
+      fullPath: '/courier/list'
+      preLoaderRoute: typeof AuthenticatedCourierListRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/courier/$partner': {
       id: '/_authenticated/courier/$partner'
       path: '/courier/$partner'
@@ -1715,6 +1735,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedBorzoReportOrderIdRoute: typeof AuthenticatedBorzoReportOrderIdRoute
   AuthenticatedCourierPartnerRoute: typeof AuthenticatedCourierPartnerRoute
+  AuthenticatedCourierListRoute: typeof AuthenticatedCourierListRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
   AuthenticatedSeoEntitiesRoute: typeof AuthenticatedSeoEntitiesRoute
@@ -1777,6 +1798,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedBorzoReportOrderIdRoute: AuthenticatedBorzoReportOrderIdRoute,
   AuthenticatedCourierPartnerRoute: AuthenticatedCourierPartnerRoute,
+  AuthenticatedCourierListRoute: AuthenticatedCourierListRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedIntegrationsProviderRoute:
     AuthenticatedIntegrationsProviderRoute,

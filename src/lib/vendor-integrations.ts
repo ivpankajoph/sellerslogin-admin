@@ -136,7 +136,53 @@ export const INTEGRATION_PROVIDER_META: Record<
     description: 'Multi-courier shipment, tracking, manifest, and NDR workflows.',
     imageSrc: nimbuspostLogo,
     docs: 'https://api.nimbuspost.com/v1/',
-    fields: [],
+    fields: [
+      {
+        key: 'warehouse_name',
+        label: 'Warehouse Name',
+        placeholder: 'test warehouse',
+      },
+      {
+        key: 'pickup_name',
+        label: 'Pickup Contact Name',
+        placeholder: 'Pankaj Verma',
+      },
+      {
+        key: 'pickup_phone',
+        label: 'Pickup Contact Phone',
+        placeholder: '9999999999',
+      },
+      {
+        key: 'pickup_address',
+        label: 'Pickup Address',
+        placeholder: 'Surajpur Greater Noida',
+      },
+      {
+        key: 'pickup_address_2',
+        label: 'Pickup Address 2',
+        placeholder: 'Near landmark',
+      },
+      {
+        key: 'pickup_city',
+        label: 'Pickup City',
+        placeholder: 'Greater Noida',
+      },
+      {
+        key: 'pickup_state',
+        label: 'Pickup State',
+        placeholder: 'Uttar Pradesh',
+      },
+      {
+        key: 'pickup_pincode',
+        label: 'Pickup Pincode',
+        placeholder: '201306',
+      },
+      {
+        key: 'pickup_gst_number',
+        label: 'GST Number',
+        placeholder: 'Optional',
+      },
+    ],
   },
   google_merchant: {
     title: 'Google Merchant',

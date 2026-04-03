@@ -208,6 +208,37 @@ const trackingPrefixByPartner: Record<CourierPartnerId, string> = {
   porter: 'PTR',
 }
 
+const isUploadReference = (value: unknown) => /^UPL/i.test(toText(value))
+
+const hasRealDelhiveryWaybill = (
+  delhivery?: CourierOrderSummary['delhivery']
+) => {
+  if (!delhivery) return false
+  const candidates = [
+    delhivery.waybill,
+    ...(Array.isArray(delhivery.waybills) ? delhivery.waybills : []),
+  ]
+    .map((entry) => toText(entry))
+    .filter(Boolean)
+  return candidates.some((entry) => !isUploadReference(entry))
+}
+
+export const isCancelledCourierState = (value: unknown) => {
+  const state = toText(value).toLowerCase()
+  return ['cancelled', 'canceled', 'shipment cancelled'].includes(state)
+}
+
+export const isClosedCourierState = (value: unknown) => {
+  const state = toText(value).toLowerCase()
+  return (
+    !state ||
+    isCancelledCourierState(state) ||
+    ['fail', 'failed', 'error', 'errored', 'delivered', 'completed', 'finished'].includes(
+      state
+    )
+  )
+}
+
 export const formatCourierAddress = (shippingAddress?: {
   line1?: string
   line2?: string
@@ -449,12 +480,59 @@ export const saveCourierAssignment = (
 export const getCourierAssignmentForOrder = (orderId: string) =>
   readCourierAssignments().find((assignment) => assignment.orderId === orderId) || null
 
+export const getActiveCourierPartnerIds = (
+  order: CourierOrderSummary | null | undefined
+): CourierPartnerId[] => {
+  if (!order) return []
+
+  const next = new Set<CourierPartnerId>()
+
+  if (order.borzo?.order_id && !isClosedCourierState(order.borzo.status)) {
+    next.add('borzo')
+  }
+
+  if (
+    hasRealDelhiveryWaybill(order.delhivery) &&
+    !isClosedCourierState(order.delhivery?.status)
+  ) {
+    next.add('delhivery')
+  }
+
+  if (
+    (order.nimbuspost?.shipment_id || order.nimbuspost?.awb_number) &&
+    !isClosedCourierState(order.nimbuspost?.status)
+  ) {
+    next.add('nimbuspost')
+  }
+
+  const localAssignment = getCourierAssignmentForOrder(order.id)
+  if (
+    localAssignment?.partnerId === 'porter' &&
+    !isClosedCourierState(localAssignment.trackingStatus)
+  ) {
+    next.add(localAssignment.partnerId)
+  }
+
+  return Array.from(next)
+}
+
+export const hasAnyActiveCourierAssignment = (
+  order: CourierOrderSummary | null | undefined
+) => getActiveCourierPartnerIds(order).length > 0
+
 export const getRemoteCourierAssignment = (
   order: CourierOrderSummary | null | undefined
 ): CourierAssignment | null => {
   if (!order) return null
 
-  if (order.delhivery?.waybill || order.delhivery?.waybills?.length) {
+  if (hasRealDelhiveryWaybill(order.delhivery) && !isClosedCourierState(order.delhivery?.status)) {
+    const realWaybill =
+      [
+        order.delhivery?.waybill,
+        ...(Array.isArray(order.delhivery?.waybills) ? order.delhivery.waybills : []),
+      ]
+        .map((entry) => toText(entry))
+        .find((entry) => entry && !isUploadReference(entry)) || ''
     return {
       orderId: order.id,
       orderNumber: order.orderNumber,
@@ -465,10 +543,7 @@ export const getRemoteCourierAssignment = (
       etaLabel: COURIER_PARTNER_MAP.delhivery.etaLabel,
       assignedAt: order.delhivery?.updated_at || order.createdAt,
       trackingStatus: order.delhivery?.status || trackingStatusByPartner.delhivery,
-      trackingCode:
-        order.delhivery?.waybill ||
-        order.delhivery?.waybills?.[0] ||
-        `${trackingPrefixByPartner.delhivery}-${order.id.slice(-6).toUpperCase()}`,
+      trackingCode: realWaybill,
       trackingUrl: order.delhivery?.label_url || '',
       customerName: order.customerName,
       customerPhone: order.customerPhone,

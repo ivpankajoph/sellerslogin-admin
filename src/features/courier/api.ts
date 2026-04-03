@@ -225,6 +225,35 @@ export const fetchDelhiveryShippingEstimate = async (params: {
   return res?.data
 }
 
+export const fetchDelhiveryBulkWaybills = async (payload: {
+  count: number
+  store?: boolean
+}) => {
+  const res = await api.post('/delhivery/waybill/bulk', payload)
+  return res?.data
+}
+
+export const fetchDelhiverySingleWaybill = async (payload?: {
+  store?: boolean
+}) => {
+  const res = await api.post('/delhivery/waybill/single', payload || {})
+  return res?.data
+}
+
+export const createDelhiveryWarehouse = async (
+  payload: Record<string, unknown>
+) => {
+  const res = await api.post('/delhivery/warehouse', payload)
+  return res?.data
+}
+
+export const updateDelhiveryWarehouse = async (
+  payload: Record<string, unknown>
+) => {
+  const res = await api.post('/delhivery/warehouse/edit', payload)
+  return res?.data
+}
+
 export const fetchNimbuspostRateServiceability = async (payload: {
   origin: string
   destination: string

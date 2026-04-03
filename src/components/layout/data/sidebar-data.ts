@@ -159,6 +159,13 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           pageKey: 'orders',
         },
         {
+          title: 'Courier List',
+          url: '/courier/list',
+          icon: Truck,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          pageKey: 'orders',
+        },
+        {
           title: 'Courier Apps',
           icon: Truck,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
