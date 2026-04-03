@@ -45,7 +45,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               pageKey: 'customers',
             },
             {
-              title: 'Customer Inquiry',
+              title: 'Customer Queries',
               url: '/customer-queries',
               roles: [ROLES.ADMIN],
               pageKey: 'customer_queries',

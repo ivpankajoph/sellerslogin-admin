@@ -1329,11 +1329,11 @@ export default function InventoryDashboard() {
         actionsClassName='gap-2 flex-wrap overflow-visible pb-0'
         showHeaderChrome={false}
       >
-        <div className='flex w-full items-center gap-3 overflow-x-auto'>
-          <div className='flex min-w-0 items-center gap-3'>
+        <div className='flex w-full flex-wrap items-start gap-3 overflow-visible'>
+          <div className='flex min-w-0 flex-1 flex-wrap items-start gap-3'>
             {isAdmin ? (
               <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
-                <SelectTrigger className='h-10 w-[280px] shrink-0'>
+                <SelectTrigger className='h-10 w-[240px] shrink-0 xl:w-[260px]'>
                   <SelectValue placeholder='Select vendor' />
                 </SelectTrigger>
                 <SelectContent>
@@ -1347,7 +1347,7 @@ export default function InventoryDashboard() {
             ) : null}
 
             <Select value={websiteFilter} onValueChange={setWebsiteFilter}>
-              <SelectTrigger className='h-10 w-[145px] shrink-0'>
+              <SelectTrigger className='h-10 w-[135px] shrink-0 xl:w-[145px]'>
                 <SelectValue placeholder='All websites' />
               </SelectTrigger>
               <SelectContent>
@@ -1362,7 +1362,7 @@ export default function InventoryDashboard() {
             </Select>
 
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className='h-10 w-[155px] shrink-0'>
+              <SelectTrigger className='h-10 w-[145px] shrink-0 xl:w-[155px]'>
                 <SelectValue placeholder='All categories' />
               </SelectTrigger>
               <SelectContent>
@@ -1376,7 +1376,7 @@ export default function InventoryDashboard() {
             </Select>
 
             <Select value={stockFilter} onValueChange={setStockFilter}>
-              <SelectTrigger className='h-10 w-[160px] shrink-0'>
+              <SelectTrigger className='h-10 w-[150px] shrink-0 xl:w-[160px]'>
                 <SelectValue placeholder='All stock states' />
               </SelectTrigger>
               <SelectContent>
@@ -1390,7 +1390,7 @@ export default function InventoryDashboard() {
             </Select>
 
             <Select value={catalogFilter} onValueChange={setCatalogFilter}>
-              <SelectTrigger className='h-10 w-[165px] shrink-0'>
+              <SelectTrigger className='h-10 w-[155px] shrink-0 xl:w-[165px]'>
                 <SelectValue placeholder='All selling states' />
               </SelectTrigger>
               <SelectContent>
@@ -1404,7 +1404,7 @@ export default function InventoryDashboard() {
             </Select>
           </div>
 
-          <div className='ml-auto flex shrink-0 items-center justify-end gap-3'>
+          <div className='ml-0 flex w-full flex-wrap items-start justify-end gap-3 self-start lg:ml-auto lg:w-auto lg:flex-nowrap'>
             <div ref={searchContainerRef} className='flex items-center gap-2'>
               {searchOpen ? (
                 <div className='relative'>

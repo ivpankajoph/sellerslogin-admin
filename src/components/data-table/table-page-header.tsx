@@ -26,9 +26,15 @@ export function TablePageHeader({
   showHeaderChrome = true,
 }: TablePageHeaderProps) {
   const authUser = useSelector((state: any) => state.auth?.user || null)
-  const isVendor = String(authUser?.role || '').toLowerCase() === 'vendor'
-  const shouldShowLocalTitle = !isVendor
-  const shouldShowLocalHeaderChrome = showHeaderChrome && !isVendor
+  const normalizedRole =
+    String(authUser?.role || '').toLowerCase() === 'superadmin'
+      ? 'admin'
+      : String(authUser?.role || '').toLowerCase()
+  const usesSharedDashboardHeader =
+    normalizedRole === 'vendor' || normalizedRole === 'admin'
+  const shouldShowLocalTitle = !usesSharedDashboardHeader
+  const shouldShowLocalHeaderChrome =
+    showHeaderChrome && !usesSharedDashboardHeader
 
   if (stacked) {
     return (

@@ -1,8 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { ThemeSwitch } from '@/components/theme-switch'
 import {
   Table,
   TableBody,
@@ -50,16 +47,6 @@ export default function TukkaSubmissions() {
 
   return (
     <div className='flex flex-col h-full'>
-      <Header fixed>
-        <div className='flex w-full items-center justify-between'>
-          <div className='text-lg font-semibold tracking-tight'>Tukka.tech Registrations</div>
-          <div className='flex items-center space-x-4'>
-            <ThemeSwitch />
-            <ProfileDropdown />
-          </div>
-        </div>
-      </Header>
-
       <Main className='flex-1 gap-4 overflow-auto'>
         <Card className='rounded-none'>
           <CardHeader>

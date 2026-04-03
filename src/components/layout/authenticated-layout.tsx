@@ -61,6 +61,11 @@ type SidebarNavItem = {
 const flattenSidebarItems = (items: SidebarNavItem[]): SidebarNavItem[] =>
   items.flatMap((item) => [item, ...(item.items ? flattenSidebarItems(item.items) : [])])
 
+const humanizePathSegment = (segment: string) =>
+  segment
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+
 const getSectionTitleFromPath = (pathname: string, role: string) => {
   const normalizedRole = role === 'admin' ? ROLES.ADMIN : ROLES.VENDOR
   const visibleItems = sidebarData.navGroups
@@ -76,7 +81,18 @@ const getSectionTitleFromPath = (pathname: string, role: string) => {
     })
     .sort((a, b) => String(b.url || '').length - String(a.url || '').length)[0]
 
-  return matchedItem?.title || 'Dashboard'
+  if (matchedItem?.title) return matchedItem.title
+
+  const pathSegments = pathname
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  const fallbackSegment = [...pathSegments]
+    .reverse()
+    .find((segment) => !segment.startsWith('$'))
+
+  return fallbackSegment ? humanizePathSegment(fallbackSegment) : 'Dashboard'
 }
 
 function ContentNavigationLoader({ rect }: { rect: LoaderViewportRect | null }) {
@@ -293,7 +309,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                 )}
               >
                 <div className='flex min-h-svh flex-col'>
-                  {isVendor ? (
+                  {effectiveRole === 'vendor' || effectiveRole === 'admin' ? (
                     <Header fixed className='mb-4'>
                       <div className='flex flex-1 flex-col gap-3 md:flex-row md:items-center md:justify-between'>
                         <div className='min-w-0'>
@@ -302,51 +318,53 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                           </div>
                         </div>
                         <div className='flex flex-wrap items-center gap-2 md:justify-end md:gap-3'>
-                          <div className='flex flex-wrap items-center gap-2'>
-                            {canAccessMyWebsites ? (
-                              <Button variant='outline' asChild className='max-sm:w-full'>
-                                <Link to='/template-workspace'>
-                                  <Sparkles className='h-4 w-4 text-primary' />
-                                  Create your website for free
-                                </Link>
-                              </Button>
-                            ) : null}
-                            <DropdownMenu modal={false}>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant='outline' className='gap-2'>
-                                  Domain&apos;s
-                                  <ChevronDown className='h-4 w-4' />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align='end' className='min-w-[200px]'>
-                                <DropdownMenuItem onClick={handleConnectDomainClick}>
-                                  Connect Domain
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>Book Domain</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            {!isVendorTeamUser ? (
-                              billingSummary?.plan?.is_premium_active ? (
-                                <Button
-                                  asChild
-                                  className='border border-amber-300 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-black shadow-sm hover:brightness-95'
-                                >
-                                  <Link to='/plans'>
-                                    <Crown className='h-4 w-4 text-amber-900' />
-                                    Premium Plan
+                          {isVendor ? (
+                            <div className='flex flex-wrap items-center gap-2'>
+                              {canAccessMyWebsites ? (
+                                <Button variant='outline' asChild className='max-sm:w-full'>
+                                  <Link to='/template-workspace'>
+                                    <Sparkles className='h-4 w-4 text-primary' />
+                                    Create your website for free
                                   </Link>
                                 </Button>
-                              ) : (
-                                <Button
-                                  onClick={() => setUpgradeDialogOpen(true)}
-                                  className='border border-amber-300 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-black shadow-sm hover:brightness-95'
-                                >
-                                  <Sparkles className='h-4 w-4 text-amber-900' />
-                                  Upgrade Plan
-                                </Button>
-                              )
-                            ) : null}
-                          </div>
+                              ) : null}
+                              <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant='outline' className='gap-2'>
+                                    Domain&apos;s
+                                    <ChevronDown className='h-4 w-4' />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align='end' className='min-w-[200px]'>
+                                  <DropdownMenuItem onClick={handleConnectDomainClick}>
+                                    Connect Domain
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem>Book Domain</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              {!isVendorTeamUser ? (
+                                billingSummary?.plan?.is_premium_active ? (
+                                  <Button
+                                    asChild
+                                    className='border border-amber-300 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-black shadow-sm hover:brightness-95'
+                                  >
+                                    <Link to='/plans'>
+                                      <Crown className='h-4 w-4 text-amber-900' />
+                                      Premium Plan
+                                    </Link>
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    onClick={() => setUpgradeDialogOpen(true)}
+                                    className='border border-amber-300 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-black shadow-sm hover:brightness-95'
+                                  >
+                                    <Sparkles className='h-4 w-4 text-amber-900' />
+                                    Upgrade Plan
+                                  </Button>
+                                )
+                              ) : null}
+                            </div>
+                          ) : null}
                           <div className='ml-auto flex items-center gap-2 md:ml-0'>
                             <NotificationBell />
                             <ThemeSwitch />
