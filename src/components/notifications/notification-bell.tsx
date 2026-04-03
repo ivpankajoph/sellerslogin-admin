@@ -75,7 +75,7 @@ export function NotificationBell({ className }: { className?: string }) {
   const latestQuery = useQuery({
     queryKey: ['notifications', 'latest'],
     queryFn: async () => {
-      const res = await api.get('/notifications', { params: { limit: 10 } })
+      const res = await api.get('/notifications', { params: { limit: 'all' } })
       return Array.isArray(res.data?.notifications) ? res.data.notifications : []
     },
     enabled: open,

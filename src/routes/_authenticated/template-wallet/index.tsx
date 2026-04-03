@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
 import { createFileRoute } from '@tanstack/react-router'
+import { Search } from 'lucide-react'
 import type { RootState } from '@/store'
 import { useSelector } from 'react-redux'
 import api from '@/lib/axios'
@@ -123,12 +124,14 @@ function TemplateWalletPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [vendors, setVendors] = useState<any[]>([])
   const [websites, setWebsites] = useState<WebsiteOption[]>([])
   const [selectedVendor, setSelectedVendor] = useState<string>('all')
   const [selectedWebsite, setSelectedWebsite] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const searchContainerRef = useRef<HTMLDivElement | null>(null)
 
   const fetchWallet = async () => {
     try {
@@ -161,6 +164,25 @@ function TemplateWalletPage() {
     fetchWallet()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVendor, selectedVendor, selectedWebsite])
+
+  useEffect(() => {
+    if (search.trim()) {
+      setSearchOpen(true)
+    }
+  }, [search])
+
+  useEffect(() => {
+    if (!searchOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null
+      if (searchContainerRef.current?.contains(target)) return
+      setSearchOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [searchOpen])
 
   useEffect(() => {
     const fetchVendors = async () => {
@@ -442,65 +464,90 @@ function TemplateWalletPage() {
   return (
     <>
       <TablePageHeader title='Website Wallet'>
-        {!isVendor && (
-          <Select
-            value={selectedVendor}
-            onValueChange={(value) => {
-              setSelectedVendor(value)
-              setSelectedWebsite('all')
-            }}
-          >
-            <SelectTrigger className='h-10 w-52 shrink-0'>
-              <SelectValue placeholder='All vendors' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>All vendors</SelectItem>
-              {vendorOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <div className='flex w-full flex-wrap items-center justify-between gap-3'>
+          <div className='flex flex-wrap items-center gap-3'>
+            {!isVendor && (
+              <Select
+                value={selectedVendor}
+                onValueChange={(value) => {
+                  setSelectedVendor(value)
+                  setSelectedWebsite('all')
+                }}
+              >
+                <SelectTrigger className='h-10 w-52 shrink-0'>
+                  <SelectValue placeholder='All vendors' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>All vendors</SelectItem>
+                  {vendorOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
-        <Select
-          value={selectedWebsite}
-          onValueChange={setSelectedWebsite}
-        >
-          <SelectTrigger className='h-10 w-52 shrink-0'>
-            <SelectValue placeholder='All websites' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='all'>All websites</SelectItem>
-            {websites.map((option) => (
-              <SelectItem key={option.id} value={option.id}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select
+              value={selectedWebsite}
+              onValueChange={setSelectedWebsite}
+            >
+              <SelectTrigger className='h-10 w-52 shrink-0'>
+                <SelectValue placeholder='All websites' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All websites</SelectItem>
+                {websites.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={
-            isVendor
-              ? 'Search order, product, or website'
-              : 'Search order, vendor, or website'
-          }
-          className='h-10 w-64 shrink-0'
-        />
-        <Button
-          variant='outline'
-          className='shrink-0'
-          onClick={() => setStatsOpen(true)}
-        >
-          Statistics
-        </Button>
-        <Button className='shrink-0' onClick={fetchWallet} disabled={loading}>
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </Button>
+          <div className='ml-auto flex flex-wrap items-center justify-end gap-3'>
+            <div ref={searchContainerRef} className='flex items-center gap-2'>
+              {searchOpen ? (
+                <div className='relative'>
+                  <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={
+                      isVendor
+                        ? 'Search order, product, or website'
+                        : 'Search order, vendor, or website'
+                    }
+                    className='h-10 w-64 shrink-0 pl-9'
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='h-10 w-10 shrink-0 rounded-full text-[#183b63] hover:bg-transparent hover:text-[#183b63]'
+                  onClick={() => setSearchOpen(true)}
+                  aria-label='Open search'
+                >
+                  <Search className='h-6 w-6 stroke-[2.5]' />
+                </Button>
+              )}
+            </div>
+            <Button
+              variant='outline'
+              className='shrink-0'
+              onClick={() => setStatsOpen(true)}
+            >
+              Statistics
+            </Button>
+            <Button className='shrink-0' onClick={fetchWallet} disabled={loading}>
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-6'>

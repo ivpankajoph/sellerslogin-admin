@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useSelector } from 'react-redux'
 import { cn } from '@/lib/utils'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
@@ -24,13 +25,20 @@ export function TablePageHeader({
   stacked = false,
   showHeaderChrome = true,
 }: TablePageHeaderProps) {
+  const authUser = useSelector((state: any) => state.auth?.user || null)
+  const isVendor = String(authUser?.role || '').toLowerCase() === 'vendor'
+  const shouldShowLocalTitle = !isVendor
+  const shouldShowLocalHeaderChrome = showHeaderChrome && !isVendor
+
   if (stacked) {
     return (
       <Header fixed className={cn('h-auto min-h-16', className)}>
         <div className='flex w-full min-w-0 flex-col gap-3'>
-          <div className='min-w-0'>
-            <h2 className='text-base font-semibold tracking-tight'>{title}</h2>
-          </div>
+          {shouldShowLocalTitle ? (
+            <div className='min-w-0'>
+              <h2 className='text-base font-semibold tracking-tight'>{title}</h2>
+            </div>
+          ) : null}
           <div className='flex w-full min-w-0 items-center gap-3'>
             <div
               className={cn(
@@ -40,7 +48,7 @@ export function TablePageHeader({
             >
               {children}
             </div>
-            {showHeaderChrome ? (
+            {shouldShowLocalHeaderChrome ? (
               <div className='flex shrink-0 items-center gap-3'>
                 <ThemeSwitch />
                 <ConfigDrawer />
@@ -61,24 +69,27 @@ export function TablePageHeader({
           stackOnMobile && 'flex-col items-stretch sm:flex-row sm:items-center'
         )}
       >
+        {shouldShowLocalTitle ? (
+          <div
+            className={cn(
+              'min-w-0 shrink-0',
+              stackOnMobile && 'w-full sm:w-auto'
+            )}
+          >
+            <h2 className='text-base font-semibold tracking-tight'>{title}</h2>
+          </div>
+        ) : null}
         <div
           className={cn(
-            'min-w-0 shrink-0',
-            stackOnMobile && 'w-full sm:w-auto'
-          )}
-        >
-          <h2 className='text-base font-semibold tracking-tight'>{title}</h2>
-        </div>
-        <div
-          className={cn(
-            'ms-auto flex min-w-0 items-center gap-3 overflow-x-auto pb-1',
+            'flex min-w-0 items-center gap-3 overflow-x-auto pb-1',
+            shouldShowLocalTitle ? 'ms-auto' : 'w-full',
             stackOnMobile &&
-              'ms-0 w-full flex-wrap justify-start overflow-visible pb-0 sm:ms-auto sm:w-auto sm:flex-1 sm:flex-nowrap sm:justify-end sm:overflow-x-auto',
+              'ms-0 w-full flex-wrap justify-start overflow-visible pb-0 sm:w-auto sm:flex-1 sm:flex-nowrap sm:justify-end sm:overflow-x-auto',
             actionsClassName
           )}
         >
           {children}
-          {showHeaderChrome ? (
+          {shouldShowLocalHeaderChrome ? (
             <>
               <div className='shrink-0'>
                 <ThemeSwitch />

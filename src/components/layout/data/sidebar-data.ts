@@ -159,12 +159,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
             {
-              title: 'Borzo',
-              url: '/courier/borzo',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
-              pageKey: 'orders',
-            },
-            {
               title: 'Delhivery',
               url: '/courier/delhivery',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
@@ -173,12 +167,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
             {
               title: 'NimbusPost',
               url: '/courier/nimbuspost',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
-              pageKey: 'orders',
-            },
-            {
-              title: 'Porter',
-              url: '/courier/porter',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
               pageKey: 'orders',
             },
@@ -339,13 +327,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               url: '/integrations/cashfree',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
               requiresIntegration: 'cashfree',
-              pageKey: 'my_apps',
-            },
-            {
-              title: 'Borzo',
-              url: '/integrations/borzo',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
-              requiresIntegration: 'borzo',
               pageKey: 'my_apps',
             },
             {

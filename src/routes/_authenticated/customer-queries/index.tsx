@@ -3,6 +3,7 @@ import axios from 'axios'
 import { format } from 'date-fns'
 import { createFileRoute } from '@tanstack/react-router'
 import type { RootState } from '@/store'
+import { Search } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import api from '@/lib/axios'
 import { Badge } from '@/components/ui/badge'
@@ -95,6 +96,8 @@ function CustomerQueriesPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchContainerRef = useRef<HTMLDivElement | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -173,6 +176,25 @@ function CustomerQueriesPage() {
     }, 350)
     return () => clearTimeout(timer)
   }, [search])
+
+  useEffect(() => {
+    if (search.trim()) {
+      setSearchOpen(true)
+    }
+  }, [search])
+
+  useEffect(() => {
+    if (!searchOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null
+      if (searchContainerRef.current?.contains(target)) return
+      setSearchOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [searchOpen])
 
   useEffect(() => {
     if (!token || !shouldShowWebsiteFilter) {
@@ -383,57 +405,82 @@ function CustomerQueriesPage() {
   return (
     <>
       <TablePageHeader title='Customer Queries'>
-        {websiteOptions.length ? (
-          <Select
-            value={selectedWebsiteId}
-            onValueChange={setSelectedWebsiteId}
-          >
-            <SelectTrigger className='h-10 w-56 shrink-0'>
-              <SelectValue placeholder='All websites' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>All websites</SelectItem>
-              {websiteOptions.map((website) => (
-                <SelectItem key={website.id} value={website.id}>
-                  {website.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder='Search...'
-          className='h-10 w-56 shrink-0'
-        />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className='w-36 shrink-0'>
-            <SelectValue placeholder='All Status' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='all'>All Status</SelectItem>
-            <SelectItem value='pending'>Pending</SelectItem>
-            <SelectItem value='in-progress'>In Progress</SelectItem>
-            <SelectItem value='resolved'>Resolved</SelectItem>
-            <SelectItem value='closed'>Closed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          variant='outline'
-          className='shrink-0'
-          onClick={() => setStatsOpen(true)}
-        >
-          Statistics
-        </Button>
-        <Button
-          className='shrink-0'
-          onClick={loadQueries}
-          disabled={loading}
-          variant='outline'
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </Button>
+        <div className='flex w-full flex-wrap items-center justify-between gap-3'>
+          <div className='flex flex-wrap items-center gap-3'>
+            {websiteOptions.length ? (
+              <Select
+                value={selectedWebsiteId}
+                onValueChange={setSelectedWebsiteId}
+              >
+                <SelectTrigger className='h-10 w-56 shrink-0'>
+                  <SelectValue placeholder='All websites' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>All websites</SelectItem>
+                  {websiteOptions.map((website) => (
+                    <SelectItem key={website.id} value={website.id}>
+                      {website.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className='w-36 shrink-0'>
+                <SelectValue placeholder='All Status' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All Status</SelectItem>
+                <SelectItem value='pending'>Pending</SelectItem>
+                <SelectItem value='in-progress'>In Progress</SelectItem>
+                <SelectItem value='resolved'>Resolved</SelectItem>
+                <SelectItem value='closed'>Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='ml-auto flex flex-wrap items-center justify-end gap-3'>
+            <div ref={searchContainerRef} className='flex items-center gap-2'>
+              {searchOpen ? (
+                <div className='relative'>
+                  <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder='Search queries...'
+                    className='h-10 w-56 shrink-0 pl-9'
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='h-10 w-10 shrink-0 rounded-full text-[#183b63] hover:bg-transparent hover:text-[#183b63]'
+                  onClick={() => setSearchOpen(true)}
+                  aria-label='Open search'
+                >
+                  <Search className='h-6 w-6 stroke-[2.5]' />
+                </Button>
+              )}
+            </div>
+            <Button
+              variant='outline'
+              className='shrink-0'
+              onClick={() => setStatsOpen(true)}
+            >
+              Statistics
+            </Button>
+            <Button
+              className='shrink-0'
+              onClick={loadQueries}
+              disabled={loading}
+              variant='outline'
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-6'>

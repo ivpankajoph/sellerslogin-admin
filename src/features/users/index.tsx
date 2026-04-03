@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getRouteApi } from '@tanstack/react-router'
 import axios from 'axios'
+import { Search } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import api from '@/lib/axios'
 import { Button } from '@/components/ui/button'
@@ -41,6 +42,8 @@ export function Users() {
   const [error, setError] = useState<string | null>(null)
   const [filterValue, setFilterValue] = useState(String(search.username || ''))
   const [statsOpen, setStatsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(Boolean(String(search.username || '').trim()))
+  const searchContainerRef = useRef<HTMLDivElement | null>(null)
   const shouldShowWebsiteFilter =
     role === 'vendor' || role === 'admin' || role === 'superadmin'
 
@@ -119,6 +122,25 @@ export function Users() {
   useEffect(() => {
     setFilterValue(String(search.username || ''))
   }, [search.username])
+
+  useEffect(() => {
+    if (String(search.username || '').trim()) {
+      setSearchOpen(true)
+    }
+  }, [search.username])
+
+  useEffect(() => {
+    if (!searchOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null
+      if (searchContainerRef.current?.contains(target)) return
+      setSearchOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [searchOpen])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -233,6 +255,36 @@ export function Users() {
     () => data.filter((user) => user.role === 'customer').length,
     [data]
   )
+  const filteredData = useMemo(() => {
+    const query = String(search.username || '')
+      .trim()
+      .toLowerCase()
+
+    if (!query) {
+      return data
+    }
+
+    return data.filter((user) => {
+      const haystacks = [
+        user.username,
+        user.firstName,
+        user.lastName,
+        `${user.firstName} ${user.lastName}`.trim(),
+        user.email,
+        user.phoneNumber,
+        user.vendorName,
+        user.websiteName,
+        user.role,
+        user.status,
+      ]
+
+      return haystacks.some((value) =>
+        String(value || '')
+          .toLowerCase()
+          .includes(query)
+      )
+    })
+  }, [data, search.username])
   const adminUsers = useMemo(
     () =>
       data.filter((user) => ['admin', 'superadmin'].includes(String(user.role)))
@@ -313,45 +365,70 @@ export function Users() {
       <TablePageHeader
         title={role === 'vendor' ? 'Customer List' : 'User List'}
       >
-        {websiteOptions.length ? (
-          <Select
-            value={selectedWebsiteId}
-            onValueChange={setSelectedWebsiteId}
-          >
-            <SelectTrigger className='h-10 w-56 shrink-0'>
-              <SelectValue placeholder='All websites' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>All websites</SelectItem>
-              {websiteOptions.map((website) => (
-                <SelectItem key={website.id} value={website.id}>
-                  {website.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
-        <Input
-          value={filterValue}
-          onChange={(event) => setFilterValue(event.target.value)}
-          placeholder='Filter users...'
-          className='h-10 w-64 shrink-0'
-        />
-        <Button
-          variant='outline'
-          className='shrink-0'
-          onClick={() => setStatsOpen(true)}
-        >
-          Statistics
-        </Button>
-        <Button
-          variant='outline'
-          className='shrink-0'
-          onClick={fetchUsers}
-          disabled={loading}
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </Button>
+        <div className='flex w-full flex-wrap items-center justify-between gap-3'>
+          <div className='flex flex-wrap items-center gap-3'>
+            {websiteOptions.length ? (
+              <Select
+                value={selectedWebsiteId}
+                onValueChange={setSelectedWebsiteId}
+              >
+                <SelectTrigger className='h-10 w-56 shrink-0'>
+                  <SelectValue placeholder='All websites' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>All websites</SelectItem>
+                  {websiteOptions.map((website) => (
+                    <SelectItem key={website.id} value={website.id}>
+                      {website.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+          </div>
+          <div className='ml-auto flex flex-wrap items-center justify-end gap-3'>
+            <div ref={searchContainerRef} className='flex items-center gap-2'>
+              {searchOpen ? (
+                <div className='relative'>
+                  <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+                  <Input
+                    value={filterValue}
+                    onChange={(event) => setFilterValue(event.target.value)}
+                    placeholder='Filter users...'
+                    className='h-10 w-64 shrink-0 pl-9'
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='h-10 w-10 shrink-0 rounded-full text-[#183b63] hover:bg-transparent hover:text-[#183b63]'
+                  onClick={() => setSearchOpen(true)}
+                  aria-label='Open search'
+                >
+                  <Search className='h-6 w-6 stroke-[2.5]' />
+                </Button>
+              )}
+            </div>
+            <Button
+              variant='outline'
+              className='shrink-0'
+              onClick={() => setStatsOpen(true)}
+            >
+              Statistics
+            </Button>
+            <Button
+              variant='outline'
+              className='shrink-0'
+              onClick={fetchUsers}
+              disabled={loading}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
@@ -361,7 +438,7 @@ export function Users() {
           )}
           {error && <p className='text-sm text-red-500'>{error}</p>}
         </div>
-        <UsersTable data={data} search={search} navigate={navigate} />
+        <UsersTable data={filteredData} search={search} navigate={navigate} />
       </Main>
 
       <StatisticsDialog

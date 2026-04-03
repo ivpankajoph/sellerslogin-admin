@@ -89,13 +89,13 @@ const APP_META: Record<
   ophmate_frontend: {
     icon: Store,
     accentClass:
-      'border-cyan-200/80 bg-gradient-to-br from-cyan-50 via-sky-50 to-white',
+      'border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-sky-500/10 to-card',
     iconClass: 'bg-cyan-600 text-white',
   },
   vendor_template_frontend: {
     icon: LayoutTemplate,
     accentClass:
-      'border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-lime-50 to-white',
+      'border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-lime-500/10 to-card',
     iconClass: 'bg-emerald-600 text-white',
   },
 }
@@ -115,19 +115,19 @@ const PROVIDER_META: Record<
   }
 > = {
   none: {
-    badgeClass: 'bg-violet-100 text-violet-700 border-violet-200',
+    badgeClass: 'border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-200',
     hint: 'No courier service, manual or self handling.',
   },
   borzo: {
-    badgeClass: 'bg-sky-100 text-sky-700 border-sky-200',
+    badgeClass: 'border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-200',
     hint: 'Fast hyperlocal delivery support.',
   },
   delhivery: {
-    badgeClass: 'bg-amber-100 text-amber-700 border-amber-200',
+    badgeClass: 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-200',
     hint: 'National delivery and logistics support.',
   },
   nimbuspost: {
-    badgeClass: 'bg-blue-100 text-blue-700 border-blue-200',
+    badgeClass: 'border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-200',
     hint: 'Multi-courier parcel routing with manifest and NDR support.',
   },
 }
@@ -518,13 +518,13 @@ function DeliveryChargesPage() {
 
   if (!isAdmin && !isVendor) {
     return (
-      <Card className='border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50'>
+      <Card className='border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-orange-500/10'>
         <CardHeader>
-          <CardTitle className='text-lg text-amber-900'>
+          <CardTitle className='text-lg text-amber-900 dark:text-amber-100'>
             Delivery charges not available
           </CardTitle>
         </CardHeader>
-        <CardContent className='text-sm text-amber-800'>
+        <CardContent className='text-sm text-amber-800 dark:text-amber-200'>
           Only admin and vendor accounts can access delivery charge controls.
         </CardContent>
       </Card>
@@ -533,13 +533,13 @@ function DeliveryChargesPage() {
 
   if (!websitesLoading && !websiteOptions.length) {
     return (
-      <Card className='border-slate-200 bg-white shadow-sm'>
+      <Card className='border-border bg-card shadow-sm'>
         <CardHeader>
-          <CardTitle className='text-lg text-slate-900'>
+          <CardTitle className='text-lg text-foreground'>
             No website available
           </CardTitle>
         </CardHeader>
-        <CardContent className='text-sm text-slate-600'>
+        <CardContent className='text-sm text-muted-foreground'>
           {isVendor
             ? 'No website is linked to this vendor account yet.'
             : 'No website scope is available right now.'}
@@ -550,23 +550,23 @@ function DeliveryChargesPage() {
 
   return (
     <div className='space-y-6 pb-4'>
-      <Card className='relative overflow-hidden border-slate-200 bg-white shadow-md'>
+      <Card className='relative overflow-hidden border-border bg-card shadow-md'>
         <CardHeader className='relative flex flex-wrap items-start justify-between gap-4 pb-3'>
           <div>
             <div className='mb-2 flex items-center gap-2'>
-              <Sparkles className='h-4 w-4 text-sky-600' />
-              <Badge className='border-sky-200 bg-sky-50 text-sky-700'>
+              <Sparkles className='h-4 w-4 text-sky-600 dark:text-sky-300' />
+              <Badge className='border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-200'>
                 Website Scoped Delivery Controls
               </Badge>
             </div>
-            <CardTitle className='text-2xl font-bold tracking-tight text-slate-900'>
+            <CardTitle className='text-2xl font-bold tracking-tight text-foreground'>
               Delivery Charges
             </CardTitle>
-            <p className='mt-1 max-w-2xl text-sm text-slate-600'>
+            <p className='mt-1 max-w-2xl text-sm text-muted-foreground'>
               Select a website and manage Borzo, Delhivery, or manual delivery
               pricing for its checkout flow.
             </p>
-            <p className='mt-1 text-xs text-slate-500'>
+            <p className='mt-1 text-xs text-muted-foreground'>
               Active scope: {scope?.website_name || scopeLabel} | Last synced:{' '}
               {lastUpdated ? lastUpdated.toLocaleString() : 'N/A'}
             </p>
@@ -578,7 +578,7 @@ function DeliveryChargesPage() {
               onValueChange={setSelectedWebsiteId}
               disabled={websitesLoading || saving}
             >
-              <SelectTrigger className='h-10 min-w-[230px] border-slate-300 bg-white text-left text-slate-900'>
+              <SelectTrigger className='h-10 min-w-[230px] border-border bg-background text-left text-foreground'>
                 <SelectValue placeholder='Select website' />
               </SelectTrigger>
               <SelectContent>
@@ -593,7 +593,7 @@ function DeliveryChargesPage() {
               onClick={() => void fetchConfig()}
               variant='outline'
               disabled={loading || saving || !hasWebsiteScopeSelected}
-              className='border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
             >
               <RefreshCcw className='mr-2 h-4 w-4' />
               {loading ? 'Refreshing...' : 'Refresh'}
@@ -601,7 +601,7 @@ function DeliveryChargesPage() {
             <Button
               onClick={saveConfig}
               disabled={loading || saving || !hasWebsiteScopeSelected}
-              className='bg-slate-900 text-white shadow-lg hover:bg-slate-800'
+              className='bg-primary text-primary-foreground shadow-lg hover:bg-primary/90'
             >
               <Save className='mr-2 h-4 w-4' />
               {saving ? 'Saving...' : 'Save Changes'}
@@ -611,7 +611,7 @@ function DeliveryChargesPage() {
               variant='outline'
               onClick={() => setIsSummaryDialogOpen(true)}
               disabled={!hasWebsiteScopeSelected}
-              className='border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
             >
               Scope Summary
             </Button>
@@ -620,7 +620,7 @@ function DeliveryChargesPage() {
       </Card>
 
       {scope?.is_fallback && !isMainWebsiteScope && (
-        <div className='rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 text-sm text-amber-800 shadow-sm'>
+        <div className='rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-orange-500/10 px-4 py-3 text-sm text-amber-800 shadow-sm dark:text-amber-200'>
           This website is currently using fallback charges from{' '}
           {scope.fallback_label || MAIN_WEBSITE_LABEL}. Save once to create a
           dedicated website-level configuration.
@@ -628,7 +628,7 @@ function DeliveryChargesPage() {
       )}
 
       {error && (
-        <div className='rounded-xl border border-rose-200 bg-gradient-to-r from-rose-50 to-red-50 px-4 py-3 text-sm text-rose-700 shadow-sm'>
+        <div className='rounded-xl border border-rose-500/20 bg-gradient-to-r from-rose-500/10 to-red-500/10 px-4 py-3 text-sm text-rose-700 shadow-sm dark:text-rose-200'>
           {error}
         </div>
       )}
@@ -643,23 +643,23 @@ function DeliveryChargesPage() {
           </DialogHeader>
 
           <div className='grid gap-3 md:grid-cols-3'>
-            <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-              <p className='text-xs uppercase tracking-wide text-slate-500'>
+            <div className='rounded-xl border border-border bg-muted/50 p-3'>
+              <p className='text-xs uppercase tracking-wide text-muted-foreground'>
                 Currency
               </p>
-              <p className='mt-1 text-xl font-bold text-slate-900'>{config.currency}</p>
+              <p className='mt-1 text-xl font-bold text-foreground'>{config.currency}</p>
             </div>
-            <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-              <p className='text-xs uppercase tracking-wide text-slate-500'>
+            <div className='rounded-xl border border-border bg-muted/50 p-3'>
+              <p className='text-xs uppercase tracking-wide text-muted-foreground'>
                 Apps Configured
               </p>
-              <p className='mt-1 text-xl font-bold text-slate-900'>{visibleAppSources.length}</p>
+              <p className='mt-1 text-xl font-bold text-foreground'>{visibleAppSources.length}</p>
             </div>
-            <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-              <p className='text-xs uppercase tracking-wide text-slate-500'>
+            <div className='rounded-xl border border-border bg-muted/50 p-3'>
+              <p className='text-xs uppercase tracking-wide text-muted-foreground'>
                 Fixed Providers
               </p>
-              <p className='mt-1 text-xl font-bold text-slate-900'>{totalFixedProviders}</p>
+              <p className='mt-1 text-xl font-bold text-foreground'>{totalFixedProviders}</p>
             </div>
           </div>
 
@@ -667,15 +667,15 @@ function DeliveryChargesPage() {
             {summaryItems.map((item) => (
               <div
                 key={item.appSource}
-                className='rounded-xl border border-slate-200 bg-slate-50/80 p-4'
+                className='rounded-xl border border-border bg-muted/50 p-4'
               >
-                <p className='text-xs uppercase tracking-wide text-slate-500'>
+                <p className='text-xs uppercase tracking-wide text-muted-foreground'>
                   {item.title}
                 </p>
-                <p className='mt-1 text-lg font-semibold text-slate-900'>
+                <p className='mt-1 text-lg font-semibold text-foreground'>
                   {PROVIDER_LABELS[item.provider]}
                 </p>
-                <p className='text-sm text-slate-600'>
+                <p className='text-sm text-muted-foreground'>
                   {item.amount == null
                     ? 'Dynamic provider pricing'
                     : `${config.currency} ${Number(item.amount).toFixed(2)}`}
@@ -696,7 +696,7 @@ function DeliveryChargesPage() {
             key={appSource}
             className={`overflow-hidden border shadow-sm ${meta.accentClass}`}
           >
-            <CardHeader className='flex flex-wrap items-start justify-between gap-3 border-b border-white/70 bg-white/60 backdrop-blur-sm'>
+            <CardHeader className='flex flex-wrap items-start justify-between gap-3 border-b border-border/60 bg-background/40 backdrop-blur-sm'>
               <div className='flex items-start gap-3'>
                 <div
                   className={`flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm ${meta.iconClass}`}
@@ -704,17 +704,17 @@ function DeliveryChargesPage() {
                   <Icon className='h-5 w-5' />
                 </div>
                 <div>
-                  <CardTitle className='text-xl text-slate-900'>
+                  <CardTitle className='text-xl text-foreground'>
                     {getAppTitle(appSource, isMainWebsiteScope, scopeLabel)}
                   </CardTitle>
-                  <p className='mt-1 text-sm text-slate-600'>
+                  <p className='mt-1 text-sm text-muted-foreground'>
                     {getAppSubtitle(appSource, isMainWebsiteScope, scopeLabel)}
                   </p>
                 </div>
               </div>
 
-              <div className='rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-sm shadow-sm backdrop-blur-sm'>
-                <p className='text-xs uppercase tracking-wide text-slate-500'>
+              <div className='rounded-xl border border-border/70 bg-background/70 px-3 py-2 text-sm shadow-sm backdrop-blur-sm'>
+                <p className='text-xs uppercase tracking-wide text-muted-foreground'>
                   Default Provider
                 </p>
                 <Select
@@ -724,7 +724,7 @@ function DeliveryChargesPage() {
                   }
                   disabled={loading || saving}
                 >
-                  <SelectTrigger className='mt-2 h-9 w-[180px] bg-white'>
+                  <SelectTrigger className='mt-2 h-9 w-[180px] border-border bg-background text-foreground'>
                     <SelectValue placeholder='Select provider' />
                   </SelectTrigger>
                   <SelectContent>
@@ -747,20 +747,20 @@ function DeliveryChargesPage() {
                 return (
                   <div
                     key={provider}
-                    className={`rounded-2xl border bg-white/85 p-4 shadow-sm ${
+                    className={`rounded-2xl border bg-card/90 p-4 shadow-sm ${
                       isDefault
-                        ? 'border-slate-900/10 ring-2 ring-slate-900/5'
-                        : 'border-slate-200'
+                        ? 'border-primary/20 ring-2 ring-primary/10'
+                        : 'border-border'
                     }`}
                   >
                     <div className='flex items-start justify-between gap-3'>
                       <div>
                         <div className='flex flex-wrap items-center gap-2'>
-                          <p className='text-base font-semibold text-slate-900'>
+                          <p className='text-base font-semibold text-foreground'>
                             {PROVIDER_LABELS[provider]}
                           </p>
                           {isDefault && (
-                            <Badge className='border-slate-200 bg-slate-900 text-white'>
+                            <Badge className='border-primary/20 bg-primary text-primary-foreground'>
                               Default
                             </Badge>
                           )}
@@ -771,13 +771,13 @@ function DeliveryChargesPage() {
                         >
                           {providerConfig.enabled ? 'Fixed charge' : 'Dynamic'}
                         </Badge>
-                        <p className='mt-2 text-sm text-slate-600'>
+                        <p className='mt-2 text-sm text-muted-foreground'>
                           {providerMeta.hint}
                         </p>
                       </div>
 
-                      <div className='flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5'>
-                        <Truck className='h-4 w-4 text-slate-500' />
+                      <div className='flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5'>
+                        <Truck className='h-4 w-4 text-muted-foreground' />
                         <Switch
                           checked={providerConfig.enabled}
                           onCheckedChange={(checked) =>
@@ -790,12 +790,12 @@ function DeliveryChargesPage() {
                       </div>
                     </div>
 
-                    <div className='mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3'>
-                      <label className='text-xs font-medium tracking-wide text-slate-500 uppercase'>
+                    <div className='mt-4 rounded-xl border border-border bg-muted/40 p-3'>
+                      <label className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
                         Fixed Amount
                       </label>
                       <div className='mt-2 flex items-center gap-2'>
-                        <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-500 shadow-sm'>
+                        <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-background text-muted-foreground shadow-sm'>
                           <CircleDollarSign className='h-4 w-4' />
                         </div>
                         <Input
@@ -808,11 +808,11 @@ function DeliveryChargesPage() {
                               amount: normalizeNumber(event.target.value),
                             })
                           }
-                          className='h-10 bg-white'
+                          className='h-10 border-border bg-background text-foreground'
                           disabled={loading || saving}
                         />
                       </div>
-                      <p className='mt-2 text-xs text-slate-500'>
+                      <p className='mt-2 text-xs text-muted-foreground'>
                         Applied only when fixed charge is enabled for this provider.
                       </p>
                     </div>

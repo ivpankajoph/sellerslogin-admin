@@ -56,7 +56,6 @@ const providerAccentClass: Record<ProviderId, string> = {
   razorpay: 'border-violet-200 bg-violet-50',
   cashfree: 'border-indigo-200 bg-indigo-50',
   cod: 'border-amber-200 bg-amber-50',
-  borzo: 'border-emerald-200 bg-emerald-50',
   delhivery: 'border-cyan-200 bg-cyan-50',
   nimbuspost: 'border-blue-200 bg-blue-50',
   google_merchant: 'border-blue-200 bg-blue-50',
@@ -205,7 +204,6 @@ export default function IntegrationsPage({
     razorpay: {},
     cashfree: {},
     cod: {},
-    borzo: {},
     delhivery: {},
     nimbuspost: {},
     google_merchant: {},
@@ -215,7 +213,6 @@ export default function IntegrationsPage({
     razorpay: false,
     cashfree: false,
     cod: true,
-    borzo: false,
     delhivery: false,
     nimbuspost: false,
     google_merchant: false,
@@ -240,7 +237,7 @@ export default function IntegrationsPage({
   const [busyMap, setBusyMap] = useState<Record<string, boolean>>({})
   const [defaultPayment, setDefaultPayment] = useState<'cod' | 'razorpay' | 'cashfree'>('cod')
   const [defaultDelivery, setDefaultDelivery] = useState<
-    'none' | 'borzo' | 'delhivery' | 'nimbuspost'
+    'none' | 'delhivery' | 'nimbuspost'
   >('none')
   const [filter, setFilter] = useState<'all' | ProviderCategory>(
     focusProvider ? providerMeta[focusProvider].category : 'all',
@@ -297,7 +294,6 @@ export default function IntegrationsPage({
         razorpay: payload.providers.razorpay.enabled,
         cashfree: payload.providers.cashfree.enabled,
         cod: payload.providers.cod.enabled,
-        borzo: payload.providers.borzo.enabled,
         delhivery: payload.providers.delhivery.enabled,
         nimbuspost: payload.providers.nimbuspost.enabled,
         google_merchant: payload.providers.google_merchant.enabled,
@@ -308,7 +304,6 @@ export default function IntegrationsPage({
         razorpay: {},
         cashfree: {},
         cod: {},
-        borzo: {},
         delhivery: {},
         nimbuspost: {},
         google_merchant: {},
@@ -391,7 +386,7 @@ export default function IntegrationsPage({
 
   const saveDefaults = async (overrides?: {
     payment?: 'cod' | 'razorpay' | 'cashfree'
-    delivery?: 'none' | 'borzo' | 'delhivery' | 'nimbuspost'
+    delivery?: 'none' | 'delhivery' | 'nimbuspost'
   }) => {
     const path = getActionPath(effectiveRole, resolvedVendorId, '/defaults')
     if (!path) {
@@ -805,7 +800,7 @@ export default function IntegrationsPage({
       nextPayment = provider as 'cod' | 'razorpay' | 'cashfree'
       setDefaultPayment(nextPayment)
     } else {
-      nextDelivery = provider as 'borzo' | 'delhivery' | 'nimbuspost'
+      nextDelivery = provider as 'delhivery' | 'nimbuspost'
       setDefaultDelivery(nextDelivery)
     }
     await saveDefaults({
@@ -816,29 +811,31 @@ export default function IntegrationsPage({
 
   if (!focusProvider) {
     return (
-      <div className='space-y-6 rounded-3xl bg-gradient-to-b from-slate-50 via-white to-slate-100/80 p-4 md:p-6'>
-        <div className='overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm'>
-          <div className='border-b border-slate-200 bg-[linear-gradient(125deg,rgba(237,246,255,0.95)_0%,rgba(248,250,252,0.96)_44%,rgba(245,243,255,0.95)_100%)] p-6 md:p-7'>
+      <div className='space-y-6 rounded-3xl bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_96%,#cbd5e1_4%)_0%,color-mix(in_srgb,var(--background)_92%,#ffffff_8%)_55%,color-mix(in_srgb,var(--background)_94%,#94a3b8_6%)_100%)] p-4 md:p-6'>
+        <div className='overflow-hidden rounded-3xl border border-border bg-card shadow-sm'>
+          <div className='border-b border-border bg-[linear-gradient(125deg,color-mix(in_srgb,var(--card)_94%,#cbd5e1_6%)_0%,color-mix(in_srgb,var(--background)_92%,#67e8f9_8%)_44%,color-mix(in_srgb,var(--card)_92%,#c4b5fd_8%)_100%)] p-6 md:p-7'>
             <div className='flex flex-wrap items-start justify-between gap-6'>
               <div className='max-w-3xl space-y-3'>
-                <Badge className='rounded-full border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700'>
+                <Badge className='rounded-full border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground'>
                   Sellerslogin Toolkit
                 </Badge>
-                <div className='space-y-2'>
-                  <h1 className='flex items-center gap-3 text-3xl font-semibold tracking-tight text-slate-950'>
-                    <Sparkles className='h-7 w-7 text-indigo-600' />
-                    Toolkit Store
-                  </h1>
-                  <p className='max-w-2xl text-sm leading-6 text-slate-600 sm:text-base'>
-                    Browse apps, pick one, and open its dedicated setup page when you want to connect it.
-                  </p>
-                </div>
+                {effectiveRole !== 'vendor' ? (
+                  <div className='space-y-2'>
+                    <h1 className='flex items-center gap-3 text-3xl font-semibold tracking-tight text-foreground'>
+                      <Sparkles className='h-7 w-7 text-primary' />
+                      Toolkit Store
+                    </h1>
+                    <p className='max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base'>
+                      Browse apps, pick one, and open its dedicated setup page when you want to connect it.
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
               <Button
                 variant='outline'
                 size='sm'
-                className='border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'
+                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                 onClick={() => loadIntegrations()}
               >
                 <RefreshCcw className='h-4 w-4' />
@@ -849,7 +846,7 @@ export default function IntegrationsPage({
         </div>
 
         {effectiveRole === 'admin' && (
-          <Card className='border-slate-200 bg-white shadow-sm'>
+          <Card className='border-border bg-card shadow-sm'>
             <CardHeader>
               <CardTitle className='text-base'>Toolkit vendor scope</CardTitle>
               <CardDescription>Enter a vendor ID to manage that vendor&apos;s toolkit apps.</CardDescription>
@@ -864,7 +861,7 @@ export default function IntegrationsPage({
                 />
               </div>
               <Button
-                className='bg-slate-950 text-white hover:bg-slate-800'
+                className='bg-primary text-primary-foreground hover:bg-primary/90'
                 onClick={async () => {
                   const id = selectedVendorId.trim()
                   if (!id) {
@@ -886,10 +883,10 @@ export default function IntegrationsPage({
             variant='outline'
             size='sm'
             className={cn(
-              'rounded-full border-slate-200',
+              'rounded-full border-border',
               filter === 'all'
-                ? 'bg-slate-950 text-white hover:bg-slate-900'
-                : 'bg-white text-slate-700 hover:bg-slate-50',
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                : 'bg-background text-foreground hover:bg-accent hover:text-foreground',
             )}
             onClick={() => setFilter('all')}
           >
@@ -903,7 +900,7 @@ export default function IntegrationsPage({
               'rounded-full border-amber-200',
               filter === 'payment'
                 ? 'bg-amber-500 text-white hover:bg-amber-600'
-                : 'bg-white text-amber-700 hover:bg-amber-50',
+                : 'bg-background text-amber-700 hover:bg-amber-500/10 dark:text-amber-300',
             )}
             onClick={() => setFilter('payment')}
           >
@@ -917,7 +914,7 @@ export default function IntegrationsPage({
               'rounded-full border-emerald-200',
               filter === 'delivery'
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                : 'bg-white text-emerald-700 hover:bg-emerald-50',
+                : 'bg-background text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300',
             )}
             onClick={() => setFilter('delivery')}
           >
@@ -932,7 +929,7 @@ export default function IntegrationsPage({
                 'rounded-full border-sky-200',
                 filter === 'marketing'
                   ? 'bg-sky-600 text-white hover:bg-sky-700'
-                  : 'bg-white text-sky-700 hover:bg-sky-50',
+                  : 'bg-background text-sky-700 hover:bg-sky-500/10 dark:text-sky-300',
               )}
               onClick={() => setFilter('marketing')}
             >
@@ -943,15 +940,15 @@ export default function IntegrationsPage({
         </div>
 
         {loading ? (
-          <Card className='border-slate-200 bg-white shadow-sm'>
+          <Card className='border-border bg-card shadow-sm'>
             <CardContent className='flex items-center gap-2 py-10 text-sm text-muted-foreground'>
               <Loader2 className='h-4 w-4 animate-spin' />
               Loading toolkit apps...
             </CardContent>
           </Card>
         ) : targetProviderIds.length === 0 ? (
-          <Card className='border-slate-200 bg-white shadow-sm'>
-            <CardContent className='py-10 text-sm text-slate-600'>
+          <Card className='border-border bg-card shadow-sm'>
+            <CardContent className='py-10 text-sm text-muted-foreground'>
               No apps match this view yet. Try a different filter.
             </CardContent>
           </Card>
@@ -962,7 +959,7 @@ export default function IntegrationsPage({
               const installed = installedProviderIds.includes(providerId)
 
               return (
-                <Card key={providerId} className='overflow-hidden border-slate-200 bg-white shadow-sm'>
+                <Card key={providerId} className='overflow-hidden border-border bg-card shadow-sm'>
                   <CardContent className='space-y-5 p-5'>
                     <ProviderArtwork
                       providerId={providerId}
@@ -971,16 +968,16 @@ export default function IntegrationsPage({
                     />
                     <div className='space-y-2'>
                       <div className='flex flex-wrap items-center gap-2'>
-                        <h3 className='text-xl font-semibold text-slate-950'>{meta.title}</h3>
-                        <span className='text-xs font-medium uppercase tracking-[0.14em] text-slate-400'>
+                        <h3 className='text-xl font-semibold text-foreground'>{meta.title}</h3>
+                        <span className='text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground'>
                           {meta.category}
                         </span>
                       </div>
-                      <p className='text-sm leading-6 text-slate-600'>{meta.description}</p>
+                      <p className='text-sm leading-6 text-muted-foreground'>{meta.description}</p>
                     </div>
 
                     <Button
-                      className='rounded-xl bg-slate-950 text-white hover:bg-slate-800'
+                      className='rounded-xl bg-primary text-primary-foreground hover:bg-primary/90'
                       asChild
                     >
                       <Link to='/integrations/$provider' params={{ provider: providerId }}>
@@ -999,24 +996,26 @@ export default function IntegrationsPage({
   }
 
   return (
-    <div className='space-y-6 rounded-3xl bg-gradient-to-b from-slate-50 via-white to-slate-100/80 p-4 md:p-6'>
-      <div className='overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm'>
-        <div className='border-b border-slate-200 bg-[linear-gradient(125deg,rgba(237,246,255,0.95)_0%,rgba(248,250,252,0.96)_44%,rgba(245,243,255,0.95)_100%)] p-6 md:p-7'>
+    <div className='space-y-6 rounded-3xl bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_96%,#cbd5e1_4%)_0%,color-mix(in_srgb,var(--background)_92%,#ffffff_8%)_55%,color-mix(in_srgb,var(--background)_94%,#94a3b8_6%)_100%)] p-4 md:p-6'>
+      <div className='overflow-hidden rounded-3xl border border-border bg-card shadow-sm'>
+        <div className='border-b border-border bg-[linear-gradient(125deg,color-mix(in_srgb,var(--card)_94%,#cbd5e1_6%)_0%,color-mix(in_srgb,var(--background)_92%,#67e8f9_8%)_44%,color-mix(in_srgb,var(--card)_92%,#c4b5fd_8%)_100%)] p-6 md:p-7'>
           <div className='flex flex-wrap items-start justify-between gap-6'>
             <div className='max-w-3xl space-y-3'>
-              <Badge className='rounded-full border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700'>
+              <Badge className='rounded-full border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground'>
                 Sellerslogin Toolkit
               </Badge>
-              <div className='space-y-2'>
-                <h1 className='flex items-center gap-3 text-3xl font-semibold tracking-tight text-slate-950'>
-                  <Sparkles className='h-7 w-7 text-indigo-600' />
-                  {providerMeta[focusProvider].title}
-                </h1>
-                <p className='max-w-2xl text-sm leading-6 text-slate-600 sm:text-base'>
-                  Manage API keys, toggle access, set defaults, and remove this app from your toolkit from one
-                  place.
-                </p>
-              </div>
+              {effectiveRole !== 'vendor' ? (
+                <div className='space-y-2'>
+                  <h1 className='flex items-center gap-3 text-3xl font-semibold tracking-tight text-foreground'>
+                    <Sparkles className='h-7 w-7 text-primary' />
+                    {providerMeta[focusProvider].title}
+                  </h1>
+                  <p className='max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base'>
+                    Manage API keys, toggle access, set defaults, and remove this app from your toolkit from one
+                    place.
+                  </p>
+                </div>
+              ) : null}
               <div className='flex flex-wrap gap-2'>
                 <Badge className={categoryBadgeClass(providerMeta[focusProvider].category)}>
                   {providerMeta[focusProvider].category}
@@ -1034,7 +1033,7 @@ export default function IntegrationsPage({
                 <Button
                   variant='outline'
                   size='sm'
-                  className='border-slate-200 bg-white hover:bg-slate-50'
+                  className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                   asChild
                 >
                   <Link to='/integrations'>
@@ -1046,7 +1045,7 @@ export default function IntegrationsPage({
               <Button
                 variant='outline'
                 size='sm'
-                className='border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'
+                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                 onClick={() => loadIntegrations()}
               >
                 <RefreshCcw className='h-4 w-4' />
@@ -1059,7 +1058,7 @@ export default function IntegrationsPage({
       </div>
 
       {effectiveRole === 'admin' && (
-        <Card className='border-slate-200 bg-white shadow-sm'>
+        <Card className='border-border bg-card shadow-sm'>
           <CardHeader>
             <CardTitle className='text-base'>Toolkit vendor scope</CardTitle>
             <CardDescription>Enter a vendor ID to manage that vendor&apos;s toolkit apps.</CardDescription>
@@ -1074,7 +1073,7 @@ export default function IntegrationsPage({
               />
             </div>
             <Button
-              className='bg-slate-950 text-white hover:bg-slate-800'
+              className='bg-primary text-primary-foreground hover:bg-primary/90'
               onClick={async () => {
                 const id = selectedVendorId.trim()
                 if (!id) {
@@ -1092,9 +1091,9 @@ export default function IntegrationsPage({
       )}
 
       {focusedCategory !== 'marketing' && (
-        <Card className='border-slate-200 bg-white shadow-sm'>
+        <Card className='border-border bg-card shadow-sm'>
           <CardHeader className='space-y-2'>
-            <CardTitle className='text-base text-slate-950'>App settings</CardTitle>
+            <CardTitle className='text-base text-foreground'>App settings</CardTitle>
             <CardDescription>
               Add credentials, enable or disable access, test the connection, and remove the app when needed.
             </CardDescription>
@@ -1107,7 +1106,7 @@ export default function IntegrationsPage({
                 onChange={(event) =>
                   setDefaultPayment(event.target.value as 'cod' | 'razorpay' | 'cashfree')
                 }
-                className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
+                className='h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground'
               >
                 <option value='cod'>Cash on Delivery</option>
                 <option value='razorpay'>Razorpay</option>
@@ -1118,23 +1117,22 @@ export default function IntegrationsPage({
               <Label>Default delivery app</Label>
               <select
                 value={defaultDelivery}
-                onChange={(event) =>
-                  setDefaultDelivery(
-                    event.target.value as 'none' | 'borzo' | 'delhivery' | 'nimbuspost'
-                  )
-                }
-                className='h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900'
-              >
-                <option value='none'>No auto-delivery</option>
-                <option value='borzo'>Borzo</option>
-                <option value='delhivery'>Delhivery</option>
-                <option value='nimbuspost'>NimbusPost</option>
-              </select>
+                  onChange={(event) =>
+                    setDefaultDelivery(
+                      event.target.value as 'none' | 'delhivery' | 'nimbuspost'
+                    )
+                  }
+                  className='h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground'
+                >
+                  <option value='none'>No auto-delivery</option>
+                  <option value='delhivery'>Delhivery</option>
+                  <option value='nimbuspost'>NimbusPost</option>
+                </select>
             </div>
             <Button
               onClick={() => saveDefaults()}
               disabled={savingDefaults}
-              className='h-11 rounded-xl bg-slate-950 text-white hover:bg-slate-800'
+              className='h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90'
             >
               {savingDefaults ? (
                 <>
@@ -1153,15 +1151,15 @@ export default function IntegrationsPage({
       )}
 
       {loading ? (
-        <Card className='border-slate-200 bg-white shadow-sm'>
+        <Card className='border-border bg-card shadow-sm'>
           <CardContent className='flex items-center gap-2 py-10 text-sm text-muted-foreground'>
             <Loader2 className='h-4 w-4 animate-spin' />
             Loading toolkit apps...
           </CardContent>
         </Card>
       ) : targetProviderIds.length === 0 ? (
-        <Card className='border-slate-200 bg-white shadow-sm'>
-          <CardContent className='py-10 text-sm text-slate-600'>
+        <Card className='border-border bg-card shadow-sm'>
+          <CardContent className='py-10 text-sm text-muted-foreground'>
             No apps match this view yet. Try a different filter or connect a new app from the store.
           </CardContent>
         </Card>
@@ -1217,8 +1215,8 @@ export default function IntegrationsPage({
                     : 'Enable app'
 
             return (
-              <Card key={providerId} className='overflow-hidden border-slate-200 bg-white shadow-sm'>
-                <CardHeader className='space-y-4 border-b border-slate-100 bg-slate-50/60'>
+              <Card key={providerId} className='overflow-hidden border-border bg-card shadow-sm'>
+                <CardHeader className='space-y-4 border-b border-border bg-muted/30'>
                   <div className='flex flex-wrap items-start justify-between gap-4'>
                     <div className='flex min-w-0 items-start gap-4'>
                       <ProviderArtwork
@@ -1228,7 +1226,7 @@ export default function IntegrationsPage({
                       />
                       <div className='min-w-0'>
                         <div className='flex flex-wrap items-center gap-2'>
-                          <CardTitle className='text-lg text-slate-950'>{meta.title}</CardTitle>
+                          <CardTitle className='text-lg text-foreground'>{meta.title}</CardTitle>
                           <Badge className={categoryBadgeClass(meta.category)}>
                             {meta.category}
                           </Badge>
@@ -1238,7 +1236,7 @@ export default function IntegrationsPage({
                             </Badge>
                           )}
                         </div>
-                        <CardDescription className='mt-1 text-sm text-slate-600'>
+                        <CardDescription className='mt-1 text-sm text-muted-foreground'>
                           {meta.description}
                         </CardDescription>
                       </div>
@@ -1252,7 +1250,7 @@ export default function IntegrationsPage({
                         <Button
                           variant='outline'
                           size='sm'
-                          className='border-slate-200 bg-white hover:bg-slate-50'
+                          className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                           asChild
                         >
                           <Link to='/integrations/$provider' params={{ provider: providerId }}>
@@ -1264,27 +1262,27 @@ export default function IntegrationsPage({
                   </div>
 
                   <div className='grid gap-3 md:grid-cols-3'>
-                    <div className='rounded-2xl border border-slate-200 bg-white p-3'>
-                      <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                    <div className='rounded-2xl border border-border bg-background p-3'>
+                      <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground'>
                         Connected at
                       </div>
-                      <div className='mt-1 text-sm font-medium text-slate-900'>
+                      <div className='mt-1 text-sm font-medium text-foreground'>
                         {toReadableTime(provider?.connected_at)}
                       </div>
                     </div>
-                    <div className='rounded-2xl border border-slate-200 bg-white p-3'>
-                      <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                    <div className='rounded-2xl border border-border bg-background p-3'>
+                      <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground'>
                         Last checked
                       </div>
-                      <div className='mt-1 text-sm font-medium text-slate-900'>
+                      <div className='mt-1 text-sm font-medium text-foreground'>
                         {toReadableTime(provider?.last_checked_at)}
                       </div>
                     </div>
-                    <div className='rounded-2xl border border-slate-200 bg-white p-3'>
-                      <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500'>
+                    <div className='rounded-2xl border border-border bg-background p-3'>
+                      <div className='text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground'>
                         Toolkit mode
                       </div>
-                      <div className='mt-1 text-sm font-medium text-slate-900'>
+                      <div className='mt-1 text-sm font-medium text-foreground'>
                         {providerEnabled[providerId] ? 'Enabled' : 'Disabled'}
                       </div>
                     </div>
@@ -1292,10 +1290,10 @@ export default function IntegrationsPage({
                 </CardHeader>
 
                 <CardContent className='space-y-5 p-5'>
-                  <div className='flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/70 p-4'>
+                  <div className='flex items-center justify-between rounded-2xl border border-border bg-muted/40 p-4'>
                     <div className='space-y-0.5'>
-                      <p className='text-sm font-medium text-slate-950'>Enable {meta.title}</p>
-                      <p className='text-xs text-slate-500'>
+                      <p className='text-sm font-medium text-foreground'>Enable {meta.title}</p>
+                      <p className='text-xs text-muted-foreground'>
                         Turn it on to expose this app across checkout and dashboard tools.
                       </p>
                     </div>

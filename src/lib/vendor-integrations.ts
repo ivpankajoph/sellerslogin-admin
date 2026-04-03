@@ -1,4 +1,3 @@
-import borzoLogo from '@/assets/toolkit-apps/borzo.svg'
 import brevoLogo from '@/assets/toolkit-apps/brevo.svg'
 import cashfreeLogo from '@/assets/toolkit-apps/cashfree.png'
 import codLogo from '@/assets/toolkit-apps/cod.svg'
@@ -11,7 +10,6 @@ export const INTEGRATION_PROVIDER_IDS = [
   'razorpay',
   'cashfree',
   'cod',
-  'borzo',
   'delhivery',
   'nimbuspost',
   'google_merchant',
@@ -20,7 +18,7 @@ export const INTEGRATION_PROVIDER_IDS = [
 
 export type IntegrationProviderId = (typeof INTEGRATION_PROVIDER_IDS)[number]
 export type PaymentProviderId = 'cod' | 'razorpay' | 'cashfree'
-export type DeliveryProviderId = 'none' | 'borzo' | 'delhivery' | 'nimbuspost'
+export type DeliveryProviderId = 'none' | 'delhivery' | 'nimbuspost'
 export type IntegrationCategory = 'payment' | 'delivery' | 'marketing'
 export type IntegrationProviderField = {
   key: string
@@ -94,19 +92,6 @@ export const INTEGRATION_PROVIDER_META: Record<
     description: 'Allow customers to pay at delivery time.',
     imageSrc: codLogo,
     fields: [],
-  },
-  borzo: {
-    title: 'Borzo',
-    shortLabel: 'Borzo',
-    category: 'delivery',
-    description: 'On-demand local delivery provider.',
-    imageSrc: borzoLogo,
-    docs: 'https://borzodelivery.com/in/business-api/doc',
-    fields: [
-      { key: 'auth_token', label: 'Auth Token', type: 'password' },
-      { key: 'base_url', label: 'Base URL', placeholder: 'https://robotapitest-in.borzodelivery.com' },
-      { key: 'api_version', label: 'API Version', placeholder: '1.6' },
-    ],
   },
   delhivery: {
     title: 'Delhivery',
@@ -208,13 +193,12 @@ export const INTEGRATION_PROVIDER_META: Record<
 const PAYMENT_PROVIDERS = new Set<PaymentProviderId>(['cod', 'razorpay', 'cashfree'])
 const DELIVERY_PROVIDERS = new Set<DeliveryProviderId>([
   'none',
-  'borzo',
   'delhivery',
   'nimbuspost',
 ])
 
 const getProviderCategory = (provider: IntegrationProviderId): IntegrationCategory =>
-  provider === 'borzo' || provider === 'delhivery' || provider === 'nimbuspost'
+  provider === 'delhivery' || provider === 'nimbuspost'
     ? 'delivery'
     : provider === 'brevo' || provider === 'google_merchant'
       ? 'marketing'

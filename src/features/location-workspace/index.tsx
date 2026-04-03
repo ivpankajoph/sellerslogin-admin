@@ -1360,7 +1360,7 @@ export default function LocationWorkspacePage() {
           <TableShell
             className='flex-1'
             title={`Product Pages for ${selectedCityLabel}`}
-            description='Yahin se selected city ke liye product visibility aur page content manage kijiye.'
+            description=''
             footer={
               <ServerPagination
                 page={currentPage}

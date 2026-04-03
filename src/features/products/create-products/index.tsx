@@ -44,6 +44,7 @@ const PRODUCT_CREATE_DRAFT_STORAGE_PREFIX = 'product_create_draft'
 const PRODUCT_CREATE_DRAFT_VERSION = 3
 const PRODUCT_CREATE_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const PRODUCT_CREATE_STEP_COUNT = 3
+const VARIANT_SUGGESTION_DISPLAY_LIMIT = 15
 
 type VariantContextRule = {
   patterns: RegExp[]
@@ -247,7 +248,7 @@ const VARIANT_KEY_CONTEXT_RULES: VariantContextRule[] = [
     ],
   },
   {
-    patterns: [/mobile/i, /smartphone/i, /phone/i],
+    patterns: [/mobile/i, /smartphone/i, /\bphones?\b/i],
     configKeys: ['Smartphones'],
     fallbackKeys: ['RAM', 'Storage', 'Color'],
     variantKeys: ['RAM', 'Storage', 'Color'],
@@ -941,6 +942,7 @@ const ProductCreateForm: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [isEditProductLoading, setIsEditProductLoading] = useState(false)
   const primarySelectedMainCategoryId = selectedMainCategoryIds[0] || ''
+  const isVendor = String(authUser?.role || '').toLowerCase() === 'vendor'
 
   const resetDraftState = () => {
     restoredVariantAttributeKeysRef.current = null
@@ -1254,7 +1256,11 @@ const ProductCreateForm: React.FC = () => {
   )
 
   const addVariantKeySuggestions = useMemo(
-    () => getSuggestedVariantKeysForContext(recommendedVariantKeys, variantContextNames).slice(0, 2),
+    () =>
+      getSuggestedVariantKeysForContext(
+        recommendedVariantKeys,
+        variantContextNames
+      ).slice(0, VARIANT_SUGGESTION_DISPLAY_LIMIT),
     [recommendedVariantKeys, variantContextNames]
   )
 
@@ -2616,6 +2622,12 @@ const ProductCreateForm: React.FC = () => {
             isWebsiteLoading={isWebsiteLoading}
             isAvailable={formData.isAvailable}
             aiLoading={aiLoading.variantKeys}
+            onPrimaryVariantNameChange={(value) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                productName: value,
+              }))
+            }
             onAddAttributeKey={handleAddVariantOptionKey}
             onAddSuggestedAttributeKeys={handleAddSuggestedVariantKeys}
             onRemoveAttributeKey={handleRemoveVariantOptionKey}
@@ -2792,20 +2804,13 @@ const ProductCreateForm: React.FC = () => {
       <div className='mx-auto max-w-7xl space-y-6'>
         <section className='rounded-3xl border border-border bg-card p-6 shadow-sm'>
           <div className='flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'>
-            <div>
-              <div className='text-sm font-medium text-muted-foreground'>
-                Products / {isEditMode ? 'Update product' : 'Create product'}
+            {!isVendor ? (
+              <div>
+                <h1 className='mt-2 text-3xl tracking-tight text-foreground sm:text-3xl'>
+                  {isEditMode ? 'Update product' : 'Create product'}
+                </h1>
               </div>
-              <h1 className='mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl'>
-                {isEditMode ? 'Update product' : 'Create product'}
-              </h1>
-              <p className='mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base'>
-                {isEditMode
-                  ? 'Edit product details, update variants, and review search content in the same step-by-step editor.'
-                  : 'Add product details, configure variants, and finish search content in'}
-                a cleaner step-by-step editor.
-              </p>
-            </div>
+            ) : null}
             <div className='flex flex-wrap items-center gap-2'>
               <div className='rounded-full border border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground'>
                 Step {currentStep} of {steps.length}

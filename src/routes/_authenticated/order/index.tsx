@@ -5,7 +5,6 @@ import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import api from '@/lib/axios'
 import { formatINR } from '@/lib/currency'
-import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -133,8 +132,7 @@ function OrdersPage() {
   })
   const role = useSelector((state: RootState) => state.auth?.user?.role)
   const isVendor = role === 'vendor'
-  const { isProviderVisible } = useVendorIntegrations()
-  const canUseBorzo = !isVendor || isProviderVisible('borzo')
+  const canUseBorzo = false
 
   const fetchOrders = async () => {
     try {

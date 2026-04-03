@@ -139,19 +139,17 @@ function CommissionPage() {
 
   return (
     <div className='space-y-6'>
-      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+      <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
         <div>
-          <h1 className='text-2xl font-semibold text-slate-900'>Commission Rules</h1>
-          <p className='text-sm text-muted-foreground'>
-            Configure category-level commission cuts for marketplace orders.
-          </p>
+          <h1 className='text-2xl font-semibold text-foreground'>Commission Rules</h1>
+          
         </div>
-        <div className='flex items-center gap-2'>
+        <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(220px,260px)_140px_minmax(180px,240px)_100px_120px] xl:items-center'>
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder='Search category'
-            className='w-64'
+            className='w-full min-w-0 border-border bg-background text-foreground'
           />
           <select
             value={scopeFilter}
@@ -159,7 +157,7 @@ function CommissionPage() {
               setScopeFilter(e.target.value)
               setPage(1)
             }}
-            className='h-10 rounded-md border border-input bg-background px-3 text-sm'
+            className='h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground'
           >
             <option value='all'>All levels</option>
             <option value='main'>Main category</option>
@@ -172,7 +170,7 @@ function CommissionPage() {
               setMainFilter(e.target.value)
               setPage(1)
             }}
-            className='h-10 min-w-[200px] rounded-md border border-input bg-background px-3 text-sm'
+            className='h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground'
           >
             <option value='all'>All main categories</option>
             {mainOptions.map((opt) => (
@@ -189,10 +187,15 @@ function CommissionPage() {
               setMainFilter('all')
               setPage(1)
             }}
+            className='w-full border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
           >
             Reset
           </Button>
-          <Button onClick={fetchRules} disabled={loading}>
+          <Button
+            onClick={fetchRules}
+            disabled={loading}
+            className='w-full bg-primary text-primary-foreground hover:bg-primary/90'
+          >
             {loading ? 'Refreshing...' : 'Refresh'}
           </Button>
         </div>
@@ -215,32 +218,32 @@ function CommissionPage() {
               return (
                 <div
                   key={mainId}
-                  className='rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-white shadow-xs'
+                  className='rounded-xl border border-border bg-gradient-to-r from-background to-card shadow-xs'
                 >
                   <button
                     type='button'
                     onClick={() =>
                       setOpenMain((prev) => ({ ...prev, [mainId]: !isOpenMain }))
                     }
-                    className='flex w-full items-center justify-between gap-3 px-4 py-4 text-left'
+                    className='flex w-full flex-col gap-4 px-4 py-4 text-left sm:flex-row sm:items-center sm:justify-between'
                   >
                     <div className='flex items-center gap-2'>
                       {isOpenMain ? (
-                        <ChevronDown className='h-4 w-4 text-slate-600' />
+                        <ChevronDown className='h-4 w-4 text-muted-foreground' />
                       ) : (
-                        <ChevronRight className='h-4 w-4 text-slate-600' />
+                        <ChevronRight className='h-4 w-4 text-muted-foreground' />
                       )}
                       <div>
-                        <p className='text-sm font-semibold text-slate-900'>
+                        <p className='text-sm font-semibold text-foreground'>
                           {main.name}
                         </p>
-                        <span className='inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700'>
+                        <span className='inline-flex rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200'>
                           Main category
                         </span>
                       </div>
                     </div>
                     <div
-                      className='flex items-center gap-3'
+                      className='flex w-full flex-wrap items-center gap-3 sm:w-auto sm:flex-nowrap'
                       onClick={(event) => event.stopPropagation()}
                     >
                       <Input
@@ -250,12 +253,12 @@ function CommissionPage() {
                         step={0.1}
                         value={main.percent}
                         onChange={(e) => updatePercent(main.scope_id, e.target.value)}
-                        className='w-24 bg-white'
+                        className='w-24 border-border bg-background text-foreground'
                       />
                       <span className='text-xs text-muted-foreground'>%</span>
                       <Button
                         size='sm'
-                        className='bg-slate-900 text-white hover:bg-slate-800'
+                        className='bg-primary text-primary-foreground hover:bg-primary/90'
                         onClick={() => updateRule(main)}
                         disabled={savingId === main.scope_id}
                       >
@@ -265,7 +268,7 @@ function CommissionPage() {
                   </button>
 
                   {isOpenMain && categories.length > 0 && (
-                    <div className='border-t border-slate-200 px-4 py-3'>
+                    <div className='border-t border-border px-4 py-3'>
                       <div className='space-y-3'>
                         {categories.map((category) => {
                           const categoryId = String(category.scope_id)
@@ -275,7 +278,7 @@ function CommissionPage() {
                           return (
                             <div
                               key={categoryId}
-                              className='rounded-lg border border-slate-200 bg-white'
+                              className='rounded-lg border border-border bg-card'
                             >
                               <button
                                 type='button'
@@ -285,25 +288,25 @@ function CommissionPage() {
                                     [categoryId]: !isOpenCategory,
                                   }))
                                 }
-                                className='flex w-full items-center justify-between gap-3 px-4 py-3 text-left'
+                                className='flex w-full flex-col gap-4 px-4 py-3 text-left sm:flex-row sm:items-center sm:justify-between'
                               >
                                 <div className='flex items-center gap-2'>
                                   {isOpenCategory ? (
-                                    <ChevronDown className='h-4 w-4 text-slate-500' />
+                                    <ChevronDown className='h-4 w-4 text-muted-foreground' />
                                   ) : (
-                                    <ChevronRight className='h-4 w-4 text-slate-500' />
+                                    <ChevronRight className='h-4 w-4 text-muted-foreground' />
                                   )}
                                   <div>
-                                    <p className='text-sm font-semibold text-slate-900'>
+                                    <p className='text-sm font-semibold text-foreground'>
                                       {category.name}
                                     </p>
-                                    <span className='inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700'>
+                                    <span className='inline-flex rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-200'>
                                       Category
                                     </span>
                                   </div>
                                 </div>
                                 <div
-                                  className='flex items-center gap-3'
+                                  className='flex w-full flex-wrap items-center gap-3 sm:w-auto sm:flex-nowrap'
                                   onClick={(event) => event.stopPropagation()}
                                 >
                                   <Input
@@ -315,13 +318,13 @@ function CommissionPage() {
                                     onChange={(e) =>
                                       updatePercent(category.scope_id, e.target.value)
                                     }
-                                    className='w-24 bg-white'
+                                    className='w-24 border-border bg-background text-foreground'
                                   />
                                   <span className='text-xs text-muted-foreground'>%</span>
                                   <Button
                                     size='sm'
                                     variant='outline'
-                                    className='border-slate-300'
+                                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                                     onClick={() => updateRule(category)}
                                     disabled={savingId === category.scope_id}
                                   >
@@ -331,18 +334,18 @@ function CommissionPage() {
                               </button>
 
                               {isOpenCategory && subcategories.length > 0 && (
-                                <div className='border-t border-slate-200 bg-slate-50 px-4 py-3'>
+                                <div className='border-t border-border bg-muted/30 px-4 py-3'>
                                   <div className='space-y-2'>
                                     {subcategories.map((sub) => (
                                       <div
                                         key={sub.scope_id}
-                                        className='flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3'
+                                        className='flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3'
                                       >
                                         <div>
-                                          <p className='text-sm font-semibold text-slate-900'>
+                                          <p className='text-sm font-semibold text-foreground'>
                                             {sub.name}
                                           </p>
-                                          <span className='inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700'>
+                                          <span className='inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-200'>
                                             Subcategory
                                           </span>
                                         </div>
@@ -356,13 +359,13 @@ function CommissionPage() {
                                             onChange={(e) =>
                                               updatePercent(sub.scope_id, e.target.value)
                                             }
-                                            className='w-24 bg-white'
+                                            className='w-24 border-border bg-background text-foreground'
                                           />
                                           <span className='text-xs text-muted-foreground'>%</span>
                                           <Button
                                             size='sm'
                                             variant='outline'
-                                            className='border-slate-300'
+                                            className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                                             onClick={() => updateRule(sub)}
                                             disabled={savingId === sub.scope_id}
                                           >
@@ -391,17 +394,19 @@ function CommissionPage() {
                 size='sm'
                 onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
                 disabled={page <= 1 || loading}
+                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
               >
                 Previous
               </Button>
               <span className='text-xs text-muted-foreground'>
-                Page {page} of {totalPages} · {total} total
+                {`Page ${page} of ${totalPages} · ${total} total`}
               </span>
               <Button
                 variant='outline'
                 size='sm'
                 onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
                 disabled={page >= totalPages || loading}
+                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
               >
                 Next
               </Button>

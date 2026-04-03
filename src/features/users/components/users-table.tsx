@@ -7,7 +7,6 @@ import {
   getCoreRowModel,
   getFacetedRowModel,
   getFacetedUniqueValues,
-  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
@@ -44,8 +43,6 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
 
   // Synced with URL states (keys/defaults mirror users route search schema)
   const {
-    columnFilters,
-    onColumnFiltersChange,
     pagination,
     onPaginationChange,
     ensurePageInRange,
@@ -54,10 +51,7 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
     navigate,
     pagination: { defaultPage: 1, defaultPageSize: 10 },
     globalFilter: { enabled: false },
-    columnFilters: [
-      // username per-column text filter
-      { columnId: 'username', searchKey: 'username', type: 'string' },
-    ],
+    columnFilters: [],
   })
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -67,16 +61,13 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
     state: {
       sorting,
       pagination,
-      columnFilters,
       columnVisibility,
     },
     onPaginationChange,
-    onColumnFiltersChange,
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     getPaginationRowModel: getPaginationRowModel(),
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),

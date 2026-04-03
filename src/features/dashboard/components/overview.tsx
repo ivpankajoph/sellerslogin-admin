@@ -16,13 +16,15 @@ export function Overview({ data }: OverviewProps) {
       <BarChart data={data}>
         <XAxis
           dataKey='name'
-          stroke='#888888'
+          stroke='var(--muted-foreground)'
+          tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
           fontSize={12}
           tickLine={false}
           axisLine={false}
         />
         <YAxis
-          stroke='#888888'
+          stroke='var(--muted-foreground)'
+          tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
           fontSize={12}
           tickLine={false}
           axisLine={false}
