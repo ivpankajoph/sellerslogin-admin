@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { RootState } from '@/store'
-import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import {
   MAIN_WEBSITE_LABEL,
   STATUS_TABS,
@@ -53,9 +52,7 @@ function BorzoReportPage() {
   const role = String(user?.role || '').toLowerCase()
   const isVendor = role === 'vendor'
   const vendorId = String(user?.vendor_id || user?._id || user?.id || '')
-  const { loading: integrationsLoading, isProviderVisible } =
-    useVendorIntegrations()
-  const canAccessBorzoReport = !isVendor || isProviderVisible('borzo')
+  const canAccessBorzoReport = false
 
   const [orders, setOrders] = useState<BorzoOrder[]>([])
   const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([])
@@ -169,10 +166,10 @@ function BorzoReportPage() {
   }
 
   useEffect(() => {
-    if (isVendor && (integrationsLoading || !canAccessBorzoReport)) return
+    if (!canAccessBorzoReport) return
     void fetchReport(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVendor, integrationsLoading, canAccessBorzoReport, selectedWebsiteId])
+  }, [canAccessBorzoReport, selectedWebsiteId])
 
   const sortedOrders = useMemo(() => {
     return [...orders].sort((a, b) => {
@@ -282,24 +279,14 @@ function BorzoReportPage() {
     URL.revokeObjectURL(url)
   }
 
-  if (isVendor && integrationsLoading) {
-    return (
-      <Card>
-        <CardContent className='py-8 text-sm text-muted-foreground'>
-          Loading connected delivery apps...
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (isVendor && !canAccessBorzoReport) {
+  if (!canAccessBorzoReport) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className='text-base'>Borzo not connected</CardTitle>
+          <CardTitle className='text-base'>Borzo unavailable</CardTitle>
         </CardHeader>
         <CardContent className='text-sm text-muted-foreground'>
-          Connect Borzo from Sellerslogin Toolkit to view delivery tracking reports.
+          Borzo delivery reports are no longer available in this workspace.
         </CardContent>
       </Card>
     )

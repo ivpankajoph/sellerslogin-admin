@@ -5,6 +5,7 @@ import {
   MailPlus,
   PencilLine,
   RefreshCw,
+  Search,
   ShieldCheck,
   Trash2,
   Users,
@@ -317,12 +318,22 @@ export default function TeamAccessPage({
   const filteredMembers = useMemo(() => {
     const query = memberSearch.trim().toLowerCase()
     if (!query) return members
+
     return members.filter((member) =>
-      [member.name, member.email].some((value) =>
-        String(value || '').toLowerCase().includes(query)
-      )
+      [
+        member.name,
+        member.email,
+        member.status,
+        ...member.allowed_page_keys.map(
+          (key) => pageOptionsByKey[key]?.label || key
+        ),
+        ...member.allowed_websites.map(
+          (website) =>
+            website.name || website.template_name || website.template_key || ''
+        ),
+      ].some((value) => String(value || '').toLowerCase().includes(query))
     )
-  }, [memberSearch, members])
+  }, [memberSearch, members, pageOptionsByKey])
 
   const memberSummary = useMemo(
     () => ({
@@ -478,25 +489,35 @@ export default function TeamAccessPage({
 
   return (
     <>
-      <TablePageHeader title='User Access'>
-        <Input
-          value={tab === 'members' ? memberSearch : activitySearch}
-          onChange={(event) =>
-            tab === 'members'
-              ? setMemberSearch(event.target.value)
-              : setActivitySearch(event.target.value)
-          }
-          placeholder={tab === 'members' ? 'Search team users...' : 'Search activity...'}
-          className='h-10 w-64 shrink-0'
-        />
-        <Button variant='outline' onClick={() => void refreshAll()} disabled={refreshing}>
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </Button>
-        <Button onClick={openCreateDialog}>
-          <MailPlus className='h-4 w-4' />
-          Invite User
-        </Button>
+      <TablePageHeader title='User Access' stackOnMobile>
+        <div className='flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='relative w-full max-w-[460px] min-w-0'>
+            <Search className='pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500' />
+            <Input
+              value={tab === 'members' ? memberSearch : activitySearch}
+              onChange={(event) =>
+                tab === 'members'
+                  ? setMemberSearch(event.target.value)
+                  : setActivitySearch(event.target.value)
+              }
+              placeholder={
+                tab === 'members' ? 'Find team users by  email status and assigned websites' : 'Search activity, page, or user'
+              }
+              className='h-14 w-full !rounded-full border-2 border-slate-300 bg-white pl-12 pr-5 text-sm shadow-[0_1px_0_rgba(15,23,42,0.04)] focus-visible:border-slate-500 focus-visible:ring-2 focus-visible:ring-slate-200'
+            />
+          </div>
+
+          <div className='flex flex-wrap items-center justify-start gap-3 sm:justify-end'>
+            <Button variant='outline' onClick={() => void refreshAll()} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <Button onClick={openCreateDialog}>
+              <MailPlus className='h-4 w-4' />
+              Invite User
+            </Button>
+          </div>
+        </div>
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-6'>

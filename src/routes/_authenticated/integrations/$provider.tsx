@@ -6,7 +6,6 @@ const supportedProviders = [
   'razorpay',
   'cashfree',
   'cod',
-  'borzo',
   'delhivery',
   'nimbuspost',
   'google_merchant',

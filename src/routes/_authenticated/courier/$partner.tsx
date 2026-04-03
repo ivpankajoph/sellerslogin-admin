@@ -242,7 +242,7 @@ function CourierPartnerPage() {
   const { data: integrationsData } = useVendorIntegrations()
   const partnerId = (supportedPartners.includes(partner as CourierPartnerId)
     ? partner
-    : 'borzo') as CourierPartnerId
+    : 'delhivery') as CourierPartnerId
   const partnerMeta = COURIER_PARTNER_MAP[partnerId]
   const isDelhivery = partnerId === 'delhivery'
   const initialLane = useMemo(() => {
@@ -367,7 +367,7 @@ function CourierPartnerPage() {
 
     const loadData = async () => {
       const needsLiveData =
-        partnerId === 'borzo' || partnerId === 'delhivery' || partnerId === 'nimbuspost'
+        partnerId === 'delhivery' || partnerId === 'nimbuspost'
       if (!needsLiveData) {
         setLiveOrders([])
         setNdrItems([])
@@ -410,7 +410,7 @@ function CourierPartnerPage() {
   }, [isVendor, partnerId, refreshKey])
 
   const assignments = useMemo(() => {
-    if (partnerId === 'borzo' || partnerId === 'delhivery' || partnerId === 'nimbuspost') {
+    if (partnerId === 'delhivery' || partnerId === 'nimbuspost') {
       return liveOrders
         .map((order) => ({ assignment: getRemoteCourierAssignment(order), order }))
         .filter(
@@ -1172,15 +1172,15 @@ function CourierPartnerPage() {
   return (
     <Main>
       <div className='space-y-6 p-4 md:p-6'>
-        <div className='overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm'>
-          <div className='bg-[linear-gradient(135deg,rgba(248,250,252,0.95)_0%,rgba(239,246,255,0.95)_45%,rgba(255,247,237,0.92)_100%)] p-6 md:p-8'>
+        <div className='overflow-hidden rounded-3xl border border-border bg-card shadow-sm'>
+          <div className='bg-[linear-gradient(135deg,color-mix(in_srgb,var(--card)_94%,#cbd5e1_6%)_0%,color-mix(in_srgb,var(--background)_92%,#67e8f9_8%)_45%,color-mix(in_srgb,var(--card)_92%,#fdba74_8%)_100%)] p-6 md:p-8'>
             <div className='flex flex-wrap items-start justify-between gap-4'>
               {isDelhivery ? (
                 <div className='space-y-2'>
-                  <h1 className='text-3xl font-semibold tracking-tight text-slate-950'>
+                  <h1 className='text-3xl font-semibold tracking-tight text-foreground'>
                     Delhivery
                   </h1>
-                  <p className='max-w-3xl text-sm leading-6 text-slate-600 sm:text-base'>
+                  <p className='max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base'>
                     All available Delhivery APIs are managed here: create, edit, cancel, tracking,
                     label, pickup request, serviceability, shipping estimate, waybill pool, and
                     warehouse actions.
@@ -1189,7 +1189,7 @@ function CourierPartnerPage() {
               ) : (
                 <div className='flex items-start gap-4'>
                   <div
-                    className={`flex h-20 w-20 items-center justify-center rounded-3xl border bg-white shadow-sm ${partnerMeta.themeClass}`}
+                    className={`flex h-20 w-20 items-center justify-center rounded-3xl border bg-background shadow-sm ${partnerMeta.themeClass}`}
                   >
                     <img
                       src={partnerMeta.imageSrc}
@@ -1198,14 +1198,14 @@ function CourierPartnerPage() {
                     />
                   </div>
                   <div className='space-y-3'>
-                    <Badge className='rounded-full border-slate-200 bg-white px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-700'>
+                    <Badge className='rounded-full border-border bg-background px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-foreground'>
                       Courier Page
                     </Badge>
                     <div>
-                      <h1 className='text-3xl font-semibold tracking-tight text-slate-950'>
+                      <h1 className='text-3xl font-semibold tracking-tight text-foreground'>
                         {partnerMeta.title}
                       </h1>
-                      <p className='mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base'>
+                      <p className='mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base'>
                         Dedicated request board for {partnerMeta.title}. Live courier records are
                         shown for integrated apps, while static partners still read from the local
                         courier desk assignment store.
@@ -1217,7 +1217,7 @@ function CourierPartnerPage() {
               <div className='flex flex-wrap gap-2'>
                 <Button
                   variant='outline'
-                  className='border-slate-200 bg-white hover:bg-slate-50'
+                  className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                   onClick={() => setRefreshKey((current) => current + 1)}
                 >
                   <RefreshCcw className='h-4 w-4' />
@@ -1225,7 +1225,7 @@ function CourierPartnerPage() {
                 </Button>
                 <Button
                   variant='outline'
-                  className='border-slate-200 bg-white hover:bg-slate-50'
+                  className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                   asChild
                 >
                   <Link to='/courier'>
@@ -1233,40 +1233,32 @@ function CourierPartnerPage() {
                     <ArrowUpRight className='h-4 w-4' />
                   </Link>
                 </Button>
-                {partnerId === 'borzo' && (
-                  <Button className='bg-slate-950 text-white hover:bg-slate-800' asChild>
-                    <Link to='/borzo-report'>
-                      Open live Borzo report
-                      <ExternalLink className='h-4 w-4' />
-                    </Link>
-                  </Button>
-                )}
               </div>
             </div>
 
             {!isDelhivery ? (
               <div className='mt-6 grid gap-3 md:grid-cols-3'>
-                <div className='rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm'>
-                  <p className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>
+                <div className='rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm'>
+                  <p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>
                     Assigned requests
                   </p>
-                  <p className='mt-1 text-3xl font-semibold text-slate-950'>
+                  <p className='mt-1 text-3xl font-semibold text-foreground'>
                     {assignments.length}
                   </p>
                 </div>
-                <div className='rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm'>
-                  <p className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>
+                <div className='rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm'>
+                  <p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>
                     Estimated charges
                   </p>
-                  <p className='mt-1 text-3xl font-semibold text-slate-950'>
+                  <p className='mt-1 text-3xl font-semibold text-foreground'>
                     {formatINR(totalCharges)}
                   </p>
                 </div>
-                <div className='rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm'>
-                  <p className='text-[11px] uppercase tracking-[0.18em] text-slate-500'>
+                <div className='rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm'>
+                  <p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>
                     Order value routed
                   </p>
-                  <p className='mt-1 text-3xl font-semibold text-slate-950'>
+                  <p className='mt-1 text-3xl font-semibold text-foreground'>
                     {formatINR(totalGMV)}
                   </p>
                 </div>
@@ -1275,7 +1267,7 @@ function CourierPartnerPage() {
           </div>
         </div>
 
-        <Card className='border-slate-200 shadow-sm'>
+        <Card className='border-border bg-card shadow-sm'>
           <CardHeader>
             <CardTitle className='text-lg'>
               {partnerId === 'delhivery'
@@ -1296,14 +1288,14 @@ function CourierPartnerPage() {
             {partnerId === 'delhivery' || partnerId === 'nimbuspost' ? (
               <>
                 {eligibleOrders.length === 0 ? (
-                  <div className='rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-600'>
+                  <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-6 text-sm text-muted-foreground'>
                     No unassigned orders available. Active shipments have moved to Courier List.
                   </div>
                 ) : (
                   <>
                     <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]'>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Order</label>
+                        <label className='text-sm font-medium text-foreground'>Order</label>
                         <select
                           value={selectedBookingOrderId}
                           onChange={(e) => {
@@ -1325,7 +1317,7 @@ function CourierPartnerPage() {
                       <div className='flex items-end'>
                         <Button
                           variant='outline'
-                          className='border-slate-200 bg-white hover:bg-slate-50'
+                          className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                           onClick={() => applyOrderToBookingForm(selectedBookingOrder)}
                         >
                           Use selected order
@@ -1334,8 +1326,8 @@ function CourierPartnerPage() {
                     </div>
 
                     {selectedBookingOrder ? (
-                      <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700'>
-                        <p className='font-medium text-slate-950'>
+                      <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                        <p className='font-medium text-foreground'>
                           {selectedBookingOrder.orderNumber} | {selectedBookingOrder.customerName}
                         </p>
                         <p className='mt-1'>
@@ -1347,7 +1339,7 @@ function CourierPartnerPage() {
 
                     <div className='grid gap-4 lg:grid-cols-2 xl:grid-cols-4'>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Origin pincode</label>
+                        <label className='text-sm font-medium text-foreground'>Origin pincode</label>
                         <Input
                           value={bookingForm.origin}
                           onChange={(e) =>
@@ -1357,7 +1349,7 @@ function CourierPartnerPage() {
                         />
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Destination pincode</label>
+                        <label className='text-sm font-medium text-foreground'>Destination pincode</label>
                         <Input
                           value={bookingForm.destination}
                           onChange={(e) =>
@@ -1368,7 +1360,7 @@ function CourierPartnerPage() {
                       </div>
                       {partnerId === 'nimbuspost' ? (
                         <div className='space-y-2'>
-                          <label className='text-sm font-medium text-slate-700'>Nimbus pickup source</label>
+                          <label className='text-sm font-medium text-foreground'>Nimbus pickup source</label>
                           <select
                             value={bookingForm.nimbusPickupSource}
                             onChange={(e) =>
@@ -1385,7 +1377,7 @@ function CourierPartnerPage() {
                         </div>
                       ) : (
                         <div className='space-y-2'>
-                          <label className='text-sm font-medium text-slate-700'>Delhivery pickup location</label>
+                          <label className='text-sm font-medium text-foreground'>Delhivery pickup location</label>
                           <Input
                             value={bookingForm.pickupLocation}
                             onChange={(e) =>
@@ -1399,7 +1391,7 @@ function CourierPartnerPage() {
                         </div>
                       )}
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Payment mode</label>
+                        <label className='text-sm font-medium text-foreground'>Payment mode</label>
                         <select
                           value={bookingForm.paymentType}
                           onChange={(e) =>
@@ -1415,7 +1407,7 @@ function CourierPartnerPage() {
                         </select>
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Product type</label>
+                        <label className='text-sm font-medium text-foreground'>Product type</label>
                         <select
                           value={bookingForm.productType}
                           onChange={(e) =>
@@ -1431,7 +1423,7 @@ function CourierPartnerPage() {
                         </select>
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Shipping mode</label>
+                        <label className='text-sm font-medium text-foreground'>Shipping mode</label>
                         <select
                           value={bookingForm.shippingMode}
                           onChange={(e) =>
@@ -1447,7 +1439,7 @@ function CourierPartnerPage() {
                         </select>
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Billing status</label>
+                        <label className='text-sm font-medium text-foreground'>Billing status</label>
                         <select
                           value={bookingForm.billingStatus}
                           onChange={(e) =>
@@ -1464,7 +1456,7 @@ function CourierPartnerPage() {
                         </select>
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Package type</label>
+                        <label className='text-sm font-medium text-foreground'>Package type</label>
                         <select
                           value={bookingForm.packageType}
                           onChange={(e) =>
@@ -1480,7 +1472,7 @@ function CourierPartnerPage() {
                         </select>
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Order amount</label>
+                        <label className='text-sm font-medium text-foreground'>Order amount</label>
                         <Input
                           value={bookingForm.orderAmount}
                           onChange={(e) =>
@@ -1493,7 +1485,7 @@ function CourierPartnerPage() {
                         />
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Weight (grams)</label>
+                        <label className='text-sm font-medium text-foreground'>Weight (grams)</label>
                         <Input
                           value={bookingForm.weight}
                           onChange={(e) =>
@@ -1503,7 +1495,7 @@ function CourierPartnerPage() {
                         />
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Length (cm)</label>
+                        <label className='text-sm font-medium text-foreground'>Length (cm)</label>
                         <Input
                           value={bookingForm.length}
                           onChange={(e) =>
@@ -1513,7 +1505,7 @@ function CourierPartnerPage() {
                         />
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Breadth (cm)</label>
+                        <label className='text-sm font-medium text-foreground'>Breadth (cm)</label>
                         <Input
                           value={bookingForm.breadth}
                           onChange={(e) =>
@@ -1523,7 +1515,7 @@ function CourierPartnerPage() {
                         />
                       </div>
                       <div className='space-y-2'>
-                        <label className='text-sm font-medium text-slate-700'>Height (cm)</label>
+                        <label className='text-sm font-medium text-foreground'>Height (cm)</label>
                         <Input
                           value={bookingForm.height}
                           onChange={(e) =>
@@ -1533,21 +1525,21 @@ function CourierPartnerPage() {
                         />
                       </div>
                       <div className='space-y-2 xl:col-span-3'>
-                        <label className='text-sm font-medium text-slate-700'>Product details</label>
+                        <label className='text-sm font-medium text-foreground'>Product details</label>
                         <Textarea
                           value={bookingForm.details}
                           onChange={(e) =>
                             setBookingForm((current) => ({ ...current, details: e.target.value }))
                           }
                           placeholder='Product names or parcel note'
-                          className='min-h-[88px] rounded-none border-slate-200'
+                          className='min-h-[88px] rounded-none border-border bg-background text-foreground'
                         />
                       </div>
                     </div>
 
                     <div className='flex flex-wrap gap-3'>
                       <Button
-                        className='rounded-none bg-slate-950 text-white hover:bg-slate-800'
+                        className='rounded-none bg-primary text-primary-foreground hover:bg-primary/90'
                         disabled={checkingBooking || !selectedBookingOrder}
                         onClick={() => {
                           void handleCheckBooking()
@@ -1562,7 +1554,7 @@ function CourierPartnerPage() {
                       </Button>
                       <Button
                         variant='outline'
-                        className='border-slate-200 bg-white hover:bg-slate-50'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                         disabled={!bookingCheck?.ok || bookingBusy || !selectedBookingOrder}
                         onClick={() => {
                           void handleCreateBooking()
@@ -1594,20 +1586,15 @@ function CourierPartnerPage() {
                   </>
                 )}
               </>
-            ) : partnerId === 'borzo' ? (
-              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600'>
-                Borzo booking is still handled from the order screens. This page remains focused on
-                routed Borzo deliveries and tracking.
-              </div>
             ) : (
-              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600'>
-                Porter booking flow is not connected yet. Use this page only for future partner rollout.
+              <div className='rounded-2xl border border-border bg-muted/40 p-6 text-sm text-muted-foreground'>
+                This courier app is no longer available.
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className='border-slate-200 shadow-sm'>
+        <Card className='border-border bg-card shadow-sm'>
           <CardHeader>
             <CardTitle className='text-lg'>
               {partnerId === 'delhivery' ? 'Shipment operation APIs' : 'Assigned delivery requests'}
@@ -1622,7 +1609,7 @@ function CourierPartnerPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-8 text-sm text-slate-600'>
+              <div className='rounded-2xl border border-border bg-muted/40 p-8 text-sm text-muted-foreground'>
                 Loading {partnerMeta.title} records...
               </div>
             ) : error ? (
@@ -1630,11 +1617,11 @@ function CourierPartnerPage() {
                 {error}
               </div>
             ) : assignments.length === 0 ? (
-              <div className='rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-sm text-slate-600'>
+              <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-8 text-sm text-muted-foreground'>
                 No requests assigned to {partnerMeta.title} yet.
               </div>
             ) : (
-              <div className='overflow-hidden rounded-2xl border border-slate-200'>
+              <div className='overflow-hidden rounded-2xl border border-border'>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1651,12 +1638,12 @@ function CourierPartnerPage() {
                       <TableRow key={`${assignment.partnerId}-${assignment.orderId}`}>
                         <TableCell>
                           <div className='space-y-1'>
-                            <p className='font-medium text-slate-950'>{assignment.orderNumber}</p>
-                            <p className='text-xs text-slate-500'>
+                            <p className='font-medium text-foreground'>{assignment.orderNumber}</p>
+                            <p className='text-xs text-muted-foreground'>
                               {assignment.customerName} | {assignment.websiteLabel}
                             </p>
                             {order?.nimbuspost?.courier_name && (
-                              <p className='text-xs text-slate-500'>
+                              <p className='text-xs text-muted-foreground'>
                                 Courier: {order.nimbuspost.courier_name}
                               </p>
                             )}
@@ -1669,12 +1656,12 @@ function CourierPartnerPage() {
                         </TableCell>
                         <TableCell>
                             <div className='space-y-1'>
-                              <p className='text-sm font-medium text-slate-900'>
+                              <p className='text-sm font-medium text-foreground'>
                                 {assignment.trackingCode}
                               </p>
                               {partnerId === 'delhivery' &&
                               order?.delhivery?.pickup_request_date ? (
-                                <p className='text-xs text-slate-500'>
+                                <p className='text-xs text-muted-foreground'>
                                   Pickup request: {order.delhivery.pickup_request_date}{' '}
                                   {order.delhivery.pickup_request_time || ''} |{' '}
                                   {order.delhivery.pickup_request_packages || 0} pkg
@@ -1717,12 +1704,12 @@ function CourierPartnerPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className='font-medium text-slate-900'>
+                        <TableCell className='font-medium text-foreground'>
                           {assignment.amount ? formatINR(assignment.amount) : 'Live'}
                         </TableCell>
                         <TableCell>
-                          <div className='inline-flex items-center gap-2 text-sm text-slate-700'>
-                            <Clock3 className='h-4 w-4 text-slate-400' />
+                          <div className='inline-flex items-center gap-2 text-sm text-muted-foreground'>
+                            <Clock3 className='h-4 w-4 text-muted-foreground' />
                             {assignment.etaLabel}
                           </div>
                         </TableCell>
@@ -1734,7 +1721,7 @@ function CourierPartnerPage() {
                                   <Button
                                     size='sm'
                                     variant='outline'
-                                    className='border-slate-200 bg-white hover:bg-slate-50'
+                                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                                     disabled={busyOrderId === order?.id || !order}
                                     onClick={() => {
                                       void handleRefreshTracking(order)
@@ -1747,7 +1734,7 @@ function CourierPartnerPage() {
                                   <Button
                                     size='sm'
                                     variant='outline'
-                                    className='border-slate-200 bg-white hover:bg-slate-50'
+                                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                                     disabled={busyOrderId === order?.id || !order}
                                     onClick={() => {
                                       void handleCreateManifest(order)
@@ -1762,7 +1749,7 @@ function CourierPartnerPage() {
                                     <Button
                                       size='sm'
                                       variant='outline'
-                                      className='border-rose-200 bg-white text-rose-700 hover:bg-rose-50'
+                                      className='border-rose-500/30 bg-background text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-300'
                                       disabled={busyOrderId === order?.id || !order}
                                       onClick={() => {
                                         void handleCancelShipment(order)
@@ -1780,7 +1767,7 @@ function CourierPartnerPage() {
                                   <Button
                                     size='sm'
                                     variant='outline'
-                                    className='border-slate-200 bg-white hover:bg-slate-50'
+                                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                                     disabled={busyOrderId === order?.id || !order}
                                     onClick={() => {
                                       void handleRefreshDelhiveryTracking(order)
@@ -1795,7 +1782,7 @@ function CourierPartnerPage() {
                                     <Button
                                       size='sm'
                                       variant='outline'
-                                      className='border-rose-200 bg-white text-rose-700 hover:bg-rose-50'
+                                      className='border-rose-500/30 bg-background text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-300'
                                       disabled={busyOrderId === order?.id || !order}
                                       onClick={() => {
                                         void handleCancelDelhiveryShipment(order)
@@ -1809,7 +1796,7 @@ function CourierPartnerPage() {
                                   <Button
                                     size='sm'
                                     variant='outline'
-                                    className='border-slate-200 bg-white hover:bg-slate-50'
+                                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                                     disabled={busyOrderId === order?.id || !order}
                                     onClick={() => {
                                       void handleGenerateDelhiveryLabel(order)
@@ -1822,7 +1809,7 @@ function CourierPartnerPage() {
                                   <Button
                                     size='sm'
                                     variant='outline'
-                                    className='border-slate-200 bg-white hover:bg-slate-50'
+                                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                                     disabled={busyOrderId === order?.id || !order}
                                     onClick={() => {
                                       void handleCreateDelhiveryPickupRequest(order)
@@ -1835,7 +1822,7 @@ function CourierPartnerPage() {
                                   <Button
                                     size='sm'
                                     variant='outline'
-                                    className='border-slate-200 bg-white hover:bg-slate-50'
+                                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                                     disabled={busyOrderId === order?.id || !order}
                                     onClick={() => {
                                       openDelhiveryEdit(order)
@@ -2174,7 +2161,7 @@ function CourierPartnerPage() {
         ) : null}
 
         {!isDelhivery ? <div className='grid gap-4 lg:grid-cols-2'>
-          <Card className='border-slate-200 shadow-sm'>
+          <Card className='border-border bg-card shadow-sm'>
             <CardHeader>
               <CardTitle className='text-base'>Tracking snapshot</CardTitle>
               <CardDescription>
@@ -2187,25 +2174,25 @@ function CourierPartnerPage() {
               {assignments.slice(0, 4).map(({ assignment, order }) => (
                 <div
                   key={assignment.orderId}
-                  className='rounded-2xl border border-slate-200 bg-slate-50 p-4'
+                  className='rounded-2xl border border-border bg-muted/40 p-4'
                 >
                   <div className='flex items-start justify-between gap-3'>
                     <div>
-                      <p className='font-medium text-slate-950'>{assignment.orderNumber}</p>
-                      <p className='text-xs text-slate-500'>{assignment.customerName}</p>
+                      <p className='font-medium text-foreground'>{assignment.orderNumber}</p>
+                      <p className='text-xs text-muted-foreground'>{assignment.customerName}</p>
                     </div>
                     <Badge className='border-indigo-200 bg-indigo-50 text-indigo-700'>
                       {assignment.trackingStatus}
                     </Badge>
                   </div>
-                  <div className='mt-3 flex flex-wrap gap-4 text-sm text-slate-600'>
+                  <div className='mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground'>
                     <span className='inline-flex items-center gap-2'>
-                      <Truck className='h-4 w-4 text-slate-400' />
+                      <Truck className='h-4 w-4 text-muted-foreground' />
                       {assignment.trackingCode}
                     </span>
                     {order?.delhivery?.scans?.[0]?.location ? (
                       <span className='inline-flex items-center gap-2'>
-                        <ArrowUpRight className='h-4 w-4 text-slate-400' />
+                        <ArrowUpRight className='h-4 w-4 text-muted-foreground' />
                         {order.delhivery.scans[0].location}
                       </span>
                     ) : null}
@@ -2223,14 +2210,14 @@ function CourierPartnerPage() {
                 </div>
               ))}
               {!assignments.length && (
-                <div className='rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-600'>
+                <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-6 text-sm text-muted-foreground'>
                   No tracking snapshot yet.
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className='border-slate-200 shadow-sm'>
+          <Card className='border-border bg-card shadow-sm'>
             <CardHeader>
               <CardTitle className='text-base'>
                 {partnerId === 'nimbuspost' ? 'NDR snapshot' : 'Partner routing notes'}
@@ -2241,26 +2228,26 @@ function CourierPartnerPage() {
                   : 'Notes for this partner view.'}
               </CardDescription>
             </CardHeader>
-            <CardContent className='space-y-3 text-sm leading-6 text-slate-600'>
+            <CardContent className='space-y-3 text-sm leading-6 text-muted-foreground'>
               {partnerId === 'nimbuspost' ? (
                 ndrItems.length ? (
                   ndrItems.slice(0, 5).map((item) => (
                     <div
                       key={item.awb_number}
-                      className='rounded-2xl border border-slate-200 bg-slate-50 p-4'
+                      className='rounded-2xl border border-border bg-muted/40 p-4'
                     >
-                      <p className='font-medium text-slate-950'>{item.awb_number}</p>
-                      <p className='text-xs text-slate-500'>
+                      <p className='font-medium text-foreground'>{item.awb_number}</p>
+                      <p className='text-xs text-muted-foreground'>
                         {item.event_date || 'Date unavailable'} | Attempts:{' '}
                         {item.total_attempts || '0'}
                       </p>
-                      <p className='mt-2 text-sm text-slate-700'>
+                      <p className='mt-2 text-sm text-foreground'>
                         {item.courier_remarks || 'No remarks'}
                       </p>
                     </div>
                   ))
                 ) : (
-                  <div className='rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-600'>
+                  <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-6 text-sm text-muted-foreground'>
                     No active NimbusPost NDR records were returned.
                   </div>
                 )

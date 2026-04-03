@@ -999,8 +999,6 @@ export default function TemplateWorkspace() {
         title={isAdmin ? 'Show Websites' : 'My Websites'}
         stackOnMobile
       >
-
-
         {!isAdmin && (
           <Button
             type='button'

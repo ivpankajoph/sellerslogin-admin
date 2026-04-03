@@ -3,6 +3,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import type { RootState } from '@/store'
@@ -10,6 +11,7 @@ import {
   ImageIcon,
   Loader2,
   PencilLine,
+  Search,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { formatINR } from '@/lib/currency'
@@ -783,6 +785,7 @@ export default function InventoryDashboard() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null)
   const [stockInput, setStockInput] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('manual_adjustment')
@@ -795,6 +798,26 @@ export default function InventoryDashboard() {
   const [visibilityError, setVisibilityError] = useState('')
   const [visibilitySuccess, setVisibilitySuccess] = useState('')
   const deferredSearch = useDeferredValue(search)
+  const searchContainerRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (search.trim()) {
+      setSearchOpen(true)
+    }
+  }, [search])
+
+  useEffect(() => {
+    if (!searchOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null
+      if (searchContainerRef.current?.contains(target)) return
+      setSearchOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [searchOpen])
 
   useEffect(() => {
     if (!isAdmin) {
@@ -1306,101 +1329,127 @@ export default function InventoryDashboard() {
         actionsClassName='gap-2 flex-wrap overflow-visible pb-0'
         showHeaderChrome={false}
       >
-        {isAdmin ? (
-          <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
-            <SelectTrigger className='h-10 w-[280px] shrink-0'>
-              <SelectValue placeholder='Select vendor' />
-            </SelectTrigger>
-            <SelectContent>
-              {vendorOptions.map((vendor) => (
-                <SelectItem key={vendor.value} value={vendor.value}>
-                  {vendor.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
+        <div className='flex w-full items-center gap-3 overflow-x-auto'>
+          <div className='flex min-w-0 items-center gap-3'>
+            {isAdmin ? (
+              <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
+                <SelectTrigger className='h-10 w-[280px] shrink-0'>
+                  <SelectValue placeholder='Select vendor' />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendorOptions.map((vendor) => (
+                    <SelectItem key={vendor.value} value={vendor.value}>
+                      {vendor.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
 
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder='Search product, SKU, brand, attribute, or website'
-          className='h-10 w-[340px] shrink-0'
-          disabled={!selectedVendorId}
-        />
+            <Select value={websiteFilter} onValueChange={setWebsiteFilter}>
+              <SelectTrigger className='h-10 w-[145px] shrink-0'>
+                <SelectValue placeholder='All websites' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All websites</SelectItem>
+                <SelectItem value='all_visible'>Visible on all websites</SelectItem>
+                {websiteOptions.map((website) => (
+                  <SelectItem key={website.value} value={website.value}>
+                    {website.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={websiteFilter} onValueChange={setWebsiteFilter}>
-          <SelectTrigger className='h-10 w-[220px] shrink-0'>
-            <SelectValue placeholder='All websites' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='all'>All websites</SelectItem>
-            <SelectItem value='all_visible'>Visible on all websites</SelectItem>
-            {websiteOptions.map((website) => (
-              <SelectItem key={website.value} value={website.value}>
-                {website.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className='h-10 w-[155px] shrink-0'>
+                <SelectValue placeholder='All categories' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All categories</SelectItem>
+                {categoryOptions.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className='h-10 w-[220px] shrink-0'>
-            <SelectValue placeholder='All categories' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='all'>All categories</SelectItem>
-            {categoryOptions.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={stockFilter} onValueChange={setStockFilter}>
+              <SelectTrigger className='h-10 w-[160px] shrink-0'>
+                <SelectValue placeholder='All stock states' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All stock states</SelectItem>
+                <SelectItem value='attention'>Needs attention</SelectItem>
+                <SelectItem value='healthy'>Healthy</SelectItem>
+                <SelectItem value='low'>Low stock</SelectItem>
+                <SelectItem value='out'>Out of stock</SelectItem>
+                <SelectItem value='unavailable'>Not sellable</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Select value={stockFilter} onValueChange={setStockFilter}>
-          <SelectTrigger className='h-10 w-[190px] shrink-0'>
-            <SelectValue placeholder='All stock states' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='all'>All stock states</SelectItem>
-            <SelectItem value='attention'>Needs attention</SelectItem>
-            <SelectItem value='healthy'>Healthy</SelectItem>
-            <SelectItem value='low'>Low stock</SelectItem>
-            <SelectItem value='out'>Out of stock</SelectItem>
-            <SelectItem value='unavailable'>Not sellable</SelectItem>
-          </SelectContent>
-        </Select>
+            <Select value={catalogFilter} onValueChange={setCatalogFilter}>
+              <SelectTrigger className='h-10 w-[165px] shrink-0'>
+                <SelectValue placeholder='All selling states' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>All selling states</SelectItem>
+                <SelectItem value='sellable'>Sellable</SelectItem>
+                <SelectItem value='draft'>Draft / pending</SelectItem>
+                <SelectItem value='hidden'>Hidden</SelectItem>
+                <SelectItem value='inactive'>Inactive variant</SelectItem>
+                <SelectItem value='not_sellable'>Any not sellable</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Select value={catalogFilter} onValueChange={setCatalogFilter}>
-          <SelectTrigger className='h-10 w-[190px] shrink-0'>
-            <SelectValue placeholder='All selling states' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='all'>All selling states</SelectItem>
-            <SelectItem value='sellable'>Sellable</SelectItem>
-            <SelectItem value='draft'>Draft / pending</SelectItem>
-            <SelectItem value='hidden'>Hidden</SelectItem>
-            <SelectItem value='inactive'>Inactive variant</SelectItem>
-            <SelectItem value='not_sellable'>Any not sellable</SelectItem>
-          </SelectContent>
-        </Select>
+          <div className='ml-auto flex shrink-0 items-center justify-end gap-3'>
+            <div ref={searchContainerRef} className='flex items-center gap-2'>
+              {searchOpen ? (
+                <div className='relative'>
+                  <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder='Search product, SKU, brand, attribute, or website'
+                    className='h-10 w-[340px] shrink-0 pl-9'
+                    disabled={!selectedVendorId}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='h-10 w-10 shrink-0 rounded-full text-[#183b63] hover:bg-transparent hover:text-[#183b63]'
+                  onClick={() => setSearchOpen(true)}
+                  aria-label='Open search'
+                  disabled={!selectedVendorId}
+                >
+                  <Search className='h-6 w-6 stroke-[2.5]' />
+                </Button>
+              )}
+            </div>
 
-        <Button
-          variant='outline'
-          className='h-10 shrink-0'
-          onClick={() => setStatsOpen(true)}
-          disabled={!selectedVendorId}
-        >
-          Statistics
-        </Button>
-        <Button
-          className='h-10 shrink-0'
-          onClick={() => fetchData()}
-          disabled={loading || !selectedVendorId}
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </Button>
+            <Button
+              variant='outline'
+              className='h-10 shrink-0'
+              onClick={() => setStatsOpen(true)}
+              disabled={!selectedVendorId}
+            >
+              Statistics
+            </Button>
+            <Button
+              className='h-10 shrink-0'
+              onClick={() => fetchData()}
+              disabled={loading || !selectedVendorId}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-4 md:gap-6'>

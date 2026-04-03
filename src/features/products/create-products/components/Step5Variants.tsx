@@ -8,7 +8,6 @@ import {
   Loader2,
   Package2,
   Plus,
-  Tag,
   ToggleLeft,
   Trash2,
   Upload,
@@ -47,7 +46,6 @@ import { cn } from '@/lib/utils'
 import type { Variant } from '../types/type'
 import {
   StudioFieldLabel,
-  StudioInfo,
   studioCardClass,
   studioInputClass,
   studioSubtleCardClass,
@@ -72,6 +70,7 @@ interface Props {
   isWebsiteLoading: boolean
   isAvailable: boolean
   aiLoading: boolean
+  onPrimaryVariantNameChange: (value: string) => void
   onAddAttributeKey: (variantIndex: number, key: string) => void
   onAddSuggestedAttributeKeys: (variantIndex: number, keys: string[]) => void
   onRemoveAttributeKey: (variantIndex: number, key: string) => void
@@ -254,6 +253,7 @@ const Step5Variants: React.FC<Props> = ({
   isWebsiteLoading,
   isAvailable,
   aiLoading,
+  onPrimaryVariantNameChange,
   onAddAttributeKey,
   onAddSuggestedAttributeKeys,
   onRemoveAttributeKey,
@@ -303,7 +303,7 @@ const Step5Variants: React.FC<Props> = ({
   )
 
   const suggestedVariantKeys = useMemo(
-    () => sanitizeKeyList(variantKeySuggestions).slice(0, 2),
+    () => sanitizeKeyList(variantKeySuggestions),
     [variantKeySuggestions]
   )
   const resolvedSuggestedVariantKey =
@@ -415,7 +415,7 @@ const Step5Variants: React.FC<Props> = ({
               </div>
               <p className='mt-2 max-w-2xl text-sm leading-6 text-muted-foreground'>
                 Set product visibility, then manage each variant card separately for option
-                values, pricing, stock, and images.
+                values, pricing, stock etc.
               </p>
             </div>
           </div>
@@ -512,8 +512,7 @@ const Step5Variants: React.FC<Props> = ({
           <h3 className='text-base font-semibold text-foreground'>No variants yet</h3>
           <p className='mt-2 text-sm text-muted-foreground'>
             Add the first variant to start with a key like Size, Color, or Lens Power.
-            You can also create a custom key and keep adding more product details
-            inside each variant card.
+            
           </p>
           <span className='mt-4 inline-flex'>
             <Button
@@ -609,156 +608,31 @@ const Step5Variants: React.FC<Props> = ({
                   </div>
                 </div>
 
-                <div className='grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]'>
-                  <div className='space-y-4'>
-                    <section
-                      className={cn(
-                        studioSubtleCardClass,
-                        'rounded-3xl border border-border/70 bg-white shadow-sm'
-                      )}
-                    >
-                      <div className='mb-4 flex flex-col gap-3 border-b border-border/60 pb-4 xl:flex-row xl:items-start xl:justify-between'>
-                        <div className='flex items-center gap-2 text-sm font-semibold text-foreground'>
-                          <Tag className='h-4 w-4 text-cyan-600' />
-                          Product details
-                          <StudioInfo
-                            content='Use suggested or custom keys like Size, Color, Lens Power, Fabric, or Material to make each variant easier to understand.'
-                          />
-                        </div>
-                        <div className='flex flex-wrap items-center gap-2'>
-                          <Popover
-                            open={Boolean(variantOptionPickerOpen[variantIndex])}
-                            onOpenChange={(open) =>
-                              handleOptionPickerOpenChange(variantIndex, open)
-                            }
-                          >
-                            <PopoverTrigger asChild>
-                              <Button
-                                type='button'
-                                variant='outline'
-                                className='h-10 border-border bg-background px-4'
-                              >
-                                <Plus className='mr-2 h-4 w-4' />
-                                Add detail
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className='w-[340px] p-0' align='start'>
-                              <Command shouldFilter={false}>
-                                <CommandInput
-                                  value={variantOptionSearch[variantIndex] || ''}
-                                  onValueChange={(value) =>
-                                    setVariantOptionSearch((prev) => ({
-                                      ...prev,
-                                      [variantIndex]: value,
-                                    }))
-                                  }
-                                  placeholder='Search suggested keys...'
-                                />
-                                <CommandList className='max-h-72'>
-                                  {!aiLoading && recommendedOptions.length === 0 ? (
-                                    <div className='px-4 py-6 text-center text-sm text-muted-foreground'>
-                                      No matching keys. Use the custom detail button below.
-                                    </div>
-                                  ) : null}
-                                  <CommandGroup
-                                    heading={
-                                      aiLoading ? 'Loading suggestions' : 'Suggested details'
-                                    }
-                                  >
-                                    {aiLoading ? (
-                                      <div className='flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground'>
-                                        <Loader2 className='h-4 w-4 animate-spin' />
-                                        Fetching category and AI suggestions...
-                                      </div>
-                                    ) : null}
-                                    {recommendedOptions.map((option) => (
-                                      <CommandItem
-                                        key={`${variantIndex}-${option.value}`}
-                                        value={`${option.label} ${option.value}`}
-                                        onSelect={() =>
-                                          toggleRecommendedKeySelection(
-                                            variantIndex,
-                                            option.value
-                                          )
-                                        }
-                                      >
-                                        <Check
-                                          className={cn(
-                                            'mr-2 h-4 w-4',
-                                            selectedRecommendedKeys.includes(option.value)
-                                              ? 'opacity-100'
-                                              : 'opacity-0'
-                                          )}
-                                        />
-                                        {option.label}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                              <div className='grid gap-2 border-t border-border/60 p-2'>
-                                <Button
-                                  type='button'
-                                  variant='outline'
-                                  onClick={() =>
-                                    handleAddSelectedRecommendedKeys(variantIndex)
-                                  }
-                                  disabled={!selectedRecommendedKeys.length}
-                                  className='h-10 w-full justify-start px-3'
-                                >
-                                  <Plus className='mr-2 h-4 w-4' />
-                                  Add selected details
-                                  {selectedRecommendedKeys.length
-                                    ? ` (${selectedRecommendedKeys.length})`
-                                    : ''}
-                                </Button>
-                                <Button
-                                  type='button'
-                                  variant='ghost'
-                                  onClick={() => {
-                                    handleOptionPickerOpenChange(variantIndex, false)
-                                    setVariantCustomInputOpen((prev) => ({
-                                      ...prev,
-                                      [variantIndex]: true,
-                                    }))
-                                  }}
-                                  className='h-10 w-full justify-start px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
-                                >
-                                  <Plus className='mr-2 h-4 w-4' />
-                                  Create custom detail
-                                </Button>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-
-                          <Button
-                            type='button'
-                            variant='ghost'
-                            onClick={() =>
-                              setVariantCustomInputOpen((prev) => ({
-                                ...prev,
-                                [variantIndex]: !prev[variantIndex],
-                              }))
-                            }
-                            className='h-10 px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
-                          >
-                            <Plus className='mr-2 h-4 w-4' />
-                            Add custom detail
-                          </Button>
-                        </div>
-                      </div>
-
+                <div className='space-y-4'>
+                  <section
+                    className={cn(
+                      studioSubtleCardClass,
+                      'rounded-3xl border border-border/70 bg-white shadow-sm'
+                    )}
+                  >
                       {isPrimaryVariant ? (
                         <div className='mb-4 rounded-2xl border border-cyan-100 bg-cyan-50/40 p-4'>
                           <StudioFieldLabel
                             label='Variant Name'
-                            help='The first variant uses the main product name from Step 1 so vendors do not need to name the base variant separately.'
+                            help='The first variant stays synced with the main product name. Editing it here will also update Step 1.'
                           />
-                          <div className='rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700'>
-                            {String(productName || '').trim() || 'This variant uses the main product name'}
-                          </div>
+                          <input
+                            type='text'
+                            value={productName || ''}
+                            onChange={(event) =>
+                              onPrimaryVariantNameChange(event.target.value)
+                            }
+                            placeholder='Enter the main product name'
+                            className={studioInputClass}
+                          />
                           <p className='mt-2 text-xs leading-5 text-muted-foreground'>
-                            The first variant always uses the product name from Step 1.
+                            This name is shared with Step 1, so any update here changes the main
+                            product name too.
                           </p>
                         </div>
                       ) : (
@@ -790,56 +664,6 @@ const Step5Variants: React.FC<Props> = ({
                           </p>
                         </div>
                       )}
-
-                      {isCustomInputVisible ? (
-                        <div className='mb-4 border border-dashed border-cyan-500/30 bg-cyan-500/5 p-4'>
-                          <div className='flex items-center justify-between gap-3'>
-                            <StudioFieldLabel label='Create custom detail' className='mb-0' />
-                            <Button
-                              type='button'
-                              variant='ghost'
-                              onClick={() =>
-                                setVariantCustomInputOpen((prev) => ({
-                                  ...prev,
-                                  [variantIndex]: false,
-                                }))
-                              }
-                              className='h-auto px-2 text-xs font-semibold text-muted-foreground hover:bg-transparent hover:text-foreground'
-                            >
-                              <X className='mr-1 h-3.5 w-3.5' />
-                              Hide
-                            </Button>
-                          </div>
-                            <div className='mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]'>
-                              <input
-                                type='text'
-                              value={variantCustomKeyInputs[variantIndex] || ''}
-                              onChange={(event) =>
-                                setVariantCustomKeyInputs((prev) => ({
-                                  ...prev,
-                                  [variantIndex]: event.target.value,
-                                }))
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault()
-                                  handleCustomKeySubmit(variantIndex)
-                                }
-                              }}
-                              placeholder='Add custom detail, e.g. color, material, finish'
-                              className={studioInputClass}
-                            />
-                            <Button
-                              type='button'
-                              onClick={() => handleCustomKeySubmit(variantIndex)}
-                              className='h-11 border border-border bg-card px-5 text-foreground hover:bg-secondary'
-                            >
-                              <Plus className='mr-2 h-4 w-4' />
-                              Add Detail
-                            </Button>
-                          </div>
-                        </div>
-                      ) : null}
 
                       <div className='grid gap-4 sm:grid-cols-2 2xl:grid-cols-3'>
                         {variantKeys.length ? (
@@ -883,21 +707,232 @@ const Step5Variants: React.FC<Props> = ({
                           </div>
                         )}
                       </div>
-                    </section>
 
-                    <section
-                      className={cn(
-                        studioSubtleCardClass,
-                        'rounded-3xl border border-border/70 bg-white shadow-sm'
-                      )}
-                    >
-                      <div className='mb-4 flex items-center gap-2 text-sm font-semibold text-foreground'>
+                      {isCustomInputVisible ? (
+                        <div className='mt-5 border border-dashed border-cyan-500/30 bg-cyan-500/5 p-4'>
+                          <div className='flex items-center justify-between gap-3'>
+                            <StudioFieldLabel label='Create custom detail' className='mb-0' />
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              onClick={() =>
+                                setVariantCustomInputOpen((prev) => ({
+                                  ...prev,
+                                  [variantIndex]: false,
+                                }))
+                              }
+                              className='h-auto px-2 text-xs font-semibold text-muted-foreground hover:bg-transparent hover:text-foreground'
+                            >
+                              <X className='mr-1 h-3.5 w-3.5' />
+                              Hide
+                            </Button>
+                          </div>
+                          <div className='mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]'>
+                            <input
+                              type='text'
+                              value={variantCustomKeyInputs[variantIndex] || ''}
+                              onChange={(event) =>
+                                setVariantCustomKeyInputs((prev) => ({
+                                  ...prev,
+                                  [variantIndex]: event.target.value,
+                                }))
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault()
+                                  handleCustomKeySubmit(variantIndex)
+                                }
+                              }}
+                              placeholder='Add custom detail, e.g. color, material, finish'
+                              className={studioInputClass}
+                            />
+                            <Button
+                              type='button'
+                              onClick={() => handleCustomKeySubmit(variantIndex)}
+                              className='h-11 border border-border bg-card px-5 text-foreground hover:bg-secondary'
+                            >
+                              <Plus className='mr-2 h-4 w-4' />
+                              Add Detail
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className='mt-5 flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4'>
+                        <Popover
+                          open={Boolean(variantOptionPickerOpen[variantIndex])}
+                          onOpenChange={(open) =>
+                            handleOptionPickerOpenChange(variantIndex, open)
+                          }
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              type='button'
+                              variant='outline'
+                              className='h-10 border-border bg-background px-4'
+                            >
+                              <Plus className='mr-2 h-4 w-4' />
+                              Add detail
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className='w-[340px] p-0' align='end'>
+                            <Command shouldFilter={false}>
+                              <CommandInput
+                                value={variantOptionSearch[variantIndex] || ''}
+                                onValueChange={(value) =>
+                                  setVariantOptionSearch((prev) => ({
+                                    ...prev,
+                                    [variantIndex]: value,
+                                  }))
+                                }
+                                placeholder='Search suggested keys...'
+                              />
+                              <CommandList className='max-h-72'>
+                                {!aiLoading && recommendedOptions.length === 0 ? (
+                                  <div className='px-4 py-6 text-center text-sm text-muted-foreground'>
+                                    No matching keys. Use the custom detail button below.
+                                  </div>
+                                ) : null}
+                                <CommandGroup
+                                  heading={aiLoading ? 'Loading suggestions' : 'Suggested details'}
+                                >
+                                  {aiLoading ? (
+                                    <div className='flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground'>
+                                      <Loader2 className='h-4 w-4 animate-spin' />
+                                      Fetching category and AI suggestions...
+                                    </div>
+                                  ) : null}
+                                  {recommendedOptions.map((option) => (
+                                    <CommandItem
+                                      key={`${variantIndex}-${option.value}`}
+                                      value={`${option.label} ${option.value}`}
+                                      onSelect={() =>
+                                        toggleRecommendedKeySelection(
+                                          variantIndex,
+                                          option.value
+                                        )
+                                      }
+                                    >
+                                      <Check
+                                        className={cn(
+                                          'mr-2 h-4 w-4',
+                                          selectedRecommendedKeys.includes(option.value)
+                                            ? 'opacity-100'
+                                            : 'opacity-0'
+                                        )}
+                                      />
+                                      {option.label}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                            <div className='grid gap-2 border-t border-border/60 p-2'>
+                              <Button
+                                type='button'
+                                variant='outline'
+                                onClick={() =>
+                                  handleAddSelectedRecommendedKeys(variantIndex)
+                                }
+                                disabled={!selectedRecommendedKeys.length}
+                                className='h-10 w-full justify-start px-3'
+                              >
+                                <Plus className='mr-2 h-4 w-4' />
+                                Add selected details
+                                {selectedRecommendedKeys.length
+                                  ? ` (${selectedRecommendedKeys.length})`
+                                  : ''}
+                              </Button>
+                              <Button
+                                type='button'
+                                variant='ghost'
+                                onClick={() => {
+                                  handleOptionPickerOpenChange(variantIndex, false)
+                                  setVariantCustomInputOpen((prev) => ({
+                                    ...prev,
+                                    [variantIndex]: true,
+                                  }))
+                                }}
+                                className='h-10 w-full justify-start px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
+                              >
+                                <Plus className='mr-2 h-4 w-4' />
+                                Create custom detail
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          onClick={() =>
+                            setVariantCustomInputOpen((prev) => ({
+                              ...prev,
+                              [variantIndex]: !prev[variantIndex],
+                            }))
+                          }
+                          className='h-10 px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
+                        >
+                          <Plus className='mr-2 h-4 w-4' />
+                          Add custom detail
+                        </Button>
+                      </div>
+                  </section>
+
+                  <section
+                    className={cn(
+                      studioSubtleCardClass,
+                      'rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-cyan-50/20 shadow-sm'
+                    )}
+                  >
+                    <div className='mb-5 flex flex-col gap-2 border-b border-emerald-100/80 pb-4 sm:flex-row sm:items-center sm:justify-between'>
+                      <div className='flex items-center gap-2 text-sm font-semibold text-foreground'>
                         <Package2 className='h-4 w-4 text-emerald-600' />
                         Pricing and stock
                       </div>
-                      <div className='grid gap-4 md:grid-cols-3'>
-                        <div>
-                          <StudioFieldLabel label='Actual Price' />
+                      <p className='text-xs leading-5 text-muted-foreground'>
+                        Set list price, selling price, and current inventory for this variant.
+                      </p>
+                    </div>
+
+                    <div className='mb-4 grid gap-3 sm:grid-cols-3'>
+                      <div className='rounded-2xl border border-emerald-100 bg-white/90 px-4 py-3 shadow-sm'>
+                        <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                          MRP
+                        </p>
+                        <p className='mt-2 text-xl font-semibold text-foreground'>
+                          {Number(variant.actualPrice || 0) > 0
+                            ? `Rs ${Number(variant.actualPrice).toLocaleString('en-IN')}`
+                            : 'Not set'}
+                        </p>
+                      </div>
+                      <div className='rounded-2xl border border-cyan-100 bg-white/90 px-4 py-3 shadow-sm'>
+                        <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                          Selling Price
+                        </p>
+                        <p className='mt-2 text-xl font-semibold text-foreground'>
+                          {Number(variant.finalPrice || 0) > 0
+                            ? `Rs ${Number(variant.finalPrice).toLocaleString('en-IN')}`
+                            : 'Not set'}
+                        </p>
+                      </div>
+                      <div className='rounded-2xl border border-amber-100 bg-white/90 px-4 py-3 shadow-sm'>
+                        <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground'>
+                          Stock
+                        </p>
+                        <p className='mt-2 text-xl font-semibold text-foreground'>
+                          {Number(variant.stockQuantity || 0).toLocaleString('en-IN')} units
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className='grid gap-4 md:grid-cols-3'>
+                      <div className='rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm'>
+                        <StudioFieldLabel label='Actual Price' />
+                        <div className='relative mt-2'>
+                          <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground'>
+                            Rs
+                          </span>
                           <input
                             type='number'
                             min='0'
@@ -910,11 +945,16 @@ const Step5Variants: React.FC<Props> = ({
                                 event.target.value
                               )
                             }
-                            className={studioInputClass}
+                            className={cn(studioInputClass, 'pl-11')}
                           />
                         </div>
-                        <div>
-                          <StudioFieldLabel label='Final Price' />
+                      </div>
+                      <div className='rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm'>
+                        <StudioFieldLabel label='Final Price' />
+                        <div className='relative mt-2'>
+                          <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground'>
+                            Rs
+                          </span>
                           <input
                             type='number'
                             min='0'
@@ -927,11 +967,13 @@ const Step5Variants: React.FC<Props> = ({
                                 event.target.value
                               )
                             }
-                            className={studioInputClass}
+                            className={cn(studioInputClass, 'pl-11')}
                           />
                         </div>
-                        <div>
-                          <StudioFieldLabel label='Stock Quantity' />
+                      </div>
+                      <div className='rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm'>
+                        <StudioFieldLabel label='Stock Quantity' />
+                        <div className='relative mt-2'>
                           <input
                             type='number'
                             min='0'
@@ -945,10 +987,13 @@ const Step5Variants: React.FC<Props> = ({
                             }
                             className={studioInputClass}
                           />
+                          <span className='mt-2 inline-flex rounded-full border border-border/70 bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground'>
+                            Available units
+                          </span>
                         </div>
                       </div>
-                    </section>
-                  </div>
+                    </div>
+                  </section>
 
                   <section
                     className={cn(
@@ -960,6 +1005,10 @@ const Step5Variants: React.FC<Props> = ({
                       <Upload className='h-4 w-4 text-indigo-600' />
                       Variant images
                     </div>
+                    <p className='mb-4 text-xs leading-5 text-muted-foreground'>
+                      Upload clean product shots for this specific variant so buyers can clearly
+                      see the selected color, finish, or model.
+                    </p>
 
                     <div
                       onDragOver={(event) => {

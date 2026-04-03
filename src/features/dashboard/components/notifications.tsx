@@ -58,7 +58,7 @@ export function Notifications() {
   useEffect(() => {
     const loadNotifications = async () => {
       try {
-        const res = await api.get('/notifications?limit=100')
+        const res = await api.get('/notifications?limit=all')
         setNotifications(res.data?.notifications || [])
       } catch (error) {
         console.error('Failed to fetch notifications', error)

@@ -147,14 +147,14 @@ function CourierListPage() {
   return (
     <Main>
       <div className='space-y-6 p-4 md:p-6'>
-        <div className='overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm'>
-          <div className='bg-[linear-gradient(135deg,rgba(248,250,252,0.95)_0%,rgba(239,246,255,0.95)_50%,rgba(255,247,237,0.92)_100%)] p-6 md:p-8'>
+        <div className='overflow-hidden rounded-3xl border border-border bg-card shadow-sm'>
+          <div className='bg-[linear-gradient(135deg,color-mix(in_srgb,var(--card)_94%,#cbd5e1_6%)_0%,color-mix(in_srgb,var(--background)_92%,#67e8f9_8%)_50%,color-mix(in_srgb,var(--card)_92%,#fdba74_8%)_100%)] p-6 md:p-8'>
             <div className='flex flex-wrap items-start justify-between gap-4'>
               <div className='space-y-2'>
-                <h1 className='text-3xl font-semibold tracking-tight text-slate-950'>
+                <h1 className='text-3xl font-semibold tracking-tight text-foreground'>
                   Courier List
                 </h1>
-                <p className='max-w-3xl text-sm leading-6 text-slate-600'>
+                <p className='max-w-3xl text-sm leading-6 text-muted-foreground'>
                   All live courier shipments are tracked here. Routed orders stay out of Courier Desk
                   and can be managed from their app page.
                 </p>
@@ -162,7 +162,7 @@ function CourierListPage() {
               <div className='flex flex-wrap gap-2'>
                 <Button
                   variant='outline'
-                  className='border-slate-200 bg-white hover:bg-slate-50'
+                  className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                   onClick={() => setRefreshKey((current) => current + 1)}
                 >
                   <RefreshCcw className='h-4 w-4' />
@@ -170,7 +170,7 @@ function CourierListPage() {
                 </Button>
                 <Button
                   variant='outline'
-                  className='border-slate-200 bg-white hover:bg-slate-50'
+                  className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                   onClick={() => window.location.assign('/courier')}
                 >
                   Courier Desk
@@ -182,24 +182,24 @@ function CourierListPage() {
         </div>
 
         {error ? (
-          <div className='rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700'>
+          <div className='rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-700 dark:text-rose-200'>
             {error}
           </div>
         ) : null}
 
         {loading ? (
-          <div className='rounded-2xl border border-slate-200 bg-slate-50 p-8 text-sm text-slate-600'>
+          <div className='rounded-2xl border border-border bg-muted/40 p-8 text-sm text-muted-foreground'>
             Loading courier shipments...
           </div>
         ) : shipmentRows.length === 0 ? (
-          <div className='rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-sm text-slate-600'>
+          <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-8 text-sm text-muted-foreground'>
             No active courier shipments found.
           </div>
         ) : (
-          <Card className='overflow-hidden rounded-3xl border-slate-200 shadow-sm'>
+          <Card className='overflow-hidden rounded-3xl border-border bg-card shadow-sm'>
             <CardContent className='p-0'>
               <Table>
-                <TableHeader className='bg-slate-50'>
+                <TableHeader className='bg-muted/40'>
                   <TableRow>
                     <TableHead className='px-4 py-3'>Order</TableHead>
                     <TableHead className='px-4 py-3'>Partner</TableHead>
@@ -221,45 +221,45 @@ function CourierListPage() {
                       <TableRow key={`${partner.id}-${order.id}`} className='align-top'>
                         <TableCell className='px-4 py-4'>
                           <div className='min-w-[220px]'>
-                            <p className='font-semibold text-slate-950'>{order.orderNumber}</p>
-                            <p className='mt-1 text-sm text-slate-500'>{formatINR(order.total)}</p>
+                            <p className='font-semibold text-foreground'>{order.orderNumber}</p>
+                            <p className='mt-1 text-sm text-muted-foreground'>{formatINR(order.total)}</p>
                           </div>
                         </TableCell>
                         <TableCell className='px-4 py-4'>
-                          <Badge className='border-indigo-200 bg-indigo-50 text-indigo-700'>
+                          <Badge className='border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:text-indigo-200'>
                             {partner.title}
                           </Badge>
                         </TableCell>
                         <TableCell className='px-4 py-4'>
                           <div className='min-w-[180px]'>
-                            <p className='font-medium text-slate-900'>{order.customerName || 'No customer'}</p>
-                            <p className='mt-1 text-sm text-slate-500'>{order.pincode || 'No pincode'}</p>
+                            <p className='font-medium text-foreground'>{order.customerName || 'No customer'}</p>
+                            <p className='mt-1 text-sm text-muted-foreground'>{order.pincode || 'No pincode'}</p>
                           </div>
                         </TableCell>
                         <TableCell className='max-w-[260px] px-4 py-4 whitespace-normal'>
-                          <p className='line-clamp-2 text-sm text-slate-600'>{destinationLabel}</p>
+                          <p className='line-clamp-2 text-sm text-muted-foreground'>{destinationLabel}</p>
                         </TableCell>
                         <TableCell className='px-4 py-4'>
-                          <span className='inline-flex items-center gap-2 text-sm text-slate-600'>
-                            <Truck className='h-4 w-4 text-slate-400' />
+                          <span className='inline-flex items-center gap-2 text-sm text-muted-foreground'>
+                            <Truck className='h-4 w-4 text-muted-foreground' />
                             {trackingStatus}
                           </span>
                         </TableCell>
                         <TableCell className='px-4 py-4'>
                           {trackingCode ? (
-                            <span className='inline-flex items-center gap-2 text-sm text-slate-600'>
-                              <ExternalLink className='h-4 w-4 text-slate-400' />
+                            <span className='inline-flex items-center gap-2 text-sm text-muted-foreground'>
+                              <ExternalLink className='h-4 w-4 text-muted-foreground' />
                               {trackingCode}
                             </span>
                           ) : (
-                            <span className='text-sm text-slate-400'>Not available</span>
+                            <span className='text-sm text-muted-foreground'>Not available</span>
                           )}
                         </TableCell>
                         <TableCell className='px-4 py-4'>
-                          <span className='text-sm text-slate-600'>{order.items.length} item(s)</span>
+                          <span className='text-sm text-muted-foreground'>{order.items.length} item(s)</span>
                         </TableCell>
                         <TableCell className='px-4 py-4'>
-                          <span className='text-sm text-slate-600'>
+                          <span className='text-sm text-muted-foreground'>
                             {updatedAt ? new Date(updatedAt).toLocaleString('en-IN') : 'Not available'}
                           </span>
                         </TableCell>
@@ -267,14 +267,14 @@ function CourierListPage() {
                           <div className='flex justify-end gap-2'>
                             <Button
                               variant='outline'
-                              className='border-slate-200 bg-white hover:bg-slate-50'
+                              className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                               onClick={() => setSelectedShipment(shipment)}
                             >
                               View details
                             </Button>
                             <Button
                               variant='outline'
-                              className='border-slate-200 bg-white hover:bg-slate-50'
+                              className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                               onClick={() => window.location.assign(shipment.partnerPath)}
                             >
                               Open {partner.title}
@@ -299,30 +299,30 @@ function CourierListPage() {
             }
           }}
         >
-          <DialogContent className='max-h-[85vh] max-w-4xl overflow-y-auto border-slate-200 p-0 sm:max-w-4xl'>
+          <DialogContent className='max-h-[85vh] max-w-4xl overflow-y-auto border-border bg-card p-0 sm:max-w-4xl'>
             {selectedShipment ? (
               <div className='space-y-6 p-6'>
                 <DialogHeader className='space-y-3'>
                   <div className='flex flex-wrap items-start justify-between gap-3'>
                     <div>
-                      <DialogTitle className='text-2xl text-slate-950'>
+                      <DialogTitle className='text-2xl text-foreground'>
                         {selectedShipment.order.orderNumber}
                       </DialogTitle>
-                      <DialogDescription className='mt-1 text-sm text-slate-500'>
+                      <DialogDescription className='mt-1 text-sm text-muted-foreground'>
                         {selectedShipment.order.customerName} | {selectedShipment.order.pincode || 'No pincode'} |{' '}
                         {formatINR(selectedShipment.order.total)}
                       </DialogDescription>
                     </div>
-                    <Badge className='border-indigo-200 bg-indigo-50 text-indigo-700'>
+                    <Badge className='border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:text-indigo-200'>
                       {selectedShipment.partner.title}
                     </Badge>
                   </div>
                 </DialogHeader>
 
                 <div className='grid gap-4 md:grid-cols-2'>
-                  <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-                    <p className='text-sm font-medium text-slate-900'>Shipment</p>
-                    <div className='mt-3 space-y-2 text-sm text-slate-600'>
+                  <div className='rounded-2xl border border-border bg-muted/40 p-4'>
+                    <p className='text-sm font-medium text-foreground'>Shipment</p>
+                    <div className='mt-3 space-y-2 text-sm text-muted-foreground'>
                       <p>Status: {selectedShipment.trackingStatus}</p>
                       <p>Tracking: {selectedShipment.trackingCode || 'Not available'}</p>
                       <p>Source: {selectedShipment.sourceLabel}</p>
@@ -339,9 +339,9 @@ function CourierListPage() {
                     </div>
                   </div>
 
-                  <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-                    <p className='text-sm font-medium text-slate-900'>Delivery</p>
-                    <div className='mt-3 space-y-2 text-sm text-slate-600'>
+                  <div className='rounded-2xl border border-border bg-muted/40 p-4'>
+                    <p className='text-sm font-medium text-foreground'>Delivery</p>
+                    <div className='mt-3 space-y-2 text-sm text-muted-foreground'>
                       <p>Address: {selectedShipment.destinationLabel}</p>
                       <p>City: {selectedShipment.order.city || 'Not available'}</p>
                       <p>State: {selectedShipment.order.state || 'Not available'}</p>
@@ -351,17 +351,17 @@ function CourierListPage() {
                   </div>
                 </div>
 
-                <div className='rounded-2xl border border-slate-200 bg-white p-4'>
-                  <p className='text-sm font-medium text-slate-900'>Products</p>
+                <div className='rounded-2xl border border-border bg-card p-4'>
+                  <p className='text-sm font-medium text-foreground'>Products</p>
                   <div className='mt-3 space-y-3'>
                     {selectedShipment.order.items.map((item, index) => (
                       <div
                         key={`${selectedShipment.order.id}-${item.productName}-${index}`}
-                        className='flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600'
+                        className='flex items-start gap-3 rounded-2xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground'
                       >
-                        <Package2 className='mt-0.5 h-4 w-4 text-slate-400' />
+                        <Package2 className='mt-0.5 h-4 w-4 text-muted-foreground' />
                         <div>
-                          <p className='font-medium text-slate-900'>{item.productName}</p>
+                          <p className='font-medium text-foreground'>{item.productName}</p>
                           <p>
                             Qty {item.quantity} | {formatINR(item.totalPrice || item.unitPrice * item.quantity)}
                           </p>
@@ -375,7 +375,7 @@ function CourierListPage() {
                 <div className='flex flex-wrap justify-end gap-2'>
                   <Button
                     variant='outline'
-                    className='border-slate-200 bg-white hover:bg-slate-50'
+                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                     onClick={() => window.location.assign(selectedShipment.partnerPath)}
                   >
                     Open {selectedShipment.partner.title}

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  Link,
   Outlet,
   useLocation,
   useNavigate,
   useRouterState,
 } from '@tanstack/react-router'
+import { ChevronDown, Crown, Sparkles } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { getCookie } from '@/lib/cookies'
 import api from '@/lib/axios'
@@ -14,7 +16,20 @@ import { SearchProvider } from '@/context/search-provider'
 import { VendorIntegrationsProvider } from '@/context/vendor-integrations-provider'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/app-sidebar'
+import { Header } from '@/components/layout/header'
 import { SkipToMain } from '@/components/skip-to-main'
+import { Button } from '@/components/ui/button'
+import { ConfigDrawer } from '@/components/config-drawer'
+import { NotificationBell } from '@/components/notifications/notification-bell'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { ThemeSwitch } from '@/components/theme-switch'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { ROLES, sidebarData } from '@/components/layout/data/sidebar-data'
 import {
   canAccessVendorPath,
   getFirstAccessibleVendorRoute,
@@ -22,6 +37,8 @@ import {
   resolveVendorPageAccessKey,
 } from '@/features/team-access/access-config'
 import { getStoredActiveWebsiteId } from '@/features/vendor-template/components/websiteStudioStorage'
+import { UpgradePlanDialog } from '@/features/dashboard/components/UpgradePlanDialog'
+import type { BillingSummary } from '@/features/plans/shared'
 
 type AuthenticatedLayoutProps = {
   children?: React.ReactNode
@@ -32,6 +49,34 @@ type LoaderViewportRect = {
   left: number
   top: number
   width: number
+}
+
+type SidebarNavItem = {
+  title: string
+  url?: string
+  roles?: string[]
+  items?: SidebarNavItem[]
+}
+
+const flattenSidebarItems = (items: SidebarNavItem[]): SidebarNavItem[] =>
+  items.flatMap((item) => [item, ...(item.items ? flattenSidebarItems(item.items) : [])])
+
+const getSectionTitleFromPath = (pathname: string, role: string) => {
+  const normalizedRole = role === 'admin' ? ROLES.ADMIN : ROLES.VENDOR
+  const visibleItems = sidebarData.navGroups
+    .filter((group) => !group.roles || group.roles.includes(normalizedRole))
+    .flatMap((group) => flattenSidebarItems(group.items as SidebarNavItem[]))
+    .filter((item) => item.url && (!item.roles || item.roles.includes(normalizedRole)))
+
+  const matchedItem = visibleItems
+    .filter((item) => {
+      const itemUrl = String(item.url || '').trim()
+      if (!itemUrl) return false
+      return pathname === itemUrl || pathname.startsWith(`${itemUrl}/`)
+    })
+    .sort((a, b) => String(b.url || '').length - String(a.url || '').length)[0]
+
+  return matchedItem?.title || 'Dashboard'
 }
 
 function ContentNavigationLoader({ rect }: { rect: LoaderViewportRect | null }) {
@@ -80,13 +125,26 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const isAnalytics = pathname.startsWith('/analytics')
   const content = children ?? <Outlet />
   const showNavigationLoader = isNavigating
+  const effectiveRole =
+    String(authUser?.role || '').toLowerCase() === 'superadmin'
+      ? 'admin'
+      : String(authUser?.role || '').toLowerCase()
+  const isVendor = effectiveRole === 'vendor'
   const isVendorTeamUser =
-    String(authUser?.role || '').toLowerCase() === 'vendor' &&
+    isVendor &&
     String(authUser?.account_type || '').toLowerCase() === 'vendor_user'
   const vendorPageAccess = normalizeVendorPageAccess(authUser?.page_access)
   const vendorId = String(
     authUser?.vendor_id || authUser?.id || authUser?._id || ''
   ).trim()
+  const canAccessMyWebsites =
+    isVendor && (!isVendorTeamUser || vendorPageAccess.has('my_websites'))
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false)
+  const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
+  const currentSectionTitle = getSectionTitleFromPath(
+    pathname,
+    effectiveRole === 'admin' ? ROLES.ADMIN : ROLES.VENDOR
+  )
 
   useEffect(() => {
     if (!isVendorTeamUser) return
@@ -159,6 +217,39 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
     }
   }, [showNavigationLoader])
 
+  useEffect(() => {
+    if (!isVendor || isVendorTeamUser) {
+      setBillingSummary(null)
+      return
+    }
+
+    let isCancelled = false
+
+    const loadBillingSummary = async () => {
+      try {
+        const res = await api.get('/billing/summary')
+        if (!isCancelled) {
+          setBillingSummary((res.data?.data || null) as BillingSummary | null)
+        }
+      } catch {
+        if (!isCancelled) {
+          setBillingSummary(null)
+        }
+      }
+    }
+
+    void loadBillingSummary()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [isVendor, isVendorTeamUser, authUser?.id])
+
+  const handleConnectDomainClick = () => {
+    if (typeof window === 'undefined') return
+    window.location.assign('/template-workspace?openConnectDomain=1')
+  }
+
   if (isAnalytics) {
     return (
       <VendorIntegrationsProvider>
@@ -201,13 +292,95 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                   'peer-data-[variant=inset]:has-[[data-layout=fixed]]:h-[calc(100svh-(var(--spacing)*4))]',
                 )}
               >
-                <div ref={contentViewportRef} className='relative min-h-svh w-full'>
+                <div className='flex min-h-svh flex-col'>
+                  {isVendor ? (
+                    <Header fixed className='mb-4'>
+                      <div className='flex flex-1 flex-col gap-3 md:flex-row md:items-center md:justify-between'>
+                        <div className='min-w-0'>
+                          <div className='inline-flex max-w-full items-center rounded-lg px-1 py-1 text-xl font-bold tracking-tight text-foreground'>
+                            <span className='truncate'>{currentSectionTitle}</span>
+                          </div>
+                        </div>
+                        <div className='flex flex-wrap items-center gap-2 md:justify-end md:gap-3'>
+                          <div className='flex flex-wrap items-center gap-2'>
+                            {canAccessMyWebsites ? (
+                              <Button variant='outline' asChild className='max-sm:w-full'>
+                                <Link to='/template-workspace'>
+                                  <Sparkles className='h-4 w-4 text-primary' />
+                                  Create your website for free
+                                </Link>
+                              </Button>
+                            ) : null}
+                            <DropdownMenu modal={false}>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant='outline' className='gap-2'>
+                                  Domain&apos;s
+                                  <ChevronDown className='h-4 w-4' />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align='end' className='min-w-[200px]'>
+                                <DropdownMenuItem onClick={handleConnectDomainClick}>
+                                  Connect Domain
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>Book Domain</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            {!isVendorTeamUser ? (
+                              billingSummary?.plan?.is_premium_active ? (
+                                <Button
+                                  asChild
+                                  className='border border-amber-300 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-black shadow-sm hover:brightness-95'
+                                >
+                                  <Link to='/plans'>
+                                    <Crown className='h-4 w-4 text-amber-900' />
+                                    Premium Plan
+                                  </Link>
+                                </Button>
+                              ) : (
+                                <Button
+                                  onClick={() => setUpgradeDialogOpen(true)}
+                                  className='border border-amber-300 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 text-black shadow-sm hover:brightness-95'
+                                >
+                                  <Sparkles className='h-4 w-4 text-amber-900' />
+                                  Upgrade Plan
+                                </Button>
+                              )
+                            ) : null}
+                          </div>
+                          <div className='ml-auto flex items-center gap-2 md:ml-0'>
+                            <NotificationBell />
+                            <ThemeSwitch />
+                            <ConfigDrawer />
+                            <ProfileDropdown />
+                          </div>
+                        </div>
+                      </div>
+                    </Header>
+                  ) : null}
+                  <div ref={contentViewportRef} className='relative min-h-0 flex-1 w-full'>
                   {content}
+                  </div>
                 </div>
                 {showNavigationLoader ? (
                   <ContentNavigationLoader rect={loaderRect} />
                 ) : null}
                 <CreatePasswordModal />
+                {isVendor && !isVendorTeamUser ? (
+                  <UpgradePlanDialog
+                    open={upgradeDialogOpen}
+                    onOpenChange={setUpgradeDialogOpen}
+                    userName={authUser?.name}
+                    userEmail={authUser?.email}
+                    onPlanActivated={async () => {
+                      try {
+                        const res = await api.get('/billing/summary')
+                        setBillingSummary((res.data?.data || null) as BillingSummary | null)
+                      } catch {
+                        return
+                      }
+                    }}
+                  />
+                ) : null}
               </SidebarInset>
             </SidebarProvider>
           </div>

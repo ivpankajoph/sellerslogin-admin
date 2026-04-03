@@ -18,7 +18,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import type { RootState } from '@/store'
-import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import {
   fetchBorzoOrderDetailsById,
   fetchBorzoReportData,
@@ -42,8 +41,7 @@ function BorzoOrderDetailsPage() {
 
   const role = useSelector((state: RootState) => state.auth?.user?.role)
   const isVendor = role === 'vendor'
-  const { loading: integrationsLoading, isProviderVisible } = useVendorIntegrations()
-  const canAccessBorzoReport = !isVendor || isProviderVisible('borzo')
+  const canAccessBorzoReport = false
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -115,10 +113,10 @@ function BorzoOrderDetailsPage() {
   }
 
   useEffect(() => {
-    if (isVendor && (integrationsLoading || !canAccessBorzoReport)) return
+    if (!canAccessBorzoReport) return
     loadOrder(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parsedOrderId, isVendor, integrationsLoading, canAccessBorzoReport])
+  }, [parsedOrderId, canAccessBorzoReport])
 
   const trackingUrl = useMemo(() => {
     if (!order?.points?.length) return ''
@@ -141,24 +139,14 @@ function BorzoOrderDetailsPage() {
     .toUpperCase()
   const statusBadgeClass = statusPillClass(order?.status)
 
-  if (isVendor && integrationsLoading) {
-    return (
-      <Card>
-        <CardContent className='py-8 text-sm text-muted-foreground'>
-          Loading connected delivery apps...
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (isVendor && !canAccessBorzoReport) {
+  if (!canAccessBorzoReport) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className='text-base'>Borzo not connected</CardTitle>
+          <CardTitle className='text-base'>Borzo unavailable</CardTitle>
         </CardHeader>
         <CardContent className='text-sm text-muted-foreground'>
-          Connect Borzo from Sellerslogin Toolkit to open delivery tracking details.
+          Borzo delivery tracking details are no longer available in this workspace.
         </CardContent>
       </Card>
     )

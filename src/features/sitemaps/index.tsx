@@ -253,21 +253,28 @@ export default function SitemapsPage() {
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-6'>
-        <div className='flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>
-          <div>
-            <h1 className='text-2xl font-semibold tracking-tight'>
-              {isAdmin ? 'Website Sitemaps' : 'My Website Sitemaps'}
-            </h1>
-            <p className='text-muted-foreground text-sm'>
-              Each new template website appears here automatically with its sitemap.
-            </p>
-          </div>
+        {isAdmin ? (
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>
+            <div>
+              <h1 className='text-2xl font-semibold tracking-tight'>
+                Website Sitemaps
+              </h1>
+              <p className='text-muted-foreground text-sm'>
+                Each new template website appears here automatically with its sitemap.
+              </p>
+            </div>
 
+            <div className='flex flex-wrap gap-2'>
+              <Badge variant='secondary'>{filteredRows.length} websites</Badge>
+              <Badge variant='outline'>Preview city: {previewCityLabel}</Badge>
+            </div>
+          </div>
+        ) : (
           <div className='flex flex-wrap gap-2'>
             <Badge variant='secondary'>{filteredRows.length} websites</Badge>
             <Badge variant='outline'>Preview city: {previewCityLabel}</Badge>
           </div>
-        </div>
+        )}
 
         <Card>
           <CardHeader className='pb-4'>

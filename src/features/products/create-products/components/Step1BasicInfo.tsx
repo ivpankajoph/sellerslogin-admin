@@ -6,7 +6,6 @@ import {
   FileText,
   FolderOpen,
   Loader2,
-  Package,
   Plus,
   Sparkles,
   X,
@@ -52,22 +51,21 @@ interface Props {
   onCreateSubcategory: (payload: { name: string; categoryId: string }) => Promise<void>
 }
 
-const pageHeroClass =
-  'overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,#f9fcff_0%,#ffffff_52%,#f7fbff_100%)] p-5 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.45)] sm:p-6'
+
 
 const panelClass =
-  'rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_60px_-48px_rgba(15,23,42,0.45)] sm:p-6'
+  'rounded-[28px] border border-border bg-card p-5 shadow-[0_20px_60px_-48px_rgba(15,23,42,0.45)] sm:p-6 dark:shadow-[0_20px_60px_-48px_rgba(0,0,0,0.8)]'
 
 const innerCardClass =
-  'rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]'
+  'rounded-2xl border border-border bg-background/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
 
 const aiButtonClass =
-  'inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-white px-4 py-2 text-xs font-semibold text-cyan-800 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex items-center gap-1 rounded-full border border-cyan-500/25 bg-background px-4 py-2 text-xs font-semibold text-cyan-700 shadow-sm transition hover:border-cyan-500/40 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-cyan-200'
 
 const helperTextClass = 'mt-2 text-xs leading-5 text-muted-foreground'
 
 const linkButtonClass =
-  'mt-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-900 disabled:cursor-not-allowed disabled:text-muted-foreground'
+  'mt-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-900 disabled:cursor-not-allowed disabled:text-muted-foreground dark:text-cyan-300 dark:hover:text-cyan-100'
 
 const selectionChipClass =
   'inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1 text-xs font-medium text-cyan-800 transition hover:border-cyan-500/40 hover:bg-cyan-500/15 dark:text-cyan-200'
@@ -165,7 +163,7 @@ const SearchableMultiSelect: React.FC<{
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'h-11 w-full justify-between rounded-xl border-slate-200 bg-white text-left text-foreground shadow-sm hover:bg-slate-50',
+            'h-11 w-full justify-between rounded-xl border-border bg-background text-left text-foreground shadow-sm hover:bg-accent',
             !selectedLabels.length && 'text-muted-foreground'
           )}
         >
@@ -353,28 +351,28 @@ const Step1BasicInfo: React.FC<Props> = ({
     [filteredSubcategories]
   )
 
-  const completionItems = [
-    {
-      label: 'Product identity',
-      detail: formData.productName?.trim() ? formData.productName : 'Add a clear product name',
-      done: Boolean(formData.productName?.trim()),
-    },
-    {
-      label: 'Category mapping',
-      detail:
-        selectedMainCategoryIds.length || selectedCategoryIds.length || formData.productSubCategories.length
-          ? `${selectedMainCategoryIds.length} main, ${selectedCategoryIds.length} category, ${formData.productSubCategories.length} subcategory selected`
-          : 'Choose where this product should appear',
-      done: Boolean(selectedMainCategoryIds.length || selectedCategoryIds.length),
-    },
-    {
-      label: 'Buyer-facing copy',
-      detail: formData.shortDescription?.trim()
-        ? 'Short description added'
-        : 'Write a short summary for buyers',
-      done: Boolean(formData.shortDescription?.trim() || formData.description?.trim()),
-    },
-  ]
+  // const completionItems = [
+  //   {
+  //     label: 'Product identity',
+  //     detail: formData.productName?.trim() ? formData.productName : 'Add a clear product name',
+  //     done: Boolean(formData.productName?.trim()),
+  //   },
+  //   {
+  //     label: 'Category mapping',
+  //     detail:
+  //       selectedMainCategoryIds.length || selectedCategoryIds.length || formData.productSubCategories.length
+  //         ? `${selectedMainCategoryIds.length} main, ${selectedCategoryIds.length} category, ${formData.productSubCategories.length} subcategory selected`
+  //         : 'Choose where this product should appear',
+  //     done: Boolean(selectedMainCategoryIds.length || selectedCategoryIds.length),
+  //   },
+  //   {
+  //     label: 'Buyer-facing copy',
+  //     detail: formData.shortDescription?.trim()
+  //       ? 'Short description added'
+  //       : 'Write a short summary for buyers',
+  //     done: Boolean(formData.shortDescription?.trim() || formData.description?.trim()),
+  //   },
+  // ]
 
   const handleCreateMainCategory = async () => {
     const trimmedName = newMainCategoryName.trim()
@@ -486,90 +484,21 @@ const Step1BasicInfo: React.FC<Props> = ({
 
   return (
     <div className='space-y-6'>
-      <section className={pageHeroClass}>
-        <div className='grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start'>
-          <div className='space-y-5'>
-            <div className='inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-800'>
-              <Package className='h-3.5 w-3.5' />
-              Step 1 of 3
-            </div>
-            <div className='space-y-3'>
-              <h2 className='text-2xl font-semibold tracking-tight text-slate-900 sm:text-[30px]'>
-                Add the basic details sellers already know
-              </h2>
-              <p className='max-w-3xl text-sm leading-6 text-slate-600 sm:text-[15px]'>
-                Keep this step simple: name the product, place it in the right catalog, then add buyer-friendly copy. The page is arranged in the same order most non-technical vendors think while uploading a product.
-              </p>
-            </div>
-            <div className='grid gap-3 md:grid-cols-3'>
-              {completionItems.map((item) => (
-                <div
-                  key={item.label}
-                  className={cn(
-                    'rounded-2xl border p-4 shadow-sm transition',
-                    item.done ? 'border-emerald-200 bg-emerald-50/80' : 'border-slate-200 bg-white/90'
-                  )}
-                >
-                  <div className='mb-2 flex items-center gap-2'>
-                    <span
-                      className={cn(
-                        'inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold',
-                        item.done ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
-                      )}
-                    >
-                      {item.done ? 'OK' : '-'}
-                    </span>
-                    <p className='text-sm font-semibold text-slate-900'>{item.label}</p>
-                  </div>
-                  <p className='text-xs leading-5 text-slate-600'>{item.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <aside className='rounded-[24px] border border-slate-200 bg-white/90 p-5 shadow-sm'>
-            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700'>
-              Quick guidance
-            </p>
-            <div className='mt-4 space-y-4 text-sm text-slate-600'>
-              <div className='rounded-2xl bg-slate-50 p-4'>
-                <p className='font-semibold text-slate-900'>1. Start with the buyer-facing name</p>
-                <p className='mt-1 leading-6'>
-                  Use the exact product name a customer should read on the product page.
-                </p>
-              </div>
-              <div className='rounded-2xl bg-slate-50 p-4'>
-                <p className='font-semibold text-slate-900'>2. Pick the right catalog path</p>
-                <p className='mt-1 leading-6'>
-                  First choose a main category, then select categories and subcategories.
-                </p>
-              </div>
-              <div className='rounded-2xl bg-slate-50 p-4'>
-                <p className='font-semibold text-slate-900'>3. Add simple product copy</p>
-                <p className='mt-1 leading-6'>
-                  Short description should be one quick summary. Full description can include details, features, and usage notes.
-                </p>
-              </div>
-            </div>
-          </aside>
-        </div>
-      </section>
-
       <section className={panelClass}>
         <div className='mb-5 flex items-start gap-4'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-200 bg-cyan-50'>
-            <Building2 className='h-5 w-5 text-cyan-700' />
+          <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10'>
+            <Building2 className='h-5 w-5 text-cyan-700 dark:text-cyan-300' />
           </div>
           <div className='space-y-1'>
-            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700'>
+            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300'>
               Product Identity
             </p>
-            <h3 className='text-xl font-semibold tracking-tight text-slate-900'>
+            <h3 className='text-xl font-semibold tracking-tight text-foreground'>
               Basic details buyers see first
             </h3>
-            <p className='max-w-3xl text-sm leading-6 text-slate-600'>
+            {/* <p className='max-w-3xl text-sm leading-6 text-muted-foreground'>
               These two fields define how the product appears in the catalog and on the product page. Keep the name precise and the brand optional.
-            </p>
+            </p> */}
           </div>
         </div>
 
@@ -594,7 +523,7 @@ const Step1BasicInfo: React.FC<Props> = ({
               required
             />
             <p className={helperTextClass}>
-              Keep it clear and searchable. Avoid internal codes or vendor-only naming.
+              Keep it clear and searchable. Avoid vendor-only naming.
             </p>
           </div>
 
@@ -622,25 +551,21 @@ const Step1BasicInfo: React.FC<Props> = ({
 
       <section className={panelClass}>
         <div className='mb-5 flex items-start gap-4'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50'>
-            <FolderOpen className='h-5 w-5 text-indigo-700' />
+          <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-indigo-500/20 bg-indigo-500/10'>
+            <FolderOpen className='h-5 w-5 text-indigo-700 dark:text-indigo-300' />
           </div>
           <div className='space-y-1'>
-            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700'>
+            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700 dark:text-indigo-300'>
               Category Mapping
             </p>
-            <h3 className='text-xl font-semibold tracking-tight text-slate-900'>
+            <h3 className='text-xl font-semibold tracking-tight text-foreground'>
               Place the product where buyers expect to find it
             </h3>
-            <p className='max-w-3xl text-sm leading-6 text-slate-600'>
-              Follow this order: choose the main category first, then categories, then optional subcategories. Selected items appear below each field so they are easy to review and remove.
-            </p>
+            
           </div>
         </div>
 
-        <div className='mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'>
-          Tip: keep categories focused. Too many unrelated selections can make the product harder to browse.
-        </div>
+       
 
         <div className='grid gap-4 xl:grid-cols-2'>
           <div className={innerCardClass}>
@@ -674,8 +599,8 @@ const Step1BasicInfo: React.FC<Props> = ({
               Can&apos;t find it? Create main category
             </button>
             {showMainCategoryCreator ? (
-              <div className='mt-3 rounded-2xl border border-cyan-100 bg-white p-4'>
-                <p className='text-sm font-semibold text-slate-900'>Create a new main category</p>
+              <div className='mt-3 rounded-2xl border border-cyan-500/20 bg-background p-4'>
+                <p className='text-sm font-semibold text-foreground'>Create a new main category</p>
                 <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
                   <Input
                     value={newMainCategoryName}
@@ -763,8 +688,8 @@ const Step1BasicInfo: React.FC<Props> = ({
               Can&apos;t find it? Create category
             </button>
             {showCategoryCreator ? (
-              <div className='mt-3 rounded-2xl border border-cyan-100 bg-white p-4'>
-                <p className='text-sm font-semibold text-slate-900'>Create a new category</p>
+              <div className='mt-3 rounded-2xl border border-cyan-500/20 bg-background p-4'>
+                <p className='text-sm font-semibold text-foreground'>Create a new category</p>
                 <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
                   <Input
                     value={newCategoryName}
@@ -851,8 +776,8 @@ const Step1BasicInfo: React.FC<Props> = ({
               Can&apos;t find it? Create subcategory
             </button>
             {showSubCategoryCreator ? (
-              <div className='mt-3 rounded-2xl border border-cyan-100 bg-white p-4'>
-                <p className='text-sm font-semibold text-slate-900'>Create a new subcategory</p>
+              <div className='mt-3 rounded-2xl border border-cyan-500/20 bg-background p-4'>
+                <p className='text-sm font-semibold text-foreground'>Create a new subcategory</p>
                 <div className='mt-3 grid gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto]'>
                   <select
                     value={newSubCategoryCategoryId}
@@ -906,19 +831,17 @@ const Step1BasicInfo: React.FC<Props> = ({
 
       <section className={panelClass}>
         <div className='mb-5 flex items-start gap-4'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50'>
-            <FileText className='h-5 w-5 text-rose-700' />
+          <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10'>
+            <FileText className='h-5 w-5 text-rose-700 dark:text-rose-300' />
           </div>
           <div className='space-y-1'>
-            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-rose-700'>
+            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-300'>
               Sales Copy
             </p>
-            <h3 className='text-xl font-semibold tracking-tight text-slate-900'>
+            <h3 className='text-xl font-semibold tracking-tight text-foreground'>
               Write the information buyers will read before purchasing
             </h3>
-            <p className='max-w-3xl text-sm leading-6 text-slate-600'>
-              Start with a short summary, then use the full description for features, materials, benefits, and usage details. AI buttons are available if you want a first draft.
-            </p>
+           
           </div>
         </div>
 
@@ -989,9 +912,7 @@ const Step1BasicInfo: React.FC<Props> = ({
               minHeight='min-h-[320px]'
               className='mt-3'
             />
-            <p className={helperTextClass}>
-              The formatting you create here is saved as rich content and shown on the product page with headings, lists, links, and emphasis.
-            </p>
+           
           </div>
         </div>
       </section>
