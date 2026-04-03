@@ -265,6 +265,8 @@ const slugify = (value: string) =>
 
 export default function VendorTemplatePages() {
   const navigate = useNavigate()
+  const user = useSelector((state: any) => state.auth?.user || null)
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
   const [data, setData] = useState<TemplateData>(initialData)
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
@@ -609,20 +611,22 @@ export default function VendorTemplatePages() {
             ? 'Saving...'
             : 'Save Template'}
       </Button>
-      <Button
-        variant='outline'
-        onClick={() => setDomainOpen(true)}
-        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
-      >
-        <Wand2 className='h-4 w-4' />{' '}
-        {connectedDomainState === 'connected'
-          ? 'Domain Connected'
-          : connectedDomainState === 'error'
-            ? 'Domain Error'
-            : connectedDomain?.hostname
-              ? 'Domain Pending'
-              : 'Connect Domain'}
-      </Button>
+      {!isAdmin && (
+        <Button
+          variant='outline'
+          onClick={() => setDomainOpen(true)}
+          className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+        >
+          <Wand2 className='h-4 w-4' />{' '}
+          {connectedDomainState === 'connected'
+            ? 'Domain Connected'
+            : connectedDomainState === 'error'
+              ? 'Domain Error'
+              : connectedDomain?.hostname
+                ? 'Domain Pending'
+                : 'Connect Domain'}
+        </Button>
+      )}
       {previewBaseUrl ? (
         <a
           href={previewBaseUrl}

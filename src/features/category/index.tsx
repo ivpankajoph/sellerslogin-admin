@@ -4,24 +4,29 @@
 import { useCallback, useEffect, useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from '@tanstack/react-router'
+import { ChevronRight, Home, RefreshCcw } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
 import { AppDispatch } from '@/store'
 import type { RootState } from '@/store'
 import { getAllCategories } from '@/store/slices/admin/categorySlice'
-import { motion } from 'framer-motion'
-import { ListFilter, Sparkles } from 'lucide-react'
-import { useDispatch, useSelector } from 'react-redux'
-import { Input } from '@/components/ui/input'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { Header } from '@/components/layout/header'
+import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
+import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { Main } from '@/components/layout/main'
 import { Pagination } from '@/components/pagination'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { CategoryTree } from './components/category-tree'
 import { UsersDialogs } from './components/users-dialogs'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersProvider } from './components/users-provider'
+
+export type DrillPath = {
+  level: 'main' | 'category'| 'subcategory'
+  mainId?: string
+  mainName?: string
+  categoryId?: string
+  categoryName?: string
+}
 
 function AdminCategoryPage() {
   const dispatch = useDispatch<AppDispatch>()
@@ -39,6 +44,10 @@ function AdminCategoryPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [mainFilter, setMainFilter] = useState('all')
+  const [statsOpen, setStatsOpen] = useState(false)
+  
+  const [drillPath, setDrillPath] = useState<DrillPath>({ level: 'main' })
+
   const [mainCategoryOptions, setMainCategoryOptions] = useState<
     Array<{ value: string; label: string }>
   >([])
@@ -160,141 +169,161 @@ function AdminCategoryPage() {
     fetchGlobalTotals()
   }, [token])
 
+  const statsItems = [
+    {
+      label: 'Main Categories',
+      value: mainCategoryTotal,
+      helper: 'Global count of main category levels.',
+    },
+    {
+      label: 'Categories',
+      value: categoryTotal,
+      helper: 'Total category level items.',
+    },
+    {
+      label: 'Subcategories',
+      value: subcategoryTotal,
+      helper: 'Count of active subcategories.',
+    },
+    {
+      label: 'Showing',
+      value: categories?.length || 0,
+      helper: 'Current items in the table below.',
+    },
+  ]
+
+  const Breadcrumbs = () => (
+    <nav className='flex items-center gap-1.5 py-1 text-sm text-slate-500'>
+      <button
+        type='button'
+        onClick={() => setDrillPath({ level: 'main' })}
+        className={`flex items-center gap-1.5 transition hover:text-indigo-600 ${
+          drillPath.level === 'main' ? 'font-bold text-slate-900' : ''
+        }`}
+      >
+        <Home className='h-3.5 w-3.5' />
+        All Main
+      </button>
+
+      {drillPath.mainId ? (
+        <>
+          <ChevronRight className='h-3.5 w-3.5 opacity-60' />
+          <button
+            type='button'
+            onClick={() =>
+              setDrillPath({
+                level: 'category',
+                mainId: drillPath.mainId,
+                mainName: drillPath.mainName,
+              })
+            }
+            className={`transition hover:text-indigo-600 ${
+              drillPath.level === 'category' ? 'font-bold text-slate-900' : ''
+            }`}
+          >
+            {drillPath.mainName}
+          </button>
+        </>
+      ) : null}
+
+      {drillPath.categoryId ? (
+        <>
+          <ChevronRight className='h-3.5 w-3.5 opacity-60' />
+          <span className='font-bold text-slate-900'>{drillPath.categoryName}</span>
+        </>
+      ) : null}
+    </nav>
+  )
+
   return (
     <UsersProvider>
-      <Header fixed>
-        <Search />
-        <div className='ms-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ConfigDrawer />
-          <ProfileDropdown />
-        </div>
-      </Header>
-
-      <Main className='font-manrope relative flex flex-1 flex-col gap-5 overflow-x-clip pb-10 sm:gap-6'>
-        <div className='pointer-events-none absolute inset-0 -z-10 overflow-hidden'>
-          <div className='absolute -top-24 -left-24 h-72 w-72 rounded-full bg-cyan-300/20 blur-3xl' />
-          <div className='absolute top-10 -right-20 h-96 w-96 rounded-full bg-indigo-300/15 blur-3xl' />
-          <div className='absolute bottom-[-7rem] left-1/3 h-80 w-80 rounded-full bg-amber-200/25 blur-3xl' />
-        </div>
-
-        <motion.section
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className='rounded-3xl border border-cyan-200/70 bg-gradient-to-br from-cyan-50/75 via-white to-indigo-50/65 p-6 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.6)]'
+      <TablePageHeader title='Category List'>
+        <Button
+          variant='outline'
+          className='ms-auto shrink-0'
+          onClick={() => setStatsOpen(true)}
         >
-          <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
-            <div>
-              <div className='mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/85 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-cyan-700 uppercase'>
-                <Sparkles className='h-3.5 w-3.5' />
-                Catalog Console
-              </div>
-              <h2 className='text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl'>
-                Category List
-              </h2>
-              <p className='mt-1 text-sm text-slate-600 sm:text-base'>
-                Manage all category levels in a tabular drill-down workflow.
-              </p>
-            </div>
+          Statistics
+        </Button>
+        <Button
+          variant='outline'
+          className='shrink-0'
+          onClick={refreshCategories}
+          disabled={loading}
+        >
+          {loading ? (
+            'Refreshing...'
+          ) : (
+            <>
+              <RefreshCcw className='mr-2 h-4 w-4' />
+              Refresh
+            </>
+          )}
+        </Button>
+        {isAdmin ? <UsersPrimaryButtons /> : null}
+      </TablePageHeader>
 
-            <div className='flex flex-wrap items-end justify-end gap-2'>
-              <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
-                <div className='rounded-xl border border-white/80 bg-white/80 px-3 py-2'>
-                  <div className='text-[11px] tracking-[0.12em] text-slate-500 uppercase'>
-                    Main Categories
-                  </div>
-                  <div className='text-lg font-bold text-slate-900'>
-                    {mainCategoryTotal}
-                  </div>
-                </div>
-                <div className='rounded-xl border border-white/80 bg-white/80 px-3 py-2'>
-                  <div className='text-[11px] tracking-[0.12em] text-slate-500 uppercase'>
-                    Categories
-                  </div>
-                  <div className='text-lg font-bold text-slate-900'>
-                    {categoryTotal}
-                  </div>
-                </div>
-                <div className='rounded-xl border border-white/80 bg-white/80 px-3 py-2'>
-                  <div className='text-[11px] tracking-[0.12em] text-slate-500 uppercase'>
-                    Subcategories
-                  </div>
-                  <div className='text-lg font-bold text-slate-900'>
-                    {subcategoryTotal}
-                  </div>
-                </div>
-                <div className='rounded-xl border border-white/80 bg-white/80 px-3 py-2'>
-                  <div className='text-[11px] tracking-[0.12em] text-slate-500 uppercase'>
-                    Showing
-                  </div>
-                  <div className='text-lg font-bold text-slate-900'>
-                    {categories?.length || 0}
-                  </div>
-                </div>
-              </div>
-              {isAdmin ? <UsersPrimaryButtons /> : null}
-            </div>
-          </div>
-        </motion.section>
-
+      <Main className='font-manrope relative flex flex-1 flex-col gap-4 overflow-x-clip pb-10 sm:gap-6'>
         <section className='rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur-sm sm:p-5'>
-          <div className='mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold tracking-[0.15em] text-slate-600 uppercase'>
-            <ListFilter className='h-3.5 w-3.5' />
-            Smart Filters
-          </div>
-          <div className='grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_190px_240px_auto_auto]'>
-            <Input
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value)
-                setPage(1)
-              }}
-              placeholder='Search main/category/subcategory, slug, or meta...'
-              className='h-11 rounded-xl border-slate-300 bg-white'
-            />
-            <select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value)
-                setPage(1)
-              }}
-              className='h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700'
-            >
-              <option value='all'>All levels</option>
-              <option value='main'>Main category</option>
-              <option value='category'>Category</option>
-              <option value='subcategory'>Subcategory</option>
-            </select>
-            <select
-              value={mainFilter}
-              onChange={(e) => {
-                setMainFilter(e.target.value)
-                setPage(1)
-              }}
-              className='h-11 min-w-[190px] rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700'
-            >
-              <option value='all'>All main categories</option>
-              {mainCategoryOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type='button'
-              onClick={() => {
-                setSearchQuery('')
-                setTypeFilter('all')
-                setMainFilter('all')
-                setPage(1)
-              }}
-              className='h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
-            >
-              Reset
-            </button>
-            <div className='flex items-center text-xs font-semibold text-slate-500'>
-              Showing {categories?.length || 0} / {totalRows}
+          <div className='flex flex-col gap-3'>
+            <Breadcrumbs />
+            <div className='flex flex-wrap items-center gap-3'>
+              <div className='min-w-0 flex-1'>
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    setPage(1)
+                  }}
+                  placeholder='Search main/category/subcategory, slug, or meta...'
+                  className='h-11 rounded-xl border-slate-300 bg-white'
+                />
+              </div>
+              <div className='flex shrink-0 items-center gap-2'>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value)
+                    setPage(1)
+                  }}
+                  className='h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none hover:border-slate-400'
+                >
+                  <option value='all'>All levels</option>
+                  <option value='main'>Main category</option>
+                  <option value='category'>Category</option>
+                  <option value='subcategory'>Subcategory</option>
+                </select>
+                <select
+                  value={mainFilter}
+                  onChange={(e) => {
+                    setMainFilter(e.target.value)
+                    setPage(1)
+                  }}
+                  className='h-11 min-w-[200px] rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none hover:border-slate-400'
+                >
+                  <option value='all'>All main categories</option>
+                  {mainCategoryOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setSearchQuery('')
+                    setTypeFilter('all')
+                    setMainFilter('all')
+                    setPage(1)
+                  }}
+                  className='h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                >
+                  Reset
+                </button>
+              </div>
+              <div className='flex items-center text-xs font-semibold text-slate-500'>
+                Showing {categories?.length || 0} / {totalRows}
+              </div>
             </div>
           </div>
         </section>
@@ -316,18 +345,20 @@ function AdminCategoryPage() {
             <section className='rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm backdrop-blur-sm sm:p-4'>
               <div className='mb-3 flex flex-wrap items-center justify-between gap-2 px-1'>
                 <h3 className='text-sm font-bold tracking-[0.12em] text-slate-600 uppercase'>
-                  Category Table
+                  {drillPath.level === 'main'
+                    ? 'Main Category List'
+                    : drillPath.level === 'category'
+                      ? `Categories in ${drillPath.mainName}`
+                      : `Subcategories in ${drillPath.categoryName}`}
                 </h3>
-                <div className='text-xs text-slate-500'>
-                  Click a main row action to open categories, then
-                  subcategories.
-                </div>
               </div>
               <div className='max-h-[70vh] min-h-[560px] overflow-auto'>
                 <CategoryTree
                   categories={categories}
                   onRefresh={refreshCategories}
                   canEdit={isAdmin}
+                  drillPath={drillPath}
+                  setDrillPath={setDrillPath}
                 />
               </div>
             </section>
@@ -344,6 +375,13 @@ function AdminCategoryPage() {
         )}
       </Main>
 
+      <StatisticsDialog
+        open={statsOpen}
+        onOpenChange={setStatsOpen}
+        title='Category Statistics'
+        description='Detailed count of all main, category, and subcategory records.'
+        items={statsItems}
+      />
       {isAdmin ? <UsersDialogs /> : null}
     </UsersProvider>
   )

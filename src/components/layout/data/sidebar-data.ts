@@ -133,18 +133,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
             },
           ],
         },
-        {
-          title: 'Delivery Tracking',
-          url: '/borzo-report',
-          icon: Truck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-        },
-        {
-          title: 'Delivery Charges',
-          url: '/delivery-charges',
-          icon: Truck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-        },
       ],
     },
     {
@@ -155,7 +143,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           title: 'Courier Desk',
           url: '/courier',
           icon: Truck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          roles: [ROLES.VENDOR],
           pageKey: 'orders',
         },
         {
@@ -221,7 +209,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
             },
           
             {
-              title: 'All Admin Products',
+              title: 'All Products',
               url: '/products/admin-products',
               roles: [ROLES.ADMIN],
             },

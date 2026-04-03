@@ -99,20 +99,22 @@ export function Dashboard() {
                   </Link>
                 </Button>
               ) : null}
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <Button variant='outline' className='gap-2'>
-                    Domain&apos;s
-                    <ChevronDown className='h-4 w-4' />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='end' className='min-w-[200px]'>
-                  <DropdownMenuItem onClick={handleConnectDomainClick}>
-                    Connect Domain
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>Book Domain</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {isVendor && (
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant='outline' className='gap-2'>
+                      Domain&apos;s
+                      <ChevronDown className='h-4 w-4' />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align='end' className='min-w-[200px]'>
+                    <DropdownMenuItem onClick={handleConnectDomainClick}>
+                      Connect Domain
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>Book Domain</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               {isVendor && !isVendorTeamUser ? (
                 billingSummary?.plan?.is_premium_active ? (
                   <Button

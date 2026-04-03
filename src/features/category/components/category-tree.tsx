@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import axios from 'axios'
-import { Edit3, Eye, Layers3, Trash2, X } from 'lucide-react'
+import { Edit3, Eye, Layers3, Trash2 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import type { RootState } from '@/store'
 import { uploadImage } from '@/lib/upload-image'
@@ -11,7 +11,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -25,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import type { DrillPath } from '../index'
 
 type Subcategory = {
   id?: string
@@ -125,10 +125,14 @@ export function CategoryTree({
   categories,
   onRefresh,
   canEdit = false,
+  drillPath,
+  setDrillPath,
 }: {
   categories: Category[]
   onRefresh?: () => void
   canEdit?: boolean
+  drillPath: DrillPath
+  setDrillPath: (path: DrillPath) => void
 }) {
   const token = useSelector((state: RootState) => state.auth?.token)
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
@@ -141,8 +145,6 @@ export function CategoryTree({
   const [preview, setPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [activeMainKey, setActiveMainKey] = useState<string | null>(null)
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
 
   const grouped = useMemo<MainGroup[]>(() => {
     const groups = categories.reduce<
@@ -164,32 +166,6 @@ export function CategoryTree({
       )
   }, [categories])
 
-  const activeMainGroup = useMemo(
-    () => grouped.find((group) => group.key === activeMainKey) || null,
-    [grouped, activeMainKey]
-  )
-
-  const activeCategoryView = useMemo(() => {
-    if (!activeCategoryId) return null
-
-    for (const group of grouped) {
-      const category = group.items.find(
-        (item) => getCategoryId(item) === activeCategoryId
-      )
-      if (category) {
-        return { group, category }
-      }
-    }
-
-    return null
-  }, [grouped, activeCategoryId])
-
-  useEffect(() => {
-    if (activeCategoryId && !activeCategoryView) {
-      setActiveCategoryId(null)
-    }
-  }, [activeCategoryId, activeCategoryView])
-
   const openEdit = (target: EditTarget) => {
     if (!canEdit) return
     const isSubcategory = target.type === 'subcategory'
@@ -207,11 +183,6 @@ export function CategoryTree({
     setEditTarget(null)
     setPreview(null)
     setSaving(false)
-  }
-
-  const closeCategoriesDialog = () => {
-    setActiveMainKey(null)
-    setActiveCategoryId(null)
   }
 
   const handleImageChange = async (file?: File | null) => {
@@ -292,98 +263,214 @@ export function CategoryTree({
     }
   }
 
-  return (
-    <>
-      <div className='overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm'>
-        <Table>
-          <TableHeader>
-            <TableRow className='bg-slate-100/90'>
-              <TableHead className='h-11 px-4'>Main Category</TableHead>
-              <TableHead className='h-11'>Slug</TableHead>
-              <TableHead className='h-11'>Categories</TableHead>
-              <TableHead className='h-11'>Subcategories</TableHead>
-              <TableHead className='h-11 min-w-[280px] pr-4 text-right'>
-                Actions
-              </TableHead>
+  const renderMainTable = () => (
+    <Table>
+      <TableHeader>
+        <TableRow className='bg-slate-100/90'>
+          <TableHead className='h-11 px-4'>Main Category</TableHead>
+          <TableHead className='h-11'>Slug</TableHead>
+          <TableHead className='h-11'>Categories</TableHead>
+          <TableHead className='h-11'>Subcategories</TableHead>
+          <TableHead className='h-11 min-w-[360px] pr-4 text-right'>
+            Actions
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {grouped.map((group) => {
+          const mainName = group.main?.name || 'Unassigned'
+          const mainSlug = group.main?.slug || '-'
+          const mainId = group.main?._id || ''
+          const totalSubcategories = group.items.reduce(
+            (sum, item) => sum + (item.subcategories?.length || 0),
+            0
+          )
+
+          return (
+            <TableRow
+              key={group.key}
+              className='bg-white transition hover:bg-cyan-50/40'
+            >
+              <TableCell className='whitespace-normal px-4 py-3'>
+                <div className='flex items-center gap-3'>
+                  <ImageThumb src={group.main?.image_url} alt={mainName} size={38} />
+                  <div className='min-w-0'>
+                    <div className='truncate text-sm font-semibold text-slate-900'>
+                      {mainName}
+                    </div>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className='max-w-[220px] truncate py-3 text-xs text-slate-600'>
+                {mainSlug}
+              </TableCell>
+              <TableCell className='py-3'>
+                <Badge className='border border-cyan-200 bg-cyan-100/70 text-cyan-800'>
+                  {group.items.length}
+                </Badge>
+              </TableCell>
+              <TableCell className='py-3'>
+                <Badge className='border border-emerald-200 bg-emerald-100/70 text-emerald-800'>
+                  {totalSubcategories}
+                </Badge>
+              </TableCell>
+              <TableCell className='whitespace-nowrap py-3 pr-4 text-right'>
+                <div className='flex items-center justify-end gap-1.5'>
+                  <button
+                    type='button'
+                    className={`${rowActionBtn} border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100`}
+                    onClick={() =>
+                      setDrillPath({
+                        level: 'category',
+                        mainId: mainId,
+                        mainName: mainName,
+                      })
+                    }
+                  >
+                    <Eye className='h-3.5 w-3.5' />
+                    View Categories
+                  </button>
+
+                  {canEdit && mainId ? (
+                    <>
+                      <button
+                        type='button'
+                        className={`${rowActionBtn} border border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100`}
+                        onClick={() =>
+                          openEdit({
+                            type: 'main',
+                            id: mainId,
+                            name: mainName,
+                            description: group.main?.description,
+                            image_url: group.main?.image_url,
+                            metaTitle: group.main?.metaTitle,
+                            metaDescription: group.main?.metaDescription,
+                          })
+                        }
+                      >
+                        <Edit3 className='h-3.5 w-3.5' />
+                        Edit
+                      </button>
+                      <button
+                        type='button'
+                        className={`${rowActionBtn} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
+                        disabled={deletingId === mainId}
+                        onClick={() => handleDelete('main', mainId)}
+                      >
+                        <Trash2 className='h-3.5 w-3.5' />
+                        {deletingId === mainId ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {grouped.map((group) => {
-              const mainName = group.main?.name || 'Unassigned'
-              const mainSlug = group.main?.slug || '-'
-              const mainId = group.main?._id || ''
-              const totalSubcategories = group.items.reduce(
-                (sum, item) => sum + (item.subcategories?.length || 0),
-                0
-              )
+          )
+        })}
+      </TableBody>
+    </Table>
+  )
+
+  const renderCategoryTable = () => {
+    const selectedGroup = grouped.find((g) => g.key === drillPath.mainId)
+    if (!selectedGroup) return <div className='p-4 text-center'>Select a main category first.</div>
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow className='bg-slate-100/90'>
+            <TableHead className='h-11 px-4'>Category</TableHead>
+            <TableHead className='h-11'>Slug</TableHead>
+            <TableHead className='h-11'>Subcategories</TableHead>
+            <TableHead className='h-11 min-w-[200px] pr-4 text-right'>
+              Actions
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {selectedGroup.items
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((category) => {
+              const categoryId = getCategoryId(category)
+              const subs = category.subcategories || []
 
               return (
                 <TableRow
-                  key={group.key}
-                  className='bg-white transition hover:bg-cyan-50/40'
+                  key={categoryId || category.name}
+                  className='bg-white transition hover:bg-indigo-50/40'
                 >
                   <TableCell className='whitespace-normal px-4 py-3'>
                     <div className='flex items-center gap-3'>
-                      <ImageThumb src={group.main?.image_url} alt={mainName} size={38} />
-                      <div className='min-w-0'>
-                        <div className='truncate text-sm font-semibold text-slate-900'>
-                          {mainName}
-                        </div>
+                      <ImageThumb
+                        src={category.image_url}
+                        alt={category.name}
+                        size={34}
+                      />
+                      <div className='font-semibold text-slate-900'>
+                        {category.name}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className='max-w-[220px] truncate py-3 text-xs text-slate-600'>
-                    {mainSlug}
-                  </TableCell>
-                  <TableCell className='py-3'>
-                    <Badge className='border border-cyan-200 bg-cyan-100/70 text-cyan-800'>
-                      {group.items.length}
-                    </Badge>
+                    {category.slug || '-'}
                   </TableCell>
                   <TableCell className='py-3'>
                     <Badge className='border border-emerald-200 bg-emerald-100/70 text-emerald-800'>
-                      {totalSubcategories}
+                      {subs.length}
                     </Badge>
                   </TableCell>
-                  <TableCell className='whitespace-normal py-3 pr-4 text-right align-top'>
-                    <div className='ml-auto flex max-w-[280px] flex-wrap justify-end gap-1.5'>
+                  <TableCell className='whitespace-nowrap py-3 pr-4 text-right'>
+                    <div className='flex items-center justify-end gap-1.5'>
                       <button
                         type='button'
-                        className={`${rowActionBtn} border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100`}
-                        onClick={() => setActiveMainKey(group.key)}
+                        className={`${rowActionIconBtn} border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100`}
+                        onClick={() =>
+                          setDrillPath({
+                            ...drillPath,
+                            level: 'subcategory',
+                            categoryId: categoryId,
+                            categoryName: category.name,
+                          })
+                        }
+                        disabled={!subs.length}
+                        title={
+                          subs.length
+                            ? 'View subcategories'
+                            : 'No subcategories available'
+                        }
                       >
-                        <Eye className='h-3.5 w-3.5' />
-                        View Categories
+                        <Layers3 className='h-3.5 w-3.5' />
                       </button>
 
-                      {canEdit && mainId ? (
+                      {canEdit && categoryId ? (
                         <>
                           <button
                             type='button'
-                            className={`${rowActionBtn} border border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100`}
+                            className={`${rowActionIconBtn} border border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100`}
                             onClick={() =>
                               openEdit({
-                                type: 'main',
-                                id: mainId,
-                                name: mainName,
-                                description: group.main?.description,
-                                image_url: group.main?.image_url,
-                                metaTitle: group.main?.metaTitle,
-                                metaDescription: group.main?.metaDescription,
+                                type: 'category',
+                                id: categoryId,
+                                name: category.name,
+                                description: category.description,
+                                image_url: category.image_url,
+                                metaTitle: category.metaTitle,
+                                metaDescription: category.metaDescription,
                               })
                             }
+                            title='Edit category'
                           >
                             <Edit3 className='h-3.5 w-3.5' />
-                            Edit
                           </button>
                           <button
                             type='button'
-                            className={`${rowActionBtn} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
-                            disabled={deletingId === mainId}
-                            onClick={() => handleDelete('main', mainId)}
+                            className={`${rowActionIconBtn} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
+                            disabled={deletingId === categoryId}
+                            onClick={() => handleDelete('category', categoryId)}
+                            title='Delete category'
                           >
                             <Trash2 className='h-3.5 w-3.5' />
-                            {deletingId === mainId ? 'Deleting...' : 'Delete'}
                           </button>
                         </>
                       ) : null}
@@ -392,321 +479,101 @@ export function CategoryTree({
                 </TableRow>
               )
             })}
-          </TableBody>
-        </Table>
+        </TableBody>
+      </Table>
+    )
+  }
+
+  const renderSubcategoryTable = () => {
+    let subcategories: Subcategory[] = []
+    
+    for (const group of grouped) {
+      const category = group.items.find(c => getCategoryId(c) === drillPath.categoryId)
+      if (category) {
+        subcategories = category.subcategories || []
+        break
+      }
+    }
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow className='bg-slate-100/90'>
+            <TableHead className='h-11 px-4'>Subcategory</TableHead>
+            <TableHead className='h-11'>Slug</TableHead>
+            <TableHead className='h-11 min-w-[150px] pr-4 text-right'>
+              Actions
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {subcategories
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((sub) => {
+              const subId = getSubcategoryId(sub)
+
+              return (
+                <TableRow
+                  key={subId || sub.name}
+                  className='bg-white transition hover:bg-emerald-50/40'
+                >
+                  <TableCell className='whitespace-normal px-4 py-3'>
+                    <div className='text-sm font-medium text-slate-900'>
+                      {sub.name}
+                    </div>
+                  </TableCell>
+                  <TableCell className='max-w-[220px] truncate py-3 text-xs text-slate-600'>
+                    {sub.slug || '-'}
+                  </TableCell>
+                  <TableCell className='whitespace-nowrap py-3 pr-4 text-right'>
+                    {canEdit && subId ? (
+                      <div className='flex items-center justify-end gap-1.5'>
+                        <button
+                          type='button'
+                          className={`${rowActionIconBtn} border border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100`}
+                          onClick={() =>
+                            openEdit({
+                              type: 'subcategory',
+                              id: subId,
+                              name: sub.name,
+                              description: sub.description,
+                              image_url: sub.image_url,
+                              metaTitle: sub.metaTitle,
+                              metaDescription: sub.metaDescription,
+                            })
+                          }
+                          title='Edit subcategory'
+                        >
+                          <Edit3 className='h-3.5 w-3.5' />
+                        </button>
+                        <button
+                          type='button'
+                          className={`${rowActionIconBtn} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
+                          disabled={deletingId === subId}
+                          onClick={() => handleDelete('subcategory', subId)}
+                          title='Delete subcategory'
+                        >
+                          <Trash2 className='h-3.5 w-3.5' />
+                        </button>
+                      </div>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+        </TableBody>
+      </Table>
+    )
+  }
+
+  return (
+    <>
+      <div className='overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm'>
+        {drillPath.level === 'main' && renderMainTable()}
+        {drillPath.level === 'category' && renderCategoryTable()}
+        {drillPath.level === 'subcategory' && renderSubcategoryTable()}
       </div>
-
-      <Dialog
-        open={!!activeMainGroup}
-        onOpenChange={(open) => {
-          if (!open) closeCategoriesDialog()
-        }}
-      >
-        <DialogContent
-          showCloseButton={false}
-          className={`${modalSurfaceClass} max-h-[92vh] !w-[min(98vw,1180px)] !max-w-[min(98vw,1180px)] sm:!w-[min(96vw,1180px)] sm:!max-w-[min(96vw,1180px)]`}
-        >
-          <div className='pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-indigo-400 to-violet-400' />
-          <div className='flex max-h-[92vh] flex-col'>
-            <DialogHeader className='gap-3 border-b border-slate-200/90 bg-gradient-to-r from-indigo-50/90 via-white to-cyan-50/90 px-5 py-4 sm:px-6 sm:py-5'>
-              <div className='flex items-start justify-between gap-3'>
-                <div>
-                  <DialogTitle className='text-xl font-bold text-slate-900'>
-                    Categories in {activeMainGroup?.main?.name || 'Main Category'}
-                  </DialogTitle>
-                  <DialogDescription className='mt-1 text-sm text-slate-600'>
-                    Browse categories and open subcategories in a dedicated popup.
-                  </DialogDescription>
-                </div>
-                <DialogClose asChild>
-                  <button
-                    type='button'
-                    className='inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-900'
-                    aria-label='Close categories'
-                  >
-                    <X className='h-4 w-4' />
-                  </button>
-                </DialogClose>
-              </div>
-              {activeMainGroup ? (
-                <div className='flex flex-wrap items-center gap-2'>
-                  <Badge className='border border-cyan-200 bg-cyan-100/70 text-cyan-800'>
-                    {activeMainGroup.items.length} categories
-                  </Badge>
-                  <Badge className='border border-emerald-200 bg-emerald-100/70 text-emerald-800'>
-                    {activeMainGroup.items.reduce(
-                      (sum, item) => sum + (item.subcategories?.length || 0),
-                      0
-                    )}{' '}
-                    subcategories
-                  </Badge>
-                </div>
-              ) : null}
-            </DialogHeader>
-
-            <div className='flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6 sm:py-5'>
-              {!activeMainGroup || activeMainGroup.items.length === 0 ? (
-                <div className='rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500'>
-                  No categories found for this main category.
-                </div>
-              ) : (
-                <div className='max-h-[64vh] overflow-auto rounded-2xl border border-slate-200/90 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'>
-                  <Table className='min-w-[860px]'>
-                    <TableHeader>
-                      <TableRow className='sticky top-0 z-10 bg-slate-100/95 backdrop-blur'>
-                        <TableHead className='h-10 px-4'>Category</TableHead>
-                        <TableHead className='h-10'>Slug</TableHead>
-                        <TableHead className='h-10'>Subcategories</TableHead>
-                        <TableHead className='h-10'>Meta</TableHead>
-                        <TableHead className='h-10 min-w-[132px] pr-4 text-right'>
-                          Actions
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {activeMainGroup.items
-                        .slice()
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((category) => {
-                          const categoryId = getCategoryId(category)
-                          const subs = category.subcategories || []
-                          const metaPreview =
-                            category.metaTitle ||
-                            category.metaDescription ||
-                            category.description ||
-                            '-'
-
-                          return (
-                            <TableRow
-                              key={categoryId || category.name}
-                              className='bg-white transition hover:bg-indigo-50/40'
-                            >
-                              <TableCell className='whitespace-normal px-4 py-3'>
-                                <div className='flex items-center gap-3'>
-                                  <ImageThumb
-                                    src={category.image_url}
-                                    alt={category.name}
-                                    size={34}
-                                  />
-                                  <div className='font-semibold text-slate-900'>
-                                    {category.name}
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className='max-w-[220px] truncate py-3 text-xs text-slate-600'>
-                                {category.slug || '-'}
-                              </TableCell>
-                              <TableCell className='py-3'>
-                                <Badge className='border border-emerald-200 bg-emerald-100/70 text-emerald-800'>
-                                  {subs.length}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className='max-w-[300px] py-3 text-xs text-slate-600'>
-                                <span className='line-clamp-2'>{metaPreview}</span>
-                              </TableCell>
-                              <TableCell className='whitespace-normal py-3 pr-4 text-right align-top'>
-                                <div className='ml-auto flex max-w-[132px] flex-wrap justify-end gap-1.5'>
-                                  <button
-                                    type='button'
-                                    className={`${rowActionIconBtn} border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100`}
-                                    onClick={() => setActiveCategoryId(categoryId)}
-                                    disabled={!subs.length}
-                                    title={
-                                      subs.length
-                                        ? 'View subcategories'
-                                        : 'No subcategories available'
-                                    }
-                                    aria-label='View subcategories'
-                                  >
-                                    <Layers3 className='h-3.5 w-3.5' />
-                                  </button>
-
-                                  {canEdit && categoryId ? (
-                                    <>
-                                      <button
-                                        type='button'
-                                        className={`${rowActionIconBtn} border border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100`}
-                                        onClick={() =>
-                                          openEdit({
-                                            type: 'category',
-                                            id: categoryId,
-                                            name: category.name,
-                                            description: category.description,
-                                            image_url: category.image_url,
-                                            metaTitle: category.metaTitle,
-                                            metaDescription: category.metaDescription,
-                                          })
-                                        }
-                                        title='Edit category'
-                                        aria-label='Edit category'
-                                      >
-                                        <Edit3 className='h-3.5 w-3.5' />
-                                      </button>
-                                      <button
-                                        type='button'
-                                        className={`${rowActionIconBtn} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
-                                        disabled={deletingId === categoryId}
-                                        onClick={() => handleDelete('category', categoryId)}
-                                        title={
-                                          deletingId === categoryId
-                                            ? 'Deleting...'
-                                            : 'Delete category'
-                                        }
-                                        aria-label='Delete category'
-                                      >
-                                        <Trash2 className='h-3.5 w-3.5' />
-                                      </button>
-                                    </>
-                                  ) : null}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={!!activeCategoryView}
-        onOpenChange={(open) => {
-          if (!open) setActiveCategoryId(null)
-        }}
-      >
-        <DialogContent
-          showCloseButton={false}
-          className={`${modalSurfaceClass} max-h-[92vh] !w-[min(98vw,1080px)] !max-w-[min(98vw,1080px)] sm:!w-[min(96vw,1080px)] sm:!max-w-[min(96vw,1080px)]`}
-        >
-          <div className='pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-400' />
-          <div className='flex max-h-[92vh] flex-col'>
-            <DialogHeader className='gap-3 border-b border-slate-200/90 bg-gradient-to-r from-emerald-50/90 via-white to-cyan-50/90 px-5 py-4 sm:px-6 sm:py-5'>
-              <div className='flex items-start justify-between gap-3'>
-                <div>
-                  <DialogTitle className='text-xl font-bold text-slate-900'>
-                    Subcategories in {activeCategoryView?.category?.name || 'Category'}
-                  </DialogTitle>
-                  <DialogDescription className='mt-1 text-sm text-slate-600'>
-                    Text-only list with quick edit and delete actions.
-                  </DialogDescription>
-                </div>
-                <DialogClose asChild>
-                  <button
-                    type='button'
-                    className='inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-900'
-                    aria-label='Close subcategories'
-                  >
-                    <X className='h-4 w-4' />
-                  </button>
-                </DialogClose>
-              </div>
-              <Badge className='w-fit border border-emerald-200 bg-emerald-100/70 text-emerald-800'>
-                {(activeCategoryView?.category?.subcategories || []).length}{' '}
-                subcategories
-              </Badge>
-            </DialogHeader>
-
-            <div className='flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6 sm:py-5'>
-              {!activeCategoryView ||
-              !(activeCategoryView.category.subcategories || []).length ? (
-                <div className='rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500'>
-                  No subcategories found for this category.
-                </div>
-              ) : (
-                <div className='max-h-[64vh] overflow-auto rounded-2xl border border-slate-200/90 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'>
-                  <Table className='min-w-[760px]'>
-                    <TableHeader>
-                      <TableRow className='sticky top-0 z-10 bg-slate-100/95 backdrop-blur'>
-                        <TableHead className='h-10 px-4'>Subcategory</TableHead>
-                        <TableHead className='h-10'>Slug</TableHead>
-                        <TableHead className='h-10'>Meta</TableHead>
-                        <TableHead className='h-10 min-w-[92px] pr-4 text-right'>
-                          Actions
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(activeCategoryView.category.subcategories || [])
-                        .slice()
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((sub) => {
-                          const subId = getSubcategoryId(sub)
-                          const subMeta =
-                            sub.metaTitle ||
-                            sub.metaDescription ||
-                            sub.description ||
-                            '-'
-
-                          return (
-                            <TableRow
-                              key={subId || sub.name}
-                              className='bg-white transition hover:bg-emerald-50/40'
-                            >
-                              <TableCell className='whitespace-normal px-4 py-3'>
-                                <div className='text-sm font-medium text-slate-900'>
-                                  {sub.name}
-                                </div>
-                              </TableCell>
-                              <TableCell className='max-w-[220px] truncate py-3 text-xs text-slate-600'>
-                                {sub.slug || '-'}
-                              </TableCell>
-                              <TableCell className='max-w-[300px] py-3 text-xs text-slate-600'>
-                                <span className='line-clamp-2'>{subMeta}</span>
-                              </TableCell>
-                              <TableCell className='whitespace-normal py-3 pr-4 text-right align-top'>
-                                {canEdit && subId ? (
-                                  <div className='ml-auto flex max-w-[92px] flex-wrap justify-end gap-1.5'>
-                                    <button
-                                      type='button'
-                                      className={`${rowActionIconBtn} border border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100`}
-                                      onClick={() =>
-                                        openEdit({
-                                          type: 'subcategory',
-                                          id: subId,
-                                          name: sub.name,
-                                          description: sub.description,
-                                          image_url: sub.image_url,
-                                          metaTitle: sub.metaTitle,
-                                          metaDescription: sub.metaDescription,
-                                        })
-                                      }
-                                      title='Edit subcategory'
-                                      aria-label='Edit subcategory'
-                                    >
-                                      <Edit3 className='h-3.5 w-3.5' />
-                                    </button>
-                                    <button
-                                      type='button'
-                                      className={`${rowActionIconBtn} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
-                                      disabled={deletingId === subId}
-                                      onClick={() => handleDelete('subcategory', subId)}
-                                      title={
-                                        deletingId === subId
-                                          ? 'Deleting...'
-                                          : 'Delete subcategory'
-                                      }
-                                      aria-label='Delete subcategory'
-                                    >
-                                      <Trash2 className='h-3.5 w-3.5' />
-                                    </button>
-                                  </div>
-                                ) : null}
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {canEdit ? (
         <Dialog

@@ -1,4 +1,4 @@
-﻿import {
+import {
   Card,
   CardContent,
   CardDescription,
@@ -8,7 +8,8 @@
 import { Button } from '@/components/ui/button'
 import { Link } from '@tanstack/react-router'
 import { Overview } from './overview'
-import { RecentSales } from './recent-sales'
+import { DataBarChart } from './DashboardCharts'
+import { DashboardDonutChart } from './DashboardDonutChart'
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
 import {
@@ -286,42 +287,50 @@ const VendorDashboard = () => {
     }))
   }, [products])
 
-  const recentItems = useMemo(() => {
-    const sorted = [...products].sort((a, b) => {
-      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0
-      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0
-      return bDate - aDate
-    })
+  const adminChartData = useMemo(() => {
+    return [
+      { name: 'Verified', total: globalCounts.verifiedVendors, fill: '#10b981' },
+      { name: 'Unverified', total: globalCounts.unverifiedVendors, fill: '#f59e0b' },
+      { name: 'Total', total: globalCounts.vendorsTotal, fill: '#6366f1' },
+    ]
+  }, [globalCounts])
 
-    return sorted.slice(0, 6).map((product) => {
-      const variants = Array.isArray(product.variants) ? product.variants : []
-      const prices = variants.map((v) => v.finalPrice || 0).filter((p) => p > 0)
-      const minPrice = prices.length ? Math.min(...prices) : 0
-      const maxPrice = prices.length ? Math.max(...prices) : 0
-      const categoryName =
-        product.productCategory && categoryMap[product.productCategory]
-          ? categoryMap[product.productCategory].name
-          : 'Category'
-      const imageUrl =
-        product.defaultImages?.[0]?.url ||
-        variants?.[0]?.variantsImageUrls?.[0]?.url ||
-        undefined
-      const priceLabel =
-        minPrice && maxPrice && minPrice !== maxPrice
-          ? `₹${minPrice.toLocaleString()} - ₹${maxPrice.toLocaleString()}`
-          : minPrice
-          ? `₹${minPrice.toLocaleString()}`
-          : '₹0'
-
-      return {
-        id: product._id,
-        name: product.productName || 'Untitled Product',
-        subtitle: `${product.brand || 'Brand'} • ${categoryName}`,
-        amount: priceLabel,
-        imageUrl,
-      }
+  const vendorChartData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    products.forEach((p) => {
+      const catName =
+        p.productCategory && categoryMap[p.productCategory]
+          ? categoryMap[p.productCategory].name
+          : 'Other'
+      counts[catName] = (counts[catName] || 0) + 1
     })
+    return Object.entries(counts)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5) // Top 5 categories
   }, [products, categoryMap])
+
+  const stockHealthData = useMemo(() => {
+    let healthy = 0
+    let low = 0
+    let empty = 0
+
+    products.forEach((p) => {
+      const variants = Array.isArray(p.variants) ? p.variants : []
+      variants.forEach((v) => {
+        const qty = v.stockQuantity || 0
+        if (qty >= 5) healthy++
+        else if (qty > 0) low++
+        else empty++
+      })
+    })
+
+    return [
+      { name: 'Healthy (>5)', value: healthy, color: '#10b981' },
+      { name: 'Low Stock (1-5)', value: low, color: '#f59e0b' },
+      { name: 'Out of Stock', value: empty, color: '#ef4444' },
+    ]
+  }, [products])
 
   const adminCards: DashboardCard[] = [
     {
@@ -492,30 +501,61 @@ const VendorDashboard = () => {
           )
         })}
       </div>
-      <div className='grid grid-cols-1 gap-4 lg:grid-cols-7'>
-        <Card className='col-span-1 lg:col-span-4'>
+      <div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
+        <Card>
           <CardHeader>
-            <CardTitle>Overview</CardTitle>
+            <CardTitle>Products Overview</CardTitle>
+            <CardDescription>Monthly product additions across the platform</CardDescription>
           </CardHeader>
           <CardContent className='ps-2'>
-            <Overview data={overviewData} />
+            {loading ? (
+              <div className="h-[300px] flex items-center justify-center">Loading...</div>
+            ) : error ? (
+              <div className="h-[300px] flex items-center justify-center text-red-500 font-medium">{error}</div>
+            ) : (
+              <Overview data={overviewData} />
+            )}
           </CardContent>
         </Card>
-        <Card className='col-span-1 lg:col-span-3'>
+        <Card>
           <CardHeader>
-            <CardTitle>Recent Products</CardTitle>
-            <CardDescription>
-              Latest products added to {isAdminRole ? 'the platform' : 'your catalog'}
-            </CardDescription>
+            <CardTitle>{isAdminRole ? 'Vendor Status' : 'Stock Status'}</CardTitle>
+            <CardDescription>Visual breakdown of {isAdminRole ? 'verification' : 'inventory'} status</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <p className='text-sm text-muted-foreground'>Loading activity...</p>
-            ) : error ? (
-              <p className='text-sm text-red-500'>{error}</p>
-            ) : (
-              <RecentSales items={recentItems} />
-            )}
+            <DashboardDonutChart
+              title={isAdminRole ? 'Verified vs Unverified' : 'Healthy vs Low stock'}
+              data={isAdminRole ? adminChartData.map(d => ({ name: d.name, value: d.total, color: d.fill })) : stockHealthData}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className='grid grid-cols-1 gap-4 lg:grid-cols-2 mt-4'>
+        <Card>
+          <CardHeader>
+            <CardTitle>Category Distribution</CardTitle>
+            <CardDescription>Top product categories by volume</CardDescription>
+          </CardHeader>
+          <CardContent className='ps-2'>
+            <DataBarChart
+              title=''
+              description=''
+              data={vendorChartData}
+              layout="horizontal"
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Catalog Insights</CardTitle>
+            <CardDescription>Percentage share of top categories</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DashboardDonutChart
+              title='Share by Category'
+              data={vendorChartData.map(d => ({ name: d.name, value: d.total }))}
+            />
           </CardContent>
         </Card>
       </div>

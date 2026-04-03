@@ -14,7 +14,7 @@ export type CourierPartner = {
   themeClass: string
   etaLabel: string
   live: boolean
-  reportPath: string
+  reportPath?: string
 }
 
 export type CourierOrderSummary = {
@@ -126,7 +126,6 @@ export const COURIER_PARTNERS: CourierPartner[] = [
     themeClass: 'border-emerald-200 bg-emerald-50',
     etaLabel: '35-55 mins',
     live: true,
-    reportPath: '/borzo-report',
   },
   {
     id: 'delhivery',

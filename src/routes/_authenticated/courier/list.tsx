@@ -97,8 +97,7 @@ function CourierListPage() {
                 : 'borzo'
           const partner = COURIER_PARTNER_MAP[partnerId]
 
-          const partnerPath =
-            partner.id === 'borzo' ? '/borzo-report' : `/courier/${partner.id}`
+          const partnerPath = `/courier/${partner.id}`
 
           const trackingCode =
             assignment?.trackingCode ||

@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -53,9 +53,17 @@ const badgeTone = (state: CheckResult['state']) =>
         : { label: 'API error', className: 'border-rose-200 bg-rose-50 text-rose-700', Icon: AlertTriangle }
 
 function CourierDeskPage() {
+  const navigate = useNavigate()
   const user = useSelector((state: RootState) => state.auth?.user)
   const role = String(user?.role || '').toLowerCase()
   const isVendor = role === 'vendor'
+
+  useEffect(() => {
+    if (user && !isVendor) {
+      void navigate({ to: '/' })
+    }
+  }, [isVendor, navigate, user])
+
   const [orders, setOrders] = useState<CourierOrderSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

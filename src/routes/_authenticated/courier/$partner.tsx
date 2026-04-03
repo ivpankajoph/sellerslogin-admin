@@ -1233,14 +1233,6 @@ function CourierPartnerPage() {
                     <ArrowUpRight className='h-4 w-4' />
                   </Link>
                 </Button>
-                {partnerId === 'borzo' && (
-                  <Button className='bg-slate-950 text-white hover:bg-slate-800' asChild>
-                    <Link to='/borzo-report'>
-                      Open live Borzo report
-                      <ExternalLink className='h-4 w-4' />
-                    </Link>
-                  </Button>
-                )}
               </div>
             </div>
 
