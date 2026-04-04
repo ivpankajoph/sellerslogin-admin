@@ -1245,7 +1245,7 @@ export default function VendorProductsTable() {
               Are you sure you want to permanently delete this product?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {productToDelete?.productName || 'This product'} will be removed from the
+              {productToDelete?.productName || 'This product'} - will be removed from the
               vendor catalog and all assigned websites. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

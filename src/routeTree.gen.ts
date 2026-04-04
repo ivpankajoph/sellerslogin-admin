@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ProductPreviewRouteImport } from './routes/product-preview'
 import { Route as ClerkRouteRouteImport } from './routes/clerk/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
@@ -94,6 +95,11 @@ import { Route as AuthenticatedProductsCreateProductsIndexRouteImport } from './
 import { Route as AuthenticatedProductsAdminProductsIndexRouteImport } from './routes/_authenticated/products/admin-products/index'
 import { Route as AuthenticatedCategoryCreateCategoryIndexRouteImport } from './routes/_authenticated/category/create-category/index'
 
+const ProductPreviewRoute = ProductPreviewRouteImport.update({
+  id: '/product-preview',
+  path: '/product-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClerkRouteRoute = ClerkRouteRouteImport.update({
   id: '/clerk',
   path: '/clerk',
@@ -576,6 +582,7 @@ const AuthenticatedCategoryCreateCategoryIndexRoute =
 
 export interface FileRoutesByFullPath {
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
+  '/product-preview': typeof ProductPreviewRoute
   '/analytics': typeof AuthenticatedAnalyticsRouteRouteWithChildren
   '/meta-pixel': typeof AuthenticatedMetaPixelRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
@@ -659,6 +666,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
+  '/product-preview': typeof ProductPreviewRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
@@ -742,6 +750,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/clerk': typeof ClerkRouteRouteWithChildren
+  '/product-preview': typeof ProductPreviewRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRouteRouteWithChildren
   '/_authenticated/meta-pixel': typeof AuthenticatedMetaPixelRouteRouteWithChildren
   '/clerk/(auth)': typeof ClerkauthRouteRouteWithChildren
@@ -829,6 +838,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/clerk'
+    | '/product-preview'
     | '/analytics'
     | '/meta-pixel'
     | '/forgot-password'
@@ -912,6 +922,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/clerk'
+    | '/product-preview'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
@@ -994,6 +1005,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/clerk'
+    | '/product-preview'
     | '/_authenticated/analytics'
     | '/_authenticated/meta-pixel'
     | '/clerk/(auth)'
@@ -1081,6 +1093,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   ClerkRouteRoute: typeof ClerkRouteRouteWithChildren
+  ProductPreviewRoute: typeof ProductPreviewRoute
   authForgotPasswordRoute: typeof authForgotPasswordRoute
   authResetPasswordRoute: typeof authResetPasswordRoute
   authSignInRoute: typeof authSignInRoute
@@ -1095,6 +1108,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/product-preview': {
+      id: '/product-preview'
+      path: '/product-preview'
+      fullPath: '/product-preview'
+      preLoaderRoute: typeof ProductPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clerk': {
       id: '/clerk'
       path: '/clerk'
@@ -1923,6 +1943,7 @@ const ClerkRouteRouteWithChildren = ClerkRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ClerkRouteRoute: ClerkRouteRouteWithChildren,
+  ProductPreviewRoute: ProductPreviewRoute,
   authForgotPasswordRoute: authForgotPasswordRoute,
   authResetPasswordRoute: authResetPasswordRoute,
   authSignInRoute: authSignInRoute,
