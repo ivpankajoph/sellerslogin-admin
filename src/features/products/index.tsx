@@ -553,28 +553,6 @@ function ProductDetailCard({
   )
 }
 
-function ProductBadgeList({
-  items,
-  emptyLabel,
-}: {
-  items: string[]
-  emptyLabel: string
-}) {
-  if (!items.length) {
-    return <span className='text-muted-foreground text-sm'>{emptyLabel}</span>
-  }
-
-  return (
-    <div className='flex flex-wrap gap-1.5'>
-      {items.map((item) => (
-        <Badge key={item} variant='secondary' className='rounded-md'>
-          {item}
-        </Badge>
-      ))}
-    </div>
-  )
-}
-
 function ProductCategorizationSection({
   product,
   categoryLookup,
@@ -610,9 +588,10 @@ function ProductCategorizationSection({
       const ref = toRef(subRef)
       const explicitCategoryId = toSubcategoryCategoryId(subRef)
       const matched =
-        (ref.id && categoryLookup.subcategoryById.get(ref.id)) ||
-        (ref.name &&
-          categoryLookup.subcategoryByName.get(normalizeSearchValue(ref.name)))
+        (ref.id ? categoryLookup.subcategoryById.get(ref.id) : undefined) ||
+        (ref.name
+          ? categoryLookup.subcategoryByName.get(normalizeSearchValue(ref.name))
+          : undefined)
 
       const name = matched?.name || ref.name
       const categoryId = matched?.categoryId || explicitCategoryId
@@ -717,8 +696,6 @@ function ProductDetailsDialog({
 }) {
   if (!product) return null
 
-  const categoryNames = getCategoryNames(product, categoryLookup)
-  const subcategoryNames = getSubcategoryNames(product, categoryLookup)
   const variants = Array.isArray(product.variants) ? product.variants : []
   const specificationEntries =
     Array.isArray(product.specifications) &&

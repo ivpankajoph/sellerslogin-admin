@@ -833,12 +833,12 @@ export default function CitiesPage() {
   )
   const [countries, setCountries] = useState<CountryOption[]>([])
   const [countriesLoading, setCountriesLoading] = useState(false)
-  const [countriesError, setCountriesError] = useState('')
+  const [, setCountriesError] = useState('')
   const [statesByCountry, setStatesByCountry] = useState<
     Record<string, string[]>
   >({})
   const [statesLoading, setStatesLoading] = useState(false)
-  const [statesError, setStatesError] = useState('')
+  const [, setStatesError] = useState('')
   const [discoveredCities, setDiscoveredCities] = useState<string[]>([])
   const [queuedCities, setQueuedCities] = useState<QueuedCity[]>([])
   const [loadingStateCities, setLoadingStateCities] = useState(false)
@@ -1278,11 +1278,6 @@ export default function CitiesPage() {
 
   const selectedFormCountry = getResolvedCountryMeta(form.country)
 
-  const selectedCountryStateOptions = useMemo(
-    () => getCountryStateOptions(form.country, countryLookup, statesByCountry),
-    [countryLookup, form.country, statesByCountry]
-  )
-
   const tableStateOptions = useMemo(() => {
     const visibleCities =
       countryFilter === 'all'
@@ -1647,7 +1642,10 @@ export default function CitiesPage() {
 
         toast.success(body?.message || 'City updated')
       } else {
-        const cityNames = uniqueStrings([...queuedCities, form.name])
+        const cityNames = uniqueStrings([
+          ...queuedCities.map((city) => city.name),
+          form.name,
+        ])
 
         if (!cityNames.length) {
           throw new Error('Add at least one city before saving')
@@ -2557,18 +2555,38 @@ export default function CitiesPage() {
                     </div>
                   )}
 
-                  <div className='pt-2 border-t flex flex-wrap gap-3'>
-
+                  {selectedDiscoveredCities.length > 0 && (
+                    <div className='space-y-3 border-t pt-2'>
+                      <div className='flex items-center justify-between gap-3'>
+                        <span className='text-[10px] font-bold uppercase tracking-widest text-slate-400'>
+                          Selected From Discovery
+                        </span>
+                        <Badge
+                          variant='outline'
+                          className='rounded-md border-slate-200 bg-white text-[10px] font-semibold text-slate-500'
+                        >
+                          {selectedDiscoveredCities.length} selected
+                        </Badge>
+                      </div>
+                      <div className='flex flex-wrap gap-2'>
+                        {selectedDiscoveredCities.map((city) => (
                           <Badge
-                            key={cityName}
+                            key={`selected-${city.name}-${city.state}-${city.country}`}
                             variant='secondary'
-                            className='gap-2 rounded-lg px-3 py-1.5 bg-white border border-slate-100 shadow-sm transition-all hover:bg-slate-50'
+                            className='gap-2 rounded-lg border border-slate-100 bg-white px-3 py-1.5 shadow-sm transition-all hover:bg-slate-50'
                           >
-                            <span className='font-medium text-slate-700'>{cityName}</span>
+                            <span className='font-medium text-slate-700'>
+                              {city.name}
+                              {city.state ? (
+                                <span className='ml-1 text-[10px] font-normal text-slate-400'>
+                                  ({city.state})
+                                </span>
+                              ) : null}
+                            </span>
                             <button
                               type='button'
-                              className='text-slate-300 hover:text-rose-500 transition-colors'
-                              onClick={() => handleRemoveQueuedCity(cityName)}
+                              className='text-slate-300 transition-colors hover:text-rose-500'
+                              onClick={() => handleRemoveQueuedCity(city)}
                             >
                               <X className='h-3.5 w-3.5' />
                             </button>

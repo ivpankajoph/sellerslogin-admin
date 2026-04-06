@@ -4,7 +4,6 @@ import { type JSX, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft,
-  ChevronDown,
   ChevronRight,
   Link2,
   Search as SearchIcon,

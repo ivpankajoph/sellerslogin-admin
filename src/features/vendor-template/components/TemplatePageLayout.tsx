@@ -10,10 +10,6 @@ import {
 } from 'react'
 import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
-import {
-  getTemplateDisplayName,
-} from './templateVariantParam'
-import { useActiveWebsiteSelection } from './websiteStudioStorage'
 
 const navItems = [
   { key: 'home', label: 'Home', to: '/vendor-template' },
@@ -54,15 +50,12 @@ export function TemplatePageLayout({
   title,
   description,
   activeKey,
-  vendorId,
   editingTemplateKey,
   showNavigation = true,
   actions,
   topContent,
   preview,
   children,
-  connectedDomainHost,
-  connectedDomainState,
 }: TemplatePageLayoutProps) {
   const [editorPanelWidth, setEditorPanelWidth] = useState(DEFAULT_EDITOR_PANEL_WIDTH)
   const [isResizing, setIsResizing] = useState(false)
@@ -75,22 +68,6 @@ export function TemplatePageLayout({
 
   const hasMainContent = preview != null || children != null
   const isSplitLayout = Boolean(preview && children)
-  const templateName = getTemplateDisplayName(editingTemplateKey)
-  const { activeWebsite } = useActiveWebsiteSelection(vendorId)
-  const domainBadgeLabel =
-    connectedDomainState === 'connected'
-      ? 'Domain Connected'
-      : connectedDomainState === 'error'
-        ? 'Domain Error'
-        : connectedDomainState === 'pending'
-          ? 'Domain Pending'
-          : ''
-  const domainBadgeClass =
-    connectedDomainState === 'connected'
-      ? 'border-sky-200 bg-sky-50 text-sky-700'
-      : connectedDomainState === 'error'
-        ? 'border-red-200 bg-red-50 text-red-700'
-        : 'border-amber-200 bg-amber-50 text-amber-700'
   const resolvedNavItems = navItems.map((item) =>
     item.key === 'home' && editingTemplateKey
       ? {

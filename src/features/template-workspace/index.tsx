@@ -114,7 +114,7 @@ const normalizeDefaultWebsiteState = (
   return items.map((item) => ({
     ...item,
     is_default:
-      normalizedDefaultId &&
+      Boolean(normalizedDefaultId) &&
       String(item._id || '').trim() === normalizedDefaultId,
   }))
 }
@@ -1170,7 +1170,9 @@ export default function TemplateWorkspace() {
           type='button'
           variant='outline'
           className='h-11 shrink-0 rounded-xl'
-          onClick={loadWorkspace}
+          onClick={() => {
+            void loadWorkspace()
+          }}
           disabled={loading}
         >
           {loading ? (
