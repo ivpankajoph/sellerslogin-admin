@@ -43,11 +43,16 @@ const BASE_URL = import.meta.env.VITE_PUBLIC_API_URL
 
 export const fetchAllVendors = createAsyncThunk(
   'vendors/fetchAllVendors',
-  async (_, { rejectWithValue, getState }) => {
+  async (arg: { search?: string } | void, { rejectWithValue, getState }) => {
     try {
       const state: any = getState()
       const token = state?.auth?.token
-      const res = await axios.get(`${BASE_URL}/v1/vendors/getall`, {
+      let url = `${BASE_URL}/v1/vendors/getall`;
+      const search = arg?.search;
+      if (search) {
+        url += `?search=${encodeURIComponent(search)}`;
+      }
+      const res = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

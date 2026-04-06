@@ -5,8 +5,16 @@ import {
   useLocation,
   useNavigate,
   useRouterState,
+  useSearch,
 } from '@tanstack/react-router'
-import { ChevronDown, Crown, Sparkles } from 'lucide-react'
+import { ChevronDown, Crown, Sparkles, Search, BarChart3, Users, ShieldCheck, XCircle } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { useSelector } from 'react-redux'
 import { getCookie } from '@/lib/cookies'
 import api from '@/lib/axios'
@@ -19,6 +27,7 @@ import { AppSidebar } from '@/components/layout/app-sidebar'
 import { Header } from '@/components/layout/header'
 import { SkipToMain } from '@/components/skip-to-main'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -129,7 +138,9 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const defaultOpen = getCookie('sidebar_state') !== 'false'
   const navigate = useNavigate()
   const pathname = useLocation({ select: (location) => location.pathname })
+  const searchValues = useSearch({ strict: false }) as any;
   const authUser = useSelector((state: any) => state.auth?.user || null)
+  const vendorsList = useSelector((state: any) => state.vendors?.vendors || [])
   const vendorProfile = useSelector(
     (state: any) =>
       state.vendorprofile?.profile?.vendor ||
@@ -396,6 +407,63 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                           </div>
                         </div>
                         <div className='flex flex-wrap items-center gap-2 md:justify-end md:gap-3'>
+                          {(pathname === '/vendor' || pathname === '/vendor/') ? (
+                            <div className='flex items-center gap-2'>
+                              <div className='relative w-full sm:w-64 md:w-80'>
+                                <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+                                <Input
+                                  placeholder='Find vendors by name, email, or phone'
+                                  value={searchValues?.username || ''}
+                                  onChange={(event) =>
+                                    navigate({
+                                      to: '/vendor',
+                                      search: (prev: any) => ({
+                                        ...prev,
+                                        username: event.target.value || undefined,
+                                        page: 1,
+                                      }),
+                                    })
+                                  }
+                                  className='h-9 rounded-none border border-border/70 pl-9 pr-4 text-sm shadow-sm'
+                                />
+                              </div>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" className="h-9 gap-2">
+                                    <BarChart3 className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Statistics</span>
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-md">
+                                  <DialogHeader>
+                                    <DialogTitle>Vendor Statistics</DialogTitle>
+                                  </DialogHeader>
+                                  <div className="grid grid-cols-2 gap-4 py-4">
+                                    <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-muted/20">
+                                      <Users className="h-6 w-6 mb-2 text-primary" />
+                                      <span className="text-2xl font-bold">{vendorsList.length}</span>
+                                      <span className="text-xs text-muted-foreground text-center">Total Vendors</span>
+                                    </div>
+                                    <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-green-50/50 dark:bg-green-950/20">
+                                      <ShieldCheck className="h-6 w-6 mb-2 text-green-600" />
+                                      <span className="text-2xl font-bold">{vendorsList.filter((v: any) => v.is_verified).length}</span>
+                                      <span className="text-xs text-muted-foreground text-center">Verified Vendors</span>
+                                    </div>
+                                    <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-blue-50/50 dark:bg-blue-950/20">
+                                      <Sparkles className="h-6 w-6 mb-2 text-blue-600" />
+                                      <span className="text-2xl font-bold">{vendorsList.filter((v: any) => v.is_profile_completed).length}</span>
+                                      <span className="text-xs text-muted-foreground text-center">Completed Profiles</span>
+                                    </div>
+                                    <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-red-50/50 dark:bg-red-950/20">
+                                      <XCircle className="h-6 w-6 mb-2 text-red-600" />
+                                      <span className="text-2xl font-bold">{vendorsList.filter((v: any) => !v.is_verified).length}</span>
+                                      <span className="text-xs text-muted-foreground text-center">Unverified / Pending</span>
+                                    </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                            </div>
+                          ) : null}
                           {isVendor ? (
                             <div className='flex flex-wrap items-center gap-2'>
                               {canAccessMyWebsites ? (

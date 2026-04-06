@@ -6,7 +6,6 @@ const supportedProviders = [
   'razorpay',
   'cashfree',
   'delhivery',
-  'nimbuspost',
   'google_merchant',
   'brevo',
 ] as const
@@ -30,4 +29,3 @@ function ProviderIntegrationsPage() {
 
   return <IntegrationsPage focusProvider={safeProvider} />
 }
-

@@ -83,6 +83,8 @@ import { Route as AuthenticatedMetaPixelConnectRouteImport } from './routes/_aut
 import { Route as AuthenticatedMetaPixelAnalyticsRouteImport } from './routes/_authenticated/meta-pixel/analytics'
 import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
+import { Route as AuthenticatedCourierWarehousesRouteImport } from './routes/_authenticated/courier/warehouses'
+import { Route as AuthenticatedCourierTrackingRouteImport } from './routes/_authenticated/courier/tracking'
 import { Route as AuthenticatedCourierListRouteImport } from './routes/_authenticated/courier/list'
 import { Route as AuthenticatedCourierDelhiveryRouteImport } from './routes/_authenticated/courier/delhivery'
 import { Route as AuthenticatedCourierPartnerRouteImport } from './routes/_authenticated/courier/$partner'
@@ -514,6 +516,18 @@ const AuthenticatedErrorsErrorRoute =
     path: '/errors/$error',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCourierWarehousesRoute =
+  AuthenticatedCourierWarehousesRouteImport.update({
+    id: '/courier/warehouses',
+    path: '/courier/warehouses',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCourierTrackingRoute =
+  AuthenticatedCourierTrackingRouteImport.update({
+    id: '/courier/tracking',
+    path: '/courier/tracking',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCourierListRoute =
   AuthenticatedCourierListRouteImport.update({
     id: '/courier/list',
@@ -613,6 +627,8 @@ export interface FileRoutesByFullPath {
   '/courier/$partner': typeof AuthenticatedCourierPartnerRoute
   '/courier/delhivery': typeof AuthenticatedCourierDelhiveryRoute
   '/courier/list': typeof AuthenticatedCourierListRoute
+  '/courier/tracking': typeof AuthenticatedCourierTrackingRoute
+  '/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
@@ -696,6 +712,8 @@ export interface FileRoutesByTo {
   '/courier/$partner': typeof AuthenticatedCourierPartnerRoute
   '/courier/delhivery': typeof AuthenticatedCourierDelhiveryRoute
   '/courier/list': typeof AuthenticatedCourierListRoute
+  '/courier/tracking': typeof AuthenticatedCourierTrackingRoute
+  '/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
@@ -785,6 +803,8 @@ export interface FileRoutesById {
   '/_authenticated/courier/$partner': typeof AuthenticatedCourierPartnerRoute
   '/_authenticated/courier/delhivery': typeof AuthenticatedCourierDelhiveryRoute
   '/_authenticated/courier/list': typeof AuthenticatedCourierListRoute
+  '/_authenticated/courier/tracking': typeof AuthenticatedCourierTrackingRoute
+  '/_authenticated/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/_authenticated/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
@@ -872,6 +892,8 @@ export interface FileRouteTypes {
     | '/courier/$partner'
     | '/courier/delhivery'
     | '/courier/list'
+    | '/courier/tracking'
+    | '/courier/warehouses'
     | '/errors/$error'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
@@ -955,6 +977,8 @@ export interface FileRouteTypes {
     | '/courier/$partner'
     | '/courier/delhivery'
     | '/courier/list'
+    | '/courier/tracking'
+    | '/courier/warehouses'
     | '/errors/$error'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
@@ -1043,6 +1067,8 @@ export interface FileRouteTypes {
     | '/_authenticated/courier/$partner'
     | '/_authenticated/courier/delhivery'
     | '/_authenticated/courier/list'
+    | '/_authenticated/courier/tracking'
+    | '/_authenticated/courier/warehouses'
     | '/_authenticated/errors/$error'
     | '/_authenticated/integrations/$provider'
     | '/_authenticated/meta-pixel/analytics'
@@ -1639,6 +1665,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedErrorsErrorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/courier/warehouses': {
+      id: '/_authenticated/courier/warehouses'
+      path: '/courier/warehouses'
+      fullPath: '/courier/warehouses'
+      preLoaderRoute: typeof AuthenticatedCourierWarehousesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/courier/tracking': {
+      id: '/_authenticated/courier/tracking'
+      path: '/courier/tracking'
+      fullPath: '/courier/tracking'
+      preLoaderRoute: typeof AuthenticatedCourierTrackingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/courier/list': {
       id: '/_authenticated/courier/list'
       path: '/courier/list'
@@ -1777,6 +1817,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCourierPartnerRoute: typeof AuthenticatedCourierPartnerRoute
   AuthenticatedCourierDelhiveryRoute: typeof AuthenticatedCourierDelhiveryRoute
   AuthenticatedCourierListRoute: typeof AuthenticatedCourierListRoute
+  AuthenticatedCourierTrackingRoute: typeof AuthenticatedCourierTrackingRoute
+  AuthenticatedCourierWarehousesRoute: typeof AuthenticatedCourierWarehousesRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
   AuthenticatedSeoEntitiesRoute: typeof AuthenticatedSeoEntitiesRoute
@@ -1841,6 +1883,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCourierPartnerRoute: AuthenticatedCourierPartnerRoute,
   AuthenticatedCourierDelhiveryRoute: AuthenticatedCourierDelhiveryRoute,
   AuthenticatedCourierListRoute: AuthenticatedCourierListRoute,
+  AuthenticatedCourierTrackingRoute: AuthenticatedCourierTrackingRoute,
+  AuthenticatedCourierWarehousesRoute: AuthenticatedCourierWarehousesRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedIntegrationsProviderRoute:
     AuthenticatedIntegrationsProviderRoute,

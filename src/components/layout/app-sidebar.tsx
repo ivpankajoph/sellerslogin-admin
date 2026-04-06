@@ -120,7 +120,13 @@ export function AppSidebar() {
     <Sidebar
       collapsible={collapsible}
       variant={variant}
-      className='[&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar/90 [&_[data-slot=sidebar-inner]]:text-sidebar-foreground [&_[data-slot=sidebar-inner]]:shadow-[0_24px_56px_rgba(15,23,42,0.08)]'
+      className={
+        effectiveRole === 'admin'
+          ? '[&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-purple-200 [&_[data-slot=sidebar-inner]]:bg-purple-50/95 [&_[data-slot=sidebar-inner]]:text-purple-800 [&_[data-slot=sidebar-inner]]:shadow-purple-100/50 [&[data-slot=sidebar-menu-button]:hover]:bg-purple-200 [&[data-slot=sidebar-menu-button]:hover]:text-purple-900 [&[data-slot=sidebar-menu-button][data-active=true]]:bg-purple-600 [&[data-slot=sidebar-menu-button][data-active=true]]:text-white'
+          : '[&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar/90 [&_[data-slot=sidebar-inner]]:text-sidebar-foreground [&_[data-slot=sidebar-inner]]:shadow-[0_24px_56px_rgba(15,23,42,0.08)]'
+      }
+      id='admin-sidebar'
+      data-role={effectiveRole}
     >
       <SidebarHeader className='border-b border-sidebar-border/70 p-3 group-data-[collapsible=icon]:px-2'>
         <div className='flex items-center gap-2 border border-sidebar-border/70 bg-sidebar-accent/40 p-2 shadow-sm group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-1.5'>

@@ -568,6 +568,9 @@ export const vendorColumns: ColumnDef<Vendor>[] = [
   {
     accessorKey: 'is_verified',
     header: ({ column }) => <DataTableColumnHeader column={column} title='Verified' />,
+    filterFn: (row, id, value) => {
+      return value.includes(String(row.getValue(id)))
+    },
     cell: ({ row }) => {
       const isVerified = row.getValue('is_verified')
       return (
@@ -590,6 +593,9 @@ export const vendorColumns: ColumnDef<Vendor>[] = [
   {
     accessorKey: 'is_active',
     header: ({ column }) => <DataTableColumnHeader column={column} title='Status' />,
+    filterFn: (row, id, value) => {
+      return value.includes(String(row.getValue(id)))
+    },
     cell: ({ row }) => {
       const isActive = row.getValue('is_active')
       return (

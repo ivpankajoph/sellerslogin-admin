@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   AlertTriangle,
   ArrowUpRight,
+  BarChart3,
   CheckCircle2,
   LoaderCircle,
   RefreshCcw,
@@ -11,6 +12,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
+import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
 import { Main } from '@/components/layout/main'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,7 +20,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
   fetchDelhiveryB2cServiceability,
-  fetchNimbuspostRateServiceability,
   loadCourierOrders,
 } from '@/features/courier/api'
 import {
@@ -42,6 +43,10 @@ type CheckResult = {
 }
 
 const readText = (value: unknown) => String(value ?? '').trim()
+const isOpenOrderStatus = (value: unknown) => {
+  const status = readText(value).toLowerCase()
+  return !['delivered', 'failed', 'cancelled', 'canceled'].includes(status)
+}
 
 const badgeTone = (state: CheckResult['state']) =>
   state === 'ok'
@@ -57,6 +62,17 @@ function CourierDeskPage() {
   const user = useSelector((state: RootState) => state.auth?.user)
   const role = String(user?.role || '').toLowerCase()
   const isVendor = role === 'vendor'
+  const initialQuery = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return { orderId: '', origin: '', destination: '' }
+    }
+    const params = new URLSearchParams(window.location.search)
+    return {
+      orderId: readText(params.get('orderId')),
+      origin: readText(params.get('origin')),
+      destination: readText(params.get('destination')),
+    }
+  }, [])
 
   useEffect(() => {
     if (user && !isVendor) {
@@ -68,13 +84,16 @@ function CourierDeskPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [statsOpen, setStatsOpen] = useState(false)
   const [checking, setChecking] = useState(false)
-  const [selectedOrderId, setSelectedOrderId] = useState('')
+  const [selectedOrderId, setSelectedOrderId] = useState(initialQuery.orderId)
   const [origin, setOrigin] = useState(
-    readText(user?.pincode || user?.pin || user?.postal_code || user?.zip)
+    initialQuery.origin ||
+      readText(user?.pincode || user?.pin || user?.postal_code || user?.zip)
   )
-  const [destination, setDestination] = useState('')
+  const [destination, setDestination] = useState(initialQuery.destination)
   const [results, setResults] = useState<CheckResult[]>([])
+  const [autoCheckDone, setAutoCheckDone] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -104,25 +123,60 @@ function CourierDeskPage() {
   }, [isVendor, refreshKey])
 
   const availableOrders = useMemo(
-    () => orders.filter((order) => !hasAnyActiveCourierAssignment(order)),
+    () =>
+      orders.filter(
+        (order) => isOpenOrderStatus(order.status) && !hasAnyActiveCourierAssignment(order)
+      ),
     [orders]
   )
   const routedOrders = useMemo(
-    () => orders.filter((order) => hasAnyActiveCourierAssignment(order)),
+    () =>
+      orders.filter(
+        (order) => isOpenOrderStatus(order.status) && hasAnyActiveCourierAssignment(order)
+      ),
+    [orders]
+  )
+  const selectableOrders = useMemo(
+    () => orders.filter((order) => isOpenOrderStatus(order.status)),
     [orders]
   )
   const selectedOrder = useMemo(
-    () => availableOrders.find((order) => order.id === selectedOrderId) || null,
-    [availableOrders, selectedOrderId]
+    () => selectableOrders.find((order) => order.id === selectedOrderId) || null,
+    [selectableOrders, selectedOrderId]
+  )
+  const statsItems = useMemo(
+    () => [
+      {
+        label: 'Open orders',
+        value: availableOrders.length,
+        helper: 'Orders that are still open and not routed.',
+      },
+      {
+        label: 'Routed shipments',
+        value: routedOrders.length,
+        helper: 'Open orders with an active courier assignment.',
+      },
+      {
+        label: 'Total orders',
+        value: orders.length,
+        helper: 'All loaded orders from vendor/admin scope.',
+      },
+      {
+        label: 'Checked apps',
+        value: 1,
+        helper: 'Currently lane check is performed for Delhivery.',
+      },
+    ],
+    [availableOrders.length, orders.length, routedOrders.length]
   )
 
   useEffect(() => {
     setSelectedOrderId((current) =>
-      current && availableOrders.some((order) => order.id === current)
+      current && selectableOrders.some((order) => order.id === current)
         ? current
-        : availableOrders[0]?.id || ''
+        : selectableOrders[0]?.id || ''
     )
-  }, [availableOrders])
+  }, [selectableOrders])
 
   useEffect(() => {
     if (!selectedOrder?.pincode) return
@@ -138,18 +192,8 @@ function CourierDeskPage() {
 
     setChecking(true)
     try {
-      const [delhivery, nimbus] = await Promise.allSettled([
+      const [delhivery] = await Promise.allSettled([
         fetchDelhiveryB2cServiceability(resolvedDestination),
-        fetchNimbuspostRateServiceability({
-          origin: resolvedOrigin,
-          destination: resolvedDestination,
-          payment_type: 'prepaid',
-          order_amount: '1000',
-          weight: '500',
-          length: '10',
-          breadth: '10',
-          height: '10',
-        }),
       ])
 
       const next: CheckResult[] = []
@@ -183,36 +227,6 @@ function CourierDeskPage() {
         })
       }
 
-      if (nimbus.status === 'fulfilled') {
-        const serviceability = nimbus.value?.serviceability || {}
-        const bestQuote = serviceability?.best_quote || {}
-        next.push({
-          id: 'nimbuspost',
-          title: 'NimbusPost',
-          state: serviceability?.serviceable ? 'ok' : 'bad',
-          summary: serviceability?.serviceable
-            ? 'NimbusPost returned available courier options.'
-            : 'NimbusPost did not return any serviceable courier for this lane.',
-          rows: [
-            `Origin: ${resolvedOrigin}`,
-            `Destination: ${resolvedDestination}`,
-            `Quotes returned: ${serviceability?.quote_count ?? 0}`,
-            bestQuote?.name ? `Best courier: ${bestQuote.name}` : 'Best courier: Not available',
-          ],
-        })
-      } else {
-        next.push({
-          id: 'nimbuspost',
-          title: 'NimbusPost',
-          state: 'error',
-          summary:
-            nimbus.reason?.response?.data?.message ||
-            nimbus.reason?.message ||
-            'NimbusPost serviceability check failed.',
-          rows: ['Basic check uses the app default parcel template. Open NimbusPost page for full booking inputs.'],
-        })
-      }
-
       setResults(next)
     } finally {
       setChecking(false)
@@ -227,56 +241,48 @@ function CourierDeskPage() {
     window.location.assign(`/courier/${partnerId}${params.toString() ? `?${params.toString()}` : ''}`)
   }
 
+  useEffect(() => {
+    if (!initialQuery.destination) return
+    if (loading || checking || autoCheckDone) return
+    if (!origin.trim() || !destination.trim()) return
+    setAutoCheckDone(true)
+    void runCheck()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery.destination, loading, checking, autoCheckDone, origin, destination])
+
   return (
     <Main>
       <div className='space-y-6 p-4 md:p-6'>
-        <div className='overflow-hidden rounded-3xl border border-border bg-card shadow-sm'>
-          <div className='bg-[linear-gradient(135deg,color-mix(in_srgb,var(--card)_92%,#67e8f9_8%)_0%,color-mix(in_srgb,var(--background)_90%,#fdba74_10%)_55%,color-mix(in_srgb,var(--card)_92%,#6ee7b7_8%)_100%)] p-6 md:p-8'>
-            <div className='flex flex-wrap items-start justify-between gap-4'>
-              <div className='space-y-2'>
-                <h1 className='text-3xl font-semibold tracking-tight text-foreground'>Courier Desk</h1>
-                <p className='max-w-3xl text-sm leading-6 text-muted-foreground'>
-                  Check lane availability by origin and destination pincode only. Shipment creation
-                  now happens on the courier app page.
-                </p>
-              </div>
-              <div className='flex flex-wrap gap-2'>
-                <Button
-                  variant='outline'
-                  className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
-                  onClick={() => setRefreshKey((current) => current + 1)}
-                >
-                  <RefreshCcw className='h-4 w-4' />
-                  Refresh
-                </Button>
-                <Button
-                  variant='outline'
-                  className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
-                  onClick={() => window.location.assign('/courier/list')}
-                >
-                  Courier List
-                  <ArrowUpRight className='h-4 w-4' />
-                </Button>
-              </div>
+        <div className='overflow-hidden rounded-none border border-border bg-card p-4 md:p-5'>
+          <div className='flex flex-wrap items-start justify-between gap-4'>
+            <div className='space-y-2'>
+              <h1 className='text-3xl font-semibold tracking-tight text-foreground'>Courier Desk</h1>
+              <p className='max-w-3xl text-sm leading-6 text-muted-foreground'>
+                Check lane availability by origin and destination pincode only. Shipment creation
+                now happens on the courier app page.
+              </p>
             </div>
-
-            <div className='mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
-              <div className='rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm'>
-                <p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>Open orders</p>
-                <p className='mt-1 text-3xl font-semibold text-foreground'>{availableOrders.length}</p>
-              </div>
-              <div className='rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm'>
-                <p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>Routed shipments</p>
-                <p className='mt-1 text-3xl font-semibold text-foreground'>{routedOrders.length}</p>
-              </div>
-              <div className='rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm'>
-                <p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>Total orders</p>
-                <p className='mt-1 text-3xl font-semibold text-foreground'>{orders.length}</p>
-              </div>
-              <div className='rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm backdrop-blur-sm'>
-                <p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>Checked apps</p>
-                <p className='mt-1 text-3xl font-semibold text-foreground'>2</p>
-              </div>
+            <div className='flex flex-wrap gap-2'>
+              <Button variant='outline' onClick={() => setStatsOpen(true)}>
+                <BarChart3 className='h-4 w-4' />
+                Statistics
+              </Button>
+              <Button
+                variant='outline'
+                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                onClick={() => setRefreshKey((current) => current + 1)}
+              >
+                <RefreshCcw className='h-4 w-4' />
+                Refresh
+              </Button>
+              <Button
+                variant='outline'
+                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                onClick={() => window.location.assign('/courier/list')}
+              >
+                Courier List
+                <ArrowUpRight className='h-4 w-4' />
+              </Button>
             </div>
           </div>
         </div>
@@ -292,11 +298,11 @@ function CourierDeskPage() {
                 className='vendor-field flex h-11 w-full rounded-none border bg-transparent px-4 py-2 text-sm shadow-sm outline-none'
               >
                 <option value=''>
-                  {availableOrders.length ? 'Select order' : 'No open orders available'}
+                  {selectableOrders.length ? 'Select order' : 'No open orders available'}
                 </option>
-                {availableOrders.map((order) => (
+                {selectableOrders.map((order) => (
                   <option key={order.id} value={order.id}>
-                    {order.orderNumber} | {order.customerName} | {order.pincode || 'No pincode'}
+                    {order.orderNumber} | {order.customerName} | {order.pincode || 'No pincode'} | {order.status}
                   </option>
                 ))}
               </select>
@@ -416,6 +422,14 @@ function CourierDeskPage() {
           </CardContent>
         </Card>
       </div>
+
+      <StatisticsDialog
+        open={statsOpen}
+        onOpenChange={setStatsOpen}
+        title='Courier Desk Statistics'
+        description='Current desk summary moved to popup view.'
+        items={statsItems}
+      />
     </Main>
   )
 }

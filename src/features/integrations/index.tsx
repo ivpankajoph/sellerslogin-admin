@@ -50,13 +50,13 @@ type ProviderCategory = IntegrationCategory
 type IntegrationsResponse = VendorIntegrationsResponse
 
 const providerMeta = INTEGRATION_PROVIDER_META
+
 const providerOrder = INTEGRATION_PROVIDER_IDS
 
 const providerAccentClass: Record<ProviderId, string> = {
   razorpay: 'border-violet-200 bg-violet-50',
   cashfree: 'border-indigo-200 bg-indigo-50',
   delhivery: 'border-cyan-200 bg-cyan-50',
-  nimbuspost: 'border-blue-200 bg-blue-50',
   google_merchant: 'border-blue-200 bg-blue-50',
   brevo: 'border-emerald-200 bg-emerald-50',
 }
@@ -203,7 +203,6 @@ export default function IntegrationsPage({
     razorpay: {},
     cashfree: {},
     delhivery: {},
-    nimbuspost: {},
     google_merchant: {},
     brevo: {},
   })
@@ -211,7 +210,6 @@ export default function IntegrationsPage({
     razorpay: false,
     cashfree: false,
     delhivery: false,
-    nimbuspost: false,
     google_merchant: false,
     brevo: false,
   })
@@ -234,7 +232,7 @@ export default function IntegrationsPage({
   const [busyMap, setBusyMap] = useState<Record<string, boolean>>({})
   const [defaultPayment, setDefaultPayment] = useState<'none' | 'razorpay' | 'cashfree'>('none')
   const [defaultDelivery, setDefaultDelivery] = useState<
-    'none' | 'delhivery' | 'nimbuspost'
+    'none' | 'delhivery'
   >('none')
   const [filter, setFilter] = useState<'all' | ProviderCategory>(
     focusProvider ? providerMeta[focusProvider].category : 'all',
@@ -291,7 +289,6 @@ export default function IntegrationsPage({
         razorpay: payload.providers.razorpay.enabled,
         cashfree: payload.providers.cashfree.enabled,
         delhivery: payload.providers.delhivery.enabled,
-        nimbuspost: payload.providers.nimbuspost.enabled,
         google_merchant: payload.providers.google_merchant.enabled,
         brevo: payload.providers.brevo.enabled,
       })
@@ -300,7 +297,6 @@ export default function IntegrationsPage({
         razorpay: {},
         cashfree: {},
         delhivery: {},
-        nimbuspost: {},
         google_merchant: {},
         brevo: {},
       }
@@ -381,7 +377,7 @@ export default function IntegrationsPage({
 
   const saveDefaults = async (overrides?: {
     payment?: 'none' | 'razorpay' | 'cashfree'
-    delivery?: 'none' | 'delhivery' | 'nimbuspost'
+    delivery?: 'none' | 'delhivery'
   }) => {
     const path = getActionPath(effectiveRole, resolvedVendorId, '/defaults')
     if (!path) {
@@ -792,7 +788,7 @@ export default function IntegrationsPage({
       nextPayment = provider as 'razorpay' | 'cashfree'
       setDefaultPayment(nextPayment)
     } else {
-      nextDelivery = provider as 'delhivery' | 'nimbuspost'
+      nextDelivery = provider as 'delhivery'
       setDefaultDelivery(nextDelivery)
     }
     await saveDefaults({
@@ -1104,21 +1100,18 @@ export default function IntegrationsPage({
                 <option value='razorpay'>Razorpay</option>
                 <option value='cashfree'>Cashfree</option>
               </select>
-            </div>
-            <div className='space-y-2'>
               <Label>Default delivery app</Label>
               <select
                 value={defaultDelivery}
                   onChange={(event) =>
                     setDefaultDelivery(
-                      event.target.value as 'none' | 'delhivery' | 'nimbuspost'
+                      event.target.value as 'none' | 'delhivery'
                     )
                   }
                   className='h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground'
                 >
                   <option value='none'>No auto-delivery</option>
                   <option value='delhivery'>Delhivery</option>
-                  <option value='nimbuspost'>NimbusPost</option>
                 </select>
             </div>
             <Button

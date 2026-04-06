@@ -73,21 +73,6 @@ export const getAssignedCourierForOrder = (order: CourierOrderSummary | null) =>
   ) as CourierAssignment | null
 }
 
-export const fetchNimbuspostQuote = async (
-  order: CourierOrderSummary,
-  payload: Record<string, unknown> = {}
-) => {
-  const res = await api.post(`${getOrderBasePath(order)}/nimbuspost/quote`, payload)
-  return res?.data
-}
-
-export const createNimbuspostShipment = async (
-  order: CourierOrderSummary,
-  payload: Record<string, unknown> = {}
-) => {
-  const res = await api.post(`${getOrderBasePath(order)}/nimbuspost/create`, payload)
-  return res?.data
-}
 
 export const createDelhiveryShipment = async (
   order: CourierOrderSummary,
@@ -146,51 +131,6 @@ export const createDelhiveryPickupRequest = async (
   return res?.data
 }
 
-export const cancelNimbuspostShipment = async (order: CourierOrderSummary) => {
-  const res = await api.post(`${getOrderBasePath(order)}/nimbuspost/cancel`)
-  return res?.data
-}
-
-export const trackNimbuspostShipment = async (order: CourierOrderSummary) => {
-  const res = await api.get(`${getOrderBasePath(order)}/nimbuspost/track`)
-  return res?.data
-}
-
-export const createNimbuspostManifest = async (order: CourierOrderSummary) => {
-  const res = await api.post(`${getOrderBasePath(order)}/nimbuspost/manifest`)
-  return res?.data
-}
-
-export const fetchNimbuspostOrderNdr = async (order: CourierOrderSummary) => {
-  const res = await api.get(`${getOrderBasePath(order)}/nimbuspost/ndr`)
-  return res?.data
-}
-
-export const submitNimbuspostOrderNdr = async (
-  order: CourierOrderSummary,
-  payload: {
-    action: string
-    action_data?: Record<string, unknown>
-  }
-) => {
-  const res = await api.post(`${getOrderBasePath(order)}/nimbuspost/ndr`, payload)
-  return res?.data
-}
-
-export const fetchNimbuspostCouriers = async () => {
-  const res = await api.get('/nimbuspost/couriers')
-  return res?.data
-}
-
-export const fetchNimbuspostNdrList = async (params?: Record<string, unknown>) => {
-  const res = await api.get('/nimbuspost/ndr', { params })
-  return res?.data
-}
-
-export const submitNimbuspostNdrAction = async (payload: unknown) => {
-  const res = await api.post('/nimbuspost/ndr/action', payload)
-  return res?.data
-}
 
 export const fetchDelhiveryB2cServiceability = async (filterCodes: string) => {
   const res = await api.get('/delhivery/serviceability', {
@@ -254,19 +194,32 @@ export const updateDelhiveryWarehouse = async (
   return res?.data
 }
 
-export const fetchNimbuspostRateServiceability = async (payload: {
-  origin: string
-  destination: string
-  payment_type: 'prepaid' | 'cod'
-  order_amount: string
-  weight: string
-  length: string
-  breadth: string
-  height: string
-}) => {
-  const res = await api.post('/nimbuspost/serviceability/rate', payload)
-  return res?.data
+export type DelhiveryWarehouse = {
+  id: string
+  name: string
+  registered_name?: string
+  phone?: string
+  email?: string
+  address?: string
+  city?: string
+  pin?: string
+  country?: string
+  return_address?: string
+  return_city?: string
+  return_pin?: string
+  return_state?: string
+  return_country?: string
+  working_days?: string[]
+  synced_at?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
 }
+
+export const fetchDelhiveryWarehouses = async (params: Record<string, unknown> = {}) => {
+  const res = await api.get('/delhivery/warehouses', { params })
+  return res?.data as { success?: boolean; warehouses?: DelhiveryWarehouse[] }
+}
+
 
 export type ExternalDelhiveryShipment = {
   id: string
@@ -314,6 +267,14 @@ export const importExternalDelhiveryShipments = async (payload: {
 
 export const refreshExternalDelhiveryShipment = async (shipmentId: string) => {
   const res = await api.post(`/delhivery/external-shipments/${shipmentId}/track`)
+  return res?.data as { success?: boolean; shipment?: ExternalDelhiveryShipment }
+}
+
+export const cancelExternalDelhiveryShipment = async (
+  shipmentId: string,
+  payload: { waybill?: string; cancellation?: string } = {}
+) => {
+  const res = await api.post(`/delhivery/external-shipments/${shipmentId}/cancel`, payload)
   return res?.data as { success?: boolean; shipment?: ExternalDelhiveryShipment }
 }
 

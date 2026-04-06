@@ -1,9 +1,9 @@
 import borzoLogo from '@/assets/toolkit-apps/borzo.svg'
 import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
-import nimbuspostLogo from '@/assets/toolkit-apps/nimbuspost.svg'
+
 import porterLogo from '@/assets/toolkit-apps/porter.svg'
 
-export type CourierPartnerId = 'borzo' | 'delhivery' | 'nimbuspost' | 'porter'
+export type CourierPartnerId = 'borzo' | 'delhivery' | 'porter'
 
 export type CourierPartner = {
   id: CourierPartnerId
@@ -37,6 +37,8 @@ export type CourierOrderSummary = {
   externalDeliveryId: string
   websiteLabel: string
   items: Array<{
+    productId: string
+    variantId: string
     productName: string
     imageUrl: string
     quantity: number
@@ -76,17 +78,7 @@ export type CourierOrderSummary = {
     }>
     updated_at?: string
   }
-  nimbuspost?: {
-    order_id?: number
-    shipment_id?: number
-    awb_number?: string
-    courier_name?: string
-    status?: string
-    label_url?: string
-    manifest_url?: string
-    last_quote_amount?: number
-    updated_at?: string
-  }
+
 }
 
 export type CourierQuote = {
@@ -138,17 +130,7 @@ export const COURIER_PARTNERS: CourierPartner[] = [
     live: true,
     reportPath: '/courier/delhivery',
   },
-  {
-    id: 'nimbuspost',
-    title: 'NimbusPost',
-    shortLabel: 'NimbusPost',
-    description: 'Multi-courier shipping with live rate, shipment, tracking, manifest, and NDR actions.',
-    imageSrc: nimbuspostLogo,
-    themeClass: 'border-blue-500/20 bg-blue-500/10',
-    etaLabel: '1-4 days',
-    live: true,
-    reportPath: '/courier/nimbuspost',
-  },
+
   {
     id: 'porter',
     title: 'Porter',
@@ -167,6 +149,68 @@ export const COURIER_PARTNER_MAP = Object.fromEntries(
 ) as Record<CourierPartnerId, CourierPartner>
 
 const toText = (value: unknown) => String(value ?? '').trim()
+
+const looksLikeImagePath = (value: string) => {
+  const next = toText(value).toLowerCase()
+  if (!next) return false
+  if (/\.(jpg|jpeg|png|webp|gif|avif|svg)(\?.*)?$/.test(next)) return true
+  return next.includes('/upload') || next.includes('/uploads/') || next.includes('imagekit.io') || next.includes('cloudinary.com')
+}
+
+const pickImageUrlFromUnknown = (value: unknown): string => {
+  if (!value) return ''
+  if (typeof value === 'string') {
+    const raw = toText(value)
+    return looksLikeImagePath(raw) ? raw : ''
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const next = pickImageUrlFromUnknown(entry)
+      if (next) return next
+    }
+    return ''
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    const direct =
+      toText(obj?.url) ||
+      toText(obj?.image_url) ||
+      toText(obj?.imageUrl) ||
+      toText(obj?.image) ||
+      toText(obj?.variant_image) ||
+      toText(obj?.variantImage)
+    if (direct) return direct
+
+    const variantImages = pickImageUrlFromUnknown(
+      obj?.variantsImageUrls || obj?.variant_images || obj?.images || obj?.defaultImages
+    )
+    if (variantImages) return variantImages
+
+    for (const nested of Object.values(obj)) {
+      const next = pickImageUrlFromUnknown(nested)
+      if (next) return next
+    }
+  }
+  return ''
+}
+
+const extractOrderItemImage = (item: any): string => {
+  const direct =
+    toText(item?.image_url) ||
+    toText(item?.imageUrl) ||
+    toText(item?.variant_image) ||
+    toText(item?.variantImage)
+  if (direct) return direct
+
+  const fromVariantAttributes = pickImageUrlFromUnknown(item?.variant_attributes)
+  if (fromVariantAttributes) return fromVariantAttributes
+
+  const fromVariant = pickImageUrlFromUnknown(item?.variant)
+  if (fromVariant) return fromVariant
+
+  const fromProduct = pickImageUrlFromUnknown(item?.product)
+  return fromProduct
+}
 
 const formatVariantSummary = (value: unknown): string => {
   if (!value) return ''
@@ -196,14 +240,14 @@ const safeWindow = () =>
 const trackingStatusByPartner: Record<CourierPartnerId, string> = {
   borzo: 'Request queued',
   delhivery: 'Pickup requested',
-  nimbuspost: 'Shipment booked',
+
   porter: 'Dispatcher review',
 }
 
 const trackingPrefixByPartner: Record<CourierPartnerId, string> = {
   borzo: 'BRZ',
   delhivery: 'DLV',
-  nimbuspost: 'NMB',
+
   porter: 'PTR',
 }
 
@@ -298,17 +342,17 @@ export const normalizeCourierOrder = (
     pincode: toText(order?.shipping_address?.pincode),
     status: toText(order?.status) || 'pending',
     deliveryProvider: toText(order?.delivery_provider),
-    trackingUrl: toText(order?.borzo?.tracking_url || order?.nimbuspost?.label_url),
+    trackingUrl: toText(order?.borzo?.tracking_url),
     externalDeliveryId: toText(
       order?.borzo?.order_id ||
-        order?.delhivery?.waybill ||
-        order?.nimbuspost?.awb_number ||
-        order?.nimbuspost?.shipment_id
+        order?.delhivery?.waybill
     ),
     websiteLabel,
     items: items.map((item: any) => ({
+      productId: toText(item?.product_id?._id || item?.product_id),
+      variantId: toText(item?.variant_id?._id || item?.variant_id),
       productName: toText(item?.product_name) || 'Product',
-      imageUrl: toText(item?.image_url),
+      imageUrl: extractOrderItemImage(item),
       quantity: Number(item?.quantity || 0) || 1,
       unitPrice: Number(item?.unit_price || 0),
       totalPrice: Number(item?.total_price || 0),
@@ -360,24 +404,7 @@ export const normalizeCourierOrder = (
           updated_at: toText(order?.delhivery?.updated_at),
         }
       : undefined,
-    nimbuspost: order?.nimbuspost
-      ? {
-          order_id: Number(order?.nimbuspost?.order_id || 0) || undefined,
-          shipment_id: Number(order?.nimbuspost?.shipment_id || 0) || undefined,
-          awb_number: toText(order?.nimbuspost?.awb_number),
-          courier_name: toText(order?.nimbuspost?.courier_name),
-          status: toText(order?.nimbuspost?.status),
-          label_url: toText(order?.nimbuspost?.label_url),
-          manifest_url: toText(order?.nimbuspost?.manifest_url),
-          last_quote_amount:
-            Number(
-              order?.nimbuspost?.last_quote?.total_charges ??
-                order?.nimbuspost?.last_quote?.freight_charges ??
-                0
-            ) || undefined,
-          updated_at: toText(order?.nimbuspost?.updated_at),
-        }
-      : undefined,
+
   }
 }
 
@@ -388,19 +415,19 @@ export const estimateCourierQuote = (
   const baseRateMap: Record<CourierPartnerId, number> = {
     borzo: 54,
     delhivery: 68,
-    nimbuspost: 61,
+
     porter: 76,
   }
   const variableRateMap: Record<CourierPartnerId, number> = {
     borzo: 0.013,
     delhivery: 0.01,
-    nimbuspost: 0.011,
+
     porter: 0.012,
   }
   const itemRateMap: Record<CourierPartnerId, number> = {
     borzo: 9,
     delhivery: 11,
-    nimbuspost: 10,
+
     porter: 13,
   }
 
@@ -497,12 +524,7 @@ export const getActiveCourierPartnerIds = (
     next.add('delhivery')
   }
 
-  if (
-    (order.nimbuspost?.shipment_id || order.nimbuspost?.awb_number) &&
-    !isClosedCourierState(order.nimbuspost?.status)
-  ) {
-    next.add('nimbuspost')
-  }
+
 
   const localAssignment = getCourierAssignmentForOrder(order.id)
   if (
@@ -551,27 +573,7 @@ export const getRemoteCourierAssignment = (
     }
   }
 
-  if (order.nimbuspost?.shipment_id || order.nimbuspost?.awb_number) {
-    return {
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      source: order.source,
-      partnerId: 'nimbuspost',
-      partnerName: COURIER_PARTNER_MAP.nimbuspost.title,
-      amount: Number(order.nimbuspost?.last_quote_amount || 0),
-      etaLabel: COURIER_PARTNER_MAP.nimbuspost.etaLabel,
-      assignedAt: order.nimbuspost?.updated_at || order.createdAt,
-      trackingStatus: order.nimbuspost?.status || trackingStatusByPartner.nimbuspost,
-      trackingCode:
-        order.nimbuspost?.awb_number ||
-        `${trackingPrefixByPartner.nimbuspost}-${order.id.slice(-6).toUpperCase()}`,
-      trackingUrl: order.nimbuspost?.label_url || '',
-      customerName: order.customerName,
-      customerPhone: order.customerPhone,
-      total: order.total,
-      websiteLabel: order.websiteLabel,
-    }
-  }
+
 
   if (order.borzo?.order_id) {
     return {

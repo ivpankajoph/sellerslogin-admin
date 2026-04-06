@@ -1,3 +1,39 @@
+/* Admin sidebar custom styles */
+#admin-sidebar [data-slot="sidebar-menu-button"] {
+  transition: all 0.15s ease;
+}
+
+#admin-sidebar [data-slot="sidebar-menu-button"]:hover {
+  background-color: rgb(233 213 255) !important;
+  color: rgb(88 28 135) !important;
+}
+
+#admin-sidebar [data-slot="sidebar-menu-button"][data-active="true"] {
+  background-color: rgb(147 51 234) !important;
+  color: white !important;
+  font-weight: 600;
+}
+
+#admin-sidebar [data-slot="sidebar-menu-button"][data-active="true"]:hover {
+  background-color: rgb(126 34 206) !important;
+}
+
+/* Submenu button styles for admin */
+#admin-sidebar [data-slot="sidebar-menu-sub-button"] {
+  transition: all 0.15s ease;
+}
+
+#admin-sidebar [data-slot="sidebar-menu-sub-button"]:hover {
+  background-color: rgb(233 213 255) !important;
+  color: rgb(88 28 135) !important;
+}
+
+#admin-sidebar [data-slot="sidebar-menu-sub-button"][data-active="true"] {
+  background-color: rgb(147 51 234) !important;
+  color: white !important;
+  font-weight: 600;
+}
+
 :root {
   color-scheme: light;
   --radius: 0;

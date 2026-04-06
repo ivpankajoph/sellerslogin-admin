@@ -23,8 +23,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { DataTablePagination, DataTableToolbar } from '@/components/data-table'
-import { roles } from '../data/data'
-
 import { vendorColumns as columns } from './users-columns'
 
 type DataTableProps = {
@@ -55,10 +53,10 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
     pagination: { defaultPage: 1, defaultPageSize: 10 },
     globalFilter: { enabled: false },
     columnFilters: [
-      // username per-column text filter
-      { columnId: 'username', searchKey: 'username', type: 'string' },
-      { columnId: 'status', searchKey: 'status', type: 'array' },
-      { columnId: 'role', searchKey: 'role', type: 'array' },
+      // name per-column text filter
+      { columnId: 'name', searchKey: 'name', type: 'string' },
+      { columnId: 'is_active', searchKey: 'is_active', type: 'array' },
+      { columnId: 'is_verified', searchKey: 'is_verified', type: 'array' },
     ],
   })
 
@@ -97,23 +95,24 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
     >
       <DataTableToolbar
         table={table}
-        searchKey='username'
-        showViewOptions={false}
+        searchKey='name'
+        showViewOptions={true}
         filters={[
           {
-            columnId: 'status',
+            columnId: 'is_active',
             title: 'Status',
             options: [
-              { label: 'Active', value: 'active' },
-              { label: 'Inactive', value: 'inactive' },
-              { label: 'Invited', value: 'invited' },
-              { label: 'Suspended', value: 'suspended' },
+              { label: 'Active', value: 'true' },
+              { label: 'Inactive', value: 'false' },
             ],
           },
           {
-            columnId: 'role',
-            title: 'Role',
-            options: roles.map((role) => ({ ...role })),
+            columnId: 'is_verified',
+            title: 'Verfication',
+            options: [
+              { label: 'Verified', value: 'true' },
+              { label: 'Unverified', value: 'false' },
+            ],
           },
         ]}
       />

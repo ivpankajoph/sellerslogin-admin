@@ -2,21 +2,19 @@ import brevoLogo from '@/assets/toolkit-apps/brevo.svg'
 import cashfreeLogo from '@/assets/toolkit-apps/cashfree.png'
 import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
 import googleMerchantLogo from '@/assets/toolkit-apps/google-merchant.svg'
-import nimbuspostLogo from '@/assets/toolkit-apps/nimbuspost.svg'
 import razorpayLogo from '@/assets/toolkit-apps/razorpay.png'
 
 export const INTEGRATION_PROVIDER_IDS = [
   'razorpay',
   'cashfree',
   'delhivery',
-  'nimbuspost',
   'google_merchant',
   'brevo',
 ] as const
 
 export type IntegrationProviderId = (typeof INTEGRATION_PROVIDER_IDS)[number]
 export type PaymentProviderId = 'none' | 'razorpay' | 'cashfree'
-export type DeliveryProviderId = 'none' | 'delhivery' | 'nimbuspost'
+export type DeliveryProviderId = 'none' | 'delhivery'
 export type IntegrationCategory = 'payment' | 'delivery' | 'marketing'
 export type IntegrationProviderField = {
   key: string
@@ -104,61 +102,6 @@ export const INTEGRATION_PROVIDER_META: Record<
       },
     ],
   },
-  nimbuspost: {
-    title: 'NimbusPost',
-    shortLabel: 'NimbusPost',
-    category: 'delivery',
-    description: 'Multi-courier shipment, tracking, manifest, and NDR workflows.',
-    imageSrc: nimbuspostLogo,
-    docs: 'https://api.nimbuspost.com/v1/',
-    fields: [
-      {
-        key: 'warehouse_name',
-        label: 'Warehouse Name',
-        placeholder: 'test warehouse',
-      },
-      {
-        key: 'pickup_name',
-        label: 'Pickup Contact Name',
-        placeholder: 'Pankaj Verma',
-      },
-      {
-        key: 'pickup_phone',
-        label: 'Pickup Contact Phone',
-        placeholder: '9999999999',
-      },
-      {
-        key: 'pickup_address',
-        label: 'Pickup Address',
-        placeholder: 'Surajpur Greater Noida',
-      },
-      {
-        key: 'pickup_address_2',
-        label: 'Pickup Address 2',
-        placeholder: 'Near landmark',
-      },
-      {
-        key: 'pickup_city',
-        label: 'Pickup City',
-        placeholder: 'Greater Noida',
-      },
-      {
-        key: 'pickup_state',
-        label: 'Pickup State',
-        placeholder: 'Uttar Pradesh',
-      },
-      {
-        key: 'pickup_pincode',
-        label: 'Pickup Pincode',
-        placeholder: '201306',
-      },
-      {
-        key: 'pickup_gst_number',
-        label: 'GST Number',
-        placeholder: 'Optional',
-      },
-    ],
-  },
   google_merchant: {
     title: 'Google Merchant',
     shortLabel: 'Merchant',
@@ -184,11 +127,10 @@ const PAYMENT_PROVIDERS = new Set<PaymentProviderId>(['none', 'razorpay', 'cashf
 const DELIVERY_PROVIDERS = new Set<DeliveryProviderId>([
   'none',
   'delhivery',
-  'nimbuspost',
 ])
 
 const getProviderCategory = (provider: IntegrationProviderId): IntegrationCategory =>
-  provider === 'delhivery' || provider === 'nimbuspost'
+  provider === 'delhivery'
     ? 'delivery'
     : provider === 'brevo' || provider === 'google_merchant'
       ? 'marketing'

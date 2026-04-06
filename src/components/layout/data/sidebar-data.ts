@@ -9,7 +9,6 @@ import {
   SearchCheck,
   ShieldCheck,
   ShoppingCart,
-
   Truck,
   Users,
 } from 'lucide-react'
@@ -140,13 +139,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
-          title: 'Courier Desk',
-          url: '/courier',
-          icon: Truck,
-          roles: [ROLES.VENDOR],
-          pageKey: 'orders',
-        },
-        {
           title: 'Courier List',
           url: '/courier/list',
           icon: Truck,
@@ -165,9 +157,9 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               pageKey: 'orders',
             },
             {
-              title: 'NimbusPost',
-              url: '/courier/nimbuspost',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
+              title: 'Warehouse Manage',
+              url: '/courier/warehouses',
+              roles: [ROLES.VENDOR],
               pageKey: 'orders',
             },
           ],
@@ -183,7 +175,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           icon: ShieldCheck,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
-              {
+            {
               title: 'Create Product',
               url: '/products/create-products',
               roles: [ROLES.VENDOR],
@@ -195,7 +187,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               roles: [ROLES.VENDOR],
               pageKey: 'products',
             },
-          
             {
               title: 'All Products',
               url: '/products/admin-products',
@@ -330,13 +321,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               pageKey: 'my_apps',
             },
             {
-              title: 'NimbusPost',
-              url: '/integrations/nimbuspost',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
-              requiresIntegration: 'nimbuspost',
-              pageKey: 'my_apps',
-            },
-            {
               title: 'Google Merchant',
               url: '/integrations/google_merchant',
               roles: [ROLES.ADMIN, ROLES.VENDOR],
@@ -443,7 +427,7 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
         {
           title: 'Live Chat',
           url: '/live-chat',
-          icon: HelpCircle, // re-using HelpCircle for now, or use Activity
+          icon: HelpCircle,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           pageKey: 'live_chat',
         },

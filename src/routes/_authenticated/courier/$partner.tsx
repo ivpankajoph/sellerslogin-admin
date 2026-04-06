@@ -44,22 +44,16 @@ import {
   createDelhiveryWarehouse,
   createDelhiveryShipment,
   createDelhiveryPickupRequest,
-  createNimbuspostShipment,
   cancelDelhiveryShipment,
-  cancelNimbuspostShipment,
-  createNimbuspostManifest,
   editDelhiveryShipment,
   fetchDelhiveryB2cServiceability,
   fetchDelhiveryBulkWaybills,
   fetchDelhiveryHeavyServiceability,
   fetchDelhiveryShippingEstimate,
   fetchDelhiverySingleWaybill,
-  fetchNimbuspostNdrList,
-  fetchNimbuspostRateServiceability,
   generateDelhiveryLabel,
   loadCourierOrders,
   trackDelhiveryShipment,
-  trackNimbuspostShipment,
   updateDelhiveryWarehouse,
 } from '@/features/courier/api'
 import { formatINR } from '@/lib/currency'
@@ -96,7 +90,6 @@ type DelhiveryEditForm = {
 }
 
 type BookingFormState = {
-  nimbusPickupSource: 'vendor' | 'nimbuspost'
   origin: string
   destination: string
   pickupLocation: string
@@ -165,7 +158,6 @@ type DelhiveryWarehouseUpdateForm = {
 }
 
 const defaultBookingForm: BookingFormState = {
-  nimbusPickupSource: 'vendor',
   origin: '',
   destination: '',
   pickupLocation: '',
@@ -314,32 +306,7 @@ function CourierPartnerPage() {
     () => readText(integrationsData?.providers?.delhivery?.config?.pickup_location),
     [integrationsData?.providers?.delhivery?.config?.pickup_location]
   )
-  const savedNimbusPickup = useMemo(() => {
-    const config = integrationsData?.providers?.nimbuspost?.config || {}
-    const pickup = {
-      warehouse_name: readText(config.warehouse_name),
-      name: readText(config.pickup_name),
-      phone: readText(config.pickup_phone),
-      address: readText(config.pickup_address),
-      address_2: readText(config.pickup_address_2),
-      city: readText(config.pickup_city),
-      state: readText(config.pickup_state),
-      pincode: readText(config.pickup_pincode),
-      gst_number: readText(config.pickup_gst_number),
-    }
-    return {
-      ...pickup,
-      isComplete: Boolean(
-        pickup.warehouse_name &&
-          pickup.name &&
-          pickup.phone &&
-          pickup.address &&
-          pickup.city &&
-          pickup.state &&
-          pickup.pincode
-      ),
-    }
-  }, [integrationsData?.providers?.nimbuspost?.config])
+
 
   useEffect(() => {
     if (partnerId !== 'delhivery') return
@@ -367,7 +334,7 @@ function CourierPartnerPage() {
 
     const loadData = async () => {
       const needsLiveData =
-        partnerId === 'delhivery' || partnerId === 'nimbuspost'
+        partnerId === 'delhivery'
       if (!needsLiveData) {
         setLiveOrders([])
         setNdrItems([])
@@ -379,19 +346,13 @@ function CourierPartnerPage() {
       try {
         setLoading(true)
         setError('')
-        const [orders, ndrResponse] = await Promise.all([
+        const [orders] = await Promise.all([
           loadCourierOrders(isVendor),
-          partnerId === 'nimbuspost'
-            ? fetchNimbuspostNdrList().catch(() => null)
-            : Promise.resolve(null),
         ])
 
         if (cancelled) return
 
         setLiveOrders(orders)
-        setNdrItems(
-          Array.isArray(ndrResponse?.response?.data) ? ndrResponse.response.data : []
-        )
       } catch (err: any) {
         if (cancelled) return
         setError(err?.response?.data?.message || 'Failed to load courier partner data')
@@ -410,7 +371,7 @@ function CourierPartnerPage() {
   }, [isVendor, partnerId, refreshKey])
 
   const assignments = useMemo(() => {
-    if (partnerId === 'delhivery' || partnerId === 'nimbuspost') {
+    if (partnerId === 'delhivery') {
       return liveOrders
         .map((order) => ({ assignment: getRemoteCourierAssignment(order), order }))
         .filter(
@@ -503,26 +464,15 @@ function CourierPartnerPage() {
     0
   )
   const handleCheckBooking = async () => {
-    if (partnerId !== 'delhivery' && partnerId !== 'nimbuspost') return
+    if (partnerId !== 'delhivery') return
     if (!selectedBookingOrder) return toast.error('Select an available order first')
 
     const resolvedOrigin = readText(bookingForm.origin || profileOriginPincode)
     const resolvedDestination = readText(bookingForm.destination || selectedBookingOrder.pincode)
     const resolvedPickupLocation = readText(bookingForm.pickupLocation || defaultPickupLocation)
-    const wantsNimbusWarehouse = bookingForm.nimbusPickupSource === 'nimbuspost'
-    const resolvedNimbusOrigin = wantsNimbusWarehouse
-      ? savedNimbusPickup.pincode || resolvedOrigin
-      : resolvedOrigin
 
     if (!resolvedOrigin) return toast.error('Origin pincode is required')
     if (!resolvedDestination) return toast.error('Destination pincode is required')
-    if (
-      partnerId === 'nimbuspost' &&
-      wantsNimbusWarehouse &&
-      !savedNimbusPickup.pincode
-    ) {
-      return toast.error('Save NimbusPost warehouse details first in Toolkit Store')
-    }
 
     setCheckingBooking(true)
     try {
@@ -599,46 +549,6 @@ function CourierPartnerPage() {
         return
       }
 
-      const response = await fetchNimbuspostRateServiceability({
-        origin: resolvedNimbusOrigin,
-        destination: resolvedDestination,
-        payment_type: bookingForm.paymentType,
-        order_amount: bookingForm.orderAmount.trim() || '0',
-        weight: bookingForm.weight.trim() || '500',
-        length: bookingForm.length.trim() || '10',
-        breadth: bookingForm.breadth.trim() || '10',
-        height: bookingForm.height.trim() || '10',
-      })
-      const serviceability = response?.serviceability || {}
-      const bestQuote = serviceability?.best_quote || {}
-      const canCreate = !wantsNimbusWarehouse || savedNimbusPickup.isComplete
-
-      setBookingCheck({
-        ok: Boolean(serviceability?.serviceable && canCreate),
-        summary: serviceability?.serviceable
-          ? 'NimbusPost rate/serviceability check passed. You can create shipment now.'
-          : 'NimbusPost did not return any serviceable courier for this order lane.',
-        rows: bookingRows([
-          `Order: ${selectedBookingOrder.orderNumber}`,
-          `Origin: ${resolvedNimbusOrigin}`,
-          `Destination: ${resolvedDestination}`,
-          `Quotes returned: ${serviceability?.quote_count ?? 0}`,
-          bestQuote?.name ? `Best courier: ${bestQuote.name}` : '',
-          wantsNimbusWarehouse
-            ? `Pickup source: ${savedNimbusPickup.warehouse_name || 'Saved NimbusPost warehouse'}`
-            : 'Pickup source: Vendor profile address',
-          wantsNimbusWarehouse && !savedNimbusPickup.isComplete
-            ? 'Complete NimbusPost warehouse details are required before booking.'
-            : '',
-        ]),
-        payload:
-          serviceability?.serviceable && canCreate
-            ? {
-                ...(bestQuote?.id ? { courier_id: String(bestQuote.id) } : {}),
-                ...(wantsNimbusWarehouse ? { pickup: savedNimbusPickup } : {}),
-              }
-            : undefined,
-      })
     } catch (err: any) {
       setBookingCheck({
         ok: false,
@@ -654,7 +564,7 @@ function CourierPartnerPage() {
   }
 
   const handleCreateBooking = async () => {
-    if (partnerId !== 'delhivery' && partnerId !== 'nimbuspost') return
+    if (partnerId !== 'delhivery') return
     if (!selectedBookingOrder) return toast.error('Select an available order first')
     if (!bookingCheck?.ok || !bookingCheck.payload) {
       return toast.error(`Run ${partnerMeta.title} check first before creating shipment`)
@@ -679,9 +589,6 @@ function CourierPartnerPage() {
         toast.success(
           `Delhivery shipment created for ${selectedBookingOrder.orderNumber} (${waybill})`
         )
-      } else {
-        await createNimbuspostShipment(selectedBookingOrder, bookingCheck.payload)
-        toast.success(`NimbusPost shipment created for ${selectedBookingOrder.orderNumber}`)
       }
       setBookingCheck(null)
       setRefreshKey((current) => current + 1)
@@ -689,22 +596,6 @@ function CourierPartnerPage() {
       toast.error(err?.response?.data?.message || 'Failed to create shipment')
     } finally {
       setBookingBusy(false)
-    }
-  }
-
-  const handleRefreshTracking = async (order: CourierOrderSummary | null) => {
-    if (!order || partnerId !== 'nimbuspost') return
-    try {
-      setBusyOrderId(order.id)
-      setBusyAction('track')
-      await trackNimbuspostShipment(order)
-      toast.success(`Tracking updated for ${order.orderNumber}`)
-      setRefreshKey((current) => current + 1)
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to refresh tracking')
-    } finally {
-      setBusyOrderId('')
-      setBusyAction('')
     }
   }
 
@@ -815,37 +706,7 @@ function CourierPartnerPage() {
     }
   }
 
-  const handleCreateManifest = async (order: CourierOrderSummary | null) => {
-    if (!order || partnerId !== 'nimbuspost') return
-    try {
-      setBusyOrderId(order.id)
-      setBusyAction('manifest')
-      await createNimbuspostManifest(order)
-      toast.success(`Manifest generated for ${order.orderNumber}`)
-      setRefreshKey((current) => current + 1)
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to create manifest')
-    } finally {
-      setBusyOrderId('')
-      setBusyAction('')
-    }
-  }
 
-  const handleCancelShipment = async (order: CourierOrderSummary | null) => {
-    if (!order || partnerId !== 'nimbuspost') return
-    try {
-      setBusyOrderId(order.id)
-      setBusyAction('cancel')
-      await cancelNimbuspostShipment(order)
-      toast.success(`Shipment cancelled for ${order.orderNumber}`)
-      setRefreshKey((current) => current + 1)
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to cancel shipment')
-    } finally {
-      setBusyOrderId('')
-      setBusyAction('')
-    }
-  }
 
   const handleCancelDelhiveryShipment = async (order: CourierOrderSummary | null) => {
     if (!order || partnerId !== 'delhivery') return
@@ -1272,20 +1133,16 @@ function CourierPartnerPage() {
             <CardTitle className='text-lg'>
               {partnerId === 'delhivery'
                 ? 'Create shipment API'
-                : partnerId === 'nimbuspost'
-                ? `Create ${partnerMeta.title} shipment`
                 : `${partnerMeta.title} booking flow`}
             </CardTitle>
             <CardDescription>
               {partnerId === 'delhivery'
                 ? 'Use Delhivery manifest create API for an order that is not already assigned.'
-                : partnerId === 'nimbuspost'
-                ? 'Only orders without an active courier assignment are available here.'
                 : 'Use this app page for partner-specific monitoring. Booking is not enabled here yet.'}
             </CardDescription>
           </CardHeader>
           <CardContent className='space-y-6'>
-            {partnerId === 'delhivery' || partnerId === 'nimbuspost' ? (
+            {partnerId === 'delhivery' ? (
               <>
                 {eligibleOrders.length === 0 ? (
                   <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-6 text-sm text-muted-foreground'>
@@ -1358,24 +1215,6 @@ function CourierPartnerPage() {
                           placeholder='201306'
                         />
                       </div>
-                      {partnerId === 'nimbuspost' ? (
-                        <div className='space-y-2'>
-                          <label className='text-sm font-medium text-foreground'>Nimbus pickup source</label>
-                          <select
-                            value={bookingForm.nimbusPickupSource}
-                            onChange={(e) =>
-                              setBookingForm((current) => ({
-                                ...current,
-                                nimbusPickupSource: e.target.value as 'vendor' | 'nimbuspost',
-                              }))
-                            }
-                            className='vendor-field flex h-11 w-full rounded-none border bg-transparent px-4 py-2 text-sm shadow-sm outline-none'
-                          >
-                            <option value='vendor'>Vendor profile address</option>
-                            <option value='nimbuspost'>Saved NimbusPost warehouse</option>
-                          </select>
-                        </div>
-                      ) : (
                         <div className='space-y-2'>
                           <label className='text-sm font-medium text-foreground'>Delhivery pickup location</label>
                           <Input
@@ -1389,7 +1228,6 @@ function CourierPartnerPage() {
                             placeholder='warehouse_name'
                           />
                         </div>
-                      )}
                       <div className='space-y-2'>
                         <label className='text-sm font-medium text-foreground'>Payment mode</label>
                         <select
@@ -1602,8 +1440,6 @@ function CourierPartnerPage() {
             <CardDescription>
               {partnerId === 'delhivery'
                 ? 'Track, cancel, generate label, request pickup, and edit live Delhivery shipments.'
-                : partnerId === 'nimbuspost'
-                ? `${partnerMeta.title} rows are sourced from live order shipment data.`
                 : 'This page is powered by the courier desk assignment store for now.'}
             </CardDescription>
           </CardHeader>
@@ -1630,7 +1466,7 @@ function CourierPartnerPage() {
                       <TableHead>Tracking</TableHead>
                       <TableHead>Charge</TableHead>
                       <TableHead>ETA</TableHead>
-                      {(partnerId === 'nimbuspost' || partnerId === 'delhivery') && <TableHead className='text-right'>Actions</TableHead>}
+                      {partnerId === 'delhivery' && <TableHead className='text-right'>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1642,11 +1478,7 @@ function CourierPartnerPage() {
                             <p className='text-xs text-muted-foreground'>
                               {assignment.customerName} | {assignment.websiteLabel}
                             </p>
-                            {order?.nimbuspost?.courier_name && (
-                              <p className='text-xs text-muted-foreground'>
-                                Courier: {order.nimbuspost.courier_name}
-                              </p>
-                            )}
+
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1679,28 +1511,7 @@ function CourierPartnerPage() {
                                   <ExternalLink className='h-3 w-3' />
                                 </a>
                               ) : null}
-                              {order?.nimbuspost?.label_url ? (
-                                <a
-                                  href={order.nimbuspost.label_url}
-                                  target='_blank'
-                                  rel='noreferrer'
-                                  className='inline-flex items-center gap-1 font-medium text-indigo-600 hover:underline'
-                                >
-                                  Shipping label
-                                  <ExternalLink className='h-3 w-3' />
-                                </a>
-                              ) : null}
-                              {order?.nimbuspost?.manifest_url ? (
-                                <a
-                                  href={order.nimbuspost.manifest_url}
-                                  target='_blank'
-                                  rel='noreferrer'
-                                  className='inline-flex items-center gap-1 font-medium text-indigo-600 hover:underline'
-                                >
-                                  Manifest
-                                  <ExternalLink className='h-3 w-3' />
-                                </a>
-                              ) : null}
+
                             </div>
                           </div>
                         </TableCell>
@@ -1713,55 +1524,10 @@ function CourierPartnerPage() {
                             {assignment.etaLabel}
                           </div>
                         </TableCell>
-                        {(partnerId === 'nimbuspost' || partnerId === 'delhivery') && (
+                        {partnerId === 'delhivery' && (
                           <TableCell className='text-right'>
                             <div className='flex flex-wrap justify-end gap-2'>
-                              {partnerId === 'nimbuspost' ? (
-                                <>
-                                  <Button
-                                    size='sm'
-                                    variant='outline'
-                                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
-                                    disabled={busyOrderId === order?.id || !order}
-                                    onClick={() => {
-                                      void handleRefreshTracking(order)
-                                    }}
-                                  >
-                                    {busyOrderId === order?.id && busyAction === 'track'
-                                      ? 'Refreshing'
-                                      : 'Track'}
-                                  </Button>
-                                  <Button
-                                    size='sm'
-                                    variant='outline'
-                                    className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
-                                    disabled={busyOrderId === order?.id || !order}
-                                    onClick={() => {
-                                      void handleCreateManifest(order)
-                                    }}
-                                  >
-                                    {busyOrderId === order?.id && busyAction === 'manifest'
-                                      ? 'Working'
-                                      : 'Manifest'}
-                                  </Button>
-                                  {String(assignment.trackingStatus || '').toLowerCase() !==
-                                  'cancelled' ? (
-                                    <Button
-                                      size='sm'
-                                      variant='outline'
-                                      className='border-rose-500/30 bg-background text-rose-600 hover:bg-rose-500/10 hover:text-rose-600 dark:text-rose-300'
-                                      disabled={busyOrderId === order?.id || !order}
-                                      onClick={() => {
-                                        void handleCancelShipment(order)
-                                      }}
-                                    >
-                                      {busyOrderId === order?.id && busyAction === 'cancel'
-                                        ? 'Cancelling'
-                                        : 'Cancel'}
-                                    </Button>
-                                  ) : null}
-                                </>
-                              ) : null}
+
                               {partnerId === 'delhivery' ? (
                                 <>
                                   <Button
@@ -2165,9 +1931,7 @@ function CourierPartnerPage() {
             <CardHeader>
               <CardTitle className='text-base'>Tracking snapshot</CardTitle>
               <CardDescription>
-                {partnerId === 'nimbuspost'
-                  ? `Recent ${partnerMeta.title} shipment states pulled from stored order shipment data.`
-                  : 'Recent assignments and tracking references.'}
+                Recent assignments and tracking references.
               </CardDescription>
             </CardHeader>
             <CardContent className='space-y-3'>
@@ -2200,12 +1964,7 @@ function CourierPartnerPage() {
                       <Package2 className='h-4 w-4 text-slate-400' />
                       {formatINR(assignment.total)}
                     </span>
-                    {order?.nimbuspost?.courier_name ? (
-                      <span className='inline-flex items-center gap-2'>
-                        <ArrowUpRight className='h-4 w-4 text-slate-400' />
-                        {order.nimbuspost.courier_name}
-                      </span>
-                    ) : null}
+
                   </div>
                 </div>
               ))}
@@ -2220,38 +1979,13 @@ function CourierPartnerPage() {
           <Card className='border-border bg-card shadow-sm'>
             <CardHeader>
               <CardTitle className='text-base'>
-                {partnerId === 'nimbuspost' ? 'NDR snapshot' : 'Partner routing notes'}
+                Partner routing notes
               </CardTitle>
               <CardDescription>
-                {partnerId === 'nimbuspost'
-                  ? 'Delivery exceptions returned by NimbusPost for your current account.'
-                  : 'Notes for this partner view.'}
+                Notes for this partner view.
               </CardDescription>
             </CardHeader>
             <CardContent className='space-y-3 text-sm leading-6 text-muted-foreground'>
-              {partnerId === 'nimbuspost' ? (
-                ndrItems.length ? (
-                  ndrItems.slice(0, 5).map((item) => (
-                    <div
-                      key={item.awb_number}
-                      className='rounded-2xl border border-border bg-muted/40 p-4'
-                    >
-                      <p className='font-medium text-foreground'>{item.awb_number}</p>
-                      <p className='text-xs text-muted-foreground'>
-                        {item.event_date || 'Date unavailable'} | Attempts:{' '}
-                        {item.total_attempts || '0'}
-                      </p>
-                      <p className='mt-2 text-sm text-foreground'>
-                        {item.courier_remarks || 'No remarks'}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-6 text-sm text-muted-foreground'>
-                    No active NimbusPost NDR records were returned.
-                  </div>
-                )
-              ) : (
                 <>
                   <p>
                     Use the courier desk to assign new orders to {partnerMeta.title}. Each
@@ -2261,7 +1995,6 @@ function CourierPartnerPage() {
                     Current ETA benchmark: {partnerMeta.etaLabel}
                   </p>
                 </>
-              )}
             </CardContent>
           </Card>
         </div> : null}

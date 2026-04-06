@@ -253,6 +253,32 @@ function TemplateOrdersPage() {
     )
   }
 
+  const courierStatusBadge = (order?: Order | null) => {
+    const orderStatus = String(order?.status || '').toLowerCase()
+    const hasRequestedCourier = Boolean(order?.borzo?.order_id || order?.delivery_provider)
+    const courierStatus =
+      orderStatus === 'delivered'
+        ? 'delivered'
+        : hasRequestedCourier
+          ? 'requested'
+          : 'pending'
+
+    const toneMap: Record<string, string> = {
+      pending: 'bg-amber-100 text-amber-700',
+      requested: 'bg-blue-100 text-blue-700',
+      delivered: 'bg-emerald-100 text-emerald-700',
+    }
+
+    return (
+      <Badge
+        variant='outline'
+        className={toneMap[courierStatus] || 'bg-slate-100 text-slate-700'}
+      >
+        {courierStatus}
+      </Badge>
+    )
+  }
+
   const buildAddressString = (address?: Order['shipping_address']) => {
     if (!address) return ''
     return [
@@ -860,6 +886,10 @@ function TemplateOrdersPage() {
                   <div>{statusBadge(selectedOrder.status)}</div>
                 </div>
                 <div>
+                  <p className='text-muted-foreground text-xs'>Courier Status</p>
+                  <div>{courierStatusBadge(selectedOrder)}</div>
+                </div>
+                <div>
                   <p className='text-muted-foreground text-xs'>Created</p>
                   <p className='font-semibold'>
                     {selectedOrder.createdAt
@@ -876,51 +906,18 @@ function TemplateOrdersPage() {
                 <div className='flex flex-wrap items-center gap-2'>
                   <Button
                     size='sm'
-                    disabled={loading || selectedOrder.status === 'delivered'}
-                    onClick={async () => {
-                      if (!selectedOrder?._id) return
-                      try {
-                        setLoading(true)
-                        await api.put(
-                          `/template-orders/${selectedOrder._id}/status`,
-                          {
-                            status: 'delivered',
-                          }
-                        )
-                        await loadOrders()
-                        setSelectedOrder({
-                          ...selectedOrder,
-                          status: 'delivered',
-                        })
-                      } finally {
-                        setLoading(false)
+                    onClick={() => {
+                      const params = new URLSearchParams()
+                      if (selectedOrder?._id) params.set('orderId', selectedOrder._id)
+                      if (selectedOrder?.shipping_address?.pincode) {
+                        params.set('destination', String(selectedOrder.shipping_address.pincode))
                       }
+                      window.location.assign(
+                        `/courier${params.toString() ? `?${params.toString()}` : ''}`
+                      )
                     }}
                   >
-                    Mark delivered
-                  </Button>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    disabled={loading || selectedOrder.status === 'failed'}
-                    onClick={async () => {
-                      if (!selectedOrder?._id) return
-                      try {
-                        setLoading(true)
-                        await api.put(
-                          `/template-orders/${selectedOrder._id}/status`,
-                          {
-                            status: 'failed',
-                          }
-                        )
-                        await loadOrders()
-                        setSelectedOrder({ ...selectedOrder, status: 'failed' })
-                      } finally {
-                        setLoading(false)
-                      }
-                    }}
-                  >
-                    Mark failed
+                    Go to Courier section
                   </Button>
                 </div>
               </div>
