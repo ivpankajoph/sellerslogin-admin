@@ -55,7 +55,6 @@ const providerOrder = INTEGRATION_PROVIDER_IDS
 const providerAccentClass: Record<ProviderId, string> = {
   razorpay: 'border-violet-200 bg-violet-50',
   cashfree: 'border-indigo-200 bg-indigo-50',
-  cod: 'border-amber-200 bg-amber-50',
   delhivery: 'border-cyan-200 bg-cyan-50',
   nimbuspost: 'border-blue-200 bg-blue-50',
   google_merchant: 'border-blue-200 bg-blue-50',
@@ -203,7 +202,6 @@ export default function IntegrationsPage({
   const [drafts, setDrafts] = useState<Record<ProviderId, Record<string, string>>>({
     razorpay: {},
     cashfree: {},
-    cod: {},
     delhivery: {},
     nimbuspost: {},
     google_merchant: {},
@@ -212,7 +210,6 @@ export default function IntegrationsPage({
   const [providerEnabled, setProviderEnabled] = useState<Record<ProviderId, boolean>>({
     razorpay: false,
     cashfree: false,
-    cod: true,
     delhivery: false,
     nimbuspost: false,
     google_merchant: false,
@@ -235,7 +232,7 @@ export default function IntegrationsPage({
     return_country: 'India',
   })
   const [busyMap, setBusyMap] = useState<Record<string, boolean>>({})
-  const [defaultPayment, setDefaultPayment] = useState<'cod' | 'razorpay' | 'cashfree'>('cod')
+  const [defaultPayment, setDefaultPayment] = useState<'none' | 'razorpay' | 'cashfree'>('none')
   const [defaultDelivery, setDefaultDelivery] = useState<
     'none' | 'delhivery' | 'nimbuspost'
   >('none')
@@ -293,7 +290,6 @@ export default function IntegrationsPage({
       setProviderEnabled({
         razorpay: payload.providers.razorpay.enabled,
         cashfree: payload.providers.cashfree.enabled,
-        cod: payload.providers.cod.enabled,
         delhivery: payload.providers.delhivery.enabled,
         nimbuspost: payload.providers.nimbuspost.enabled,
         google_merchant: payload.providers.google_merchant.enabled,
@@ -303,7 +299,6 @@ export default function IntegrationsPage({
       const nextDrafts: Record<ProviderId, Record<string, string>> = {
         razorpay: {},
         cashfree: {},
-        cod: {},
         delhivery: {},
         nimbuspost: {},
         google_merchant: {},
@@ -385,7 +380,7 @@ export default function IntegrationsPage({
   }
 
   const saveDefaults = async (overrides?: {
-    payment?: 'cod' | 'razorpay' | 'cashfree'
+    payment?: 'none' | 'razorpay' | 'cashfree'
     delivery?: 'none' | 'delhivery' | 'nimbuspost'
   }) => {
     const path = getActionPath(effectiveRole, resolvedVendorId, '/defaults')
@@ -515,10 +510,7 @@ export default function IntegrationsPage({
       }
 
       const hasCredentialInput = Object.keys(config).length > 0
-      const shouldEnable =
-        provider === 'cod'
-          ? providerEnabled[provider]
-          : providerEnabled[provider] || hasCredentialInput
+      const shouldEnable = providerEnabled[provider] || hasCredentialInput
 
       await api.put(path, {
         enabled: shouldEnable,
@@ -797,7 +789,7 @@ export default function IntegrationsPage({
     let nextPayment = defaultPayment
     let nextDelivery = defaultDelivery
     if (providerMeta[provider].category === 'payment') {
-      nextPayment = provider as 'cod' | 'razorpay' | 'cashfree'
+      nextPayment = provider as 'razorpay' | 'cashfree'
       setDefaultPayment(nextPayment)
     } else {
       nextDelivery = provider as 'delhivery' | 'nimbuspost'
@@ -1104,11 +1096,11 @@ export default function IntegrationsPage({
               <select
                 value={defaultPayment}
                 onChange={(event) =>
-                  setDefaultPayment(event.target.value as 'cod' | 'razorpay' | 'cashfree')
+                  setDefaultPayment(event.target.value as 'none' | 'razorpay' | 'cashfree')
                 }
                 className='h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground'
               >
-                <option value='cod'>Cash on Delivery</option>
+                <option value='none'>No default payment app</option>
                 <option value='razorpay'>Razorpay</option>
                 <option value='cashfree'>Cashfree</option>
               </select>
@@ -1775,7 +1767,7 @@ export default function IntegrationsPage({
                       )}
                     </Button>
 
-                    {providerId !== 'cod' && (providerId !== 'google_merchant' || googleMerchantConnected) && (
+                    {(providerId !== 'google_merchant' || googleMerchantConnected) && (
                       <Button
                         size='sm'
                         variant='outline'

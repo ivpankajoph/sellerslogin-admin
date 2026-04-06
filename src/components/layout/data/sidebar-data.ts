@@ -309,13 +309,6 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           items: [
             {
-              title: 'Cash on Delivery',
-              url: '/integrations/cod',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
-              requiresIntegration: 'cod',
-              pageKey: 'my_apps',
-            },
-            {
               title: 'Razorpay',
               url: '/integrations/razorpay',
               roles: [ROLES.ADMIN, ROLES.VENDOR],

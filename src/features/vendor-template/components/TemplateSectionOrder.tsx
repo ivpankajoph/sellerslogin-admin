@@ -35,10 +35,10 @@ export function TemplateSectionOrder({
   }
 
   return (
-    <div className='rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
+    <div className='rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm'>
       <div className='flex items-center justify-between'>
         <div>
-          <p className='text-xs font-semibold uppercase tracking-[0.3em] text-slate-400'>
+          <p className='text-xs font-semibold uppercase tracking-[0.3em] text-slate-500'>
             Layout
           </p>
           <h3 className='text-lg font-semibold text-slate-900'>{title}</h3>
@@ -56,7 +56,7 @@ export function TemplateSectionOrder({
           <Reorder.Item
             key={item.id}
             value={item.id}
-            className='flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm'
+            className='flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm'
             whileDrag={{ scale: 1.02 }}
           >
             <div className='flex items-start gap-3'>

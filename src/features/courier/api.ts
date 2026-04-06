@@ -267,3 +267,64 @@ export const fetchNimbuspostRateServiceability = async (payload: {
   const res = await api.post('/nimbuspost/serviceability/rate', payload)
   return res?.data
 }
+
+export type ExternalDelhiveryShipment = {
+  id: string
+  waybill: string
+  order_id: string
+  status: string
+  status_type: string
+  status_description: string
+  destination: string
+  origin: string
+  source: string
+  label_url: string
+  requested_waybills: string[]
+  requested_ref_ids: string[]
+  scans: Array<{
+    status?: string
+    status_type?: string
+    description?: string
+    location?: string
+    time?: string
+  }>
+  tracking_payload?: unknown
+  last_response?: unknown
+  last_synced_at?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export const fetchExternalDelhiveryShipments = async () => {
+  const res = await api.get('/delhivery/external-shipments')
+  return res?.data as { success?: boolean; shipments?: ExternalDelhiveryShipment[] }
+}
+
+export const importExternalDelhiveryShipments = async (payload: {
+  waybill?: string
+  ref_ids?: string
+}) => {
+  const res = await api.post('/delhivery/external-shipments/import', payload)
+  return res?.data as {
+    success?: boolean
+    shipments?: ExternalDelhiveryShipment[]
+    tracking?: { shipments?: ExternalDelhiveryShipment[] }
+  }
+}
+
+export const refreshExternalDelhiveryShipment = async (shipmentId: string) => {
+  const res = await api.post(`/delhivery/external-shipments/${shipmentId}/track`)
+  return res?.data as { success?: boolean; shipment?: ExternalDelhiveryShipment }
+}
+
+export const generateExternalDelhiveryShipmentLabel = async (
+  shipmentId: string,
+  payload: { pdf?: boolean; pdf_size?: 'A4' | '4R' } = {}
+) => {
+  const res = await api.post(`/delhivery/external-shipments/${shipmentId}/label`, payload)
+  return res?.data as {
+    success?: boolean
+    label?: { label_url?: string }
+    shipment?: ExternalDelhiveryShipment
+  }
+}

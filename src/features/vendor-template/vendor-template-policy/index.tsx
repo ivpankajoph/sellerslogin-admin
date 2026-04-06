@@ -827,6 +827,16 @@ function VendorTemplatePolicy() {
       >
         {isSaving ? 'Saving...' : 'Save Template'}
       </Button>
+      <Button
+        variant='outline'
+        onClick={() => {
+          void handleSave()
+        }}
+        disabled={isSaving || !vendor_id}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+      >
+        Sync Preview
+      </Button>
       {!isAdmin && (
         <Button
           variant='outline'

@@ -1,6 +1,5 @@
 import brevoLogo from '@/assets/toolkit-apps/brevo.svg'
 import cashfreeLogo from '@/assets/toolkit-apps/cashfree.png'
-import codLogo from '@/assets/toolkit-apps/cod.svg'
 import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
 import googleMerchantLogo from '@/assets/toolkit-apps/google-merchant.svg'
 import nimbuspostLogo from '@/assets/toolkit-apps/nimbuspost.svg'
@@ -9,7 +8,6 @@ import razorpayLogo from '@/assets/toolkit-apps/razorpay.png'
 export const INTEGRATION_PROVIDER_IDS = [
   'razorpay',
   'cashfree',
-  'cod',
   'delhivery',
   'nimbuspost',
   'google_merchant',
@@ -17,7 +15,7 @@ export const INTEGRATION_PROVIDER_IDS = [
 ] as const
 
 export type IntegrationProviderId = (typeof INTEGRATION_PROVIDER_IDS)[number]
-export type PaymentProviderId = 'cod' | 'razorpay' | 'cashfree'
+export type PaymentProviderId = 'none' | 'razorpay' | 'cashfree'
 export type DeliveryProviderId = 'none' | 'delhivery' | 'nimbuspost'
 export type IntegrationCategory = 'payment' | 'delivery' | 'marketing'
 export type IntegrationProviderField = {
@@ -84,14 +82,6 @@ export const INTEGRATION_PROVIDER_META: Record<
       { key: 'secret_key', label: 'Secret Key', type: 'password' },
       { key: 'environment', label: 'Environment', placeholder: 'sandbox / production' },
     ],
-  },
-  cod: {
-    title: 'Cash on Delivery',
-    shortLabel: 'COD',
-    category: 'payment',
-    description: 'Allow customers to pay at delivery time.',
-    imageSrc: codLogo,
-    fields: [],
   },
   delhivery: {
     title: 'Delhivery',
@@ -190,7 +180,7 @@ export const INTEGRATION_PROVIDER_META: Record<
   },
 }
 
-const PAYMENT_PROVIDERS = new Set<PaymentProviderId>(['cod', 'razorpay', 'cashfree'])
+const PAYMENT_PROVIDERS = new Set<PaymentProviderId>(['none', 'razorpay', 'cashfree'])
 const DELIVERY_PROVIDERS = new Set<DeliveryProviderId>([
   'none',
   'delhivery',
@@ -205,12 +195,9 @@ const getProviderCategory = (provider: IntegrationProviderId): IntegrationCatego
       : 'payment'
 
 export const isProviderUsable = (
-  provider: IntegrationProviderId,
+  _provider: IntegrationProviderId,
   state?: Partial<IntegrationProviderState> | null,
 ) => {
-  if (provider === 'cod') {
-    return state?.enabled !== false
-  }
   return Boolean(state?.enabled && state?.connected)
 }
 
@@ -276,7 +263,7 @@ export const parseVendorIntegrations = (
     defaults: {
       payment: PAYMENT_PROVIDERS.has(paymentDefault as PaymentProviderId)
         ? (paymentDefault as PaymentProviderId)
-        : 'cod',
+        : 'none',
       delivery: DELIVERY_PROVIDERS.has(deliveryDefault as DeliveryProviderId)
         ? (deliveryDefault as DeliveryProviderId)
         : 'none',

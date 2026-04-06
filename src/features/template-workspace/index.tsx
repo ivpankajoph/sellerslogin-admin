@@ -76,6 +76,47 @@ type WebsiteCard = {
     status?: string
     ssl_status?: string
   }
+  is_default?: boolean
+}
+
+const sortWebsitesByDefault = (items: WebsiteCard[]) =>
+  [...items].sort((left, right) => {
+    if (Boolean(left.is_default) !== Boolean(right.is_default)) {
+      return left.is_default ? -1 : 1
+    }
+
+    const leftCreatedAt = new Date(left.createdAt || 0).getTime()
+    const rightCreatedAt = new Date(right.createdAt || 0).getTime()
+
+    return rightCreatedAt - leftCreatedAt
+  })
+
+const normalizeDefaultWebsiteState = (
+  items: WebsiteCard[],
+  preferredDefaultWebsiteId?: string
+) => {
+  const normalizedPreferredId = String(preferredDefaultWebsiteId || '').trim()
+  const preferredExists = normalizedPreferredId
+    ? items.some((item) => String(item._id || '').trim() === normalizedPreferredId)
+    : false
+
+  if (preferredExists) {
+    return items.map((item) => ({
+      ...item,
+      is_default: String(item._id || '').trim() === normalizedPreferredId,
+    }))
+  }
+
+  const firstDefaultId =
+    items.find((item) => item.is_default)?._id || items[0]?._id || ''
+  const normalizedDefaultId = String(firstDefaultId || '').trim()
+
+  return items.map((item) => ({
+    ...item,
+    is_default:
+      normalizedDefaultId &&
+      String(item._id || '').trim() === normalizedDefaultId,
+  }))
 }
 
 type CityRow = {
@@ -394,6 +435,8 @@ export default function TemplateWorkspace() {
     useState<WebsiteCard | null>(null)
   const [setupMethod, setSetupMethod] = useState<'new' | 'existing'>('existing')
   const [domainModalOpen, setDomainModalOpen] = useState(false)
+  const [resolvedDefaultWebsiteId, setResolvedDefaultWebsiteId] =
+    useState<string>('')
   const { activeWebsiteId, activeWebsite } = useActiveWebsiteSelection(vendorId)
 
   const availableTemplates = useMemo(
@@ -539,7 +582,7 @@ export default function TemplateWorkspace() {
     [availableTemplates.length, selectedCityOption.label, visibleProductsCount, websites.length]
   )
 
-  const loadWorkspace = async () => {
+  const loadWorkspace = async (preferredDefaultWebsiteId?: string) => {
     if (!vendorId && !isAdmin) {
       setLoading(false)
       setWebsites([])
@@ -556,6 +599,7 @@ export default function TemplateWorkspace() {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         timeout: REQUEST_TIMEOUT_MS,
       }
+      const requestTs = Date.now()
 
       const [
         catalogResponse,
@@ -566,8 +610,8 @@ export default function TemplateWorkspace() {
         axios.get(`${BASE_URL}/v1/templates/catalog`, requestConfig),
         axios.get(
           isAdmin
-            ? `${BASE_URL}/v1/templates/by-vendor`
-            : `${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}`,
+            ? `${BASE_URL}/v1/templates/by-vendor?_ts=${requestTs}`
+            : `${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}&_ts=${requestTs}`,
           requestConfig
         ),
         axios.get(`${BASE_URL}/v1/cities?includeInactive=true`, requestConfig),
@@ -600,8 +644,19 @@ export default function TemplateWorkspace() {
           ? (productsResponse.value.data.products as VendorProduct[])
           : []
 
+      const nextResolvedDefaultWebsiteId = String(
+        preferredDefaultWebsiteId ||
+          nextWebsites.find((item) => item.is_default)?._id ||
+          nextWebsites[0]?._id ||
+          ''
+      ).trim()
+      const normalizedWebsites = sortWebsitesByDefault(
+        normalizeDefaultWebsiteState(nextWebsites, nextResolvedDefaultWebsiteId)
+      )
+
       setTemplateCatalog(nextCatalog)
-      setWebsites(nextWebsites)
+      setWebsites(normalizedWebsites)
+      setResolvedDefaultWebsiteId(nextResolvedDefaultWebsiteId)
       setCities(nextCities)
       setProducts(nextProducts)
       setSelectedTemplateKey((current) => {
@@ -718,6 +773,27 @@ export default function TemplateWorkspace() {
     if (!selectedCitySlug) return
     setStoredTemplatePreviewCity(selectedCitySlug)
   }, [selectedCitySlug])
+
+  useEffect(() => {
+    if (!vendorId || isAdmin || !websites.length) return
+
+    const activeWebsiteExists = websites.some(
+      (website) => website._id === activeWebsiteId
+    )
+    if (activeWebsiteExists) return
+
+    const preferredWebsite =
+      websites.find((website) => website.is_default) || websites[0]
+
+    if (!preferredWebsite?._id) return
+
+    setStoredActiveWebsite(vendorId, {
+      id: preferredWebsite._id,
+      name: preferredWebsite.name || preferredWebsite.business_name || '',
+      templateKey: preferredWebsite.template_key || '',
+      websiteSlug: preferredWebsite.website_slug || preferredWebsite._id,
+    })
+  }, [activeWebsiteId, isAdmin, vendorId, websites])
 
   const openCreateDialog = () => {
     if (!isAdmin && vendorProfile) {
@@ -914,6 +990,62 @@ export default function TemplateWorkspace() {
     }
   }
 
+  const handleMakeDefaultWebsite = async (website: WebsiteCard) => {
+    if (!vendorId) {
+      toast.error(
+        'Vendor profile is still loading. Please refresh and try again.'
+      )
+      return
+    }
+
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/v1/templates/website/${website._id}/default`,
+        {},
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
+      )
+
+      const nextDefaultWebsiteId =
+        String(response?.data?.data?._id || website._id).trim() || website._id
+
+      setResolvedDefaultWebsiteId(nextDefaultWebsiteId)
+      setWebsites((current) =>
+        sortWebsitesByDefault(
+          normalizeDefaultWebsiteState(current, nextDefaultWebsiteId)
+        )
+      )
+
+      setStoredActiveWebsite(vendorId, {
+        id: nextDefaultWebsiteId,
+        name:
+          response?.data?.data?.name ||
+          website.name ||
+          website.business_name ||
+          '',
+        templateKey:
+          response?.data?.data?.template_key || website.template_key || '',
+        websiteSlug:
+          response?.data?.data?.website_slug ||
+          website.website_slug ||
+          nextDefaultWebsiteId,
+      })
+
+      await Promise.all([
+        loadWorkspace(nextDefaultWebsiteId),
+        dispatch(fetchVendorProfile()),
+      ])
+      toast.success('Default website updated')
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          'Failed to update default website'
+      )
+    }
+  }
+
   const handleDeleteWebsite = async () => {
     if (!deleteTarget?._id) return
 
@@ -993,6 +1125,20 @@ export default function TemplateWorkspace() {
     }
   }
 
+  const defaultWebsite = useMemo(
+    () =>
+      websites.find((website) => website._id === resolvedDefaultWebsiteId) ||
+      websites.find((website) => website.is_default) ||
+      null,
+    [resolvedDefaultWebsiteId, websites]
+  )
+  const defaultWebsiteName = String(
+    defaultWebsite?.name ||
+      defaultWebsite?.business_name ||
+      defaultWebsite?.template_name ||
+      ''
+  ).trim()
+
   return (
     <>
       <TablePageHeader
@@ -1064,6 +1210,11 @@ export default function TemplateWorkspace() {
                 ? `Browse every vendor website from one place. Preview links currently use ${selectedCityOption.label}.`
                 : `Preview, edit, and manage storefront websites for ${selectedCityOption.label} from here.`}
             </p>
+            {!isAdmin && defaultWebsiteName ? (
+              <p className='mt-2 text-sm font-medium text-blue-700'>
+                Default website: {defaultWebsiteName}
+              </p>
+            ) : null}
           </div>
 
           {loading ? (
@@ -1079,6 +1230,9 @@ export default function TemplateWorkspace() {
             <div className='grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
               {websites.map((website) => {
                 const isActiveWebsite = activeWebsiteId === website._id
+                const isDefaultWebsite =
+                  resolvedDefaultWebsiteId === website._id ||
+                  (!resolvedDefaultWebsiteId && Boolean(website.is_default))
                 const templateKey = String(website.template_key || '').trim()
                 const websiteTemplate = templateByKey.get(templateKey)
                 const previewUrl = getVendorTemplatePreviewUrl(
@@ -1123,9 +1277,9 @@ export default function TemplateWorkspace() {
                               websiteTemplate?.name ||
                               templateKey}
                           </div>
-                          {isActiveWebsite ? (
-                            <div className='inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700'>
-                              Selected Website
+                          {isDefaultWebsite ? (
+                            <div className='inline-flex rounded-full border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700'>
+                              Default Website
                             </div>
                           ) : null}
                         </div>
@@ -1198,17 +1352,38 @@ export default function TemplateWorkspace() {
                       <div
                         className={cn(
                           'mt-auto grid gap-3',
-                          !isAdmin && 'sm:grid-cols-2'
+                          !isAdmin ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'
                         )}
                       >
                         {!isAdmin ? (
-                          <Button
-                            type='button'
-                            onClick={() => handleEditWebsite(website)}
-                            className='h-11 w-full rounded-2xl'
-                          >
-                            Edit Website
-                          </Button>
+                          <>
+                            <Button
+                              type='button'
+                              onClick={() => handleEditWebsite(website)}
+                              className='h-11 w-full rounded-2xl px-4 text-center'
+                            >
+                              Edit Website
+                            </Button>
+                            {isDefaultWebsite ? (
+                              <Button
+                                type='button'
+                                variant='outline'
+                                className='h-11 w-full rounded-2xl border-blue-200 bg-blue-50 px-4 text-center text-blue-700 hover:bg-blue-100'
+                                disabled
+                              >
+                                Default
+                              </Button>
+                            ) : (
+                              <Button
+                                type='button'
+                                variant='outline'
+                                className='h-11 w-full rounded-2xl px-4 text-center'
+                                onClick={() => handleMakeDefaultWebsite(website)}
+                              >
+                                Set Default
+                              </Button>
+                            )}
+                          </>
                         ) : null}
 
                         {previewUrl ? (
@@ -1216,14 +1391,14 @@ export default function TemplateWorkspace() {
                             href={previewUrl}
                             target='_blank'
                             rel='noreferrer'
-                            className='block'
+                            className={cn('block', !isAdmin && 'sm:col-span-2')}
                           >
                             <Button
                               type='button'
                               variant='outline'
-                              className='h-11 w-full rounded-2xl'
+                              className='h-11 w-full rounded-2xl px-4 text-center'
                             >
-                              <ExternalLink className='h-4 w-4' />
+                              <ExternalLink className='h-4 w-4 shrink-0' />
                               Open Preview
                             </Button>
                           </a>
@@ -1231,10 +1406,13 @@ export default function TemplateWorkspace() {
                           <Button
                             type='button'
                             variant='outline'
-                            className='h-11 w-full rounded-2xl'
+                            className={cn(
+                              'h-11 w-full rounded-2xl px-4 text-center',
+                              !isAdmin && 'sm:col-span-2'
+                            )}
                             disabled
                           >
-                            <ExternalLink className='h-4 w-4' />
+                            <ExternalLink className='h-4 w-4 shrink-0' />
                             Preview Unavailable
                           </Button>
                         )}

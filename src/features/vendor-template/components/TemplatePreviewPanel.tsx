@@ -10,13 +10,15 @@ import { cn } from '@/lib/utils'
 
 interface TemplatePreviewPanelProps {
   title: string
-  subtitle: string
+  subtitle?: string
   src?: string
   fullPreviewUrl?: string
   baseSrc?: string
   previewQuery?: string
   defaultPath?: string
   pageOptions?: Array<{ label: string; path: string }>
+  showPageSelector?: boolean
+  showPreviewActions?: boolean
   onSync?: () => Promise<void> | void
   isSyncing?: boolean
   syncDisabled?: boolean
@@ -47,6 +49,8 @@ export function TemplatePreviewPanel({
   previewQuery,
   defaultPath = '',
   pageOptions,
+  showPageSelector = false,
+  showPreviewActions = false,
   onSync,
   isSyncing,
   syncDisabled,
@@ -163,91 +167,100 @@ export function TemplatePreviewPanel({
   }, [onSelectSection, onInlineEdit, vendorId, page, previewOrigin])
 
   return (
-    <div className='rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_30px_60px_-45px_rgba(15,23,42,0.4)] backdrop-blur'>
-      <div className='flex flex-col gap-3'>
-        <div className='flex items-start justify-between gap-3'>
-          <div>
-            <h3 className='text-lg font-semibold text-slate-900'>{title}</h3>
-            <p className='text-xs text-slate-500'>{subtitle}</p>
-          </div>
-          <div className='flex items-center gap-2'>
-            {pageOptions && pageOptions.length > 0 ? (
-              <select
-                className='h-9 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600'
-                value={previewPath}
-                onChange={(event) => setPreviewPath(event.target.value)}
-              >
-                {pageOptions.map((option) => (
-                  <option key={option.path} value={option.path}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-            <Button
-              type='button'
-              variant='outline'
-              size='icon'
-              className={cn(
-                'rounded-full border-slate-200',
-                device === 'desktop' &&
-                  'border-slate-900 bg-slate-900 text-white hover:bg-slate-800'
-              )}
-              onClick={() => setDevice('desktop')}
-            >
-              <Monitor className='h-4 w-4' />
-            </Button>
-            <Button
-              type='button'
-              variant='outline'
-              size='icon'
-              className={cn(
-                'rounded-full border-slate-200',
-                device === 'mobile' &&
-                  'border-slate-900 bg-slate-900 text-white hover:bg-slate-800'
-              )}
-              onClick={() => setDevice('mobile')}
-            >
-              <Smartphone className='h-4 w-4' />
-            </Button>
-          </div>
-        </div>
-
-        <div className='flex flex-wrap items-center gap-2'>
-          <Button
-            type='button'
-            variant='outline'
-            className='border-slate-300'
-            onClick={handleSync}
-            disabled={syncDisabled || isSyncing}
-          >
-            <RefreshCcw className='h-4 w-4' />
-            {isSyncing ? 'Syncing...' : 'Sync + Refresh'}
-          </Button>
-          {computedFullPreviewUrl ? (
-            <a
-              href={computedFullPreviewUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-            >
+    <div className='min-h-full border-l border-slate-200 bg-[#f1f1f1] p-4 lg:p-5'>
+      <div className='flex flex-col gap-4'>
+        <div className='flex flex-col gap-3 border border-slate-200 bg-white p-4'>
+          <div className='flex items-start justify-between gap-3'>
+            <div className='min-w-0'>
+              <h3 className='text-[15px] font-semibold text-slate-900'>{title}</h3>
+              {subtitle ? (
+                <p className='mt-1 text-sm text-slate-500'>{subtitle}</p>
+              ) : null}
+            </div>
+            <div className='flex items-center gap-2'>
+              {showPageSelector && pageOptions && pageOptions.length > 0 ? (
+                <select
+                  className='h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700'
+                  value={previewPath}
+                  onChange={(event) => setPreviewPath(event.target.value)}
+                >
+                  {pageOptions.map((option) => (
+                    <option key={option.path} value={option.path}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
               <Button
                 type='button'
                 variant='outline'
-                className='border-slate-300'
+                size='icon'
+                className={cn(
+                  'rounded-full border-slate-200 bg-white shadow-none',
+                  device === 'desktop' &&
+                    'border-slate-900 bg-slate-900 text-white hover:bg-slate-800'
+                )}
+                onClick={() => setDevice('desktop')}
               >
-                <ExternalLink className='h-4 w-4' /> Full Preview
+                <Monitor className='h-4 w-4' />
               </Button>
-            </a>
+              <Button
+                type='button'
+                variant='outline'
+                size='icon'
+                className={cn(
+                  'rounded-full border-slate-200 bg-white shadow-none',
+                  device === 'mobile' &&
+                    'border-slate-900 bg-slate-900 text-white hover:bg-slate-800'
+                )}
+                onClick={() => setDevice('mobile')}
+              >
+                <Smartphone className='h-4 w-4' />
+              </Button>
+            </div>
+          </div>
+
+          {showPreviewActions ? (
+            <div className='flex flex-wrap items-center gap-2'>
+              <Button
+                variant='outline'
+                className='border-slate-300 bg-white'
+                onClick={handleSync}
+                disabled={syncDisabled || isSyncing}
+              >
+                <RefreshCcw className='h-4 w-4' />
+                {isSyncing ? 'Syncing...' : 'Sync + Refresh'}
+              </Button>
+              {computedFullPreviewUrl ? (
+                <a
+                  href={computedFullPreviewUrl}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                >
+                  <Button
+                    type='button'
+                    variant='outline'
+                    className='border-slate-300 bg-white'
+                  >
+                    <ExternalLink className='h-4 w-4' /> Full Preview
+                  </Button>
+                </a>
+              ) : null}
+            </div>
           ) : null}
+
+          <div className='border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-xs text-slate-500'>
+            Click text directly inside the preview to edit it. Click any block to jump the sidebar to that section.
+          </div>
         </div>
 
-        <div className='rounded-2xl border border-slate-200 bg-slate-50 p-2'>
+        <div className='border border-slate-200 bg-white p-3'>
           {computedSrc ? (
             <div
               className={cn(
-                'overflow-hidden rounded-xl bg-white shadow-inner',
+                'overflow-hidden border border-slate-200 bg-white',
                 device === 'mobile'
-                  ? 'mx-auto w-full max-w-[360px]'
+                  ? 'mx-auto w-full max-w-[390px]'
                   : 'w-full'
               )}
             >
@@ -274,7 +287,7 @@ export function TemplatePreviewPanel({
               />
             </div>
           ) : (
-            <div className='flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white text-center text-sm text-slate-500'>
+            <div className='flex min-h-[320px] flex-col items-center justify-center gap-2 border border-dashed border-slate-300 bg-white text-center text-sm text-slate-500'>
               <p>Preview will appear once vendor data is available.</p>
               <p>Save the template to load the live preview.</p>
             </div>
@@ -282,7 +295,7 @@ export function TemplatePreviewPanel({
         </div>
 
         <p className='text-xs text-slate-500'>
-          Live preview reflects the latest saved template and products.
+          The canvas uses live saved data. Sync after changing text, images, or section order.
         </p>
       </div>
     </div>

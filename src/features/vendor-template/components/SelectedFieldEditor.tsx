@@ -85,9 +85,9 @@ export function SelectedFieldEditor({
   const useTextarea = prefersTextarea(path, rawValue)
 
   return (
-    <div className='rounded-3xl border border-blue-200 bg-blue-50/70 p-5 shadow-sm'>
+    <div className='rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm'>
       <div className='mb-3'>
-        <p className='text-xs font-semibold uppercase tracking-[0.25em] text-blue-600'>
+        <p className='text-xs font-semibold uppercase tracking-[0.25em] text-slate-500'>
           Quick Editor
         </p>
         <h3 className='text-lg font-semibold text-slate-900'>{label || 'Selected field'}</h3>

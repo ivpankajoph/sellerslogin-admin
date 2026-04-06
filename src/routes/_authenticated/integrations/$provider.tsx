@@ -5,7 +5,6 @@ import IntegrationsPage from '@/features/integrations'
 const supportedProviders = [
   'razorpay',
   'cashfree',
-  'cod',
   'delhivery',
   'nimbuspost',
   'google_merchant',

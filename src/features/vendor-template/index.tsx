@@ -2,7 +2,14 @@
 
 import { type JSX, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Link2, Search as SearchIcon, Wand2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  Link2,
+  Search as SearchIcon,
+  Wand2,
+} from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -83,16 +90,15 @@ export default function TemplateForm() {
 
   const handleInlineEdit = (path: string[], value: unknown) => {
     updateField(path, value)
-    setInlineEditVersion((prev) => prev + 1)
   }
 
   const [domainOpen, setDomainOpen] = useState(false)
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
   const [isBuilderOpen, setIsBuilderOpen] = useState(false)
-  const [, setInlineEditVersion] = useState(0)
   const [templateSearchTerm, setTemplateSearchTerm] = useState('')
   const [builderSearchTerm, setBuilderSearchTerm] = useState('')
+  const [expandedSectionId, setExpandedSectionId] = useState('hero')
   const [sectionOrder, setSectionOrder] = useState([
     'branding',
     'hero',
@@ -122,6 +128,7 @@ export default function TemplateForm() {
 
   useEffect(() => {
     if (!selectedSection) return
+    setExpandedSectionId(selectedSection)
     const container = document.querySelector(
       '[data-editor-scroll-container="true"]'
     ) as HTMLElement | null
@@ -287,6 +294,7 @@ export default function TemplateForm() {
   const handleBuilderSearchSelect = (target: BuilderSearchTarget) => {
     setSelectedSection(target.sectionId)
     setSelectedComponent(target.componentId || null)
+    setExpandedSectionId(target.sectionId)
     setBuilderSearchTerm(target.label)
   }
 
@@ -303,6 +311,7 @@ export default function TemplateForm() {
     }
     setSelectedSection(sectionId)
     setSelectedComponent(componentId || null)
+    setExpandedSectionId(sectionId)
   }
 
   const sections = useMemo(
@@ -564,6 +573,42 @@ export default function TemplateForm() {
       .slice(0, 12)
   }, [builderSearchTargets, builderSearchTerm])
 
+  const orderedSections = useMemo(
+    () =>
+      sectionOrder
+        .map((id) => sections.find((section) => section.id === id))
+        .filter((section): section is (typeof sections)[number] => Boolean(section)),
+    [sectionOrder, sections]
+  )
+  const homeSidebarGroups = useMemo(
+    () => [
+      {
+        title: 'Header',
+        items: orderedSections.filter((section) => section.id === 'branding'),
+      },
+      {
+        title: 'Template',
+        items: orderedSections.filter((section) => section.id !== 'branding'),
+      },
+      {
+        title: 'Settings',
+        items: [
+          {
+            id: '__theme',
+            title: 'Theme settings',
+            description: 'Colors, typography, and global style',
+          },
+          {
+            id: '__order',
+            title: 'Section order',
+            description: 'Reorder blocks on the home page',
+          },
+        ],
+      },
+    ],
+    [orderedSections]
+  )
+
   const builderHeaderActions = isBuilderOpen ? (
     <>
       <Button
@@ -593,6 +638,14 @@ export default function TemplateForm() {
         className='h-9 shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-3 text-xs text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 sm:px-4 sm:text-sm'
       >
         {isSubmitting ? 'Saving...' : 'Save Template'}
+      </Button>
+      <Button
+        variant='outline'
+        onClick={handleSubmitWithOrder}
+        disabled={isSubmitting || uploadingPaths.size > 0}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+      >
+        Sync Preview
       </Button>
       {!isAdmin && (
         <Button
@@ -1056,11 +1109,59 @@ export default function TemplateForm() {
       >
         {isBuilderOpen ? (
           <>
-            <div className='rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm'>
-              <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-                Quick Field Search
-              </p>
-              <div className='relative mt-3'>
+            <div className='rounded-[24px] border border-slate-200 bg-white'>
+              <div className='border-b border-slate-200 px-5 py-4'>
+                <h3 className='text-[17px] font-semibold text-slate-900'>Home page</h3>
+              </div>
+              <div className='space-y-6 p-4'>
+                {homeSidebarGroups.map((group) => (
+                  <div key={group.title} className='space-y-2'>
+                    <p className='text-[13px] font-semibold text-slate-800'>{group.title}</p>
+                    <div className='space-y-1'>
+                      {group.items.map((item) => {
+                        const isExpanded = expandedSectionId === item.id
+                        const isSelected = selectedSection === item.id
+                        return (
+                          <button
+                            key={item.id}
+                            type='button'
+                            data-editor-section={item.id}
+                            onClick={() => {
+                              setExpandedSectionId(item.id)
+                              if (!item.id.startsWith('__')) {
+                                setSelectedSection(item.id)
+                              } else {
+                                setSelectedSection(null)
+                                setSelectedComponent(null)
+                              }
+                            }}
+                            className={cn(
+                              'flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left transition',
+                              isExpanded || isSelected
+                                ? 'bg-slate-100 text-slate-900'
+                                : 'bg-transparent text-slate-700 hover:bg-slate-50'
+                            )}
+                          >
+                            <div className='flex items-center gap-3'>
+                              <ChevronRight
+                                className={cn(
+                                  'h-4 w-4 text-slate-400 transition',
+                                  isExpanded && 'rotate-90 text-slate-700'
+                                )}
+                              />
+                              <span className='text-[15px] font-medium'>{item.title}</span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className='rounded-[22px] border border-slate-200 bg-white p-4'>
+              <div className='relative'>
                 <SearchIcon className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
                 <input
                   type='text'
@@ -1072,26 +1173,27 @@ export default function TemplateForm() {
                     event.preventDefault()
                     handleBuilderSearchSelect(filteredBuilderSearchTargets[0])
                   }}
-                  placeholder='Find any editable field (hero, products, story, catalog...)'
+                  placeholder='Search editable content'
                   className='h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10'
                 />
               </div>
               {builderSearchTerm.trim() ? (
-                <div className='mt-3 grid gap-2 sm:grid-cols-2'>
+                <div className='mt-3 space-y-2'>
                   {filteredBuilderSearchTargets.length > 0 ? (
                     filteredBuilderSearchTargets.map((target) => (
                       <button
                         key={target.id}
                         type='button'
                         onClick={() => handleBuilderSearchSelect(target)}
-                        className='rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:border-slate-400 hover:bg-white'
+                        className='flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left transition hover:border-slate-400 hover:bg-white'
                       >
-                        <p className='text-sm font-semibold text-slate-900'>
-                          {target.label}
-                        </p>
-                        <p className='text-xs text-slate-500'>
-                          {sectionTitleById[target.sectionId] || target.sectionId}
-                        </p>
+                        <div>
+                          <p className='text-sm font-semibold text-slate-900'>{target.label}</p>
+                          <p className='text-xs text-slate-500'>
+                            {sectionTitleById[target.sectionId] || target.sectionId}
+                          </p>
+                        </div>
+                        <ChevronRight className='h-4 w-4 text-slate-400' />
                       </button>
                     ))
                   ) : (
@@ -1102,40 +1204,35 @@ export default function TemplateForm() {
                 </div>
               ) : (
                 <p className='mt-2 text-xs text-slate-500'>
-                  Start typing to jump to a section or editable field.
+                  Click preview sections directly or search by content name.
                 </p>
               )}
             </div>
 
-            <SelectedFieldEditor
-              data={data}
-              selectedComponent={selectedComponent}
-              updateField={updateField}
-              handleImageChange={handleImageChange}
-            />
-
-            <ThemeSettingsSection data={data} updateField={updateField} />
-
-            <TemplateSectionOrder
-              title='Home Sections'
-              items={sections}
-              order={sectionOrder}
-              setOrder={setSectionOrder}
-            />
-
-            {sectionOrder.map((sectionId) => (
-              <div
-                key={sectionId}
-                data-editor-section={sectionId}
-                className={
-                  selectedSection === sectionId
-                    ? 'rounded-3xl ring-2 ring-slate-900/15 ring-offset-2 ring-offset-slate-50'
-                    : undefined
-                }
-              >
-                {sectionBlocks[sectionId]}
+            {expandedSectionId === '__theme' ? (
+              <ThemeSettingsSection data={data} updateField={updateField} />
+            ) : expandedSectionId === '__order' ? (
+              <TemplateSectionOrder
+                title='Reorder Home Sections'
+                items={sections}
+                order={sectionOrder}
+                setOrder={setSectionOrder}
+              />
+            ) : expandedSectionId ? (
+              <div className='space-y-4'>
+                {selectedComponent ? (
+                  <SelectedFieldEditor
+                    data={data}
+                    selectedComponent={selectedComponent}
+                    updateField={updateField}
+                    handleImageChange={handleImageChange}
+                  />
+                ) : null}
+                <div data-editor-section={expandedSectionId}>
+                  {sectionBlocks[expandedSectionId]}
+                </div>
               </div>
-            ))}
+            ) : null}
           </>
         ) : null}
       </TemplatePageLayout>

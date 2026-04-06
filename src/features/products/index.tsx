@@ -8,8 +8,10 @@ import {
   FileText,
   HelpCircle,
   ImageIcon,
+  Layers3,
   Loader2,
   Pencil,
+  Trash2,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { formatINR } from '@/lib/currency'
@@ -56,7 +58,6 @@ import { TableShell } from '@/components/data-table/table-shell'
 import { Main } from '@/components/layout/main'
 import { LinkedText } from './components/linked-text'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
 
 type ProductCategoryRef =
   | string
@@ -574,6 +575,132 @@ function ProductBadgeList({
   )
 }
 
+function ProductCategorizationSection({
+  product,
+  categoryLookup,
+}: {
+  product: Product
+  categoryLookup: CategoryLookup
+}) {
+  const categorization = useMemo(() => {
+    const categoryRefs = uniqueRefs([
+      ...(Array.isArray(product.productCategories)
+        ? product.productCategories
+        : []),
+      ...(product.productCategory ? [product.productCategory] : []),
+    ])
+
+    const subcategoryRefs = uniqueRefs(product.productSubCategories || [])
+
+    const groups: { categoryName: string; subcategories: string[] }[] = []
+    const categoryIdToIdx = new Map<string, number>()
+
+    categoryRefs.forEach((catRef) => {
+      const ref = toRef(catRef)
+      const catalogCategory = getCatalogCategory(catRef, categoryLookup)
+      const name = toRef(catalogCategory || ref).name
+      const id = toRef(catalogCategory || ref).id
+      if (name) {
+        categoryIdToIdx.set(id || name, groups.length)
+        groups.push({ categoryName: name, subcategories: [] })
+      }
+    })
+
+    subcategoryRefs.forEach((subRef) => {
+      const ref = toRef(subRef)
+      const explicitCategoryId = toSubcategoryCategoryId(subRef)
+      const matched =
+        (ref.id && categoryLookup.subcategoryById.get(ref.id)) ||
+        (ref.name &&
+          categoryLookup.subcategoryByName.get(normalizeSearchValue(ref.name)))
+
+      const name = matched?.name || ref.name
+      const categoryId = matched?.categoryId || explicitCategoryId
+
+      if (name) {
+        if (categoryId && categoryIdToIdx.has(categoryId)) {
+          groups[categoryIdToIdx.get(categoryId)!].subcategories.push(name)
+        } else if (categoryId) {
+          const parent = categoryLookup.categoryById.get(categoryId)
+          if (parent?.name) {
+            const existingIdx = groups.findIndex(
+              (g) => g.categoryName === parent.name
+            )
+            if (existingIdx !== -1) {
+              groups[existingIdx].subcategories.push(name)
+            } else {
+              groups.push({ categoryName: parent.name, subcategories: [name] })
+            }
+          } else {
+            groups.push({ categoryName: '', subcategories: [name] })
+          }
+        } else {
+          groups.push({ categoryName: '', subcategories: [name] })
+        }
+      }
+    })
+
+    return groups.filter((g) => g.categoryName || g.subcategories.length > 0)
+  }, [product, categoryLookup])
+
+  if (!categorization.length) {
+    return (
+      <ProductDetailCard
+        label='Categorization'
+        className='col-span-full border-dashed shadow-none'
+      >
+        <span className='text-muted-foreground text-sm italic'>
+          No categories or subcategories found
+        </span>
+      </ProductDetailCard>
+    )
+  }
+
+  return (
+    <div className={cn(DETAILS_CARD_CLASSNAME, 'col-span-full bg-slate-50/30')}>
+      <p className='text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wider'>
+        Classification
+      </p>
+      <div className='grid gap-4 sm:grid-cols-2'>
+        {categorization.map((group, idx) => (
+          <div key={idx} className='relative'>
+            <div className='flex flex-col gap-2'>
+              {group.categoryName && (
+                <div className='flex items-center gap-2'>
+                  <div className='bg-primary/10 text-primary group flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-primary/20 transition hover:bg-primary/15'>
+                    <Layers3 className='h-3 w-3' />
+                    {group.categoryName}
+                  </div>
+                </div>
+              )}
+              {group.subcategories.length > 0 && (
+                <div
+                  className={cn(
+                    'flex flex-wrap gap-1.5',
+                    group.categoryName
+                      ? 'ml-3 border-l-2 border-slate-200 py-0.5 pl-3'
+                      : ''
+                  )}
+                >
+                  {group.subcategories.map((sub, sIdx) => (
+                    <Badge
+                      key={sIdx}
+                      variant='secondary'
+                      className='bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm ring-1 ring-slate-200'
+                    >
+                      {sub}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const buildProductEditorUrl = (productId: string) =>
   `/products/create-products?mode=edit&productId=${encodeURIComponent(productId)}`
 
@@ -668,18 +795,10 @@ function ProductDetailsDialog({
               />
             </div>
             <div className='grid gap-4 sm:grid-cols-2'>
-              <ProductDetailCard label='Categories'>
-                <ProductBadgeList
-                  items={categoryNames}
-                  emptyLabel='No categories mapped'
-                />
-              </ProductDetailCard>
-              <ProductDetailCard label='Subcategories'>
-                <ProductBadgeList
-                  items={subcategoryNames}
-                  emptyLabel='No subcategories mapped'
-                />
-              </ProductDetailCard>
+              <ProductCategorizationSection
+                product={product}
+                categoryLookup={categoryLookup}
+              />
               <ProductDetailCard label='Price Range'>
                 {getPriceRange(product.variants)}
               </ProductDetailCard>

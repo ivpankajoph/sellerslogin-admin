@@ -36,7 +36,10 @@ import {
   normalizeVendorPageAccess,
   resolveVendorPageAccessKey,
 } from '@/features/team-access/access-config'
-import { getStoredActiveWebsiteId } from '@/features/vendor-template/components/websiteStudioStorage'
+import {
+  getStoredActiveWebsiteId,
+  setStoredActiveWebsite,
+} from '@/features/vendor-template/components/websiteStudioStorage'
 import { UpgradePlanDialog } from '@/features/dashboard/components/UpgradePlanDialog'
 import type { BillingSummary } from '@/features/plans/shared'
 
@@ -127,6 +130,13 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const navigate = useNavigate()
   const pathname = useLocation({ select: (location) => location.pathname })
   const authUser = useSelector((state: any) => state.auth?.user || null)
+  const vendorProfile = useSelector(
+    (state: any) =>
+      state.vendorprofile?.profile?.vendor ||
+      state.vendorprofile?.profile?.data ||
+      state.vendorprofile?.profile ||
+      null
+  )
   const contentViewportRef = useRef<HTMLDivElement | null>(null)
   const lastLoggedPathRef = useRef('')
   const [loaderRect, setLoaderRect] = useState<LoaderViewportRect | null>(null)
@@ -139,6 +149,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
       ),
   })
   const isAnalytics = pathname.startsWith('/analytics')
+  const isThemeEditor = pathname.startsWith('/vendor-template')
   const content = children ?? <Outlet />
   const showNavigationLoader = isNavigating
   const effectiveRole =
@@ -191,6 +202,35 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
       website_id: pageKey === 'my_websites' ? websiteId : '',
     })
   }, [isVendorTeamUser, pathname, vendorId, vendorPageAccess])
+
+  useEffect(() => {
+    if (!isVendor || !vendorId) return
+
+    const currentWebsiteId = getStoredActiveWebsiteId(vendorId)
+    if (currentWebsiteId) return
+
+    const source = vendorProfile || authUser || {}
+    const defaultWebsiteId = String(
+      source?.default_website_id || source?.defaultWebsiteId || ''
+    ).trim()
+
+    if (!defaultWebsiteId) return
+
+    setStoredActiveWebsite(vendorId, {
+      id: defaultWebsiteId,
+      name: String(
+        source?.default_website_name || source?.defaultWebsiteName || ''
+      ).trim(),
+      templateKey: String(
+        source?.default_website_template_key ||
+          source?.defaultWebsiteTemplateKey ||
+          ''
+      ).trim(),
+      websiteSlug: String(
+        source?.default_website_slug || source?.defaultWebsiteSlug || ''
+      ).trim(),
+    })
+  }, [authUser, isVendor, vendorId, vendorProfile])
 
   useEffect(() => {
     if (!showNavigationLoader) {
@@ -280,6 +320,44 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                 <ContentNavigationLoader rect={loaderRect} />
               ) : null}
             </div>
+          </LayoutProvider>
+        </SearchProvider>
+      </VendorIntegrationsProvider>
+    )
+  }
+
+  if (isThemeEditor) {
+    return (
+      <VendorIntegrationsProvider>
+        <SearchProvider>
+          <LayoutProvider>
+            <SidebarProvider defaultOpen={false}>
+              <div className='vendor-flow dashboard-square min-h-svh w-full bg-[#f6f6f7]'>
+                <div ref={contentViewportRef} className='relative min-h-svh w-full'>
+                  {content}
+                  <CreatePasswordModal />
+                </div>
+                {showNavigationLoader ? (
+                  <ContentNavigationLoader rect={loaderRect} />
+                ) : null}
+                {isVendor && !isVendorTeamUser ? (
+                  <UpgradePlanDialog
+                    open={upgradeDialogOpen}
+                    onOpenChange={setUpgradeDialogOpen}
+                    userName={authUser?.name}
+                    userEmail={authUser?.email}
+                    onPlanActivated={async () => {
+                      try {
+                        const res = await api.get('/billing/summary')
+                        setBillingSummary((res.data?.data || null) as BillingSummary | null)
+                      } catch {
+                        return
+                      }
+                    }}
+                  />
+                ) : null}
+              </div>
+            </SidebarProvider>
           </LayoutProvider>
         </SearchProvider>
       </VendorIntegrationsProvider>

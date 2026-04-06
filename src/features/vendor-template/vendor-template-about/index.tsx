@@ -456,6 +456,16 @@ function VendorTemplateAbout() {
             ? 'Saving...'
             : 'Save Template'}
       </Button>
+      <Button
+        variant='outline'
+        onClick={() => {
+          void handleSave({ silent: true })
+        }}
+        disabled={isSaving || uploadingPaths.size > 0 || !vendor_id}
+        className='h-9 shrink-0 whitespace-nowrap rounded-full border-slate-300 px-3 text-xs sm:px-4 sm:text-sm'
+      >
+        Sync Preview
+      </Button>
       {!isAdmin && (
         <Button
           variant='outline'
@@ -1014,8 +1024,8 @@ function VendorTemplateAbout() {
       </Header>
       <Toaster position='top-right' />
       <TemplatePageLayout
-        title='About Page Builder'
-        description='Tell your story, highlight your values, and introduce the team. Reorder sections to control how the narrative flows.'
+        title='About'
+        description='Edit the about page and preview updates in real time.'
         activeKey='about'
         vendorId={vendor_id}
         connectedDomainHost={connectedDomain?.hostname || ''}
@@ -1023,8 +1033,7 @@ function VendorTemplateAbout() {
         editingTemplateKey={selectedTemplateKey}
         preview={
           <TemplatePreviewPanel
-            title='Live About Preview'
-            subtitle={`Sync to refresh the right-side preview. Default city: ${previewCity.label}`}
+            title='About Preview'
             baseSrc={previewBaseUrl}
             previewQuery='?previewChrome=content-only'
             defaultPath='/about'
@@ -1053,16 +1062,14 @@ function VendorTemplateAbout() {
         <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
           <div className='flex flex-col gap-2'>
             <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
-              Quick About Editor
+              Quick Editor
             </p>
             <h3 className='text-xl font-semibold text-slate-900'>
-              Edit the exact content vendors see in About preview
+              Edit the About page content
             </h3>
             <p className='text-sm text-slate-600'>
-              Blog editor ki tarah yahan se About page ka main heading, subtitle,
-              story, aur fallback business details directly edit kar sakte ho.
-              Agar About title/subtitle blank chhode jaate hain, preview vendor
-              profile details se auto-generate hota hai.
+              Update the main heading, story, and fallback business details used
+              when About content is empty.
             </p>
           </div>
 
@@ -1161,9 +1168,8 @@ function VendorTemplateAbout() {
                 Fallback Business Details
               </h4>
               <p className='text-xs text-slate-600'>
-                Ye details tab use hoti hain jab About content blank hota hai.
-                Isse auto-generated title/subtitle aur story text bhi better ho
-                jayega.
+                These details are used when About content is empty and help
+                generate a better default title, subtitle, and story.
               </p>
             </div>
 

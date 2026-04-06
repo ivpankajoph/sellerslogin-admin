@@ -15,6 +15,14 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -96,6 +104,12 @@ type MultiSelectOption = {
 }
 
 type LocationManagerView = 'cities' | 'countries'
+
+type QueuedCity = {
+  name: string
+  state: string
+  country: string
+}
 
 type CountrySummaryRow = {
   activeCityCount: number
@@ -261,6 +275,107 @@ const FALLBACK_COUNTRY_CONFIGS: CountryOption[] = [
     ],
   },
   { code: 'SG', name: 'Singapore', states: ['Singapore'] },
+]
+
+export const INDIAN_CITIES = [
+  { name: 'Mumbai', state: 'Maharashtra', country: 'India' },
+  { name: 'Delhi', state: 'Delhi', country: 'India' },
+  { name: 'Bangalore', state: 'Karnataka', country: 'India' },
+  { name: 'Hyderabad', state: 'Telangana', country: 'India' },
+  { name: 'Ahmedabad', state: 'Gujarat', country: 'India' },
+  { name: 'Chennai', state: 'Tamil Nadu', country: 'India' },
+  { name: 'Kolkata', state: 'West Bengal', country: 'India' },
+  { name: 'Surat', state: 'Gujarat', country: 'India' },
+  { name: 'Pune', state: 'Maharashtra', country: 'India' },
+  { name: 'Jaipur', state: 'Rajasthan', country: 'India' },
+  { name: 'Lucknow', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Kanpur', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Nagpur', state: 'Maharashtra', country: 'India' },
+  { name: 'Indore', state: 'Madhya Pradesh', country: 'India' },
+  { name: 'Thane', state: 'Maharashtra', country: 'India' },
+  { name: 'Bhopal', state: 'Madhya Pradesh', country: 'India' },
+  { name: 'Visakhapatnam', state: 'Andhra Pradesh', country: 'India' },
+  { name: 'Pimpri-Chinchwad', state: 'Maharashtra', country: 'India' },
+  { name: 'Patna', state: 'Bihar', country: 'India' },
+  { name: 'Vadodara', state: 'Gujarat', country: 'India' },
+  { name: 'Ghaziabad', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Ludhiana', state: 'Punjab', country: 'India' },
+  { name: 'Agra', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Nashik', state: 'Maharashtra', country: 'India' },
+  { name: 'Faridabad', state: 'Haryana', country: 'India' },
+  { name: 'Meerut', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Rajkot', state: 'Gujarat', country: 'India' },
+  { name: 'Kalyan-Dombivli', state: 'Maharashtra', country: 'India' },
+  { name: 'Vasai-Virar', state: 'Maharashtra', country: 'India' },
+  { name: 'Varanasi', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Srinagar', state: 'Jammu and Kashmir', country: 'India' },
+  { name: 'Aurangabad', state: 'Maharashtra', country: 'India' },
+  { name: 'Dhanbad', state: 'Jharkhand', country: 'India' },
+  { name: 'Amritsar', state: 'Punjab', country: 'India' },
+  { name: 'Navi Mumbai', state: 'Maharashtra', country: 'India' },
+  { name: 'Allahabad', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Ranchi', state: 'Jharkhand', country: 'India' },
+  { name: 'Howrah', state: 'West Bengal', country: 'India' },
+  { name: 'Jabalpur', state: 'Madhya Pradesh', country: 'India' },
+  { name: 'Gwalior', state: 'Madhya Pradesh', country: 'India' },
+  { name: 'Vijayawada', state: 'Andhra Pradesh', country: 'India' },
+  { name: 'Jodhpur', state: 'Rajasthan', country: 'India' },
+  { name: 'Madurai', state: 'Tamil Nadu', country: 'India' },
+  { name: 'Raipur', state: 'Chhattisgarh', country: 'India' },
+  { name: 'Kota', state: 'Rajasthan', country: 'India' },
+  { name: 'Guwahati', state: 'Assam', country: 'India' },
+  { name: 'Chandigarh', state: 'Chandigarh', country: 'India' },
+  { name: 'Solapur', state: 'Maharashtra', country: 'India' },
+  { name: 'Hubli–Dharwad', state: 'Karnataka', country: 'India' },
+  { name: 'Bareilly', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Moradabad', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Mysore', state: 'Karnataka', country: 'India' },
+  { name: 'Gurgaon', state: 'Haryana', country: 'India' },
+  { name: 'Aligarh', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Jalandhar', state: 'Punjab', country: 'India' },
+  { name: 'Tiruchirappalli', state: 'Tamil Nadu', country: 'India' },
+  { name: 'Bhubaneswar', state: 'Odisha', country: 'India' },
+  { name: 'Salem', state: 'Tamil Nadu', country: 'India' },
+  { name: 'Mira-Bhayandar', state: 'Maharashtra', country: 'India' },
+  { name: 'Warangal', state: 'Telangana', country: 'India' },
+  { name: 'Guntur', state: 'Andhra Pradesh', country: 'India' },
+  { name: 'Bhiwandi', state: 'Maharashtra', country: 'India' },
+  { name: 'Saharanpur', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Gorakhpur', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Bikaner', state: 'Rajasthan', country: 'India' },
+  { name: 'Amravati', state: 'Maharashtra', country: 'India' },
+  { name: 'Noida', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Jamshedpur', state: 'Jharkhand', country: 'India' },
+  { name: 'Bhilai', state: 'Chhattisgarh', country: 'India' },
+  { name: 'Cuttack', state: 'Odisha', country: 'India' },
+  { name: 'Firozabad', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Kochi', state: 'Kerala', country: 'India' },
+  { name: 'Bhavnagar', state: 'Gujarat', country: 'India' },
+  { name: 'Dehradun', state: 'Uttarakhand', country: 'India' },
+  { name: 'Durgapur', state: 'West Bengal', country: 'India' },
+  { name: 'Asansol', state: 'West Bengal', country: 'India' },
+  { name: 'Nanded', state: 'Maharashtra', country: 'India' },
+  { name: 'Kolhapur', state: 'Maharashtra', country: 'India' },
+  { name: 'Ajmer', state: 'Rajasthan', country: 'India' },
+  { name: 'Gulbarga', state: 'Karnataka', country: 'India' },
+  { name: 'Jamnagar', state: 'Gujarat', country: 'India' },
+  { name: 'Ujjain', state: 'Madhya Pradesh', country: 'India' },
+  { name: 'Loni', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Siliguri', state: 'West Bengal', country: 'India' },
+  { name: 'Jhansi', state: 'Uttar Pradesh', country: 'India' },
+  { name: 'Ulhasnagar', state: 'Maharashtra', country: 'India' },
+  { name: 'Nellore', state: 'Andhra Pradesh', country: 'India' },
+  { name: 'Jammu', state: 'Jammu and Kashmir', country: 'India' },
+  { name: 'Sangli-Miraj & Kupwad', state: 'Maharashtra', country: 'India' },
+  { name: 'Belgaum', state: 'Karnataka', country: 'India' },
+  { name: 'Mangalore', state: 'Karnataka', country: 'India' },
+  { name: 'Ambattur', state: 'Tamil Nadu', country: 'India' },
+  { name: 'Tirunelveli', state: 'Tamil Nadu', country: 'India' },
+  { name: 'Malegaon', state: 'Maharashtra', country: 'India' },
+  { name: 'Gaya', state: 'Bihar', country: 'India' },
+  { name: 'Jalgaon', state: 'Maharashtra', country: 'India' },
+  { name: 'Udaipur', state: 'Rajasthan', country: 'India' },
+  { name: 'Maheshtala', state: 'West Bengal', country: 'India' },
 ]
 
 const DEFAULT_FORM = {
@@ -494,6 +609,7 @@ const SearchableMultiSelect = ({
   disabled,
   loading,
   triggerFlag,
+  headerAction,
 }: {
   values: string[]
   options: MultiSelectOption[]
@@ -504,6 +620,7 @@ const SearchableMultiSelect = ({
   disabled?: boolean
   loading?: boolean
   triggerFlag?: string
+  headerAction?: React.ReactNode | ((close: () => void) => React.ReactNode)
 }) => {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -582,6 +699,14 @@ const SearchableMultiSelect = ({
             className='h-10 rounded-md'
           />
         </div>
+
+        {headerAction ? (
+          <div className='bg-muted/30 border-b px-2 py-1.5'>
+            {typeof headerAction === 'function'
+              ? headerAction(() => setOpen(false))
+              : headerAction}
+          </div>
+        ) : null}
 
         <div
           className='max-h-72 overflow-y-auto overscroll-contain'
@@ -715,8 +840,9 @@ export default function CitiesPage() {
   const [statesLoading, setStatesLoading] = useState(false)
   const [statesError, setStatesError] = useState('')
   const [discoveredCities, setDiscoveredCities] = useState<string[]>([])
-  const [queuedCities, setQueuedCities] = useState<string[]>([])
+  const [queuedCities, setQueuedCities] = useState<QueuedCity[]>([])
   const [loadingStateCities, setLoadingStateCities] = useState(false)
+  const [manualCityDialogOpen, setManualCityDialogOpen] = useState(false)
 
   const vendorRegistrationCountry =
     normalizeText(vendorProfile?.country || authUser?.country) || 'India'
@@ -880,6 +1006,7 @@ export default function CitiesPage() {
     setStatesError('')
     setDiscoveredCities([])
     setQueuedCities([])
+    setManualCityDialogOpen(false)
   }, [])
 
   const loadCities = useCallback(async () => {
@@ -951,7 +1078,6 @@ export default function CitiesPage() {
       )
     } catch (fetchError: any) {
       setCountries([])
-      setCountriesError(fetchError?.message || 'Failed to load countries')
     } finally {
       setCountriesLoading(false)
     }
@@ -1024,12 +1150,10 @@ export default function CitiesPage() {
     const countryKey = normalizeSearchValue(safeCountry)
     if (!countryKey) {
       setStatesLoading(false)
-      setStatesError('')
       return
     }
 
     if (Object.prototype.hasOwnProperty.call(statesByCountry, countryKey)) {
-      setStatesError('')
       setStatesLoading(false)
       return
     }
@@ -1176,20 +1300,46 @@ export default function CitiesPage() {
     ).sort((a, b) => a.localeCompare(b))
   }, [cityLocationRows, countryFilter])
 
-  const discoveredCityOptions = useMemo<MultiSelectOption[]>(
-    () =>
-      discoveredCities.map((cityName) => ({
-        value: cityName,
-        label: cityName,
+  const globalCitiesOptions = useMemo<MultiSelectOption[]>(() => {
+    const options: MultiSelectOption[] = []
+    const seen = new Set<string>()
+
+    // Add static known cities first
+    INDIAN_CITIES.forEach((city) => {
+      const key = normalizeSearchValue(city.name)
+      if (seen.has(key)) return
+      seen.add(key)
+      options.push({
+        value: city.name,
+        label: city.name,
+        flag: getFlagEmoji('IN'),
+        meta: `${city.state}, India`,
+      })
+    })
+
+    // Add discovered cities from API if any
+    discoveredCities.forEach((city) => {
+      const key = normalizeSearchValue(city)
+      if (seen.has(key)) return
+      seen.add(key)
+      options.push({
+        value: city,
+        label: city,
         flag: getResolvedCountryMeta(form.country).flag,
-        meta: form.state || form.country || '',
-      })),
-    [discoveredCities, form.country, form.state, getResolvedCountryMeta]
-  )
+        meta: `${form.state || ''}, ${form.country}`,
+      })
+    })
+
+    return options.sort((a, b) => a.label.localeCompare(b.label))
+  }, [discoveredCities, form.country, form.state, getResolvedCountryMeta])
 
   const selectedDiscoveredCities = useMemo(
     () =>
-      queuedCities.filter((cityName) => discoveredCities.includes(cityName)),
+      queuedCities.filter((city) => {
+        const isDiscovered = discoveredCities.includes(city.name)
+        const isStatic = INDIAN_CITIES.some((c) => c.name === city.name)
+        return isDiscovered || isStatic
+      }),
     [discoveredCities, queuedCities]
   )
 
@@ -1361,50 +1511,99 @@ export default function CitiesPage() {
   }
 
   const handleSuggestedCitiesChange = (values: string[]) => {
-    const selectedDiscoveredSet = new Set(discoveredCities)
-    setQueuedCities((current) =>
-      uniqueStrings([
-        ...current.filter((cityName) => !selectedDiscoveredSet.has(cityName)),
-        ...values,
-      ]).sort((a, b) => a.localeCompare(b))
-    )
+    // Detect if a new city was added
+    const lastAdded = values.length > queuedCities.length ? values[values.length - 1] : null
+    
+    if (lastAdded) {
+      // Find the full city metadata
+      const staticCity = INDIAN_CITIES.find((c) => c.name === lastAdded)
+      const nextCity: QueuedCity = staticCity
+        ? {
+            name: staticCity.name,
+            state: staticCity.state,
+            country: staticCity.country,
+          }
+        : {
+            name: lastAdded,
+            state: form.state,
+            country: form.country,
+          }
+
+      // Update form state for auto-selection if it's a known city
+      if (staticCity) {
+        setForm((current) => ({
+          ...current,
+          state: staticCity.state,
+          country: staticCity.country,
+        }))
+      }
+
+      setQueuedCities((current) => {
+        const next = [...current, nextCity]
+        return next.sort((a, b) => a.name.localeCompare(b.name))
+      })
+    } else {
+      // It's a removal
+      setQueuedCities((current) => {
+        const next = current.filter((city) => values.includes(city.name))
+        return next.sort((a, b) => a.name.localeCompare(b.name))
+      })
+    }
   }
 
   const handleAddManualCity = () => {
     if (editingCity) return
-    if (!form.state) {
-      toast.error('Select a state first')
-      return
+
+    const manualCity: QueuedCity = {
+      name: toTitleCase(normalizeText(form.name)),
+      state: form.state,
+      country: form.country,
     }
 
-    const manualCity = toTitleCase(normalizeText(form.name))
-    if (!manualCity) {
+    if (!manualCity.name) {
       toast.error('Type a manual city name first')
       return
     }
 
     setQueuedCities((current) =>
-      uniqueStrings([...current, manualCity]).sort((a, b) => a.localeCompare(b))
+      [...current, manualCity].sort((a, b) => a.name.localeCompare(b.name))
     )
     setForm((current) => ({ ...current, name: '' }))
+    setManualCityDialogOpen(false) // Close the popup after adding
+  }
+
+  const handleDiscoveredCitiesChange = (discoveredCities: string[]) => {
+    const nextCities: QueuedCity[] = discoveredCities.map((cityName) => ({
+      name: cityName,
+      state: form.state,
+      country: form.country,
+    }))
+
+    setQueuedCities((current) => {
+      const merged = [...current]
+      nextCities.forEach((city) => {
+        if (!merged.some((m) => m.name === city.name && m.state === city.state)) {
+          merged.push(city)
+        }
+      })
+      return merged.sort((a, b) => a.name.localeCompare(b.name))
+    })
   }
 
   const handleQueueAllDiscovered = () => {
-    if (editingCity) return
-    if (!discoveredCities.length) {
-      toast.error('No state cities available to add')
-      return
-    }
-
-    setQueuedCities((current) =>
-      uniqueStrings([...current, ...discoveredCities]).sort((a, b) =>
-        a.localeCompare(b)
-      )
-    )
+    handleDiscoveredCitiesChange(discoveredCities)
   }
 
-  const handleRemoveQueuedCity = (cityName: string) => {
-    setQueuedCities((current) => current.filter((item) => item !== cityName))
+  const handleRemoveQueuedCity = (cityToRemove: QueuedCity) => {
+
+    setQueuedCities((current) =>
+      current.filter(
+        (city) =>
+          city.name !== cityToRemove.name ||
+          city.state !== cityToRemove.state ||
+          city.country !== cityToRemove.country
+      )
+    )
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -1413,10 +1612,6 @@ export default function CitiesPage() {
     if (!token) return
     if (!form.country) {
       toast.error('Country is required')
-      return
-    }
-    if (!form.state) {
-      toast.error('State is required')
       return
     }
 
@@ -2207,13 +2402,13 @@ export default function CitiesPage() {
           if (!open) resetSheetState()
         }}
       >
-        <SheetContent side='right' className='w-full gap-0 p-0 sm:max-w-2xl'>
+        <SheetContent side='right' className='w-full gap-0 p-0 sm:max-w-2xl text-slate-900'>
           <SheetHeader className='border-b px-5 py-5 pr-14 text-left'>
             <SheetTitle>{editingCity ? 'Edit City' : 'Create City'}</SheetTitle>
             <SheetDescription>
               {editingCity
                 ? 'Update one city from your current list.'
-                : 'Choose a country and state, then search and select one or more cities from the dropdown.'}
+                : 'Search for any city directly. We will auto-detect the state and country for you.'}
             </SheetDescription>
           </SheetHeader>
           <form
@@ -2221,47 +2416,18 @@ export default function CitiesPage() {
             className='flex min-h-0 flex-1 flex-col overflow-hidden'
           >
             <div className='flex-1 overflow-y-auto px-5 py-5'>
-              <div className='grid gap-3 sm:grid-cols-3'>
-                <div className='bg-background rounded-md border px-4 py-3 shadow-sm'>
-                  <p className='text-muted-foreground text-xs font-medium'>
-                    Country
-                  </p>
-                  <div className='mt-1 flex items-center gap-2 text-sm font-semibold'>
-                    <CountryFlag country={selectedFormCountry} />
-                    <span>{selectedFormCountry.name}</span>
-                  </div>
-                </div>
-                <div className='bg-background rounded-md border px-4 py-3 shadow-sm'>
-                  <p className='text-muted-foreground text-xs font-medium'>
-                    Selected state
-                  </p>
-                  <p className='mt-1 text-sm font-semibold'>
-                    {form.state || 'Choose state'}
-                  </p>
-                </div>
-                <div className='bg-background rounded-md border px-4 py-3 shadow-sm'>
-                  <p className='text-muted-foreground text-xs font-medium'>
-                    Available state cities
-                  </p>
-                  <p className='mt-1 text-sm font-semibold'>
-                    {loadingStateCities
-                      ? 'Loading...'
-                      : discoveredCities.length}
-                  </p>
-                </div>
-              </div>
 
-              <div className='mt-5 grid gap-4 sm:grid-cols-2'>
-                <div className='space-y-2'>
-                  <label className='text-sm font-medium'>Country</label>
+              <div className='mt-3 grid gap-4 sm:grid-cols-2'>
+                <div className='space-y-1.5'>
+                  <label className='text-[10px] font-bold text-slate-500 uppercase tracking-wider'>Country</label>
                   <Select
                     value={form.country}
                     onValueChange={handleCountryChange}
                   >
-                    <SelectTrigger className='h-11'>
+                    <SelectTrigger className='h-11 bg-slate-50 border-slate-200'>
                       <span className='flex items-center gap-2 truncate'>
                         <CountryFlag country={selectedFormCountry} />
-                        <span className='truncate'>
+                        <span className='truncate font-medium'>
                           {countriesLoading && !countryOptions.length
                             ? 'Loading countries...'
                             : selectedFormCountry.name}
@@ -2279,26 +2445,16 @@ export default function CitiesPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {countriesLoading ? (
-                    <p className='text-muted-foreground text-xs'>
-                      Loading countries and flags...
-                    </p>
-                  ) : null}
-                  {countriesError ? (
-                    <p className='text-xs text-amber-700'>
-                      {countriesError}. Showing fallback country list.
-                    </p>
-                  ) : null}
                 </div>
 
-                <div className='space-y-2'>
-                  <label className='text-sm font-medium'>State</label>
+                <div className='space-y-1.5'>
+                  <label className='text-[10px] font-bold text-slate-500 uppercase tracking-wider'>State</label>
                   <Select value={form.state} onValueChange={handleStateChange}>
-                    <SelectTrigger className='h-11'>
-                      <span className='truncate'>
+                    <SelectTrigger className='h-11 bg-slate-50 border-slate-200'>
+                      <span className='truncate font-medium'>
                         {form.state ||
                           (statesLoading
-                            ? 'Loading states...'
+                            ? 'Loading...'
                             : 'Select state')}
                       </span>
                     </SelectTrigger>
@@ -2316,71 +2472,130 @@ export default function CitiesPage() {
                       )}
                     </SelectContent>
                   </Select>
-                  {statesLoading ? (
-                    <p className='text-muted-foreground text-xs'>
-                      Loading state data for {selectedFormCountry.name}...
-                    </p>
-                  ) : (
-                    <p className='text-muted-foreground text-xs'>
-                      {selectedCountryStateOptions.length
-                        ? `${selectedCountryStateOptions.length} states available`
-                        : 'No API state data available for this country yet.'}
-                    </p>
-                  )}
-                  {statesError ? (
-                    <p className='text-xs text-amber-700'>
-                      {statesError}. Showing saved state options where
-                      available.
-                    </p>
-                  ) : null}
                 </div>
               </div>
 
               {!editingCity ? (
-                <div className='bg-background mt-5 rounded-md border p-4 shadow-sm'>
-                  <div className='space-y-2'>
+                <div className='bg-background mt-5 rounded-md border p-6 shadow-sm space-y-6'>
+                  <div className='space-y-3'>
                     <div className='flex items-center justify-between gap-3'>
-                      <label className='text-sm font-medium'>
-                        Cities from selected state
+                      <label className='text-sm font-bold text-slate-800'>
+                        Cities Discovery
                       </label>
-                      <Badge variant='outline' className='rounded-md'>
-                        {selectedDiscoveredCities.length} selected
+                      <Badge variant='outline' className='rounded-md bg-primary/5 text-primary border-primary/20 font-semibold'>
+                        {queuedCities.length} In Queue
                       </Badge>
                     </div>
                     <SearchableMultiSelect
-                      values={selectedDiscoveredCities}
-                      options={discoveredCityOptions}
+                      values={queuedCities.map((c) => c.name)}
+                      options={globalCitiesOptions}
                       onChange={handleSuggestedCitiesChange}
-                      placeholder={
-                        form.state
-                          ? 'Search and select cities'
-                          : 'Select state first'
-                      }
-                      searchPlaceholder={
-                        form.state
-                          ? `Search cities in ${form.state}`
-                          : 'Select state first'
-                      }
-                      emptyLabel={
-                        form.state
-                          ? 'No cities found for this state.'
-                          : 'Select state first'
-                      }
-                      disabled={!form.state}
+                      placeholder='Search and select cities (e.g. Mumbai)'
+                      searchPlaceholder='Type city name...'
+                      emptyLabel='City not found.'
                       loading={loadingStateCities}
                       triggerFlag={selectedFormCountry.flag}
+                      headerAction={(close) => (
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='sm'
+                          className='w-full justify-start text-xs text-primary hover:text-primary hover:bg-primary/5 h-9 px-3 font-bold border-b border-primary/10 rounded-none'
+                          onClick={() => {
+                             close();
+                             setManualCityDialogOpen(true);
+                          }}
+                        >
+                          <Plus className='mr-2 h-4 w-4' />
+                          Can't find your city? Add manually
+                        </Button>
+                      )}
                     />
-                    <p className='text-muted-foreground text-xs'>
-                      Search inside the dropdown and select multiple cities in
-                      one go.
+                    <p className='text-muted-foreground text-[10px] italic'>
+                      Search results depend on your Selected State ({form.state || 'None'}).
                     </p>
                   </div>
 
-                  <div className='mt-4 space-y-2'>
-                    <label className='text-sm font-medium'>
-                      Manual city name
-                    </label>
-                    <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]'>
+                  {queuedCities.length > 0 && (
+                    <div className='rounded-xl border border-slate-100 bg-slate-50/30 p-4'>
+                      <div className='flex items-center justify-between mb-3'>
+                         <span className='text-[10px] font-bold uppercase tracking-widest text-slate-400'>Added to Queue</span>
+                         <Button
+                            type='button'
+                            variant='ghost'
+                            size='sm'
+                            onClick={() => {
+                              setQueuedCities([])
+                              setForm((current) => ({ ...current, name: '' }))
+                            }}
+                            className='h-6 px-2 text-[10px] font-bold text-slate-400'
+                          >
+                            Clear All
+                          </Button>
+                      </div>
+                      <div className='flex flex-wrap gap-2'>
+                        {queuedCities.map((city) => (
+                          <Badge
+                            key={`${city.name}-${city.state}`}
+                            variant='secondary'
+                            className='gap-2 rounded-lg px-3 py-1.5 bg-white border border-slate-100 shadow-sm transition-all hover:bg-slate-50'
+                          >
+                            <span className='font-medium text-slate-700'>
+                              {city.name}
+                              {city.state ? <span className='ml-1 text-[10px] text-slate-400 font-normal'>({city.state})</span> : null}
+                            </span>
+                            <button
+                              type='button'
+                              className='text-slate-300 hover:text-rose-500 transition-colors'
+                              onClick={() => handleRemoveQueuedCity(city)}
+                            >
+                              <X className='h-3.5 w-3.5' />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className='pt-2 border-t flex flex-wrap gap-3'>
+
+                          <Badge
+                            key={cityName}
+                            variant='secondary'
+                            className='gap-2 rounded-lg px-3 py-1.5 bg-white border border-slate-100 shadow-sm transition-all hover:bg-slate-50'
+                          >
+                            <span className='font-medium text-slate-700'>{cityName}</span>
+                            <button
+                              type='button'
+                              className='text-slate-300 hover:text-rose-500 transition-colors'
+                              onClick={() => handleRemoveQueuedCity(cityName)}
+                            >
+                              <X className='h-3.5 w-3.5' />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className='pt-2 border-t flex flex-wrap gap-3'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      className='h-9 rounded-lg border-slate-200 bg-white shadow-none text-xs font-semibold'
+                      onClick={handleQueueAllDiscovered}
+                      disabled={!discoveredCities.length}
+                    >
+                      <Plus className='mr-2 h-3.5 w-3.5' />
+                      Add all {discoveredCities.length} cities from {form.state}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className='bg-background mt-5 rounded-md border p-6 shadow-sm space-y-4'>
+                   <div>
+                      <label className='text-sm font-bold text-slate-800 mb-2 block'>City Name</label>
                       <Input
                         value={form.name}
                         onChange={(event) =>
@@ -2389,110 +2604,24 @@ export default function CitiesPage() {
                             name: toTitleCase(event.target.value),
                           }))
                         }
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            handleAddManualCity()
-                          }
-                        }}
-                        placeholder='Type a new city if it is not in the dropdown'
+                        placeholder='e.g. Bangalore'
+                        className='h-11'
                       />
-                      <Button
-                        type='button'
-                        variant='outline'
-                        onClick={handleAddManualCity}
-                        disabled={!normalizeText(form.name)}
-                      >
-                        <Plus className='mr-2 h-4 w-4' />
-                        Add Manual City
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className='mt-4 flex flex-wrap gap-2'>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      onClick={handleQueueAllDiscovered}
-                      disabled={!discoveredCities.length}
-                    >
-                      Add All State Cities
-                    </Button>
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      onClick={() => {
-                        setQueuedCities([])
-                        setForm((current) => ({ ...current, name: '' }))
-                      }}
-                      disabled={
-                        !queuedCities.length && !normalizeText(form.name)
-                      }
-                    >
-                      Clear Selection
-                    </Button>
-                  </div>
-
-                  <div className='mt-4 rounded-md border border-dashed px-4 py-3'>
-                    <p className='text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase'>
-                      Cities To Create
-                    </p>
-                    {queuedCities.length ? (
-                      <div className='mt-3 flex flex-wrap gap-2'>
-                        {queuedCities.map((cityName) => (
-                          <Badge
-                            key={cityName}
-                            variant='secondary'
-                            className='gap-2 rounded-md px-2 py-1'
-                          >
-                            <span>{cityName}</span>
-                            <button
-                              type='button'
-                              className='text-xs'
-                              onClick={() => handleRemoveQueuedCity(cityName)}
-                            >
-                              <X className='h-3 w-3' />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className='text-muted-foreground mt-2 text-sm'>
-                        Select multiple cities from the dropdown or add custom
-                        ones manually.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className='bg-background mt-5 rounded-md border p-4 shadow-sm'>
-                  <div className='space-y-2'>
-                    <label className='text-sm font-medium'>City name</label>
-                    <Input
-                      value={form.name}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          name: toTitleCase(event.target.value),
-                        }))
-                      }
-                      placeholder='e.g. Bangalore'
-                    />
-                  </div>
+                   </div>
                 </div>
               )}
 
-              <div className='bg-background mt-5 rounded-md border p-4 shadow-sm'>
+              <div className='bg-background mt-6 rounded-md border p-6 shadow-sm transition-all hover:border-primary/20'>
                 <div className='flex items-center justify-between gap-3'>
                   <div>
-                    <p className='text-sm font-medium'>City status</p>
-                    <p className='text-muted-foreground text-sm'>
-                      Control whether the city remains available in your list.
+                    <p className='text-sm font-bold text-slate-800 transition-none'>City Status</p>
+                    <p className='text-muted-foreground text-xs'>
+                      Control whether the city remains available for selection.
                     </p>
                   </div>
                   <div className='flex items-center gap-3'>
-                    <span className='text-sm text-slate-600'>
-                      {form.isActive ? 'Active' : 'Inactive'}
+                    <span className={cn('text-xs font-bold uppercase tracking-wider', form.isActive ? 'text-emerald-600' : 'text-slate-400')}>
+                      {form.isActive ? 'Live' : 'Hidden'}
                     </span>
                     <Switch
                       checked={form.isActive}
@@ -2508,10 +2637,11 @@ export default function CitiesPage() {
               </div>
             </div>
 
-            <SheetFooter className='border-t px-5 py-4 sm:flex-row sm:justify-end'>
+            <SheetFooter className='border-t px-5 py-4 sm:flex-row sm:justify-end bg-slate-50/50'>
               <Button
                 type='button'
-                variant='outline'
+                variant='ghost'
+                className='font-semibold text-slate-500'
                 onClick={() => {
                   setSheetOpen(false)
                   resetSheetState()
@@ -2520,7 +2650,7 @@ export default function CitiesPage() {
               >
                 Cancel
               </Button>
-              <Button type='submit' disabled={saving}>
+              <Button type='submit' disabled={saving} className='min-w-[120px] font-bold shadow-md shadow-primary/20'>
                 {saving ? (
                   <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                 ) : null}
@@ -2530,6 +2660,88 @@ export default function CitiesPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* Manual City Entry Dialog (Pop-up) */}
+      <Dialog open={manualCityDialogOpen} onOpenChange={setManualCityDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Add City Manually
+            </DialogTitle>
+            <DialogDescription>
+              {form.state 
+                ? `Adding city for ${form.state}, ${form.country}.` 
+                : "Enter the city name and state below."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {!form.state && (
+              <div className="space-y-2">
+                 <label className='text-sm font-medium'>State</label>
+                 <Select value={form.state} onValueChange={handleStateChange}>
+                    <SelectTrigger className='h-11 bg-slate-50 border-slate-200'>
+                      <span className='truncate font-medium'>
+                        {form.state || (statesLoading ? 'Loading...' : 'Choose state')}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formStateOptions.length ? (
+                        formStateOptions.map((stateName) => (
+                          <SelectItem key={stateName} value={stateName}>
+                            {stateName}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value='__placeholder' disabled>
+                          No states available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">City Name</label>
+              <Input
+                value={form.name}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    name: toTitleCase(event.target.value),
+                  }))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    handleAddManualCity()
+                  }
+                }}
+                placeholder='Enter city name manually'
+                className='h-11'
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='ghost'
+              onClick={() => setManualCityDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type='button'
+              onClick={handleAddManualCity}
+              disabled={!normalizeText(form.name)}
+              className="font-bold"
+            >
+              Add to Queue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
