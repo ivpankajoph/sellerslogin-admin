@@ -25,7 +25,6 @@ import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import { generateWithAI } from './aiHelpers'
 import { deleteFromCloudinary, uploadToCloudinary } from './cloudinary'
 import Step1BasicInfo from './components/Step1BasicInfo'
-import ProductPreviewDialog from './components/ProductPreviewDialog'
 import Step4SEO from './components/Step4SEO'
 import Step5Variants from './components/Step5Variants'
 import Step6FAQs from './components/Step6FAQs'
@@ -45,6 +44,8 @@ const PRODUCT_CREATE_DRAFT_VERSION = 3
 const PRODUCT_CREATE_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const PRODUCT_CREATE_STEP_COUNT = 3
 const VARIANT_SUGGESTION_DISPLAY_LIMIT = 15
+const PRODUCT_PREVIEW_STORAGE_PREFIX = 'product_preview_draft'
+const PRODUCT_PREVIEW_STORAGE_TTL_MS = 30 * 60 * 1000
 
 type VariantContextRule = {
   patterns: RegExp[]
@@ -434,6 +435,7 @@ type ProductCreateDraft = {
 
 type WebsiteCard = {
   _id: string
+  website_slug?: string
   template_key?: string
   template_name?: string
   name?: string
@@ -939,7 +941,7 @@ const ProductCreateForm: React.FC = () => {
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
   const [successDialogMessage, setSuccessDialogMessage] = useState('')
-  const [previewOpen, setPreviewOpen] = useState(false)
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false)
   const [isEditProductLoading, setIsEditProductLoading] = useState(false)
   const primarySelectedMainCategoryId = selectedMainCategoryIds[0] || ''
   const isVendor = String(authUser?.role || '').toLowerCase() === 'vendor'
@@ -1172,17 +1174,6 @@ const ProductCreateForm: React.FC = () => {
     return String(current?.name || '').trim()
   }, [mainCategories, primarySelectedMainCategoryId])
 
-  const selectedMainCategoryNames = useMemo(
-    () =>
-      mainCategories
-        .filter((category: any) =>
-          selectedMainCategoryIds.includes(String(category?._id || ''))
-        )
-        .map((category: any) => String(category?.name || '').trim())
-        .filter(Boolean),
-    [mainCategories, selectedMainCategoryIds]
-  )
-
   const selectedCategoryNames = useMemo(
     () =>
       categories
@@ -1202,42 +1193,6 @@ const ProductCreateForm: React.FC = () => {
         .filter(Boolean),
     [filteredSubcategories, formData.productSubCategories]
   )
-
-  const selectedWebsiteNames = useMemo(() => {
-    if (!formData.websiteIds.length) return []
-
-    const websiteMap = new Map(
-      websites.map((website) => [
-        String(website?._id || ''),
-        String(
-          website?.name ||
-            website?.business_name ||
-            website?.template_name ||
-            website?.template_key ||
-            ''
-        ).trim(),
-      ])
-    )
-
-    return sanitizeStringList(
-      formData.websiteIds.map((websiteId) => websiteMap.get(String(websiteId || '')) || '')
-    )
-  }, [formData.websiteIds, websites])
-
-  const selectedCityNames = useMemo(() => {
-    if (!formData.availableCities.length) return []
-
-    const cityMap = new Map(
-      cities.map((city: any) => [
-        String(city?._id || ''),
-        String(city?.name || city?.label || '').trim(),
-      ])
-    )
-
-    return sanitizeStringList(
-      formData.availableCities.map((cityId) => cityMap.get(String(cityId || '')) || '')
-    )
-  }, [cities, formData.availableCities])
 
   const variantContextNames = useMemo(
     () =>
@@ -1374,8 +1329,6 @@ const ProductCreateForm: React.FC = () => {
       seoDefaultCityLabel,
     ]
   )
-
-  const previewFormData = useMemo(() => sanitizeProductFormData(formData), [formData])
 
   const goToStep = (stepIndex: number) => {
     setCurrentStep(clampProductCreateStep(stepIndex))
@@ -2584,6 +2537,31 @@ const ProductCreateForm: React.FC = () => {
     }
   }
 
+  const handleProductPreview = async () => {
+    if (typeof window === 'undefined') return
+
+    setIsPreviewLoading(true)
+    try {
+      const previewStorageKey = `${PRODUCT_PREVIEW_STORAGE_PREFIX}_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 10)}`
+      const previewPayload = {
+        savedAt: Date.now(),
+        expiresAt: Date.now() + PRODUCT_PREVIEW_STORAGE_TTL_MS,
+        formData,
+      }
+
+      window.localStorage.setItem(previewStorageKey, JSON.stringify(previewPayload))
+      window.open(
+        `/product-preview?draftKey=${encodeURIComponent(previewStorageKey)}`,
+        '_blank',
+        'noopener,noreferrer'
+      )
+    } finally {
+      setIsPreviewLoading(false)
+    }
+  }
+
   // --- Render Current Step ---
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -2823,6 +2801,12 @@ const ProductCreateForm: React.FC = () => {
                   Saved {lastSavedLabel}
                 </div>
               ) : null}
+              <Link to='/products'>
+                <Button variant='outline' className='h-10 rounded-full px-4'>
+                  <ArrowLeft className='mr-2 h-4 w-4' />
+                  Back to Products
+                </Button>
+              </Link>
               <Link to='/upload-products'>
                 <Button variant='outline' className='h-10 rounded-full px-4'>
                   <PackagePlus className='mr-2 h-4 w-4' />
@@ -2936,25 +2920,33 @@ const ProductCreateForm: React.FC = () => {
                 Previous
               </button>
 
-              {currentStep < steps.length ? (
+              <div className='flex flex-wrap items-center gap-3'>
                 <button
                   type='button'
-                  onClick={() => goToStep(currentStep + 1)}
-                  className='inline-flex h-11 items-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-semibold text-white transition hover:bg-cyan-700'
+                  onClick={() => void handleProductPreview()}
+                  disabled={isPreviewLoading || loading || isEditProductLoading}
+                  className='inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-background px-5 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-70'
                 >
-                  Next
-                  <ArrowRight className='h-4 w-4' />
+                  {isPreviewLoading ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : (
+                    <Search className='h-4 w-4' />
+                  )}
+                  {isPreviewLoading ? 'Opening preview...' : 'Product Preview'}
                 </button>
-              ) : (
-                <div className='flex flex-wrap items-center gap-3'>
+
+                {currentStep < steps.length ? (
                   <button
                     type='button'
-                    onClick={() => setPreviewOpen(true)}
-                    className='inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-background px-5 text-sm font-semibold text-foreground transition hover:bg-secondary'
+                    onClick={() => goToStep(currentStep + 1)}
+                    className='inline-flex h-11 items-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-semibold text-white transition hover:bg-cyan-700'
                   >
-                    <Search className='h-4 w-4' />
-                    Product Preview
+                    Next
+                    <ArrowRight className='h-4 w-4' />
                   </button>
+                ) : null}
+
+                {isEditMode || currentStep === steps.length ? (
                   <button
                     type='button'
                     onClick={handleSubmit}
@@ -2964,29 +2956,12 @@ const ProductCreateForm: React.FC = () => {
                     {loading && <Loader2 className='h-4 w-4 animate-spin' />}
                     {isEditMode ? 'Update Product' : 'Create Product'}
                   </button>
-                </div>
-              )}
+                ) : null}
+              </div>
             </div>
           </form>
         </div>
       </div>
-
-      <ProductPreviewDialog
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-        formData={previewFormData}
-        mainCategoryLabels={selectedMainCategoryNames}
-        categoryLabels={selectedCategoryNames}
-        subcategoryLabels={selectedSubcategoryNames}
-        websiteLabels={selectedWebsiteNames}
-        cityLabels={selectedCityNames}
-        searchPreviewTitle={formData.metaTitle?.trim() || defaultMetaTitle || 'Search title preview'}
-        searchPreviewDescription={
-          formData.metaDescription?.trim() ||
-          defaultMetaDescription ||
-          'Meta description will show here once the vendor fills Step 3.'
-        }
-      />
 
       <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
         <DialogContent className='max-w-md rounded-[28px] border-border p-0 shadow-2xl'>

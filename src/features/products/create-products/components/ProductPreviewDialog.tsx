@@ -34,11 +34,6 @@ const getVariantDisplayName = (
   index: number,
   productName?: string
 ) => {
-  if (index === 0) {
-    const baseProductName = String(productName || '').trim()
-    if (baseProductName) return baseProductName
-  }
-
   const customName = String(variant?.variantDisplayName || '').trim()
   if (customName) return customName
 
@@ -48,6 +43,10 @@ const getVariantDisplayName = (
     .join(' / ')
 
   if (summary) return summary
+  if (index === 0) {
+    const baseProductName = String(productName || '').trim()
+    if (baseProductName) return baseProductName
+  }
   return `Variant ${index + 1}`
 }
 
@@ -78,6 +77,7 @@ const ProductPreviewDialog: React.FC<Props> = ({
   const selectedVariantLabel = selectedVariant
     ? getVariantDisplayName(selectedVariant, selectedVariantIndex, formData.productName)
     : ''
+  const previewTitle = selectedVariantLabel || fallbackName
 
   const discountPercent = useMemo(() => {
     if (!selectedVariant?.actualPrice || !selectedVariant?.finalPrice) return 0
@@ -285,9 +285,11 @@ const ProductPreviewDialog: React.FC<Props> = ({
                       </div>
                     )}
                     <h1 className='text-2xl lg:text-3xl font-bold text-gray-900 leading-tight'>
-                      {fallbackName}
+                      {previewTitle}
                     </h1>
-                    {selectedVariantLabel && selectedVariantLabel !== fallbackName && (
+                    {selectedVariantLabel &&
+                    fallbackName &&
+                    selectedVariantLabel !== fallbackName && (
                       <p className='text-base font-medium text-gray-600'>
                         {selectedVariantLabel}
                       </p>
