@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAnalyticsContext } from "@/features/analytics-hub/hooks/use-analytics-context";
-import { buildApiUrl } from "@/features/analytics-hub/lib/api";
+import { buildAnalyticsDateParams, buildApiUrl } from "@/features/analytics-hub/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatsCard } from "@/features/analytics-hub/components/dashboard/stats-card";
 import { LineChart } from "@/features/analytics-hub/components/charts/line-chart";
@@ -22,8 +22,40 @@ import type { AnalyticsSummary } from "@/features/analytics-hub/lib/types";
 import { getQueryFn } from "@/features/analytics-hub/lib/query";
 import { formatINR } from "@/lib/currency";
 
+const getRangeLabel = (range?: string) => {
+  switch (range) {
+    case "today":
+      return "Today";
+    case "yesterday":
+      return "Yesterday";
+    case "30d":
+      return "Last 30 days";
+    case "custom":
+      return "Custom range";
+    case "7d":
+    default:
+      return "Last 7 days";
+  }
+};
+
+const downloadTextFile = (filename: string, content: string, type: string) => {
+  if (typeof window === "undefined") return;
+  const blob = new Blob([content], { type });
+  const url = window.URL.createObjectURL(blob);
+  const link = window.document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  window.document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+const sanitizeFilenamePart = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
 export default function Reports() {
-  const { role, vendorId, source, websiteId } = useAnalyticsContext();
+  const { role, vendorId, source, websiteId, range, fromDate, toDate } = useAnalyticsContext();
   const sourceParam = source === "all" ? undefined : source;
   const websiteParam =
     role === "vendor" || source === "template"
@@ -32,20 +64,23 @@ export default function Reports() {
         : websiteId
       : undefined;
   const queryFn = getQueryFn<AnalyticsSummary>();
+  const dateParams = buildAnalyticsDateParams({ range, fromDate, toDate });
   const { data, isLoading } = useQuery<AnalyticsSummary>({
-    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, website_id: websiteParam })],
+    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, website_id: websiteParam, ...dateParams })],
     queryFn,
+    refetchInterval: 15000,
   });
   const cardClassName =
     "border border-sky-100/80 bg-white/85 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card";
+  const rangeLabel = getRangeLabel(range);
 
-  // Mock weekly data
-  const weeklyData = [
-    { name: 'Week 1', users: 1200, revenue: 8500, orders: 145 },
-    { name: 'Week 2', users: 1450, revenue: 9200, orders: 168 },
-    { name: 'Week 3', users: 1380, revenue: 8900, orders: 152 },
-    { name: 'Week 4', users: 1650, revenue: 11200, orders: 195 },
-  ];
+  const timelineData = (data?.timeline || []).map((point) => ({
+    name: point.label,
+    users: point.users,
+    revenue: point.revenue,
+    orders: point.purchases,
+    searches: point.searches,
+  }));
 
   const trafficSources = (data?.trafficBySource || []).map(s => ({
     name: s.source.charAt(0).toUpperCase() + s.source.slice(1),
@@ -56,55 +91,77 @@ export default function Reports() {
     {
       title: 'Total Users',
       value: data?.totalUsers || 0,
-      change: 12.5,
+      description: rangeLabel,
       icon: <Users className="h-4 w-4" />,
     },
     {
-      title: 'Page Views',
-      value: data?.totalPageViews || 0,
-      change: 8.3,
+      title: 'Product Views',
+      value: data?.totalProductViews || 0,
+      description: rangeLabel,
       icon: <Eye className="h-4 w-4" />,
     },
     {
       title: 'Total Orders',
       value: data?.totalOrders || 0,
-      change: 15.2,
+      description: rangeLabel,
       icon: <ShoppingCart className="h-4 w-4" />,
     },
     {
       title: 'Revenue',
       value: formatINR(data?.totalRevenue, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      change: 22.8,
+      description: rangeLabel,
       icon: <DollarSign className="h-4 w-4" />,
     },
   ];
 
   const reportItems = [
     {
-      name: 'Traffic Summary Report',
-      description: 'User acquisition, sources, and demographics',
-      lastGenerated: 'Today, 10:30 AM',
-      status: 'ready',
+      name: 'Traffic Summary',
+      description: `${data?.totalUsers || 0} users, ${data?.totalSessions || 0} sessions, bounce ${(
+        data?.bounceRate || 0
+      ).toFixed(1)}%`,
+      metric: `${data?.totalPageViews || 0} page views`,
     },
     {
-      name: 'E-commerce Performance',
-      description: 'Sales, revenue, and conversion metrics',
-      lastGenerated: 'Today, 10:30 AM',
-      status: 'ready',
+      name: 'Revenue Summary',
+      description: `${data?.totalOrders || 0} orders with ${formatINR(data?.avgOrderValue, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })} average order value`,
+      metric: formatINR(data?.totalRevenue, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     },
     {
-      name: 'Behavior Analysis',
-      description: 'User journeys, engagement, and drop-offs',
-      lastGenerated: 'Today, 10:30 AM',
-      status: 'ready',
+      name: 'Funnel Summary',
+      description: `${data?.funnel?.productViews || 0} product views -> ${data?.funnel?.purchases || 0} purchases`,
+      metric: `${(data?.conversionRate || 0).toFixed(2)}% conversion`,
     },
     {
-      name: 'Product Performance',
-      description: 'Top products, views, and conversions',
-      lastGenerated: 'Today, 10:30 AM',
-      status: 'ready',
+      name: 'Search Summary',
+      description: `${data?.totalSearches || 0} tracked searches in selected period`,
+      metric: data?.topSearches?.[0]?.term || 'No search trends yet',
     },
   ];
+
+  const exportReport = (scope: string) => {
+    if (!data) return;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const payload = {
+      scope,
+      exportedAt: new Date().toISOString(),
+      range: rangeLabel,
+      filters: {
+        vendorId: vendorId || null,
+        source: sourceParam || "all",
+        websiteId: websiteParam || "all",
+      },
+      summary: data,
+    };
+    downloadTextFile(
+      `analytics-report-${sanitizeFilenamePart(scope)}-${timestamp}.json`,
+      JSON.stringify(payload, null, 2),
+      "application/json"
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -112,10 +169,16 @@ export default function Reports() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Summary Report</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Comprehensive overview of your analytics data
+            Comprehensive overview of your selected website and date range
           </p>
         </div>
-        <Button variant="outline" className="gap-2" data-testid="button-export-report">
+        <Button
+          variant="outline"
+          className="gap-2"
+          data-testid="button-export-report"
+          onClick={() => exportReport("summary-report")}
+          disabled={!data || isLoading}
+        >
           <Download className="h-4 w-4" />
           Export Report
         </Button>
@@ -127,8 +190,7 @@ export default function Reports() {
             key={index}
             title={metric.title}
             value={metric.value}
-            trend={metric.change}
-            trendLabel="vs last month"
+            description={metric.description}
             icon={metric.icon}
             isLoading={isLoading}
           />
@@ -137,8 +199,8 @@ export default function Reports() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <LineChart
-          title="Weekly Performance"
-          data={weeklyData}
+          title="Period Performance"
+          data={timelineData}
           lines={[
             { dataKey: 'users', color: 'var(--chart-1)', name: 'Users' },
             { dataKey: 'orders', color: 'var(--chart-2)', name: 'Orders' },
@@ -165,7 +227,7 @@ export default function Reports() {
             <div>
               <p className="text-sm font-medium text-green-500">Revenue Growth</p>
               <p className="text-sm text-muted-foreground">
-                Revenue increased by 22.8% compared to last month, with an average order value of {formatINR(data?.avgOrderValue, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
+                Selected period revenue is {formatINR(data?.totalRevenue, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} with an average order value of {formatINR(data?.avgOrderValue, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
               </p>
             </div>
           </div>
@@ -174,7 +236,7 @@ export default function Reports() {
             <div>
               <p className="text-sm font-medium text-blue-500">User Acquisition</p>
               <p className="text-sm text-muted-foreground">
-                {data?.newUsers?.toLocaleString() || 0} new users acquired this period, representing{' '}
+                {data?.newUsers?.toLocaleString() || 0} new users visited in this range, representing{' '}
                 {data?.totalUsers ? ((data.newUsers || 0) / data.totalUsers * 100).toFixed(1) : 0}% of total traffic.
               </p>
             </div>
@@ -192,11 +254,21 @@ export default function Reports() {
               </p>
             </div>
           </div>
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
+            <FileText className="h-5 w-5 text-violet-500 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-violet-500">Search Intent</p>
+              <p className="text-sm text-muted-foreground">
+                Top tracked search in the selected range is{" "}
+                <strong>{data?.topSearches?.[0]?.term || "not available yet"}</strong>.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       <DataTable
-        title="Available Reports"
+        title="Vendor Summary Snapshots"
         data={reportItems}
         columns={[
           { 
@@ -206,7 +278,7 @@ export default function Reports() {
                 <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
                   <FileText className="h-4 w-4 text-primary" />
                 </div>
-                <div>
+                  <div>
                   <div className="font-medium">{row.name}</div>
                   <div className="text-xs text-muted-foreground">{row.description}</div>
                 </div>
@@ -214,22 +286,28 @@ export default function Reports() {
             )
           },
           { 
-            header: 'Last Generated', 
-            accessorKey: 'lastGenerated',
+            header: 'Key Metric', 
+            accessorKey: 'metric',
             className: 'text-muted-foreground'
           },
           { 
             header: 'Status', 
             accessorKey: () => (
               <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
-                Ready
+                Live
               </Badge>
             )
           },
           { 
             header: '', 
             accessorKey: (row) => (
-              <Button variant="ghost" size="icon" data-testid={`button-download-${row.name.toLowerCase().replace(/\s+/g, '-')}`}>
+              <Button
+                variant="ghost"
+                size="icon"
+                data-testid={`button-download-${row.name.toLowerCase().replace(/\s+/g, '-')}`}
+                onClick={() => exportReport(row.name)}
+                disabled={!data || isLoading}
+              >
                 <Download className="h-4 w-4" />
               </Button>
             ),
@@ -239,6 +317,32 @@ export default function Reports() {
         isLoading={isLoading}
         emptyMessage="No reports available"
       />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <DataTable
+          title="Top Products"
+          data={data?.topProducts || []}
+          columns={[
+            { header: 'Product', accessorKey: (row) => row.name || 'Unknown Product' },
+            { header: 'Views', accessorKey: (row) => (row.views || 0).toLocaleString(), className: 'text-right tabular-nums' },
+            { header: 'Carts', accessorKey: (row) => (row.addToCarts || 0).toLocaleString(), className: 'text-right tabular-nums' },
+            { header: 'Purchases', accessorKey: (row) => (row.purchases || 0).toLocaleString(), className: 'text-right tabular-nums' },
+          ]}
+          isLoading={isLoading}
+          emptyMessage="No product analytics available"
+        />
+        <DataTable
+          title="Top Searches"
+          data={data?.topSearches || []}
+          columns={[
+            { header: 'Search Term', accessorKey: 'term' },
+            { header: 'Count', accessorKey: (row) => row.count.toLocaleString(), className: 'text-right tabular-nums' },
+            { header: 'Avg Results', accessorKey: (row) => String(row.results || 0), className: 'text-right tabular-nums' },
+          ]}
+          isLoading={isLoading}
+          emptyMessage="No search activity tracked yet"
+        />
+      </div>
     </div>
   );
 }

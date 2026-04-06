@@ -14,6 +14,10 @@ import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
+  getVendorTemplateProductUrl,
+  resolvePreviewCityFromVendorProfile,
+} from '@/lib/storefront-url'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -44,7 +48,6 @@ const PRODUCT_CREATE_DRAFT_VERSION = 3
 const PRODUCT_CREATE_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const PRODUCT_CREATE_STEP_COUNT = 3
 const VARIANT_SUGGESTION_DISPLAY_LIMIT = 15
-const PRODUCT_PREVIEW_STORAGE_PREFIX = 'product_preview_draft'
 const PRODUCT_PREVIEW_STORAGE_TTL_MS = 30 * 60 * 1000
 
 type VariantContextRule = {
@@ -442,6 +445,7 @@ type WebsiteCard = {
   business_name?: string
   previewImage?: string
   createdAt?: string
+  is_default?: boolean
 }
 
 const buildProductCreateDraftStorageKey = (vendorId: string) =>
@@ -467,6 +471,12 @@ const formatCityLabel = (value: string) =>
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
+
+const slugifyPreviewProductPath = (value: string) =>
+  toTrimmedText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'preview-product'
 
 const includesTextIgnoreCase = (source: string, target: string) =>
   Boolean(target) && source.toLowerCase().includes(target.toLowerCase())
@@ -2542,21 +2552,103 @@ const ProductCreateForm: React.FC = () => {
 
     setIsPreviewLoading(true)
     try {
-      const previewStorageKey = `${PRODUCT_PREVIEW_STORAGE_PREFIX}_${Date.now()}_${Math.random()
-        .toString(36)
-        .slice(2, 10)}`
-      const previewPayload = {
-        savedAt: Date.now(),
-        expiresAt: Date.now() + PRODUCT_PREVIEW_STORAGE_TTL_MS,
-        formData,
+      const sourceProfile = vendorProfile || authUser || {}
+      const defaultWebsiteId = toTrimmedText(
+        sourceProfile?.default_website_id || sourceProfile?.defaultWebsiteId
+      )
+      const fallbackActiveWebsiteId = websites[0]?._id || ''
+      const previewWebsite =
+        websites.find((website) => String(website?._id || '').trim() === defaultWebsiteId) ||
+        websites.find((website) => Boolean(website?.is_default)) ||
+        websites.find((website) => String(website?._id || '').trim() === fallbackActiveWebsiteId) ||
+        websites[0] ||
+        null
+
+      const templateKey = toTrimmedText(
+        previewWebsite?.template_key ||
+          sourceProfile?.default_website_template_key ||
+          sourceProfile?.defaultWebsiteTemplateKey
+      )
+      const websiteIdentifier = toTrimmedText(
+        previewWebsite?.website_slug ||
+          previewWebsite?._id ||
+          sourceProfile?.default_website_slug ||
+          sourceProfile?.defaultWebsiteSlug ||
+          defaultWebsiteId
+      )
+      const previewCity = resolvePreviewCityFromVendorProfile(sourceProfile)
+      const productIdentifier = slugifyPreviewProductPath(
+        formData.productName || initialEditorSearch.productId || 'preview-product'
+      )
+
+      if (!vendorId || !templateKey || !websiteIdentifier) {
+        toast.error(
+          'Default website preview is not ready yet. Please create/select a default website template first.'
+        )
+        return
       }
 
-      window.localStorage.setItem(previewStorageKey, JSON.stringify(previewPayload))
-      window.open(
-        `/product-preview?draftKey=${encodeURIComponent(previewStorageKey)}`,
-        '_blank',
-        'noopener,noreferrer'
+      const previewUrl = getVendorTemplateProductUrl(
+        vendorId,
+        productIdentifier,
+        previewCity.slug,
+        websiteIdentifier,
+        templateKey
       )
+
+      if (!previewUrl) {
+        toast.error('Unable to build the storefront preview URL right now.')
+        return
+      }
+
+      const previewSessionId = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+      const previewWindow = window.open(
+        `${previewUrl}?previewDraft=1&previewSessionId=${encodeURIComponent(previewSessionId)}`,
+        '_blank'
+      )
+
+      if (!previewWindow) {
+        toast.error('Preview window was blocked. Please allow popups and try again.')
+        return
+      }
+
+      const targetOrigin = (() => {
+        try {
+          return new URL(previewUrl, window.location.origin).origin
+        } catch {
+          return '*'
+        }
+      })()
+
+      const previewPayload = {
+        type: 'template-product-preview-draft',
+        sessionId: previewSessionId,
+        vendorId,
+        payload: {
+          savedAt: Date.now(),
+          expiresAt: Date.now() + PRODUCT_PREVIEW_STORAGE_TTL_MS,
+          formData,
+        },
+      }
+
+      let attempts = 0
+      const maxAttempts = 20
+      const postPreviewPayload = () => {
+        if (previewWindow.closed) {
+          window.clearInterval(intervalId)
+          return
+        }
+
+        previewWindow.postMessage(previewPayload, targetOrigin)
+        attempts += 1
+
+        if (attempts >= maxAttempts) {
+          window.clearInterval(intervalId)
+        }
+      }
+
+      const intervalId = window.setInterval(postPreviewPayload, 500)
+      window.setTimeout(postPreviewPayload, 250)
     } finally {
       setIsPreviewLoading(false)
     }

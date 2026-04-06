@@ -7,6 +7,8 @@ import {
   ShoppingCart, 
   CreditCard, 
   CheckCircle,
+  Search,
+  Package,
   Monitor,
   Smartphone,
   Tablet
@@ -14,6 +16,7 @@ import {
 import type { AnalyticsEvent } from "@/features/analytics-hub/lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { formatINR } from "@/lib/currency";
+import { resolveStorefrontHref } from "@/features/analytics-hub/lib/api";
 
 interface LiveActivityFeedProps {
   events: AnalyticsEvent[];
@@ -22,6 +25,8 @@ interface LiveActivityFeedProps {
 
 const eventConfig = {
   pageview: { icon: Eye, color: 'bg-blue-500/10 text-blue-500', label: 'Page View' },
+  productView: { icon: Package, color: 'bg-indigo-500/10 text-indigo-500', label: 'Product View' },
+  search: { icon: Search, color: 'bg-violet-500/10 text-violet-500', label: 'Search' },
   click: { icon: MousePointerClick, color: 'bg-purple-500/10 text-purple-500', label: 'Click' },
   addToCart: { icon: ShoppingCart, color: 'bg-orange-500/10 text-orange-500', label: 'Add to Cart' },
   checkout: { icon: CreditCard, color: 'bg-yellow-500/10 text-yellow-500', label: 'Checkout' },
@@ -62,6 +67,8 @@ export function LiveActivityFeed({ events, maxItems = 20 }: LiveActivityFeedProp
                 const config = eventConfig[event.eventType as keyof typeof eventConfig] || eventConfig.pageview;
                 const Icon = config.icon;
                 const DeviceIcon = deviceIcons[event.device as keyof typeof deviceIcons] || Monitor;
+                const pageHref = resolveStorefrontHref(event.pageUrl || undefined);
+                const referrerHref = event.referrer && /^https?:\/\//i.test(event.referrer) ? event.referrer : "";
                 
                 return (
                   <div
@@ -81,13 +88,30 @@ export function LiveActivityFeed({ events, maxItems = 20 }: LiveActivityFeedProp
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         {event.pageTitle && (
-                          <span className="text-xs text-muted-foreground truncate max-w-[180px]">
-                            {event.pageTitle}
-                          </span>
+                          pageHref ? (
+                            <a
+                              href={pageHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="max-w-[180px] truncate text-xs text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
+                              title={pageHref}
+                            >
+                              {event.pageTitle}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                              {event.pageTitle}
+                            </span>
+                          )
                         )}
                         {event.productName && (
                           <span className="text-xs text-muted-foreground truncate max-w-[180px]">
                             {event.productName}
+                          </span>
+                        )}
+                        {event.metadata?.search_term && (
+                          <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                            Search: {String(event.metadata.search_term)}
                           </span>
                         )}
                         {event.cartTotal && (
@@ -100,9 +124,30 @@ export function LiveActivityFeed({ events, maxItems = 20 }: LiveActivityFeedProp
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
+                        {event.source && (
+                          <Badge variant="outline" className="h-4 px-1 text-[10px] capitalize">
+                            {event.source}
+                          </Badge>
+                        )}
+                        {referrerHref ? (
+                          <a
+                            href={referrerHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="max-w-[150px] truncate text-[10px] text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
+                            title={event.referrer || undefined}
+                          >
+                            {event.referrer}
+                          </a>
+                        ) : null}
                         {event.country && (
                           <span className="text-[10px] text-muted-foreground/70">
                             {event.city ? `${event.city}, ` : ''}{event.country}
+                          </span>
+                        )}
+                        {event.ip && (
+                          <span className="text-[10px] text-muted-foreground/50">
+                            {event.ip}
                           </span>
                         )}
                         <span className="text-[10px] text-muted-foreground/50">

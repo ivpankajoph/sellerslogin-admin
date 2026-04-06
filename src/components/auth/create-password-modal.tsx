@@ -103,7 +103,7 @@ export function CreatePasswordModal() {
           show_password_change_reminder: false,
         })
       )
-      toast.success('Password created successfully')
+      toast.success(body?.message || 'Your password has been created')
       form.reset()
     } catch (error: any) {
       console.error('Password creation error:', error)

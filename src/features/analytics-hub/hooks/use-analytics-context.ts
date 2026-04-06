@@ -5,7 +5,7 @@ export const useAnalyticsContext = () => {
   const user = useSelector((state: any) => state.auth?.user);
   const role = user?.role || "admin";
   const vendorId = role === "vendor" ? user?._id || user?.id || "" : "";
-  const { source, websiteId } = useAnalyticsSource();
+  const { source, websiteId, range, fromDate, toDate } = useAnalyticsSource();
 
-  return { role, vendorId, source, websiteId };
+  return { role, vendorId, source, websiteId, range, fromDate, toDate };
 };
