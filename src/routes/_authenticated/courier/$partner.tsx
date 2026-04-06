@@ -277,7 +277,7 @@ function CourierPartnerPage() {
     shipment_width: '',
     shipment_length: '',
   })
-  const [ndrItems, setNdrItems] = useState<
+  const [, setNdrItems] = useState<
     { awb_number?: string; event_date?: string; courier_remarks?: string; total_attempts?: string }[]
   >([])
   const [delhiveryLaneBusy, setDelhiveryLaneBusy] = useState<'b2c' | 'heavy' | 'estimate' | ''>('')
