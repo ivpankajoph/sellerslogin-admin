@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAnalyticsContext } from "@/features/analytics-hub/hooks/use-analytics-context";
-import { buildApiUrl } from "@/features/analytics-hub/lib/api";
+import { buildAnalyticsDateParams, buildApiUrl } from "@/features/analytics-hub/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatsCard } from "@/features/analytics-hub/components/dashboard/stats-card";
 import { FunnelChart } from "@/features/analytics-hub/components/charts/funnel-chart";
@@ -19,8 +19,11 @@ import {
 import type { AnalyticsSummary } from "@/features/analytics-hub/lib/types";
 import { getQueryFn } from "@/features/analytics-hub/lib/query";
 
+const toPercentString = (value: number, total: number, digits = 1) =>
+  total > 0 ? ((value / total) * 100).toFixed(digits) : (0).toFixed(digits);
+
 export default function FunnelAnalysis() {
-  const { role, vendorId, source, websiteId } = useAnalyticsContext();
+  const { role, vendorId, source, websiteId, range, fromDate, toDate } = useAnalyticsContext();
   const sourceParam = source === "all" ? undefined : source;
   const websiteParam =
     role === "vendor" || source === "template"
@@ -29,9 +32,11 @@ export default function FunnelAnalysis() {
         : websiteId
       : undefined;
   const queryFn = getQueryFn<AnalyticsSummary>();
+  const dateParams = buildAnalyticsDateParams({ range, fromDate, toDate });
   const { data, isLoading } = useQuery<AnalyticsSummary>({
-    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, website_id: websiteParam })],
+    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, website_id: websiteParam, ...dateParams })],
     queryFn,
+    refetchInterval: 15000,
   });
   const cardClassName =
     "border border-sky-100/80 bg-white/85 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card";
@@ -75,16 +80,13 @@ export default function FunnelAnalysis() {
     },
   ];
 
-  // Mock daily funnel data
-  const dailyFunnelData = [
-    { name: 'Mon', views: 450, carts: 85, checkouts: 42, purchases: 28 },
-    { name: 'Tue', views: 520, carts: 98, checkouts: 51, purchases: 35 },
-    { name: 'Wed', views: 480, carts: 92, checkouts: 46, purchases: 31 },
-    { name: 'Thu', views: 620, carts: 118, checkouts: 62, purchases: 45 },
-    { name: 'Fri', views: 710, carts: 142, checkouts: 78, purchases: 58 },
-    { name: 'Sat', views: 820, carts: 168, checkouts: 92, purchases: 72 },
-    { name: 'Sun', views: 650, carts: 132, checkouts: 68, purchases: 52 },
-  ];
+  const dailyFunnelData = (data?.timeline || []).map((point) => ({
+    name: point.label,
+    views: point.productViews,
+    carts: point.addToCarts,
+    checkouts: point.checkouts,
+    purchases: point.purchases,
+  }));
 
   const overallConversionRate = funnel.productViews > 0 
     ? (funnel.purchases / funnel.productViews) * 100 
@@ -207,10 +209,10 @@ export default function FunnelAnalysis() {
         title="Funnel Performance by Day"
         data={dailyFunnelData.map(day => ({
           ...day,
-          viewToCart: ((day.carts / day.views) * 100).toFixed(1),
-          cartToCheckout: ((day.checkouts / day.carts) * 100).toFixed(1),
-          checkoutToPurchase: ((day.purchases / day.checkouts) * 100).toFixed(1),
-          overall: ((day.purchases / day.views) * 100).toFixed(2),
+          viewToCart: toPercentString(day.carts, day.views),
+          cartToCheckout: toPercentString(day.checkouts, day.carts),
+          checkoutToPurchase: toPercentString(day.purchases, day.checkouts),
+          overall: toPercentString(day.purchases, day.views, 2),
         }))}
         columns={[
           { header: 'Day', accessorKey: 'name' },

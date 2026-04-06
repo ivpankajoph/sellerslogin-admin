@@ -1,30 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { resolveStorefrontHref } from "@/features/analytics-hub/lib/api";
 
 interface ActivePagesChartProps {
   pages: { page: string; users: number }[];
   isLoading?: boolean;
 }
-
-const STOREFRONT_BASE_URL = String(
-  import.meta.env.VITE_PUBLIC_STOREFRONT_URL ||
-    import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND ||
-    ""
-)
-  .trim()
-  .replace(/\/+$/, "");
-
-const resolvePageHref = (value?: string) => {
-  const rawValue = String(value || "").trim();
-  if (!rawValue) return "";
-  if (/^https?:\/\//i.test(rawValue)) return rawValue;
-
-  const normalizedPath = rawValue.startsWith("/") ? rawValue : `/${rawValue}`;
-  return STOREFRONT_BASE_URL
-    ? `${STOREFRONT_BASE_URL}${normalizedPath}`
-    : normalizedPath;
-};
 
 export function ActivePagesChart({ pages, isLoading }: ActivePagesChartProps) {
   const maxUsers = Math.max(...pages.map(p => p.users), 1);
@@ -67,7 +49,7 @@ export function ActivePagesChart({ pages, isLoading }: ActivePagesChartProps) {
         ) : (
           pages.slice(0, 8).map((page, index) => {
             const pagePath = page.page || "/";
-            const pageHref = resolvePageHref(pagePath);
+            const pageHref = resolveStorefrontHref(pagePath);
             const percentage = (page.users / maxUsers) * 100;
             const userPercentage = totalUsers > 0 ? ((page.users / totalUsers) * 100).toFixed(1) : 0;
             

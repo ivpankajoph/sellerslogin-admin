@@ -428,7 +428,7 @@ export default function ProfilePage() {
         otp: passwordOtp,
         purpose: 'password_change',
       })
-      await api.put('/profile/password', {
+      await api.put('/password', {
         newPassword: passwordForm.newPassword,
         confirmPassword: passwordForm.confirmPassword,
       })

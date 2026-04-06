@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAnalyticsContext } from "@/features/analytics-hub/hooks/use-analytics-context";
-import { buildApiUrl } from "@/features/analytics-hub/lib/api";
+import { buildAnalyticsDateParams, buildApiUrl } from "@/features/analytics-hub/lib/api";
 import { StatsCard } from "@/features/analytics-hub/components/dashboard/stats-card";
 import { DonutChart } from "@/features/analytics-hub/components/charts/donut-chart";
 import { BarChart } from "@/features/analytics-hub/components/charts/bar-chart";
@@ -12,7 +12,7 @@ import type { AnalyticsSummary } from "@/features/analytics-hub/lib/types";
 import { getQueryFn } from "@/features/analytics-hub/lib/query";
 
 export default function TrafficReport() {
-  const { role, vendorId, source, websiteId } = useAnalyticsContext();
+  const { role, vendorId, source, websiteId, range, fromDate, toDate } = useAnalyticsContext();
   const sourceParam = source === "all" ? undefined : source;
   const websiteParam =
     role === "vendor" || source === "template"
@@ -21,9 +21,11 @@ export default function TrafficReport() {
         : websiteId
       : undefined;
   const queryFn = getQueryFn<AnalyticsSummary>();
+  const dateParams = buildAnalyticsDateParams({ range, fromDate, toDate });
   const { data, isLoading } = useQuery<AnalyticsSummary>({
-    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, website_id: websiteParam })],
+    queryKey: [buildApiUrl("/analytics/dashboard/summary", { vendorId, source: sourceParam, website_id: websiteParam, ...dateParams })],
     queryFn,
+    refetchInterval: 15000,
   });
   const cardClassName =
     "border border-sky-100/80 bg-white/85 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card";
@@ -99,7 +101,6 @@ export default function TrafficReport() {
           title="New Users"
           value={data?.newUsers || 0}
           description={`${newUsersPercent.toFixed(1)}% of total`}
-          trend={8.5}
           icon={<UserPlus className="h-4 w-4" />}
           isLoading={isLoading}
         />
@@ -107,7 +108,6 @@ export default function TrafficReport() {
           title="Returning Users"
           value={data?.returningUsers || 0}
           description={`${(100 - newUsersPercent).toFixed(1)}% of total`}
-          trend={-2.3}
           icon={<UserCheck className="h-4 w-4" />}
           isLoading={isLoading}
         />

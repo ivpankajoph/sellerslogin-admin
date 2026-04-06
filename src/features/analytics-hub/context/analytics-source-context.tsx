@@ -14,6 +14,12 @@ type AnalyticsSourceContextValue = {
   options: AnalyticsSourceOption[];
   websiteId: string;
   setWebsiteId: (value: string) => void;
+  range: string;
+  setRange: (value: string) => void;
+  fromDate: string;
+  setFromDate: (value: string) => void;
+  toDate: string;
+  setToDate: (value: string) => void;
 };
 
 const AnalyticsSourceContext = createContext<AnalyticsSourceContextValue | null>(
@@ -23,6 +29,9 @@ const AnalyticsSourceContext = createContext<AnalyticsSourceContextValue | null>
 const STORAGE_KEY = "analytics_source";
 const WEBSITE_STORAGE_KEY = "analytics_website";
 const LEGACY_TEMPLATE_STORAGE_KEY = "analytics_template";
+const RANGE_STORAGE_KEY = "analytics_range";
+const FROM_STORAGE_KEY = "analytics_from";
+const TO_STORAGE_KEY = "analytics_to";
 
 const getStoredSource = (): AnalyticsSourceValue => {
   if (typeof window === "undefined") return "all";
@@ -42,6 +51,24 @@ const getStoredWebsite = (): string => {
   );
 };
 
+const getTodayDate = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getStoredRange = () => {
+  if (typeof window === "undefined") return "today";
+  return window.localStorage.getItem(RANGE_STORAGE_KEY) || "today";
+};
+
+const getStoredDateValue = (key: string) => {
+  if (typeof window === "undefined") return getTodayDate();
+  return window.localStorage.getItem(key) || getTodayDate();
+};
+
 export function AnalyticsSourceProvider({
   children,
 }: {
@@ -54,6 +81,13 @@ export function AnalyticsSourceProvider({
   );
   const [websiteId, setWebsiteIdState] = useState<string>(() =>
     getStoredWebsite()
+  );
+  const [range, setRangeState] = useState<string>(() => getStoredRange());
+  const [fromDate, setFromDateState] = useState<string>(() =>
+    getStoredDateValue(FROM_STORAGE_KEY)
+  );
+  const [toDate, setToDateState] = useState<string>(() =>
+    getStoredDateValue(TO_STORAGE_KEY)
   );
 
   const setSource = (value: AnalyticsSourceValue) => {
@@ -68,6 +102,27 @@ export function AnalyticsSourceProvider({
     if (typeof window !== "undefined") {
       window.localStorage.setItem(WEBSITE_STORAGE_KEY, value);
       window.localStorage.setItem(LEGACY_TEMPLATE_STORAGE_KEY, value);
+    }
+  };
+
+  const setRange = (value: string) => {
+    setRangeState(value);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(RANGE_STORAGE_KEY, value);
+    }
+  };
+
+  const setFromDate = (value: string) => {
+    setFromDateState(value);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(FROM_STORAGE_KEY, value);
+    }
+  };
+
+  const setToDate = (value: string) => {
+    setToDateState(value);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(TO_STORAGE_KEY, value);
     }
   };
 
@@ -93,7 +148,19 @@ export function AnalyticsSourceProvider({
 
   return (
     <AnalyticsSourceContext.Provider
-      value={{ source, setSource, options, websiteId, setWebsiteId }}
+      value={{
+        source,
+        setSource,
+        options,
+        websiteId,
+        setWebsiteId,
+        range,
+        setRange,
+        fromDate,
+        setFromDate,
+        toDate,
+        setToDate,
+      }}
     >
       {children}
     </AnalyticsSourceContext.Provider>

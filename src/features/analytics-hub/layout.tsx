@@ -130,7 +130,18 @@ function AnalyticsHubShell() {
   const authUser = useSelector((state: any) => state.auth?.user);
   const vendorId = authUser?._id || authUser?.id || "";
   const token = useSelector((state: any) => state.auth?.token);
-  const { source, setSource, websiteId, setWebsiteId } = useAnalyticsSource();
+  const {
+    source,
+    setSource,
+    websiteId,
+    setWebsiteId,
+    range,
+    setRange,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = useAnalyticsSource();
   const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([]);
   const style: CSSProperties = {
     "--sidebar-width": "16rem",
@@ -283,6 +294,34 @@ function AnalyticsHubShell() {
                   options={websiteOptions}
                   placeholder={role === "vendor" ? "All websites" : "All storefronts"}
                 />
+              )}
+              <Select value={range} onValueChange={setRange}>
+                <SelectTrigger className="h-8 w-36">
+                  <SelectValue placeholder="Select range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="yesterday">Yesterday</SelectItem>
+                  <SelectItem value="7d">Last 7 Days</SelectItem>
+                  <SelectItem value="30d">Last 30 Days</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+              {range === "custom" && (
+                <>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(event) => setFromDate(event.target.value)}
+                    className="h-8 w-36"
+                  />
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(event) => setToDate(event.target.value)}
+                    className="h-8 w-36"
+                  />
+                </>
               )}
             </div>
           </header>
