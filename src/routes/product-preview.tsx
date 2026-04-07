@@ -20,6 +20,7 @@ const emptyFormData: ProductFormData = {
   metaTitle: '',
   metaDescription: '',
   metaKeywords: [],
+  specifications: [],
   variants: [],
   faqs: [],
 }

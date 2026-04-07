@@ -7,7 +7,24 @@ import {
   useRouterState,
   useSearch,
 } from '@tanstack/react-router'
-import { ChevronDown, Crown, Sparkles, Search, BarChart3, Users, ShieldCheck, XCircle } from 'lucide-react'
+import {
+  ChevronDown,
+  Crown,
+  Sparkles,
+  Search,
+  BarChart3,
+  Users,
+  ShieldCheck,
+  XCircle,
+} from 'lucide-react'
+import { useSelector } from 'react-redux'
+import api from '@/lib/axios'
+import { getCookie } from '@/lib/cookies'
+import { cn } from '@/lib/utils'
+import { LayoutProvider } from '@/context/layout-provider'
+import { SearchProvider } from '@/context/search-provider'
+import { VendorIntegrationsProvider } from '@/context/vendor-integrations-provider'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -15,30 +32,25 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { useSelector } from 'react-redux'
-import { getCookie } from '@/lib/cookies'
-import api from '@/lib/axios'
-import { cn } from '@/lib/utils'
-import { LayoutProvider } from '@/context/layout-provider'
-import { SearchProvider } from '@/context/search-provider'
-import { VendorIntegrationsProvider } from '@/context/vendor-integrations-provider'
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
-import { AppSidebar } from '@/components/layout/app-sidebar'
-import { Header } from '@/components/layout/header'
-import { SkipToMain } from '@/components/skip-to-main'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { NotificationBell } from '@/components/notifications/notification-bell'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { ThemeSwitch } from '@/components/theme-switch'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { CreatePasswordModal } from '@/components/auth/create-password-modal'
+import { ConfigDrawer } from '@/components/config-drawer'
+import { AppSidebar } from '@/components/layout/app-sidebar'
 import { ROLES, sidebarData } from '@/components/layout/data/sidebar-data'
+import { Header } from '@/components/layout/header'
+import { NotificationBell } from '@/components/notifications/notification-bell'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { SkipToMain } from '@/components/skip-to-main'
+import { ThemeSwitch } from '@/components/theme-switch'
+import { UpgradePlanDialog } from '@/features/dashboard/components/UpgradePlanDialog'
+import type { BillingSummary } from '@/features/plans/shared'
 import {
   canAccessVendorPath,
   getFirstAccessibleVendorRoute,
@@ -49,8 +61,6 @@ import {
   getStoredActiveWebsiteId,
   setStoredActiveWebsite,
 } from '@/features/vendor-template/components/websiteStudioStorage'
-import { UpgradePlanDialog } from '@/features/dashboard/components/UpgradePlanDialog'
-import type { BillingSummary } from '@/features/plans/shared'
 
 type AuthenticatedLayoutProps = {
   children?: React.ReactNode
@@ -71,19 +81,22 @@ type SidebarNavItem = {
 }
 
 const flattenSidebarItems = (items: SidebarNavItem[]): SidebarNavItem[] =>
-  items.flatMap((item) => [item, ...(item.items ? flattenSidebarItems(item.items) : [])])
+  items.flatMap((item) => [
+    item,
+    ...(item.items ? flattenSidebarItems(item.items) : []),
+  ])
 
 const humanizePathSegment = (segment: string) =>
-  segment
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+  segment.replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 
 const getSectionTitleFromPath = (pathname: string, role: string) => {
   const normalizedRole = role === 'admin' ? ROLES.ADMIN : ROLES.VENDOR
   const visibleItems = sidebarData.navGroups
     .filter((group) => !group.roles || group.roles.includes(normalizedRole))
     .flatMap((group) => flattenSidebarItems(group.items as SidebarNavItem[]))
-    .filter((item) => item.url && (!item.roles || item.roles.includes(normalizedRole)))
+    .filter(
+      (item) => item.url && (!item.roles || item.roles.includes(normalizedRole))
+    )
 
   const matchedItem = visibleItems
     .filter((item) => {
@@ -107,12 +120,16 @@ const getSectionTitleFromPath = (pathname: string, role: string) => {
   return fallbackSegment ? humanizePathSegment(fallbackSegment) : 'Dashboard'
 }
 
-function ContentNavigationLoader({ rect }: { rect: LoaderViewportRect | null }) {
+function ContentNavigationLoader({
+  rect,
+}: {
+  rect: LoaderViewportRect | null
+}) {
   if (!rect) return null
 
   return (
     <div
-      className='fixed z-50 flex items-center justify-center bg-background/55 backdrop-blur-md'
+      className='bg-background/55 fixed z-50 flex items-center justify-center backdrop-blur-md'
       style={{
         height: rect.height,
         left: rect.left,
@@ -132,13 +149,11 @@ function ContentNavigationLoader({ rect }: { rect: LoaderViewportRect | null }) 
   )
 }
 
-import { CreatePasswordModal } from '@/components/auth/create-password-modal'
-
 export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const defaultOpen = getCookie('sidebar_state') !== 'false'
   const navigate = useNavigate()
   const pathname = useLocation({ select: (location) => location.pathname })
-  const searchValues = useSearch({ strict: false }) as any;
+  const searchValues = useSearch({ strict: false }) as any
   const authUser = useSelector((state: any) => state.auth?.user || null)
   const vendorsList = useSelector((state: any) => state.vendors?.vendors || [])
   const vendorProfile = useSelector(
@@ -161,6 +176,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   })
   const isAnalytics = pathname.startsWith('/analytics')
   const isThemeEditor = pathname.startsWith('/vendor-template')
+  const isProductEditor = pathname.startsWith('/products/create-products')
   const content = children ?? <Outlet />
   const showNavigationLoader = isNavigating
   const effectiveRole =
@@ -178,7 +194,9 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const canAccessMyWebsites =
     isVendor && (!isVendorTeamUser || vendorPageAccess.has('my_websites'))
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false)
-  const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
+  const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(
+    null
+  )
   const currentSectionTitle = getSectionTitleFromPath(
     pathname,
     effectiveRole === 'admin' ? ROLES.ADMIN : ROLES.VENDOR
@@ -323,7 +341,10 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
         <SearchProvider>
           <LayoutProvider>
             <div className='vendor-flow dashboard-square relative min-h-svh w-full'>
-              <div ref={contentViewportRef} className='relative min-h-svh w-full'>
+              <div
+                ref={contentViewportRef}
+                className='relative min-h-svh w-full'
+              >
                 {content}
                 <CreatePasswordModal />
               </div>
@@ -342,9 +363,12 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
       <VendorIntegrationsProvider>
         <SearchProvider>
           <LayoutProvider>
-            <SidebarProvider defaultOpen={false}>
+            <SidebarProvider defaultOpen>
               <div className='vendor-flow dashboard-square min-h-svh w-full bg-[#f6f6f7]'>
-                <div ref={contentViewportRef} className='relative min-h-svh w-full'>
+                <div
+                  ref={contentViewportRef}
+                  className='relative min-h-svh w-full'
+                >
                   {content}
                   <CreatePasswordModal />
                 </div>
@@ -360,7 +384,53 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                     onPlanActivated={async () => {
                       try {
                         const res = await api.get('/billing/summary')
-                        setBillingSummary((res.data?.data || null) as BillingSummary | null)
+                        setBillingSummary(
+                          (res.data?.data || null) as BillingSummary | null
+                        )
+                      } catch {
+                        return
+                      }
+                    }}
+                  />
+                ) : null}
+              </div>
+            </SidebarProvider>
+          </LayoutProvider>
+        </SearchProvider>
+      </VendorIntegrationsProvider>
+    )
+  }
+
+  if (isProductEditor) {
+    return (
+      <VendorIntegrationsProvider>
+        <SearchProvider>
+          <LayoutProvider>
+            <SidebarProvider defaultOpen>
+              <div className='vendor-flow dashboard-square min-h-svh w-full bg-[#f6f6f7] dark:bg-[#101216]'>
+                <SkipToMain />
+                <div
+                  ref={contentViewportRef}
+                  className='relative min-h-svh w-full'
+                >
+                  {content}
+                  <CreatePasswordModal />
+                </div>
+                {showNavigationLoader ? (
+                  <ContentNavigationLoader rect={loaderRect} />
+                ) : null}
+                {isVendor && !isVendorTeamUser ? (
+                  <UpgradePlanDialog
+                    open={upgradeDialogOpen}
+                    onOpenChange={setUpgradeDialogOpen}
+                    userName={authUser?.name}
+                    userEmail={authUser?.email}
+                    onPlanActivated={async () => {
+                      try {
+                        const res = await api.get('/billing/summary')
+                        setBillingSummary(
+                          (res.data?.data || null) as BillingSummary | null
+                        )
                       } catch {
                         return
                       }
@@ -394,7 +464,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
 
                   // If layout is fixed and sidebar is inset,
                   // set the height to 100svh - spacing (total margins) to prevent overflow
-                  'peer-data-[variant=inset]:has-[[data-layout=fixed]]:h-[calc(100svh-(var(--spacing)*4))]',
+                  'peer-data-[variant=inset]:has-[[data-layout=fixed]]:h-[calc(100svh-(var(--spacing)*4))]'
                 )}
               >
                 <div className='flex min-h-svh flex-col'>
@@ -402,15 +472,17 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                     <Header fixed className='mb-4'>
                       <div className='flex flex-1 flex-col gap-3 md:flex-row md:items-center md:justify-between'>
                         <div className='min-w-0'>
-                          <div className='inline-flex max-w-full items-center rounded-lg px-1 py-1 text-xl font-bold tracking-tight text-foreground'>
-                            <span className='truncate'>{currentSectionTitle}</span>
+                          <div className='text-foreground inline-flex max-w-full items-center rounded-lg px-1 py-1 text-xl font-bold tracking-tight'>
+                            <span className='truncate'>
+                              {currentSectionTitle}
+                            </span>
                           </div>
                         </div>
                         <div className='flex flex-wrap items-center gap-2 md:justify-end md:gap-3'>
-                          {(pathname === '/vendor' || pathname === '/vendor/') ? (
+                          {pathname === '/vendor' || pathname === '/vendor/' ? (
                             <div className='flex items-center gap-2'>
                               <div className='relative w-full sm:w-64 md:w-80'>
-                                <Search className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+                                <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
                                 <Input
                                   placeholder='Find vendors by name, email, or phone'
                                   value={searchValues?.username || ''}
@@ -419,45 +491,79 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                                       to: '/vendor',
                                       search: (prev: any) => ({
                                         ...prev,
-                                        username: event.target.value || undefined,
+                                        username:
+                                          event.target.value || undefined,
                                         page: 1,
                                       }),
                                     })
                                   }
-                                  className='h-9 rounded-none border border-border/70 pl-9 pr-4 text-sm shadow-sm'
+                                  className='border-border/70 h-9 rounded-none border pr-4 pl-9 text-sm shadow-sm'
                                 />
                               </div>
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <Button variant="outline" className="h-9 gap-2">
-                                    <BarChart3 className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Statistics</span>
+                                  <Button
+                                    variant='outline'
+                                    className='h-9 gap-2'
+                                  >
+                                    <BarChart3 className='h-4 w-4' />
+                                    <span className='hidden sm:inline'>
+                                      Statistics
+                                    </span>
                                   </Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-md">
+                                <DialogContent className='sm:max-w-md'>
                                   <DialogHeader>
                                     <DialogTitle>Vendor Statistics</DialogTitle>
                                   </DialogHeader>
-                                  <div className="grid grid-cols-2 gap-4 py-4">
-                                    <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-muted/20">
-                                      <Users className="h-6 w-6 mb-2 text-primary" />
-                                      <span className="text-2xl font-bold">{vendorsList.length}</span>
-                                      <span className="text-xs text-muted-foreground text-center">Total Vendors</span>
+                                  <div className='grid grid-cols-2 gap-4 py-4'>
+                                    <div className='bg-muted/20 flex flex-col items-center justify-center rounded-xl border p-4'>
+                                      <Users className='text-primary mb-2 h-6 w-6' />
+                                      <span className='text-2xl font-bold'>
+                                        {vendorsList.length}
+                                      </span>
+                                      <span className='text-muted-foreground text-center text-xs'>
+                                        Total Vendors
+                                      </span>
                                     </div>
-                                    <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-green-50/50 dark:bg-green-950/20">
-                                      <ShieldCheck className="h-6 w-6 mb-2 text-green-600" />
-                                      <span className="text-2xl font-bold">{vendorsList.filter((v: any) => v.is_verified).length}</span>
-                                      <span className="text-xs text-muted-foreground text-center">Verified Vendors</span>
+                                    <div className='flex flex-col items-center justify-center rounded-xl border bg-green-50/50 p-4 dark:bg-green-950/20'>
+                                      <ShieldCheck className='mb-2 h-6 w-6 text-green-600' />
+                                      <span className='text-2xl font-bold'>
+                                        {
+                                          vendorsList.filter(
+                                            (v: any) => v.is_verified
+                                          ).length
+                                        }
+                                      </span>
+                                      <span className='text-muted-foreground text-center text-xs'>
+                                        Verified Vendors
+                                      </span>
                                     </div>
-                                    <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-blue-50/50 dark:bg-blue-950/20">
-                                      <Sparkles className="h-6 w-6 mb-2 text-blue-600" />
-                                      <span className="text-2xl font-bold">{vendorsList.filter((v: any) => v.is_profile_completed).length}</span>
-                                      <span className="text-xs text-muted-foreground text-center">Completed Profiles</span>
+                                    <div className='flex flex-col items-center justify-center rounded-xl border bg-blue-50/50 p-4 dark:bg-blue-950/20'>
+                                      <Sparkles className='mb-2 h-6 w-6 text-blue-600' />
+                                      <span className='text-2xl font-bold'>
+                                        {
+                                          vendorsList.filter(
+                                            (v: any) => v.is_profile_completed
+                                          ).length
+                                        }
+                                      </span>
+                                      <span className='text-muted-foreground text-center text-xs'>
+                                        Completed Profiles
+                                      </span>
                                     </div>
-                                    <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-red-50/50 dark:bg-red-950/20">
-                                      <XCircle className="h-6 w-6 mb-2 text-red-600" />
-                                      <span className="text-2xl font-bold">{vendorsList.filter((v: any) => !v.is_verified).length}</span>
-                                      <span className="text-xs text-muted-foreground text-center">Unverified / Pending</span>
+                                    <div className='flex flex-col items-center justify-center rounded-xl border bg-red-50/50 p-4 dark:bg-red-950/20'>
+                                      <XCircle className='mb-2 h-6 w-6 text-red-600' />
+                                      <span className='text-2xl font-bold'>
+                                        {
+                                          vendorsList.filter(
+                                            (v: any) => !v.is_verified
+                                          ).length
+                                        }
+                                      </span>
+                                      <span className='text-muted-foreground text-center text-xs'>
+                                        Unverified / Pending
+                                      </span>
                                     </div>
                                   </div>
                                 </DialogContent>
@@ -467,9 +573,13 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                           {isVendor ? (
                             <div className='flex flex-wrap items-center gap-2'>
                               {canAccessMyWebsites ? (
-                                <Button variant='outline' asChild className='max-sm:w-full'>
+                                <Button
+                                  variant='outline'
+                                  asChild
+                                  className='max-sm:w-full'
+                                >
                                   <Link to='/template-workspace'>
-                                    <Sparkles className='h-4 w-4 text-primary' />
+                                    <Sparkles className='text-primary h-4 w-4' />
                                     Create your website for free
                                   </Link>
                                 </Button>
@@ -481,11 +591,18 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                                     <ChevronDown className='h-4 w-4' />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align='end' className='min-w-[200px]'>
-                                  <DropdownMenuItem onClick={handleConnectDomainClick}>
+                                <DropdownMenuContent
+                                  align='end'
+                                  className='min-w-[200px]'
+                                >
+                                  <DropdownMenuItem
+                                    onClick={handleConnectDomainClick}
+                                  >
                                     Connect Domain
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>Book Domain</DropdownMenuItem>
+                                  <DropdownMenuItem>
+                                    Book Domain
+                                  </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                               {!isVendorTeamUser ? (
@@ -521,8 +638,11 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                       </div>
                     </Header>
                   ) : null}
-                  <div ref={contentViewportRef} className='relative min-h-0 flex-1 w-full'>
-                  {content}
+                  <div
+                    ref={contentViewportRef}
+                    className='relative min-h-0 w-full flex-1'
+                  >
+                    {content}
                   </div>
                 </div>
                 {showNavigationLoader ? (
@@ -538,7 +658,9 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                     onPlanActivated={async () => {
                       try {
                         const res = await api.get('/billing/summary')
-                        setBillingSummary((res.data?.data || null) as BillingSummary | null)
+                        setBillingSummary(
+                          (res.data?.data || null) as BillingSummary | null
+                        )
                       } catch {
                         return
                       }

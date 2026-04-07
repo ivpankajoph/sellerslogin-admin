@@ -25,6 +25,10 @@ export interface FAQ {
   answer: string
 }
 
+export interface ProductSpecification {
+  [key: string]: string
+}
+
 export interface ProductFormData {
   mainCategory: string
   mainCategories: string[]
@@ -42,6 +46,7 @@ export interface ProductFormData {
   metaTitle: string
   metaDescription: string
   metaKeywords: string[]
+  specifications: ProductSpecification[]
   variants: Variant[]
   faqs: FAQ[]
 }

@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react'
 import { Info, type LucideIcon } from 'lucide-react'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 type StudioTone = 'cyan' | 'emerald' | 'amber' | 'indigo' | 'rose'
 
@@ -48,14 +52,13 @@ const toneStyles: Record<
 
 export const studioCardClass = 'rounded-3xl border border-border/60 bg-card p-5'
 
-export const studioSubtleCardClass =
-  'rounded-2xl bg-transparent p-4'
+export const studioSubtleCardClass = 'rounded-2xl bg-transparent p-4'
 
 export const studioInputClass =
-  'h-11 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/80 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15'
+  'h-11 w-full rounded-xl border border-input bg-white px-4 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/80 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15'
 
 export const studioTextareaClass =
-  'w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/80 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15'
+  'w-full rounded-xl border border-input bg-white px-4 py-3 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/80 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15'
 
 export function StudioInfo({
   content,
@@ -70,7 +73,7 @@ export function StudioInfo({
         <button
           type='button'
           className={cn(
-            'inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition hover:border-cyan-500/40 hover:text-cyan-600',
+            'border-border bg-background text-muted-foreground inline-flex h-6 w-6 items-center justify-center rounded-full border transition hover:border-cyan-500/40 hover:text-cyan-600',
             className
           )}
           aria-label='Field information'
@@ -78,7 +81,11 @@ export function StudioInfo({
           <Info className='h-3.5 w-3.5' />
         </button>
       </TooltipTrigger>
-      <TooltipContent side='top' sideOffset={8} className='max-w-64 rounded-xl px-3 py-2'>
+      <TooltipContent
+        side='top'
+        sideOffset={8}
+        className='max-w-64 rounded-xl px-3 py-2'
+      >
         {content}
       </TooltipContent>
     </Tooltip>
@@ -99,9 +106,11 @@ export function StudioFieldLabel({
   className?: string
 }) {
   return (
-    <div className={cn('mb-2 flex items-center justify-between gap-3', className)}>
+    <div
+      className={cn('mb-2 flex items-center justify-between gap-3', className)}
+    >
       <div className='flex items-center gap-2'>
-        <span className='text-sm font-semibold text-foreground'>
+        <span className='text-foreground text-sm font-semibold'>
           {label}
           {required ? ' *' : ''}
         </span>
@@ -143,7 +152,7 @@ export function StudioSection({
         className
       )}
     >
-      <div className='mb-6 flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-start lg:justify-between'>
+      <div className='border-border/60 mb-6 flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-start lg:justify-between'>
         <div className='flex items-start gap-4'>
           <div
             className={cn(
@@ -157,7 +166,7 @@ export function StudioSection({
             {eyebrow ? (
               <div
                 className={cn(
-                  'text-[11px] font-semibold uppercase tracking-[0.22em]',
+                  'text-[11px] font-semibold tracking-[0.22em] uppercase',
                   toneStyle.eyebrow
                 )}
               >
@@ -165,15 +174,21 @@ export function StudioSection({
               </div>
             ) : null}
             <div className='flex items-center gap-2'>
-              <h2 className='text-xl font-semibold tracking-tight text-foreground'>{title}</h2>
+              <h2 className='text-foreground text-xl font-semibold tracking-tight'>
+                {title}
+              </h2>
               {help ? <StudioInfo content={help} /> : null}
             </div>
-            <p className='max-w-3xl text-sm leading-6 text-muted-foreground'>
-              {description}
-            </p>
+            {description ? (
+              <p className='text-muted-foreground max-w-3xl text-sm leading-6'>
+                {description}
+              </p>
+            ) : null}
           </div>
         </div>
-        {action ? <div className='flex shrink-0 items-center gap-2'>{action}</div> : null}
+        {action ? (
+          <div className='flex shrink-0 items-center gap-2'>{action}</div>
+        ) : null}
       </div>
 
       {children}

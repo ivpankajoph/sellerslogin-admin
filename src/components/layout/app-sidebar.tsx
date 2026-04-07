@@ -1,15 +1,15 @@
 'use client'
 
 import { type JSX } from 'react/jsx-runtime'
+import type { RootState } from '@/store'
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useSelector } from 'react-redux'
-import { useLayout } from '@/context/layout-provider'
-import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import {
   getInstalledProviderIds,
   type IntegrationProviderId,
 } from '@/lib/vendor-integrations'
-import type { RootState } from '@/store'
+import { useLayout } from '@/context/layout-provider'
+import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import { Button } from '@/components/ui/button'
 import {
   Sidebar,
@@ -18,14 +18,18 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { sidebarData } from './data/sidebar-data'
-import { NavGroup } from './nav-group'
-import type { NavCollapsible, NavGroup as SidebarNavGroup, NavItem } from './types'
-import { NavUser } from './nav-user'
 import {
   hasVendorPageAccess,
   normalizeVendorPageAccess,
 } from '@/features/team-access/access-config'
+import { sidebarData } from './data/sidebar-data'
+import { NavGroup } from './nav-group'
+import { NavUser } from './nav-user'
+import type {
+  NavCollapsible,
+  NavGroup as SidebarNavGroup,
+  NavItem,
+} from './types'
 
 const hasChildren = (item: NavItem): item is NavCollapsible =>
   'items' in item && Array.isArray(item.items)
@@ -63,44 +67,46 @@ export function AppSidebar() {
       (group): group is SidebarNavGroup =>
         !group.roles || group.roles.includes(effectiveRole)
     )
-    .map((group): SidebarNavGroup => ({
-      ...group,
-      items: group.items
-        .filter(
-          (item) =>
-            (!item.roles || item.roles.includes(effectiveRole)) &&
-            canShowByPageAccess(item.pageKey) &&
-            (group.useToolkitInstallFilter
-              ? canShowByToolkitInstall(item.requiresIntegration)
-              : canShowByIntegration(item.requiresIntegration)),
-        )
-        .map((item): NavItem => {
-          const badge =
-            item.title === 'My Apps' &&
-            effectiveRole === 'vendor' &&
-            installedToolkitCount
-              ? String(installedToolkitCount)
-              : item.badge
+    .map(
+      (group): SidebarNavGroup => ({
+        ...group,
+        items: group.items
+          .filter(
+            (item) =>
+              (!item.roles || item.roles.includes(effectiveRole)) &&
+              canShowByPageAccess(item.pageKey) &&
+              (group.useToolkitInstallFilter
+                ? canShowByToolkitInstall(item.requiresIntegration)
+                : canShowByIntegration(item.requiresIntegration))
+          )
+          .map((item): NavItem => {
+            const badge =
+              item.title === 'My Apps' &&
+              effectiveRole === 'vendor' &&
+              installedToolkitCount
+                ? String(installedToolkitCount)
+                : item.badge
 
-          if (!hasChildren(item)) {
-            return { ...item, badge }
-          }
+            if (!hasChildren(item)) {
+              return { ...item, badge }
+            }
 
-          return {
-            ...item,
-            badge,
-            items: item.items.filter(
-              (subItem) =>
-                (!subItem.roles || subItem.roles.includes(effectiveRole)) &&
-                canShowByPageAccess(subItem.pageKey) &&
-                (group.useToolkitInstallFilter
-                  ? canShowByToolkitInstall(subItem.requiresIntegration)
-                  : canShowByIntegration(subItem.requiresIntegration))
-            ),
-          }
-        })
-        .filter((item) => !hasChildren(item) || item.items.length > 0),
-    }))
+            return {
+              ...item,
+              badge,
+              items: item.items.filter(
+                (subItem) =>
+                  (!subItem.roles || subItem.roles.includes(effectiveRole)) &&
+                  canShowByPageAccess(subItem.pageKey) &&
+                  (group.useToolkitInstallFilter
+                    ? canShowByToolkitInstall(subItem.requiresIntegration)
+                    : canShowByIntegration(subItem.requiresIntegration))
+              ),
+            }
+          })
+          .filter((item) => !hasChildren(item) || item.items.length > 0),
+      })
+    )
     .filter((group) => group.items.length > 0)
 
   const orderedNavGroups =
@@ -116,20 +122,19 @@ export function AppSidebar() {
         })
       : filteredNavGroups
 
+  const sidebarShellClassName =
+    '[&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar/90 [&_[data-slot=sidebar-inner]]:text-sidebar-foreground [&_[data-slot=sidebar-inner]]:shadow-[0_24px_56px_rgba(15,23,42,0.08)] dark:[&_[data-slot=sidebar-inner]]:shadow-[0_24px_56px_rgba(2,6,23,0.42)]'
+
   return (
     <Sidebar
       collapsible={collapsible}
       variant={variant}
-      className={
-        effectiveRole === 'admin'
-          ? '[&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-purple-200 [&_[data-slot=sidebar-inner]]:bg-purple-50/95 [&_[data-slot=sidebar-inner]]:text-purple-800 [&_[data-slot=sidebar-inner]]:shadow-purple-100/50 [&[data-slot=sidebar-menu-button]:hover]:bg-purple-200 [&[data-slot=sidebar-menu-button]:hover]:text-purple-900 [&[data-slot=sidebar-menu-button][data-active=true]]:bg-purple-600 [&[data-slot=sidebar-menu-button][data-active=true]]:text-white'
-          : '[&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar/90 [&_[data-slot=sidebar-inner]]:text-sidebar-foreground [&_[data-slot=sidebar-inner]]:shadow-[0_24px_56px_rgba(15,23,42,0.08)]'
-      }
+      className={sidebarShellClassName}
       id='admin-sidebar'
       data-role={effectiveRole}
     >
-      <SidebarHeader className='border-b border-sidebar-border/70 p-3 group-data-[collapsible=icon]:px-2'>
-        <div className='flex items-center gap-2 border border-sidebar-border/70 bg-sidebar-accent/40 p-2 shadow-sm group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-1.5'>
+      <SidebarHeader className='border-sidebar-border/70 border-b p-3 group-data-[collapsible=icon]:px-2'>
+        <div className='border-sidebar-border/70 bg-sidebar-accent/40 flex items-center gap-2 border p-2 shadow-sm group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-1.5'>
           <div className='min-w-0 flex-1 group-data-[collapsible=icon]:hidden'>
             <NavUser />
           </div>
@@ -138,9 +143,11 @@ export function AppSidebar() {
             variant='ghost'
             size='icon'
             onClick={toggleSidebar}
-            className='size-8 border border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-sm hover:bg-sidebar-accent'
+            className='border-sidebar-border/70 bg-sidebar text-sidebar-foreground hover:bg-sidebar-accent size-8 border shadow-sm'
             title={state === 'expanded' ? 'Collapse sidebar' : 'Expand sidebar'}
-            aria-label={state === 'expanded' ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-label={
+              state === 'expanded' ? 'Collapse sidebar' : 'Expand sidebar'
+            }
           >
             {state === 'expanded' ? (
               <ChevronsLeft className='h-4 w-4' />
@@ -152,9 +159,11 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {orderedNavGroups.map((group: JSX.IntrinsicAttributes & SidebarNavGroup) => (
-          <NavGroup key={group.title} {...group} />
-        ))}
+        {orderedNavGroups.map(
+          (group: JSX.IntrinsicAttributes & SidebarNavGroup) => (
+            <NavGroup key={group.title} {...group} />
+          )
+        )}
       </SidebarContent>
 
       <SidebarRail />

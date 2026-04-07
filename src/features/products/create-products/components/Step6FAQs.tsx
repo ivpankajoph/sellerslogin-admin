@@ -46,7 +46,7 @@ const Step6FAQs: React.FC<Props> = ({
               type='button'
               onClick={onGenerate}
               disabled={aiLoading}
-              className='h-11 rounded-xl border border-border bg-card px-5 text-foreground hover:bg-secondary disabled:opacity-70'
+              className='h-11 rounded-xl border border-border bg-card px-5 text-foreground hover:bg-white hover:text-black disabled:opacity-70'
             >
               {aiLoading ? (
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -58,7 +58,7 @@ const Step6FAQs: React.FC<Props> = ({
             <Button
               type='button'
               onClick={onAddFAQ}
-              className='h-11 rounded-xl bg-amber-500 px-5 text-white hover:bg-amber-600'
+              className='h-11 rounded-xl bg-amber-500 px-5 text-white hover:bg-white hover:text-black'
             >
               <Plus className='mr-2 h-4 w-4' />
               Add FAQ

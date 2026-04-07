@@ -11,10 +11,8 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import RichTextEditor from '@/components/product/RichTextEditor'
-import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import {
   Command,
   CommandEmpty,
@@ -23,8 +21,18 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { StudioFieldLabel, studioInputClass, studioTextareaClass } from './studio-ui'
+import { Input } from '@/components/ui/input'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import RichTextEditor from '@/components/product/RichTextEditor'
+import {
+  StudioFieldLabel,
+  studioInputClass,
+  studioTextareaClass,
+} from './studio-ui'
 
 type SelectOption = {
   value: string
@@ -48,10 +56,11 @@ interface Props {
   generateDescription: () => void
   onCreateMainCategory: (name: string) => Promise<void>
   onCreateCategory: (name: string) => Promise<void>
-  onCreateSubcategory: (payload: { name: string; categoryId: string }) => Promise<void>
+  onCreateSubcategory: (payload: {
+    name: string
+    categoryId: string
+  }) => Promise<void>
 }
-
-
 
 const panelClass =
   'rounded-[28px] border border-border bg-card p-5 shadow-[0_20px_60px_-48px_rgba(15,23,42,0.45)] sm:p-6 dark:shadow-[0_20px_60px_-48px_rgba(0,0,0,0.8)]'
@@ -60,7 +69,7 @@ const innerCardClass =
   'rounded-2xl border border-border bg-background/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
 
 const aiButtonClass =
-  'inline-flex items-center gap-1 rounded-full border border-cyan-500/25 bg-background px-4 py-2 text-xs font-semibold text-cyan-700 shadow-sm transition hover:border-cyan-500/40 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-cyan-200'
+  'inline-flex items-center gap-1 rounded-full border border-cyan-500/25 bg-white px-4 py-2 text-xs font-semibold text-cyan-700 shadow-sm transition hover:border-cyan-500/40 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-60 dark:text-cyan-200'
 
 const helperTextClass = 'mt-2 text-xs leading-5 text-muted-foreground'
 
@@ -104,11 +113,16 @@ const filterOptions = (options: SelectOption[], search: string) => {
 
       return { option, rank, index }
     })
-    .filter((item): item is { option: SelectOption; rank: number; index: number } => Boolean(item))
+    .filter(
+      (item): item is { option: SelectOption; rank: number; index: number } =>
+        Boolean(item)
+    )
     .sort(
       (a, b) =>
         a.rank - b.rank ||
-        a.option.label.localeCompare(b.option.label, undefined, { sensitivity: 'base' }) ||
+        a.option.label.localeCompare(b.option.label, undefined, {
+          sensitivity: 'base',
+        }) ||
         a.index - b.index
     )
     .map((item) => item.option)
@@ -123,7 +137,16 @@ const SearchableMultiSelect: React.FC<{
   loading?: boolean
   searchPlaceholder?: string
   emptyLabel?: string
-}> = ({ values, onChange, options, placeholder, disabled, loading, searchPlaceholder, emptyLabel }) => {
+}> = ({
+  values,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+  loading,
+  searchPlaceholder,
+  emptyLabel,
+}) => {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
@@ -132,7 +155,10 @@ const SearchableMultiSelect: React.FC<{
     return values.map((id) => map.get(id)).filter(Boolean) as string[]
   }, [options, values])
 
-  const visibleOptions = useMemo(() => filterOptions(options, search), [options, search])
+  const visibleOptions = useMemo(
+    () => filterOptions(options, search),
+    [options, search]
+  )
 
   const buttonText = useMemo(() => {
     if (!selectedLabels.length) return placeholder
@@ -163,15 +189,20 @@ const SearchableMultiSelect: React.FC<{
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'h-11 w-full justify-between rounded-xl border-border bg-background text-left text-foreground shadow-sm hover:bg-accent',
+            'border-border bg-white text-foreground hover:bg-white hover:text-black h-11 w-full justify-between rounded-xl text-left shadow-sm',
             !selectedLabels.length && 'text-muted-foreground'
           )}
         >
-          <span className='truncate'>{loading ? 'Loading...' : buttonText}</span>
+          <span className='truncate'>
+            {loading ? 'Loading...' : buttonText}
+          </span>
           <ChevronsUpDown className='h-4 w-4 shrink-0 opacity-50' />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className='w-[--radix-popover-trigger-width] p-0' align='start'>
+      <PopoverContent
+        className='w-[--radix-popover-trigger-width] p-0'
+        align='start'
+      >
         <Command shouldFilter={false}>
           <CommandInput
             value={search}
@@ -191,7 +222,10 @@ const SearchableMultiSelect: React.FC<{
                     onSelect={() => toggleValue(option.value)}
                   >
                     <Check
-                      className={cn('mr-2 h-4 w-4', checked ? 'opacity-100' : 'opacity-0')}
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        checked ? 'opacity-100' : 'opacity-0'
+                      )}
                     />
                     {option.label}
                   </CommandItem>
@@ -211,7 +245,9 @@ const SelectedOptionsChips: React.FC<{
   onRemove: (value: string) => void
 }> = ({ values, options, onRemove }) => {
   const selectedOptions = useMemo(() => {
-    const optionMap = new Map(options.map((option) => [option.value, option.label]))
+    const optionMap = new Map(
+      options.map((option) => [option.value, option.label])
+    )
     return values
       .map((value) => {
         const label = optionMap.get(value)
@@ -273,7 +309,9 @@ const Step1BasicInfo: React.FC<Props> = ({
 
   useEffect(() => {
     setNewSubCategoryCategoryId((current) =>
-      selectedCategoryIds.includes(current) ? current : selectedCategoryIds[0] || ''
+      selectedCategoryIds.includes(current)
+        ? current
+        : selectedCategoryIds[0] || ''
     )
   }, [selectedCategoryIds])
 
@@ -336,18 +374,27 @@ const Step1BasicInfo: React.FC<Props> = ({
   )
 
   const selectedCategoryCreateOptions = useMemo(
-    () => categoryOptions.filter((option) => selectedCategoryIds.includes(option.value)),
+    () =>
+      categoryOptions.filter((option) =>
+        selectedCategoryIds.includes(option.value)
+      ),
     [categoryOptions, selectedCategoryIds]
   )
 
   const subcategoryIdsByCategoryId = useMemo(
     () =>
-      filteredSubcategories.reduce((acc: Record<string, string[]>, subcategory: any) => {
-        const categoryId = String(subcategory?.category_id || '')
-        if (!categoryId) return acc
-        acc[categoryId] = [...(acc[categoryId] || []), String(subcategory?._id || '')]
-        return acc
-      }, {}),
+      filteredSubcategories.reduce(
+        (acc: Record<string, string[]>, subcategory: any) => {
+          const categoryId = String(subcategory?.category_id || '')
+          if (!categoryId) return acc
+          acc[categoryId] = [
+            ...(acc[categoryId] || []),
+            String(subcategory?._id || ''),
+          ]
+          return acc
+        },
+        {}
+      ),
     [filteredSubcategories]
   )
 
@@ -460,7 +507,9 @@ const Step1BasicInfo: React.FC<Props> = ({
     })
 
     const removedSubcategoryIds = new Set(
-      removedCategoryIds.flatMap((categoryId) => subcategoryIdsByCategoryId[categoryId] || [])
+      removedCategoryIds.flatMap(
+        (categoryId) => subcategoryIdsByCategoryId[categoryId] || []
+      )
     )
 
     const nextCategoryIds = selectedCategoryIds.filter(
@@ -485,21 +534,11 @@ const Step1BasicInfo: React.FC<Props> = ({
   return (
     <div className='space-y-6'>
       <section className={panelClass}>
-        <div className='mb-5 flex items-start gap-4'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10'>
-            <Building2 className='h-5 w-5 text-cyan-700 dark:text-cyan-300' />
+        <div className='mb-5 flex items-center gap-3'>
+          <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/20 bg-cyan-500/10'>
+            <Building2 className='h-4 w-4 text-cyan-700 dark:text-cyan-300' />
           </div>
-          <div className='space-y-1'>
-            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300'>
-              Product Identity
-            </p>
-            <h3 className='text-xl font-semibold tracking-tight text-foreground'>
-              Basic details buyers see first
-            </h3>
-            {/* <p className='max-w-3xl text-sm leading-6 text-muted-foreground'>
-              These two fields define how the product appears in the catalog and on the product page. Keep the name precise and the brand optional.
-            </p> */}
-          </div>
+          <h3 className='text-foreground text-lg font-semibold'>Title</h3>
         </div>
 
         <div className='grid gap-4 lg:grid-cols-2'>
@@ -544,28 +583,22 @@ const Step1BasicInfo: React.FC<Props> = ({
               className={studioInputClass}
               placeholder='Optional brand name'
             />
-            <p className={helperTextClass}>If the product is unbranded, you can leave this blank.</p>
+            <p className={helperTextClass}>
+              If the product is unbranded, you can leave this blank.
+            </p>
           </div>
         </div>
       </section>
 
       <section className={panelClass}>
-        <div className='mb-5 flex items-start gap-4'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-indigo-500/20 bg-indigo-500/10'>
-            <FolderOpen className='h-5 w-5 text-indigo-700 dark:text-indigo-300' />
+        <div className='mb-5 flex items-center gap-3'>
+          <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/10'>
+            <FolderOpen className='h-4 w-4 text-indigo-700 dark:text-indigo-300' />
           </div>
-          <div className='space-y-1'>
-            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700 dark:text-indigo-300'>
-              Category Mapping
-            </p>
-            <h3 className='text-xl font-semibold tracking-tight text-foreground'>
-              Place the product where buyers expect to find it
-            </h3>
-            
-          </div>
+          <h3 className='text-foreground text-lg font-semibold'>
+            Product organization
+          </h3>
         </div>
-
-       
 
         <div className='grid gap-4 xl:grid-cols-2'>
           <div className={innerCardClass}>
@@ -585,11 +618,15 @@ const Step1BasicInfo: React.FC<Props> = ({
               values={selectedMainCategoryIds}
               options={mainCategoryOptions}
               onRemove={(value) => {
-                const nextValues = selectedMainCategoryIds.filter((id) => id !== value)
+                const nextValues = selectedMainCategoryIds.filter(
+                  (id) => id !== value
+                )
                 applyMainCategorySelection(nextValues)
               }}
             />
-            <p className={helperTextClass}>Main category controls the category list shown below.</p>
+            <p className={helperTextClass}>
+              Main category controls the category list shown below.
+            </p>
             <button
               type='button'
               onClick={() => setShowMainCategoryCreator((prev) => !prev)}
@@ -599,21 +636,25 @@ const Step1BasicInfo: React.FC<Props> = ({
               Can&apos;t find it? Create main category
             </button>
             {showMainCategoryCreator ? (
-              <div className='mt-3 rounded-2xl border border-cyan-500/20 bg-background p-4'>
-                <p className='text-sm font-semibold text-foreground'>Create a new main category</p>
+              <div className='bg-background mt-3 rounded-2xl border border-cyan-500/20 p-4'>
+                <p className='text-foreground text-sm font-semibold'>
+                  Create a new main category
+                </p>
                 <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
                   <Input
                     value={newMainCategoryName}
-                    onChange={(event) => setNewMainCategoryName(event.target.value)}
+                    onChange={(event) =>
+                      setNewMainCategoryName(event.target.value)
+                    }
                     placeholder='Enter main category name'
-                    className='h-11 rounded-xl border-border bg-background'
+                    className='border-border bg-white h-11 rounded-xl'
                   />
                   <div className='flex gap-2'>
                     <Button
                       type='button'
                       onClick={handleCreateMainCategory}
                       disabled={isCreatingMainCategory}
-                      className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-cyan-700'
+                      className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-white hover:text-black'
                     >
                       {isCreatingMainCategory ? (
                         <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -667,7 +708,9 @@ const Step1BasicInfo: React.FC<Props> = ({
               values={selectedCategoryIds}
               options={categoryOptions}
               onRemove={(value) => {
-                const nextValues = selectedCategoryIds.filter((id) => id !== value)
+                const nextValues = selectedCategoryIds.filter(
+                  (id) => id !== value
+                )
                 setSelectedCategoryIds(nextValues)
                 setFormData((prev: any) => ({
                   ...prev,
@@ -677,7 +720,9 @@ const Step1BasicInfo: React.FC<Props> = ({
                 }))
               }}
             />
-            <p className={helperTextClass}>Choose only the categories that genuinely match this product.</p>
+            <p className={helperTextClass}>
+              Choose only the categories that genuinely match this product.
+            </p>
             <button
               type='button'
               onClick={() => setShowCategoryCreator((prev) => !prev)}
@@ -688,21 +733,25 @@ const Step1BasicInfo: React.FC<Props> = ({
               Can&apos;t find it? Create category
             </button>
             {showCategoryCreator ? (
-              <div className='mt-3 rounded-2xl border border-cyan-500/20 bg-background p-4'>
-                <p className='text-sm font-semibold text-foreground'>Create a new category</p>
+              <div className='bg-background mt-3 rounded-2xl border border-cyan-500/20 p-4'>
+                <p className='text-foreground text-sm font-semibold'>
+                  Create a new category
+                </p>
                 <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
                   <Input
                     value={newCategoryName}
                     onChange={(event) => setNewCategoryName(event.target.value)}
                     placeholder='Enter category name'
-                    className='h-11 rounded-xl border-border bg-background'
+                    className='border-border bg-white h-11 rounded-xl'
                   />
                   <div className='flex gap-2'>
                     <Button
                       type='button'
                       onClick={handleCreateCategory}
-                      disabled={isCreatingCategory || !selectedMainCategoryIds.length}
-                      className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-cyan-700'
+                      disabled={
+                        isCreatingCategory || !selectedMainCategoryIds.length
+                      }
+                      className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-white hover:text-black'
                     >
                       {isCreatingCategory ? (
                         <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -750,7 +799,9 @@ const Step1BasicInfo: React.FC<Props> = ({
               disabled={!selectedCategoryIds.length}
               searchPlaceholder='Search subcategories...'
               emptyLabel={
-                selectedCategoryIds.length ? 'No subcategories found.' : 'Select categories first.'
+                selectedCategoryIds.length
+                  ? 'No subcategories found.'
+                  : 'Select categories first.'
               }
             />
             <SelectedOptionsChips
@@ -759,12 +810,15 @@ const Step1BasicInfo: React.FC<Props> = ({
               onRemove={(value) =>
                 setFormData((prev: any) => ({
                   ...prev,
-                  productSubCategories: prev.productSubCategories.filter((id: string) => id !== value),
+                  productSubCategories: prev.productSubCategories.filter(
+                    (id: string) => id !== value
+                  ),
                 }))
               }
             />
             <p className={helperTextClass}>
-              Subcategories are optional, but useful when buyers expect a more specific product path.
+              Subcategories are optional, but useful when buyers expect a more
+              specific product path.
             </p>
             <button
               type='button'
@@ -776,13 +830,17 @@ const Step1BasicInfo: React.FC<Props> = ({
               Can&apos;t find it? Create subcategory
             </button>
             {showSubCategoryCreator ? (
-              <div className='mt-3 rounded-2xl border border-cyan-500/20 bg-background p-4'>
-                <p className='text-sm font-semibold text-foreground'>Create a new subcategory</p>
+              <div className='bg-background mt-3 rounded-2xl border border-cyan-500/20 p-4'>
+                <p className='text-foreground text-sm font-semibold'>
+                  Create a new subcategory
+                </p>
                 <div className='mt-3 grid gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto]'>
                   <select
                     value={newSubCategoryCategoryId}
-                    onChange={(event) => setNewSubCategoryCategoryId(event.target.value)}
-                    className='h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15'
+                    onChange={(event) =>
+                      setNewSubCategoryCategoryId(event.target.value)
+                    }
+                    className='border-input bg-white h-11 rounded-xl border px-4 text-sm transition outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15'
                   >
                     <option value=''>Select parent category</option>
                     {selectedCategoryCreateOptions.map((option) => (
@@ -793,16 +851,20 @@ const Step1BasicInfo: React.FC<Props> = ({
                   </select>
                   <Input
                     value={newSubCategoryName}
-                    onChange={(event) => setNewSubCategoryName(event.target.value)}
+                    onChange={(event) =>
+                      setNewSubCategoryName(event.target.value)
+                    }
                     placeholder='Enter subcategory name'
-                    className='h-11 rounded-xl border-border bg-background'
+                    className='border-border bg-white h-11 rounded-xl'
                   />
                   <div className='flex gap-2'>
                     <Button
                       type='button'
                       onClick={handleCreateSubCategory}
-                      disabled={isCreatingSubCategory || !selectedCategoryIds.length}
-                      className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-cyan-700'
+                      disabled={
+                        isCreatingSubCategory || !selectedCategoryIds.length
+                      }
+                      className='h-11 rounded-xl bg-cyan-600 px-4 text-white hover:bg-white hover:text-black'
                     >
                       {isCreatingSubCategory ? (
                         <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -815,7 +877,9 @@ const Step1BasicInfo: React.FC<Props> = ({
                       onClick={() => {
                         setShowSubCategoryCreator(false)
                         setNewSubCategoryName('')
-                        setNewSubCategoryCategoryId(selectedCategoryIds[0] || '')
+                        setNewSubCategoryCategoryId(
+                          selectedCategoryIds[0] || ''
+                        )
                       }}
                       className='h-11 rounded-xl px-4'
                     >
@@ -835,13 +899,12 @@ const Step1BasicInfo: React.FC<Props> = ({
             <FileText className='h-5 w-5 text-rose-700 dark:text-rose-300' />
           </div>
           <div className='space-y-1'>
-            <p className='text-xs font-semibold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-300'>
+            <p className='text-xs font-semibold tracking-[0.2em] text-rose-700 uppercase dark:text-rose-300'>
               Sales Copy
             </p>
-            <h3 className='text-xl font-semibold tracking-tight text-foreground'>
+            <h3 className='text-foreground text-xl font-semibold tracking-tight'>
               Write the information buyers will read before purchasing
             </h3>
-           
           </div>
         </div>
 
@@ -879,7 +942,9 @@ const Step1BasicInfo: React.FC<Props> = ({
               placeholder='Example: Durable stainless steel bottle with leak-proof lid, easy-carry handle, and 1 litre capacity.'
               className={studioTextareaClass}
             />
-            <p className={helperTextClass}>Aim for 1-2 sentences. This is useful for quick catalog scanning.</p>
+            <p className={helperTextClass}>
+              Aim for 1-2 sentences. This is useful for quick catalog scanning.
+            </p>
           </div>
 
           <div className={innerCardClass}>
@@ -906,13 +971,15 @@ const Step1BasicInfo: React.FC<Props> = ({
             <RichTextEditor
               value={formData.description}
               onChange={(nextValue) =>
-                setFormData((prev: any) => ({ ...prev, description: nextValue }))
+                setFormData((prev: any) => ({
+                  ...prev,
+                  description: nextValue,
+                }))
               }
               placeholder='Write the full product description here. Include features, materials, sizes, benefits, and any usage or care information.'
               minHeight='min-h-[320px]'
               className='mt-3'
             />
-           
           </div>
         </div>
       </section>
@@ -921,5 +988,3 @@ const Step1BasicInfo: React.FC<Props> = ({
 }
 
 export default Step1BasicInfo
-
-

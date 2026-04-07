@@ -25,7 +25,7 @@ interface Props {
 }
 
 const aiButtonClass =
-  'h-10 rounded-xl border border-border bg-card px-4 text-foreground hover:bg-secondary'
+  'h-10 rounded-xl border border-border bg-card px-4 text-foreground hover:bg-white hover:text-black'
 
 const chipClass =
   'inline-flex items-center gap-1 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300'
@@ -48,9 +48,9 @@ const Step4SEO: React.FC<Props> = ({
   return (
     <div className='space-y-6'>
       <div className={studioCardClass}>
-        <div className='flex items-center gap-2 text-base font-semibold text-foreground'>
+        <div className='text-foreground flex items-center gap-2 text-base font-semibold'>
           <Search className='h-4 w-4 text-cyan-600' />
-          SEO
+          Search engine listing
         </div>
       </div>
 
@@ -146,7 +146,7 @@ const Step4SEO: React.FC<Props> = ({
                 <button
                   type='button'
                   onClick={() => onRemoveKeyword(index)}
-                  className='rounded-full p-0.5 transition hover:bg-background hover:text-foreground'
+                  className='hover:bg-background hover:text-foreground rounded-full p-0.5 transition'
                   aria-label={`Remove ${keyword}`}
                 >
                   <X className='h-3 w-3' />

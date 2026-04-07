@@ -1,9 +1,12 @@
 // src/components/ProductCreate/index.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import {
   ArrowLeft,
   ArrowRight,
+  CircleHelp,
+  Eye,
+  ImagePlus,
   CheckCircle2,
   Layers3,
   Loader2,
@@ -12,11 +15,11 @@ import {
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import {
   getVendorTemplateProductUrl,
   resolvePreviewCityFromVendorProfile,
 } from '@/lib/storefront-url'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -25,9 +28,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
+import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
 import { generateWithAI } from './aiHelpers'
 import { deleteFromCloudinary, uploadToCloudinary } from './cloudinary'
+import ProductEditorSidebar from './components/ProductEditorSidebar'
+import ProductMediaSection from './components/ProductMediaSection'
 import Step1BasicInfo from './components/Step1BasicInfo'
 import Step4SEO from './components/Step4SEO'
 import Step5Variants from './components/Step5Variants'
@@ -36,6 +41,7 @@ import { fieldConfig } from './helpers/SpecificationsData'
 import {
   type ImageUpload,
   type ProductFormData,
+  type ProductSpecification,
   type Variant,
 } from './types/type'
 
@@ -44,11 +50,13 @@ import {
 // Specification templates by category
 
 const PRODUCT_CREATE_DRAFT_STORAGE_PREFIX = 'product_create_draft'
-const PRODUCT_CREATE_DRAFT_VERSION = 3
+const PRODUCT_CREATE_DRAFT_VERSION = 4
 const PRODUCT_CREATE_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
-const PRODUCT_CREATE_STEP_COUNT = 3
+const PRODUCT_CREATE_STEP_COUNT = 5
 const VARIANT_SUGGESTION_DISPLAY_LIMIT = 15
 const PRODUCT_PREVIEW_STORAGE_TTL_MS = 30 * 60 * 1000
+const MAX_VARIANT_IMAGES = 3
+const MIN_SPECIFICATION_KEY_COUNT = 10
 
 type VariantContextRule = {
   patterns: RegExp[]
@@ -106,7 +114,13 @@ const VARIANT_KEY_CONTEXT_RULES: VariantContextRule[] = [
     patterns: [/contact lens/i, /contact lenses/i],
     fallbackKeys: ['Lens Power', 'Base Curve', 'Diameter'],
     variantKeys: ['Lens Power', 'Base Curve', 'Diameter'],
-    detailKeys: ['Lens Power', 'Base Curve', 'Diameter', 'Pack Size', 'Wear Duration'],
+    detailKeys: [
+      'Lens Power',
+      'Base Curve',
+      'Diameter',
+      'Pack Size',
+      'Wear Duration',
+    ],
     allowedDetailKeyPatterns: [
       /lens/i,
       /power/i,
@@ -123,10 +137,21 @@ const VARIANT_KEY_CONTEXT_RULES: VariantContextRule[] = [
     ],
   },
   {
-    patterns: [/power lens/i, /optical lens/i, /reading lens/i, /prescription lens/i],
+    patterns: [
+      /power lens/i,
+      /optical lens/i,
+      /reading lens/i,
+      /prescription lens/i,
+    ],
     fallbackKeys: ['Lens Power', 'Lens Type', 'Diameter'],
     variantKeys: ['Lens Power', 'Lens Type', 'Diameter'],
-    detailKeys: ['Lens Power', 'Lens Type', 'Diameter', 'Lens Material', 'Coating'],
+    detailKeys: [
+      'Lens Power',
+      'Lens Type',
+      'Diameter',
+      'Lens Material',
+      'Coating',
+    ],
     allowedDetailKeyPatterns: [
       /lens/i,
       /power/i,
@@ -238,7 +263,13 @@ const VARIANT_KEY_CONTEXT_RULES: VariantContextRule[] = [
     configKeys: ['Watches'],
     fallbackKeys: ['Dial Color', 'Band Material', 'Case Size'],
     variantKeys: ['Dial Color', 'Band Material', 'Case Size'],
-    detailKeys: ['Dial Color', 'Band Material', 'Case Size', 'Case Material', 'Strap Color'],
+    detailKeys: [
+      'Dial Color',
+      'Band Material',
+      'Case Size',
+      'Case Material',
+      'Strap Color',
+    ],
     allowedDetailKeyPatterns: [
       /dial/i,
       /band/i,
@@ -317,7 +348,13 @@ const VARIANT_KEY_CONTEXT_RULES: VariantContextRule[] = [
     patterns: [/television/i, /\btv\b/i, /monitor/i, /display/i],
     fallbackKeys: ['Display Size', 'Screen Resolution', 'Screen Type'],
     variantKeys: ['Display Size', 'Screen Resolution', 'Screen Type'],
-    detailKeys: ['Display Size', 'Screen Resolution', 'Screen Type', 'Refresh Rate', 'Connectivity'],
+    detailKeys: [
+      'Display Size',
+      'Screen Resolution',
+      'Screen Type',
+      'Refresh Rate',
+      'Connectivity',
+    ],
     allowedDetailKeyPatterns: [
       /display/i,
       /screen/i,
@@ -336,7 +373,13 @@ const VARIANT_KEY_CONTEXT_RULES: VariantContextRule[] = [
     configKeys: ['Headphones', 'Electronics'],
     fallbackKeys: ['Color', 'Connectivity', 'Type'],
     variantKeys: ['Color', 'Connectivity', 'Type'],
-    detailKeys: ['Color', 'Connectivity', 'Type', 'Battery Life', 'Water Resistance'],
+    detailKeys: [
+      'Color',
+      'Connectivity',
+      'Type',
+      'Battery Life',
+      'Water Resistance',
+    ],
     allowedDetailKeyPatterns: [
       /color/i,
       /colour/i,
@@ -350,7 +393,14 @@ const VARIANT_KEY_CONTEXT_RULES: VariantContextRule[] = [
     ],
   },
   {
-    patterns: [/accessor/i, /cover/i, /case/i, /charger/i, /cable/i, /power bank/i],
+    patterns: [
+      /accessor/i,
+      /cover/i,
+      /case/i,
+      /charger/i,
+      /cable/i,
+      /power bank/i,
+    ],
     fallbackKeys: ['Compatibility', 'Color', 'Type'],
     variantKeys: ['Compatibility', 'Color', 'Type'],
     detailKeys: ['Compatibility', 'Color', 'Type', 'Length', 'Capacity'],
@@ -421,6 +471,7 @@ const createInitialFormData = (): ProductFormData => ({
   metaTitle: '',
   metaDescription: '',
   metaKeywords: [],
+  specifications: [],
   variants: [],
   faqs: [],
 })
@@ -548,7 +599,8 @@ const ensureMetaDescriptionIncludesCity = (
   const normalizedDescription = toTrimmedText(description)
   const normalizedCityLabel = toTrimmedText(cityLabel)
 
-  if (!normalizedDescription || !normalizedCityLabel) return normalizedDescription
+  if (!normalizedDescription || !normalizedCityLabel)
+    return normalizedDescription
   if (includesTextIgnoreCase(normalizedDescription, normalizedCityLabel)) {
     return ensureSentenceEnding(normalizedDescription)
   }
@@ -571,21 +623,30 @@ const buildDefaultMetaDescription = ({
   categoryLabel: string
   cityLabel: string
 }) => {
-  const shortCopy = ensureMetaDescriptionIncludesCity(shortDescription, cityLabel)
+  const shortCopy = ensureMetaDescriptionIncludesCity(
+    shortDescription,
+    cityLabel
+  )
   if (shortCopy) return shortCopy
 
-  const descriptionCopy = ensureMetaDescriptionIncludesCity(description, cityLabel)
+  const descriptionCopy = ensureMetaDescriptionIncludesCity(
+    description,
+    cityLabel
+  )
   if (descriptionCopy) return descriptionCopy
 
-  const productLabel = buildMetaProductLabel(productName, brand) || 'this product'
+  const productLabel =
+    buildMetaProductLabel(productName, brand) || 'this product'
   const normalizedCategoryLabel = toTrimmedText(categoryLabel)
   const normalizedCityLabel = toTrimmedText(cityLabel)
   const categorySuffix =
-    normalizedCategoryLabel && !includesTextIgnoreCase(productLabel, normalizedCategoryLabel)
+    normalizedCategoryLabel &&
+    !includesTextIgnoreCase(productLabel, normalizedCategoryLabel)
       ? ` in ${normalizedCategoryLabel}`
       : ''
   const citySuffix =
-    normalizedCityLabel && !includesTextIgnoreCase(productLabel, normalizedCityLabel)
+    normalizedCityLabel &&
+    !includesTextIgnoreCase(productLabel, normalizedCityLabel)
       ? ` in ${normalizedCityLabel}`
       : ''
 
@@ -598,6 +659,22 @@ const sanitizeStringList = (value: unknown) =>
         new Set(value.map((item) => toTrimmedText(item)).filter(Boolean))
       )
     : []
+
+const normalizeComparableKey = (value: unknown) =>
+  toTrimmedText(value)
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+
+const areSameStringLists = (left: string[], right: string[]) => {
+  const normalizedLeft = [...sanitizeStringList(left)].sort()
+  const normalizedRight = [...sanitizeStringList(right)].sort()
+
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((value, index) => value === normalizedRight[index])
+  )
+}
 
 const sanitizeImageUploads = (value: unknown): ImageUpload[] => {
   if (!Array.isArray(value)) return []
@@ -622,12 +699,23 @@ const sanitizeImageUploads = (value: unknown): ImageUpload[] => {
 const sanitizeStringRecord = (value: unknown): Record<string, string> => {
   if (!isRecord(value)) return {}
 
-  return Object.entries(value).reduce<Record<string, string>>((acc, [key, entryValue]) => {
-    const normalizedKey = toTrimmedText(key)
-    if (!normalizedKey) return acc
-    acc[normalizedKey] = toText(entryValue)
-    return acc
-  }, {})
+  return Object.entries(value).reduce<Record<string, string>>(
+    (acc, [key, entryValue]) => {
+      const normalizedKey = toTrimmedText(key)
+      if (!normalizedKey) return acc
+      acc[normalizedKey] = toText(entryValue)
+      return acc
+    },
+    {}
+  )
+}
+
+const sanitizeSpecifications = (value: unknown): ProductSpecification[] => {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((item) => sanitizeStringRecord(item))
+    .filter((item) => Object.keys(item).length > 0)
 }
 
 const collectFieldConfigKeys = (configKey: string) =>
@@ -638,11 +726,74 @@ const collectFieldConfigKeys = (configKey: string) =>
         .slice(0, 8)
     : []
 
+const collectSpecificationFieldConfigKeys = (configKey: string) =>
+  Array.isArray(fieldConfig?.[configKey])
+    ? fieldConfig[configKey]
+        .map((field) => toTrimmedText(field?.label || field?.name))
+        .filter(Boolean)
+    : []
+
+const filterExcludedKeys = (keys: string[], excludedKeys: string[] = []) => {
+  const excludedSet = new Set(
+    sanitizeStringList(excludedKeys).map((key) => normalizeComparableKey(key))
+  )
+
+  return sanitizeStringList(keys).filter(
+    (key) => !excludedSet.has(normalizeComparableKey(key))
+  )
+}
+
+const COMMON_SPECIFICATION_KEYS = [
+  'Brand',
+  'Model Number',
+  'Product Type',
+  'Features',
+  'Dimensions',
+  'Weight',
+  'Warranty Summary',
+  'Sales Package',
+  'Material',
+  'Care Instructions',
+  'Usage Instructions',
+  'Battery Life',
+  'Connectivity',
+  'Compatibility',
+  'In The Box',
+]
+
+const PRODUCT_DETAIL_BLOCKED_KEY_PATTERNS = [
+  /\bprice\b/i,
+  /\bmrp\b/i,
+  /\bcost\b/i,
+  /\bdiscount\b/i,
+  /\boffer\b/i,
+  /\bsale\b/i,
+  /\bselling\b/i,
+  /\bamount\b/i,
+  /\bcurrency\b/i,
+  /\bretail\b/i,
+]
+
+const isBlockedProductDetailKey = (key: string) =>
+  PRODUCT_DETAIL_BLOCKED_KEY_PATTERNS.some((pattern) =>
+    pattern.test(String(key || ''))
+  )
+
+const filterProductDetailKeys = (
+  keys: string[],
+  excludedKeys: string[] = []
+) =>
+  filterExcludedKeys(keys, excludedKeys).filter(
+    (key) => !isBlockedProductDetailKey(key)
+  )
+
 const filterKeysByPatterns = (keys: string[], patterns: RegExp[]) => {
   if (!patterns.length) return sanitizeStringList(keys)
 
   return sanitizeStringList(
-    keys.filter((key) => patterns.some((pattern) => pattern.test(String(key || ''))))
+    keys.filter((key) =>
+      patterns.some((pattern) => pattern.test(String(key || '')))
+    )
   )
 }
 
@@ -673,7 +824,9 @@ const getFallbackVariantKeysFromContext = (contextNames: string[]) => {
 }
 
 const isGenericVariantLikeKey = (key: string) =>
-  GENERIC_VARIANT_KEY_PATTERNS.some((pattern) => pattern.test(String(key || '')))
+  GENERIC_VARIANT_KEY_PATTERNS.some((pattern) =>
+    pattern.test(String(key || ''))
+  )
 
 const buildRecommendedVariantKeysForContext = (
   apiKeys: string[],
@@ -714,6 +867,42 @@ const getSuggestedVariantKeysForContext = (
   return sanitizeStringList([
     ...getFallbackVariantKeysFromContext(contextNames),
     ...recommendedKeys.filter(isGenericVariantLikeKey),
+  ])
+}
+
+const buildRecommendedSpecificationKeysForContext = (
+  apiKeys: string[],
+  contextNames: string[],
+  excludedKeys: string[] = []
+) => {
+  const matchedRule = getVariantContextRule(contextNames)
+  const configFieldKeys = sanitizeStringList(
+    (matchedRule?.configKeys || []).flatMap(collectSpecificationFieldConfigKeys)
+  )
+  const contextualKeys = sanitizeStringList(matchedRule?.detailKeys || [])
+  const filteredConfigKeys = filterProductDetailKeys(configFieldKeys, excludedKeys)
+  const filteredApiKeys = filterProductDetailKeys(apiKeys, excludedKeys)
+  const filteredContextualKeys = filterProductDetailKeys(
+    contextualKeys,
+    excludedKeys
+  )
+
+  const keys = sanitizeStringList([
+    ...filteredConfigKeys,
+    ...filteredApiKeys,
+    ...filteredContextualKeys,
+  ])
+
+  if (keys.length >= MIN_SPECIFICATION_KEY_COUNT) {
+    return keys
+  }
+
+  return sanitizeStringList([
+    ...keys,
+    ...filterProductDetailKeys(COMMON_SPECIFICATION_KEYS, [
+      ...excludedKeys,
+      ...keys,
+    ]),
   ])
 }
 
@@ -766,28 +955,28 @@ const mapIdList = (value: unknown) =>
     ? sanitizeStringList(value.map((item) => getIdValue(item)))
     : []
 
-const buildEditModeHydratedFormData = (product: Record<string, unknown>): ProductFormData =>
+const buildEditModeHydratedFormData = (
+  product: Record<string, unknown>
+): ProductFormData =>
   sanitizeProductFormData({
     mainCategory:
-      getIdValue(product.mainCategory) ||
-      getIdValue(product.mainCategoryData),
-    mainCategories:
-      mapIdList(product.mainCategories).length
-        ? mapIdList(product.mainCategories)
-        : [
-            getIdValue(product.mainCategory) || getIdValue(product.mainCategoryData),
-          ].filter(Boolean),
+      getIdValue(product.mainCategory) || getIdValue(product.mainCategoryData),
+    mainCategories: mapIdList(product.mainCategories).length
+      ? mapIdList(product.mainCategories)
+      : [
+          getIdValue(product.mainCategory) ||
+            getIdValue(product.mainCategoryData),
+        ].filter(Boolean),
     productName: product.productName,
     productCategory:
       getIdValue(product.productCategory) ||
       getIdValue(product.productCategoryData),
-    productCategories:
-      mapIdList(product.productCategories).length
-        ? mapIdList(product.productCategories)
-        : [
-            getIdValue(product.productCategory) ||
-              getIdValue(product.productCategoryData),
-          ].filter(Boolean),
+    productCategories: mapIdList(product.productCategories).length
+      ? mapIdList(product.productCategories)
+      : [
+          getIdValue(product.productCategory) ||
+            getIdValue(product.productCategoryData),
+        ].filter(Boolean),
     productSubCategories: mapIdList(product.productSubCategories),
     availableCities: mapIdList(product.availableCities),
     websiteIds: mapIdList(product.websiteIds),
@@ -799,6 +988,7 @@ const buildEditModeHydratedFormData = (product: Record<string, unknown>): Produc
     metaTitle: product.metaTitle,
     metaDescription: product.metaDescription,
     metaKeywords: product.metaKeywords,
+    specifications: product.specifications,
     variants: Array.isArray(product.variants)
       ? product.variants.map((variant) =>
           sanitizeVariant({
@@ -834,7 +1024,10 @@ const sanitizeProductFormData = (value: unknown): ProductFormData => {
     metaTitle: toText(raw.metaTitle),
     metaDescription: toText(raw.metaDescription),
     metaKeywords: sanitizeStringList(raw.metaKeywords),
-    variants: Array.isArray(raw.variants) ? raw.variants.map(sanitizeVariant) : [],
+    specifications: sanitizeSpecifications(raw.specifications),
+    variants: Array.isArray(raw.variants)
+      ? raw.variants.map(sanitizeVariant)
+      : [],
     faqs: sanitizeFaqs(raw.faqs),
   }
 }
@@ -842,7 +1035,10 @@ const sanitizeProductFormData = (value: unknown): ProductFormData => {
 const clampProductCreateStep = (value: unknown) => {
   const numericValue = Number(value)
   if (!Number.isFinite(numericValue)) return 1
-  return Math.min(PRODUCT_CREATE_STEP_COUNT, Math.max(1, Math.trunc(numericValue)))
+  return Math.min(
+    PRODUCT_CREATE_STEP_COUNT,
+    Math.max(1, Math.trunc(numericValue))
+  )
 }
 
 const sortEntitiesByName = <T extends { name?: string }>(items: T[]) =>
@@ -852,7 +1048,10 @@ const sortEntitiesByName = <T extends { name?: string }>(items: T[]) =>
     })
   )
 
-const mergeEntityById = <T extends { _id?: string }>(items: T[], nextItem: T) => {
+const mergeEntityById = <T extends { _id?: string }>(
+  items: T[],
+  nextItem: T
+) => {
   const entityMap = new Map<string, T>()
   items.forEach((item) => {
     const id = String(item?._id || '')
@@ -867,7 +1066,9 @@ const mergeEntityById = <T extends { _id?: string }>(items: T[], nextItem: T) =>
   return Array.from(entityMap.values())
 }
 
-const sanitizeProductCreateDraft = (value: unknown): ProductCreateDraft | null => {
+const sanitizeProductCreateDraft = (
+  value: unknown
+): ProductCreateDraft | null => {
   if (!isRecord(value)) return null
 
   return {
@@ -911,7 +1112,8 @@ const ProductCreateForm: React.FC = () => {
     }
   }, [])
   const isEditMode =
-    initialEditorSearch.mode === 'edit' && Boolean(initialEditorSearch.productId)
+    initialEditorSearch.mode === 'edit' &&
+    Boolean(initialEditorSearch.productId)
   const draftStorageKey = vendorId
     ? `${buildProductCreateDraftStorageKey(vendorId)}_${isEditMode ? `edit_${initialEditorSearch.productId}` : 'create'}`
     : ''
@@ -920,10 +1122,14 @@ const ProductCreateForm: React.FC = () => {
   const lastAutoAppliedMetaTitleRef = useRef('')
   const lastAutoAppliedMetaDescriptionRef = useRef('')
   const lastGeneratedVariantSuggestionContextRef = useRef('')
+  const lastAutoGeneratedSpecificationContextRef = useRef('')
+  const lastAutoGeneratedSpecificationKeysRef = useRef<string[]>([])
   const formTopRef = useRef<HTMLDivElement | null>(null)
 
   // Form state
-  const [formData, setFormData] = useState<ProductFormData>(() => createInitialFormData())
+  const [formData, setFormData] = useState<ProductFormData>(() =>
+    createInitialFormData()
+  )
 
   const [mainCategories, setMainCategories] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
@@ -933,15 +1139,20 @@ const ProductCreateForm: React.FC = () => {
   const [isCategoryLoading, setIsCategoryLoading] = useState(false)
   const [isWebsiteLoading, setIsWebsiteLoading] = useState(false)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
-  const [selectedMainCategoryIds, setSelectedMainCategoryIds] = useState<string[]>([])
+  const [selectedMainCategoryIds, setSelectedMainCategoryIds] = useState<
+    string[]
+  >([])
   const [filteredSubcategories, setFilteredSubcategories] = useState<any[]>([])
   const [variantAttributeKeys, setVariantAttributeKeys] = useState<string[]>([])
-  const [recommendedVariantKeys, setRecommendedVariantKeys] = useState<string[]>([])
+  const [recommendedVariantKeys, setRecommendedVariantKeys] = useState<
+    string[]
+  >([])
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState<any>({
     metaTitle: false,
     metaDescription: false,
     metaKeywords: false,
+    specificationKeys: false,
     variantKeys: false,
     faqs: false,
   })
@@ -954,7 +1165,6 @@ const ProductCreateForm: React.FC = () => {
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
   const [isEditProductLoading, setIsEditProductLoading] = useState(false)
   const primarySelectedMainCategoryId = selectedMainCategoryIds[0] || ''
-  const isVendor = String(authUser?.role || '').toLowerCase() === 'vendor'
 
   const resetDraftState = () => {
     restoredVariantAttributeKeysRef.current = null
@@ -1011,7 +1221,8 @@ const ProductCreateForm: React.FC = () => {
         return
       }
 
-      restoredVariantAttributeKeysRef.current = parsedDraft.variantAttributeKeys.length
+      restoredVariantAttributeKeysRef.current = parsedDraft.variantAttributeKeys
+        .length
         ? parsedDraft.variantAttributeKeys
         : null
 
@@ -1020,7 +1231,8 @@ const ProductCreateForm: React.FC = () => {
         parsedDraft.selectedMainCategoryIds.length
           ? parsedDraft.selectedMainCategoryIds
           : sanitizeStringList(
-              parsedDraft.formData.mainCategories ?? parsedDraft.formData.mainCategory
+              parsedDraft.formData.mainCategories ??
+                parsedDraft.formData.mainCategory
             )
       )
       setSelectedCategoryIds(
@@ -1045,7 +1257,12 @@ const ProductCreateForm: React.FC = () => {
   }, [draftStorageKey, isEditMode, vendorId])
 
   useEffect(() => {
-    if (!isDraftHydrated || !vendorId || !draftStorageKey || typeof window === 'undefined') {
+    if (
+      !isDraftHydrated ||
+      !vendorId ||
+      !draftStorageKey ||
+      typeof window === 'undefined'
+    ) {
       return
     }
 
@@ -1056,7 +1273,9 @@ const ProductCreateForm: React.FC = () => {
         formData: sanitizeProductFormData(formData),
         selectedMainCategoryIds: selectedMainCategoryIds.length
           ? selectedMainCategoryIds
-          : sanitizeStringList(formData.mainCategories ?? formData.mainCategory),
+          : sanitizeStringList(
+              formData.mainCategories ?? formData.mainCategory
+            ),
         selectedCategoryIds: selectedCategoryIds.length
           ? selectedCategoryIds
           : sanitizeStringList(formData.productCategories),
@@ -1066,7 +1285,10 @@ const ProductCreateForm: React.FC = () => {
       }
 
       try {
-        window.localStorage.setItem(draftStorageKey, JSON.stringify(draftToPersist))
+        window.localStorage.setItem(
+          draftStorageKey,
+          JSON.stringify(draftToPersist)
+        )
         setDraftSavedAt(draftToPersist.savedAt)
       } catch {
         return
@@ -1106,7 +1328,9 @@ const ProductCreateForm: React.FC = () => {
 
         const result = await response.json().catch(() => null)
         if (!response.ok || !result?.product) {
-          throw new Error(result?.message || 'Failed to load product for editing')
+          throw new Error(
+            result?.message || 'Failed to load product for editing'
+          )
         }
 
         const product = result.product as Record<string, unknown>
@@ -1179,7 +1403,8 @@ const ProductCreateForm: React.FC = () => {
 
   const selectedMainCategoryName = useMemo(() => {
     const current = mainCategories.find(
-      (category: any) => String(category?._id) === String(primarySelectedMainCategoryId)
+      (category: any) =>
+        String(category?._id) === String(primarySelectedMainCategoryId)
     )
     return String(current?.name || '').trim()
   }, [mainCategories, primarySelectedMainCategoryId])
@@ -1187,7 +1412,9 @@ const ProductCreateForm: React.FC = () => {
   const selectedCategoryNames = useMemo(
     () =>
       categories
-        .filter((category: any) => selectedCategoryIds.includes(String(category?._id || '')))
+        .filter((category: any) =>
+          selectedCategoryIds.includes(String(category?._id || ''))
+        )
         .map((category: any) => String(category?.name || '').trim())
         .filter(Boolean),
     [categories, selectedCategoryIds]
@@ -1220,6 +1447,36 @@ const ProductCreateForm: React.FC = () => {
     ]
   )
 
+  const specificationCategoryContext = useMemo(
+    () =>
+      sanitizeStringList([
+        selectedMainCategoryName,
+        ...selectedCategoryNames,
+        ...selectedSubcategoryNames,
+      ]).join(', '),
+    [
+      selectedCategoryNames,
+      selectedMainCategoryName,
+      selectedSubcategoryNames,
+    ]
+  )
+
+  const specificationContextSignature = useMemo(
+    () =>
+      [
+        primarySelectedMainCategoryId,
+        ...selectedCategoryIds,
+        ...formData.productSubCategories,
+      ]
+        .filter(Boolean)
+        .join('|'),
+    [
+      formData.productSubCategories,
+      primarySelectedMainCategoryId,
+      selectedCategoryIds,
+    ]
+  )
+
   const addVariantKeySuggestions = useMemo(
     () =>
       getSuggestedVariantKeysForContext(
@@ -1246,6 +1503,11 @@ const ProductCreateForm: React.FC = () => {
         )
       ),
     [formData.variants]
+  )
+
+  const specificationExcludedKeys = useMemo(
+    () => sanitizeStringList(allVariantAttributeKeys),
+    [allVariantAttributeKeys]
   )
 
   const primarySeoCategoryLabel = useMemo(
@@ -1275,7 +1537,9 @@ const ProductCreateForm: React.FC = () => {
         authUser?.default_city_name ||
         authUser?.defaultCityName
     )
-    const registrationCity = toTrimmedText(vendorProfile?.city || authUser?.city)
+    const registrationCity = toTrimmedText(
+      vendorProfile?.city || authUser?.city
+    )
     const candidateCityName =
       defaultCitySlug !== 'all'
         ? defaultCityName || formatCityLabel(defaultCitySlug)
@@ -1317,7 +1581,12 @@ const ProductCreateForm: React.FC = () => {
         categoryLabel: primarySeoCategoryLabel,
         cityLabel: seoDefaultCityLabel,
       }),
-    [formData.brand, formData.productName, primarySeoCategoryLabel, seoDefaultCityLabel]
+    [
+      formData.brand,
+      formData.productName,
+      primarySeoCategoryLabel,
+      seoDefaultCityLabel,
+    ]
   )
 
   const defaultMetaDescription = useMemo(
@@ -1444,7 +1713,9 @@ const ProductCreateForm: React.FC = () => {
       const currentCityIds = sanitizeStringList(prev.availableCities)
       if (
         currentCityIds.length === allVisibleCityIds.length &&
-        currentCityIds.every((cityId, index) => cityId === allVisibleCityIds[index])
+        currentCityIds.every(
+          (cityId, index) => cityId === allVisibleCityIds[index]
+        )
       ) {
         return prev
       }
@@ -1466,13 +1737,15 @@ const ProductCreateForm: React.FC = () => {
     )
 
     setFormData((prev: ProductFormData) => {
-      const nextWebsiteIds = sanitizeStringList(prev.websiteIds).filter((websiteId) =>
-        visibleWebsiteIds.has(websiteId)
+      const nextWebsiteIds = sanitizeStringList(prev.websiteIds).filter(
+        (websiteId) => visibleWebsiteIds.has(websiteId)
       )
 
       if (
         nextWebsiteIds.length === prev.websiteIds.length &&
-        nextWebsiteIds.every((websiteId, index) => websiteId === prev.websiteIds[index])
+        nextWebsiteIds.every(
+          (websiteId, index) => websiteId === prev.websiteIds[index]
+        )
       ) {
         return prev
       }
@@ -1520,7 +1793,12 @@ const ProductCreateForm: React.FC = () => {
         }
 
         const unique = Array.from(
-          new Map(merged.map((category: any) => [String(category?._id || ''), category])).values()
+          new Map(
+            merged.map((category: any) => [
+              String(category?._id || ''),
+              category,
+            ])
+          ).values()
         )
         setCategories(sortEntitiesByName(unique))
       } catch (err) {
@@ -1567,7 +1845,8 @@ const ProductCreateForm: React.FC = () => {
           if (!json?.success || !Array.isArray(json.data)) continue
 
           const categoryId = selectedCategoryIds[index]
-          const categoryName = categoryNameById[categoryId] || 'Unknown Category'
+          const categoryName =
+            categoryNameById[categoryId] || 'Unknown Category'
 
           merged.push(
             ...json.data.map((subcategory: any) => ({
@@ -1578,7 +1857,9 @@ const ProductCreateForm: React.FC = () => {
         }
 
         const unique = Array.from(
-          new Map(merged.map((subcategory) => [subcategory._id, subcategory])).values()
+          new Map(
+            merged.map((subcategory) => [subcategory._id, subcategory])
+          ).values()
         )
         setFilteredSubcategories(unique)
       } catch (err) {
@@ -1616,7 +1897,9 @@ const ProductCreateForm: React.FC = () => {
     }
 
     const created = payload.data
-    setMainCategories((prev) => sortEntitiesByName(mergeEntityById(prev, created)))
+    setMainCategories((prev) =>
+      sortEntitiesByName(mergeEntityById(prev, created))
+    )
     setSelectedMainCategoryIds((prev) =>
       prev.includes(created._id) ? prev : [...prev, created._id]
     )
@@ -1648,7 +1931,8 @@ const ProductCreateForm: React.FC = () => {
     }
 
     const selectedMainCategory = mainCategories.find(
-      (category: any) => String(category?._id) === String(primarySelectedMainCategoryId)
+      (category: any) =>
+        String(category?._id) === String(primarySelectedMainCategoryId)
     )
 
     const response = await fetch(
@@ -1716,7 +2000,8 @@ const ProductCreateForm: React.FC = () => {
     }
 
     const selectedMainCategory = mainCategories.find(
-      (category: any) => String(category?._id) === String(primarySelectedMainCategoryId)
+      (category: any) =>
+        String(category?._id) === String(primarySelectedMainCategoryId)
     )
 
     const response = await fetch(
@@ -1769,10 +2054,13 @@ const ProductCreateForm: React.FC = () => {
 
         variants[variantIndex] = {
           ...targetVariant,
-          variantAttributes: normalizedKeys.reduce<Record<string, string>>((acc, key) => {
-            acc[key] = String(targetVariant.variantAttributes?.[key] || '')
-            return acc
-          }, {}),
+          variantAttributes: normalizedKeys.reduce<Record<string, string>>(
+            (acc, key) => {
+              acc[key] = String(targetVariant.variantAttributes?.[key] || '')
+              return acc
+            },
+            {}
+          ),
         }
 
         return {
@@ -1823,7 +2111,10 @@ const ProductCreateForm: React.FC = () => {
       ...selectedSubcategoryNames,
       toTrimmedText(formData.productName),
     ]
-    const fallbackKeys = buildRecommendedVariantKeysForContext([], suggestionContextNames)
+    const fallbackKeys = buildRecommendedVariantKeysForContext(
+      [],
+      suggestionContextNames
+    )
     const variantKeyContextSignature = [
       primarySelectedMainCategoryId,
       ...selectedCategoryIds,
@@ -1859,14 +2150,16 @@ const ProductCreateForm: React.FC = () => {
 
         if (shouldAutoApplyRecommendedKeys) {
           setVariantAttributeKeys(nextRecommendedKeys)
-          lastAutoAppliedVariantKeyContextRef.current = variantKeyContextSignature
+          lastAutoAppliedVariantKeyContextRef.current =
+            variantKeyContextSignature
         }
       } catch {
         setRecommendedVariantKeys(fallbackKeys)
 
         if (shouldAutoApplyRecommendedKeys) {
           setVariantAttributeKeys(fallbackKeys)
-          lastAutoAppliedVariantKeyContextRef.current = variantKeyContextSignature
+          lastAutoAppliedVariantKeyContextRef.current =
+            variantKeyContextSignature
         }
       }
     }
@@ -1913,7 +2206,8 @@ const ProductCreateForm: React.FC = () => {
 
     setFormData((prev: ProductFormData) => {
       const currentMetaDescription = toTrimmedText(prev.metaDescription)
-      const lastAutoAppliedDescription = lastAutoAppliedMetaDescriptionRef.current
+      const lastAutoAppliedDescription =
+        lastAutoAppliedMetaDescriptionRef.current
 
       if (
         currentMetaDescription &&
@@ -2097,7 +2391,8 @@ const ProductCreateForm: React.FC = () => {
 
     if (
       suggestionContextSignature &&
-      lastGeneratedVariantSuggestionContextRef.current === suggestionContextSignature
+      lastGeneratedVariantSuggestionContextRef.current ===
+        suggestionContextSignature
     ) {
       return
     }
@@ -2127,15 +2422,14 @@ const ProductCreateForm: React.FC = () => {
       )
 
       setRecommendedVariantKeys(nextRecommendedKeys)
-      lastGeneratedVariantSuggestionContextRef.current = suggestionContextSignature
+      lastGeneratedVariantSuggestionContextRef.current =
+        suggestionContextSignature
     } catch (error: any) {
       return
     } finally {
       setAiLoading((prev: any) => ({ ...prev, variantKeys: false }))
     }
   }
-
-
 
   // --- Variant Handlers ---
   // --- Variant Handlers ---
@@ -2162,17 +2456,19 @@ const ProductCreateForm: React.FC = () => {
 
     if (!initialKeys.length) return
 
-    setVariantAttributeKeys((prev) => sanitizeStringList([...prev, ...initialKeys]))
+    setVariantAttributeKeys((prev) =>
+      sanitizeStringList([...prev, ...initialKeys])
+    )
     setFormData((prev: ProductFormData) => ({
-        ...prev,
-        variants: [
-          ...prev.variants,
-          {
-            variantDisplayName: '',
-            variantAttributes: initialKeys.reduce<Record<string, string>>(
-              (acc, key) => {
-                acc[key] = ''
-                return acc
+      ...prev,
+      variants: [
+        ...prev.variants,
+        {
+          variantDisplayName: '',
+          variantAttributes: initialKeys.reduce<Record<string, string>>(
+            (acc, key) => {
+              acc[key] = ''
+              return acc
             },
             {}
           ),
@@ -2189,7 +2485,9 @@ const ProductCreateForm: React.FC = () => {
   const handleRemoveVariant = (index: number) => {
     setFormData((prev: ProductFormData) => ({
       ...prev,
-      variants: prev.variants.filter((_, variantIndex) => variantIndex !== index),
+      variants: prev.variants.filter(
+        (_, variantIndex) => variantIndex !== index
+      ),
     }))
   }
 
@@ -2214,12 +2512,19 @@ const ProductCreateForm: React.FC = () => {
 
       if (!targetVariant || !previousVariant) return prev
 
-      const targetAttributes = sanitizeStringRecord(targetVariant.variantAttributes)
-      const previousAttributes = sanitizeStringRecord(previousVariant.variantAttributes)
+      const targetAttributes = sanitizeStringRecord(
+        targetVariant.variantAttributes
+      )
+      const previousAttributes = sanitizeStringRecord(
+        previousVariant.variantAttributes
+      )
       const targetKeys = sanitizeStringList(Object.keys(targetAttributes))
       const previousKeys = sanitizeStringList(Object.keys(previousAttributes))
       const protectedVariantKey = targetKeys[0] || ''
-      const nextAttributeKeys = sanitizeStringList([...targetKeys, ...previousKeys])
+      const nextAttributeKeys = sanitizeStringList([
+        ...targetKeys,
+        ...previousKeys,
+      ])
 
       variants[variantIndex] = {
         ...targetVariant,
@@ -2230,7 +2535,9 @@ const ProductCreateForm: React.FC = () => {
               return acc
             }
 
-            acc[key] = toText(previousAttributes[key] ?? targetAttributes[key] ?? '')
+            acc[key] = toText(
+              previousAttributes[key] ?? targetAttributes[key] ?? ''
+            )
             return acc
           },
           {}
@@ -2258,7 +2565,9 @@ const ProductCreateForm: React.FC = () => {
       if (!targetVariant) return prev
 
       const normalizedValue =
-        field === 'actualPrice' || field === 'finalPrice' || field === 'stockQuantity'
+        field === 'actualPrice' ||
+        field === 'finalPrice' ||
+        field === 'stockQuantity'
           ? value === '' || value === null || value === undefined
             ? 0
             : Number(value)
@@ -2301,11 +2610,98 @@ const ProductCreateForm: React.FC = () => {
     })
   }
 
-  const uploadVariantFiles = async (variantIndex: number, files: File[]) => {
+  const uploadDefaultImageFiles = async (files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith('image/'))
     if (!imageFiles.length) return
 
     const tempImages = imageFiles.map((file, idx) => ({
+      url: URL.createObjectURL(file),
+      publicId: '',
+      uploading: true,
+      tempId: `default-image-${Date.now()}-${idx}`,
+    }))
+
+    setFormData((prev: ProductFormData) => ({
+      ...prev,
+      defaultImages: [...prev.defaultImages, ...tempImages],
+    }))
+
+    for (let i = 0; i < imageFiles.length; i++) {
+      const result = await uploadToCloudinary(imageFiles[i])
+      if (!result) continue
+
+      setFormData((prev: ProductFormData) => {
+        const nextImages = [...prev.defaultImages]
+        const imageIndex = nextImages.findIndex(
+          (image) => image.tempId === tempImages[i].tempId
+        )
+
+        if (imageIndex !== -1) {
+          nextImages[imageIndex] = {
+            url: result.url,
+            publicId: result.publicId,
+            uploading: false,
+          }
+        }
+
+        return {
+          ...prev,
+          defaultImages: nextImages,
+        }
+      })
+    }
+  }
+
+  const handleDefaultImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
+
+    event.target.value = ''
+    await uploadDefaultImageFiles(files)
+  }
+
+  const handleDefaultImageDrop = async (files: File[]) => {
+    await uploadDefaultImageFiles(files)
+  }
+
+  const handleDefaultImageDelete = async (imageIndex: number) => {
+    const image = formData.defaultImages[imageIndex]
+    if (!image) return
+
+    if (image.publicId) {
+      await deleteFromCloudinary(image.publicId)
+    }
+
+    setFormData((prev: ProductFormData) => ({
+      ...prev,
+      defaultImages: prev.defaultImages.filter(
+        (_, index) => index !== imageIndex
+      ),
+    }))
+  }
+
+  const uploadVariantFiles = async (variantIndex: number, files: File[]) => {
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'))
+    if (!imageFiles.length) return
+
+    const existingImageCount =
+      formData.variants[variantIndex]?.variantsImageUrls?.length || 0
+    const availableSlots = Math.max(0, MAX_VARIANT_IMAGES - existingImageCount)
+
+    if (!availableSlots) {
+      toast.error(`You can upload up to ${MAX_VARIANT_IMAGES} images per variant.`)
+      return
+    }
+
+    const nextFiles = imageFiles.slice(0, availableSlots)
+
+    if (nextFiles.length < imageFiles.length) {
+      toast.error(`Only ${MAX_VARIANT_IMAGES} images are allowed per variant.`)
+    }
+
+    const tempImages = nextFiles.map((file, idx) => ({
       url: URL.createObjectURL(file),
       publicId: '',
       uploading: true,
@@ -2314,6 +2710,7 @@ const ProductCreateForm: React.FC = () => {
 
     setFormData((prev: ProductFormData) => {
       const variants = [...prev.variants]
+      if (!variants[variantIndex]) return prev
       variants[variantIndex] = {
         ...variants[variantIndex],
         variantsImageUrls: [
@@ -2324,12 +2721,13 @@ const ProductCreateForm: React.FC = () => {
       return { ...prev, variants }
     })
 
-    for (let i = 0; i < imageFiles.length; i++) {
-      const result = await uploadToCloudinary(imageFiles[i])
+    for (let i = 0; i < nextFiles.length; i++) {
+      const result = await uploadToCloudinary(nextFiles[i])
       if (!result) continue
 
       setFormData((prev: ProductFormData) => {
         const variants = [...prev.variants]
+        if (!variants[variantIndex]) return prev
         const images = [...variants[variantIndex].variantsImageUrls]
 
         const idx = images.findIndex(
@@ -2365,7 +2763,10 @@ const ProductCreateForm: React.FC = () => {
     await uploadVariantFiles(variantIndex, files)
   }
 
-  const handleVariantImageDrop = async (variantIndex: number, files: File[]) => {
+  const handleVariantImageDrop = async (
+    variantIndex: number,
+    files: File[]
+  ) => {
     await uploadVariantFiles(variantIndex, files)
   }
 
@@ -2396,7 +2797,10 @@ const ProductCreateForm: React.FC = () => {
         const currentVariantKeys = sanitizeStringList(
           Object.keys(targetVariant.variantAttributes || {})
         )
-        const nextKeys = sanitizeStringList([...currentVariantKeys, ...normalizedKeys])
+        const nextKeys = sanitizeStringList([
+          ...currentVariantKeys,
+          ...normalizedKeys,
+        ])
 
         if (nextKeys.length === currentVariantKeys.length) {
           return prev
@@ -2404,10 +2808,13 @@ const ProductCreateForm: React.FC = () => {
 
         variants[variantIndex] = {
           ...targetVariant,
-          variantAttributes: nextKeys.reduce<Record<string, string>>((acc, key) => {
-            acc[key] = String(targetVariant.variantAttributes?.[key] || '')
-            return acc
-          }, {}),
+          variantAttributes: nextKeys.reduce<Record<string, string>>(
+            (acc, key) => {
+              acc[key] = String(targetVariant.variantAttributes?.[key] || '')
+              return acc
+            },
+            {}
+          ),
         }
 
         return { ...prev, variants }
@@ -2416,7 +2823,10 @@ const ProductCreateForm: React.FC = () => {
     []
   )
 
-  const handleAddVariantOptionKey = (variantIndex: number, keyToAdd: string) => {
+  const handleAddVariantOptionKey = (
+    variantIndex: number,
+    keyToAdd: string
+  ) => {
     mergeVariantOptionKeys(variantIndex, [keyToAdd])
   }
 
@@ -2437,6 +2847,249 @@ const ProductCreateForm: React.FC = () => {
     const nextKeys = currentVariantKeys.filter((key) => key !== keyToRemove)
     syncVariantWithOptionKeys(variantIndex, nextKeys)
   }
+
+  const applySpecificationKeys = useCallback(
+    (keysToApply: string[], mode: 'merge' | 'replace' = 'merge') => {
+      const normalizedKeys = filterProductDetailKeys(keysToApply)
+
+      setFormData((prev: ProductFormData) => {
+        const currentSpec = prev.specifications[0] || {}
+        const nextSpec =
+          mode === 'replace'
+            ? normalizedKeys.reduce<ProductSpecification>((acc, key) => {
+                acc[key] = String(currentSpec[key] || '')
+                return acc
+              }, {})
+            : normalizedKeys.reduce<ProductSpecification>(
+                (acc, key) => {
+                  if (!(key in acc)) {
+                    acc[key] = ''
+                  }
+                  return acc
+                },
+                { ...currentSpec }
+              )
+
+        const currentKeys = sanitizeStringList(Object.keys(currentSpec))
+        const nextKeys = sanitizeStringList(Object.keys(nextSpec))
+        const hasKeyChanges = !areSameStringLists(currentKeys, nextKeys)
+        const hasValueChanges = nextKeys.some(
+          (key) => String(currentSpec[key] || '') !== String(nextSpec[key] || '')
+        )
+
+        if (!hasKeyChanges && !hasValueChanges) return prev
+
+        return {
+          ...prev,
+          specifications: nextKeys.length ? [nextSpec] : [],
+        }
+      })
+    },
+    []
+  )
+
+  const handleSpecificationChange = (key: string, value: string) => {
+    const normalizedKey = toTrimmedText(key)
+    if (!normalizedKey) return
+
+    setFormData((prev: ProductFormData) => {
+      const currentSpec = prev.specifications[0] || {}
+      return {
+        ...prev,
+        specifications: [
+          {
+            ...currentSpec,
+            [normalizedKey]: value,
+          },
+        ],
+      }
+    })
+  }
+
+  const handleAddSpecificationKey = (key: string) => {
+    if (isBlockedProductDetailKey(key)) {
+      toast.error('Price fields belong in Pricing, not Product Details.')
+      return
+    }
+
+    applySpecificationKeys([key], 'merge')
+    lastAutoGeneratedSpecificationContextRef.current = ''
+    lastAutoGeneratedSpecificationKeysRef.current = []
+  }
+
+  useEffect(() => {
+    if (!specificationExcludedKeys.length && !formData.specifications.length) return
+
+    setFormData((prev: ProductFormData) => {
+      const currentSpec = prev.specifications[0] || {}
+      const nextSpec = Object.entries(currentSpec).reduce<ProductSpecification>(
+        (acc, [key, value]) => {
+          if (
+            isBlockedProductDetailKey(key) ||
+            specificationExcludedKeys.some(
+              (excludedKey) =>
+                normalizeComparableKey(excludedKey) ===
+                normalizeComparableKey(key)
+            )
+          ) {
+            return acc
+          }
+
+          acc[key] = value
+          return acc
+        },
+        {}
+      )
+
+      if (
+        areSameStringLists(Object.keys(currentSpec), Object.keys(nextSpec))
+      ) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        specifications: Object.keys(nextSpec).length ? [nextSpec] : [],
+      }
+    })
+  }, [specificationExcludedKeys])
+
+  const handleGenerateSpecificationKeys = useCallback(
+    async ({
+      mode = 'merge',
+      silent = false,
+    }: {
+      mode?: 'merge' | 'replace'
+      silent?: boolean
+    } = {}) => {
+      const fallbackKeys = buildRecommendedSpecificationKeysForContext(
+        [],
+        variantContextNames,
+        specificationExcludedKeys
+      )
+
+      if (!specificationCategoryContext) {
+        if (!silent) {
+          toast.error('Select categories in Basics first.')
+        }
+        return []
+      }
+
+      setAiLoading((prev: any) => ({ ...prev, specificationKeys: true }))
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-specification-keys`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              category: specificationCategoryContext,
+              productName: formData.productName,
+            }),
+          }
+        )
+
+        const json = await res.json().catch(() => null)
+        if (!res.ok || !Array.isArray(json?.data)) {
+          throw new Error(json?.message || 'Failed to generate specification keys')
+        }
+
+        const nextKeys = buildRecommendedSpecificationKeysForContext(
+          json.data,
+          variantContextNames,
+          specificationExcludedKeys
+        )
+        const resolvedKeys = nextKeys.length ? nextKeys : fallbackKeys
+
+        if (resolvedKeys.length) {
+          applySpecificationKeys(resolvedKeys, mode)
+        } else if (!silent) {
+          toast.error('No specification keys were generated.')
+        }
+
+        return resolvedKeys
+      } catch (error: any) {
+        if (fallbackKeys.length) {
+          applySpecificationKeys(fallbackKeys, mode)
+          return fallbackKeys
+        }
+
+        if (!silent) {
+          toast.error(error?.message || 'Failed to generate specification keys')
+        }
+        return []
+      } finally {
+        setAiLoading((prev: any) => ({ ...prev, specificationKeys: false }))
+      }
+    },
+    [
+      applySpecificationKeys,
+      formData.productName,
+      specificationExcludedKeys,
+      specificationCategoryContext,
+      variantContextNames,
+    ]
+  )
+
+  useEffect(() => {
+    if (!isDraftHydrated) return
+
+    if (!specificationContextSignature) {
+      lastAutoGeneratedSpecificationContextRef.current = ''
+      lastAutoGeneratedSpecificationKeysRef.current = []
+      return
+    }
+
+    const currentSpec = formData.specifications[0] || {}
+    const currentKeys = sanitizeStringList(Object.keys(currentSpec))
+    const hasValues = Object.values(currentSpec).some((value) =>
+      Boolean(toTrimmedText(value))
+    )
+    const hasMinimumSpecificationKeys =
+      currentKeys.length >= MIN_SPECIFICATION_KEY_COUNT
+    const isLastAutoGeneratedSet = areSameStringLists(
+      currentKeys,
+      lastAutoGeneratedSpecificationKeysRef.current
+    )
+    const shouldRefreshSpecifications =
+      !hasMinimumSpecificationKeys || !currentKeys.length || isLastAutoGeneratedSet
+
+    if (hasValues && hasMinimumSpecificationKeys) return
+    if (!shouldRefreshSpecifications) return
+    if (
+      lastAutoGeneratedSpecificationContextRef.current ===
+        specificationContextSignature &&
+      hasMinimumSpecificationKeys &&
+      isLastAutoGeneratedSet
+    ) {
+      return
+    }
+
+    lastAutoGeneratedSpecificationContextRef.current = specificationContextSignature
+
+    let cancelled = false
+
+    const syncSpecificationKeys = async () => {
+      const nextKeys = await handleGenerateSpecificationKeys({
+        mode: hasValues ? 'merge' : 'replace',
+        silent: true,
+      })
+      if (cancelled) return
+
+      lastAutoGeneratedSpecificationKeysRef.current = sanitizeStringList(nextKeys)
+    }
+
+    void syncSpecificationKeys()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    formData.specifications,
+    handleGenerateSpecificationKeys,
+    isDraftHydrated,
+    specificationContextSignature,
+  ])
 
   // --- FAQ Handlers ---
   const handleAddFAQ = () => {
@@ -2471,7 +3124,8 @@ const ProductCreateForm: React.FC = () => {
       const autoAvailableCityIds = cities
         .map((city: any) => String(city?._id || '').trim())
         .filter(Boolean)
-      const nextAvailableCityIds = sanitizeStringList(formData.availableCities).length
+      const nextAvailableCityIds = sanitizeStringList(formData.availableCities)
+        .length
         ? sanitizeStringList(formData.availableCities)
         : autoAvailableCityIds
 
@@ -2480,11 +3134,14 @@ const ProductCreateForm: React.FC = () => {
         mainCategory: primarySelectedMainCategoryId || formData.mainCategory,
         mainCategories: selectedMainCategoryIds.length
           ? selectedMainCategoryIds
-          : sanitizeStringList(formData.mainCategories ?? formData.mainCategory),
+          : sanitizeStringList(
+              formData.mainCategories ?? formData.mainCategory
+            ),
         productCategory: selectedCategoryIds[0] || '',
         productCategories: selectedCategoryIds,
         availableCities: nextAvailableCityIds,
         websiteIds: sanitizeStringList(formData.websiteIds),
+        specifications: sanitizeSpecifications(formData.specifications),
         variants: formData.variants.map((v) => ({
           ...v,
           _id: toTrimmedText(v._id),
@@ -2520,14 +3177,17 @@ const ProductCreateForm: React.FC = () => {
         const backendMessage =
           responseBody?.message ||
           responseBody?.error ||
-          (Array.isArray(responseBody?.errors) && responseBody.errors[0]?.message) ||
+          (Array.isArray(responseBody?.errors) &&
+            responseBody.errors[0]?.message) ||
           `Failed to create product (HTTP ${res.status})`
         throw new Error(String(backendMessage))
       }
 
-      const nextSuccessMessage = responseBody?.message || (isEditMode
-        ? 'Product updated successfully!'
-        : 'Product created successfully!')
+      const nextSuccessMessage =
+        responseBody?.message ||
+        (isEditMode
+          ? 'Product updated successfully!'
+          : 'Product created successfully!')
 
       if (isEditMode) {
         toast.success(nextSuccessMessage)
@@ -2540,7 +3200,8 @@ const ProductCreateForm: React.FC = () => {
       }
     } catch (err: any) {
       toast.error(
-        err?.message || (isEditMode ? 'Failed to update product' : 'Failed to create product')
+        err?.message ||
+          (isEditMode ? 'Failed to update product' : 'Failed to create product')
       )
     } finally {
       setLoading(false)
@@ -2558,9 +3219,14 @@ const ProductCreateForm: React.FC = () => {
       )
       const fallbackActiveWebsiteId = websites[0]?._id || ''
       const previewWebsite =
-        websites.find((website) => String(website?._id || '').trim() === defaultWebsiteId) ||
+        websites.find(
+          (website) => String(website?._id || '').trim() === defaultWebsiteId
+        ) ||
         websites.find((website) => Boolean(website?.is_default)) ||
-        websites.find((website) => String(website?._id || '').trim() === fallbackActiveWebsiteId) ||
+        websites.find(
+          (website) =>
+            String(website?._id || '').trim() === fallbackActiveWebsiteId
+        ) ||
         websites[0] ||
         null
 
@@ -2578,7 +3244,9 @@ const ProductCreateForm: React.FC = () => {
       )
       const previewCity = resolvePreviewCityFromVendorProfile(sourceProfile)
       const productIdentifier = slugifyPreviewProductPath(
-        formData.productName || initialEditorSearch.productId || 'preview-product'
+        formData.productName ||
+          initialEditorSearch.productId ||
+          'preview-product'
       )
 
       if (!vendorId || !templateKey || !websiteIdentifier) {
@@ -2608,7 +3276,9 @@ const ProductCreateForm: React.FC = () => {
       )
 
       if (!previewWindow) {
-        toast.error('Preview window was blocked. Please allow popups and try again.')
+        toast.error(
+          'Preview window was blocked. Please allow popups and try again.'
+        )
         return
       }
 
@@ -2654,6 +3324,27 @@ const ProductCreateForm: React.FC = () => {
     }
   }
 
+  const handleResetEditor = () => {
+    if (isEditMode) {
+      if (typeof window !== 'undefined') {
+        window.location.assign(
+          `/products/create-products?mode=edit&productId=${encodeURIComponent(initialEditorSearch.productId)}`
+        )
+      }
+      return
+    }
+
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm('Clear the saved product draft for this vendor?')
+    ) {
+      return
+    }
+
+    clearDraftStorage()
+    resetDraftState()
+  }
+
   // --- Render Current Step ---
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -2681,9 +3372,19 @@ const ProductCreateForm: React.FC = () => {
         )
       case 2:
         return (
+          <ProductMediaSection
+            defaultImages={formData.defaultImages}
+            onUpload={handleDefaultImageUpload}
+            onDelete={handleDefaultImageDelete}
+            onDrop={handleDefaultImageDrop}
+          />
+        )
+      case 3:
+        return (
           <Step5Variants
             productName={formData.productName}
             variants={formData.variants}
+            specifications={formData.specifications}
             recommendedAttributeKeys={recommendedVariantKeys}
             variantKeySuggestions={addVariantKeySuggestions}
             variantKeyContextLabel={variantKeyContextLabel}
@@ -2692,6 +3393,7 @@ const ProductCreateForm: React.FC = () => {
             isWebsiteLoading={isWebsiteLoading}
             isAvailable={formData.isAvailable}
             aiLoading={aiLoading.variantKeys}
+            specificationAiLoading={aiLoading.specificationKeys}
             onPrimaryVariantNameChange={(value) =>
               setFormData((prev: ProductFormData) => ({
                 ...prev,
@@ -2722,364 +3424,408 @@ const ProductCreateForm: React.FC = () => {
             onVariantImageUpload={handleVariantImageUpload}
             onVariantImageDrop={handleVariantImageDrop}
             onVariantImageDelete={handleVariantImageDelete}
+            onSpecificationChange={handleSpecificationChange}
+            onAddSpecificationKey={handleAddSpecificationKey}
+            onReplaceVariants={(variants) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                variants,
+              }))
+            }
           />
         )
-      case 3:
+      case 4:
         return (
-          <>
-            <Step4SEO
-              metaTitle={formData.metaTitle}
-              metaDescription={formData.metaDescription}
-              metaKeywords={formData.metaKeywords}
-              metaKeywordInput={metaKeywordInput}
-              aiLoading={aiLoading}
-              onMetaTitleChange={(val) =>
-                setFormData((prev: ProductFormData) => ({ ...prev, metaTitle: val }))
-              }
-              onMetaDescChange={(val) =>
-                setFormData((prev: ProductFormData) => ({ ...prev, metaDescription: val }))
-              }
-              onKeywordInputChange={setMetaKeywordInput}
-              onAddKeyword={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  if (metaKeywordInput.trim()) {
-                    setFormData((prev: ProductFormData) => ({
-                      ...prev,
-                      metaKeywords: [
-                        ...prev.metaKeywords,
-                        metaKeywordInput.trim(),
-                      ],
-                    }))
-                    setMetaKeywordInput('')
-                  }
+          <Step4SEO
+            metaTitle={formData.metaTitle}
+            metaDescription={formData.metaDescription}
+            metaKeywords={formData.metaKeywords}
+            metaKeywordInput={metaKeywordInput}
+            aiLoading={aiLoading}
+            onMetaTitleChange={(val) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                metaTitle: val,
+              }))
+            }
+            onMetaDescChange={(val) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                metaDescription: val,
+              }))
+            }
+            onKeywordInputChange={setMetaKeywordInput}
+            onAddKeyword={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (metaKeywordInput.trim()) {
+                  setFormData((prev: ProductFormData) => ({
+                    ...prev,
+                    metaKeywords: [
+                      ...prev.metaKeywords,
+                      metaKeywordInput.trim(),
+                    ],
+                  }))
+                  setMetaKeywordInput('')
                 }
-              }}
-              onRemoveKeyword={(index) => {
-                setFormData((prev: ProductFormData) => ({
-                  ...prev,
-                  metaKeywords: prev.metaKeywords.filter((_, i) => i !== index),
-                }))
-              }}
-              onGenerateTitle={() =>
-                handleGenerateMetaTitle()
               }
-              onGenerateDesc={() =>
-                handleGenerateMetaDescription()
+            }}
+            onRemoveKeyword={(index) => {
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                metaKeywords: prev.metaKeywords.filter((_, i) => i !== index),
+              }))
+            }}
+            onGenerateTitle={() => handleGenerateMetaTitle()}
+            onGenerateDesc={() => handleGenerateMetaDescription()}
+            onGenerateKeywords={async () => {
+              setAiLoading((prev: any) => ({ ...prev, metaKeywords: true }))
+              try {
+                const res = await fetch(
+                  `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      field: 'metaKeywords',
+                      context: `Product: ${formData.productName}, Description: ${formData.shortDescription}, Categories: ${selectedCategoryNames.join(', ')}`,
+                    }),
+                  }
+                )
+                const data = await res.json()
+                if (data.success && typeof data.data === 'string') {
+                  const keywords = data.data
+                    .split(',')
+                    .map((keyword: string) => keyword.trim())
+                    .filter(Boolean)
+                  setFormData((prev: ProductFormData) => ({
+                    ...prev,
+                    metaKeywords: [...prev.metaKeywords, ...keywords],
+                  }))
+                }
+              } catch {
+                toast.error('AI generation failed')
+              } finally {
+                setAiLoading((prev: any) => ({ ...prev, metaKeywords: false }))
               }
-              onGenerateKeywords={async () => {
-                setAiLoading((prev: any) => ({ ...prev, metaKeywords: true }))
-                try {
-                  const res = await fetch(
-                    `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
-                    {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        field: 'metaKeywords',
-                        context: `Product: ${formData.productName}, Description: ${formData.shortDescription}, Categories: ${selectedCategoryNames.join(', ')}`
-                      }),
-                    }
+            }}
+          />
+        )
+      case 5:
+        return (
+          <Step6FAQs
+            faqs={formData.faqs}
+            onFAQChange={handleFAQChange}
+            onAddFAQ={handleAddFAQ}
+            onRemoveFAQ={handleRemoveFAQ}
+            aiLoading={aiLoading.faqs}
+            onGenerate={async () => {
+              setAiLoading((prev: any) => ({ ...prev, faqs: true }))
+              try {
+                const variantContext = formData.variants
+                  .map((variant) =>
+                    Object.entries(variant.variantAttributes || {})
+                      .filter(([, value]) => String(value || '').trim())
+                      .map(([key, value]) => `${key}: ${value}`)
+                      .join(', ')
                   )
-                  const data = await res.json()
-                  if (data.success && typeof data.data === 'string') {
-                    const keywords = data.data.split(',').map((k: string) => k.trim()).filter(Boolean)
-                    setFormData((prev: ProductFormData) => ({
-                      ...prev,
-                      metaKeywords: [...prev.metaKeywords, ...keywords],
-                    }))
+                  .filter(Boolean)
+                  .join(' | ')
+                const context = `Product: ${formData.productName}, Description: ${formData.shortDescription}, Categories: ${selectedCategoryNames.join(', ') || selectedMainCategoryName}, Variant keys: ${allVariantAttributeKeys.join(', ')}, Variant values: ${variantContext}`
+                const res = await fetch(
+                  `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ field: 'faqs', context }),
                   }
-                } catch (err) {
-                  toast.error('AI generation failed')
-                } finally {
-                  setAiLoading((prev: any) => ({ ...prev, metaKeywords: false }))
-                }
-              }}
-            />
-            <div className="mt-8">
-              <Step6FAQs
-                faqs={formData.faqs}
-                onFAQChange={handleFAQChange}
-                onAddFAQ={handleAddFAQ}
-                onRemoveFAQ={handleRemoveFAQ}
-                aiLoading={aiLoading.faqs}
-                onGenerate={async () => {
-                  setAiLoading((prev: any) => ({ ...prev, faqs: true }))
+                )
+                const data = await res.json()
+                if (data.success && typeof data.data === 'string') {
                   try {
-                    const variantContext = formData.variants
-                      .map((variant) =>
-                        Object.entries(variant.variantAttributes || {})
-                          .filter(([, value]) => String(value || '').trim())
-                          .map(([key, value]) => `${key}: ${value}`)
-                          .join(', ')
-                      )
-                      .filter(Boolean)
-                      .join(' | ')
-                    const context = `Product: ${formData.productName}, Description: ${formData.shortDescription}, Categories: ${selectedCategoryNames.join(', ') || selectedMainCategoryName}, Variant keys: ${allVariantAttributeKeys.join(', ')}, Variant values: ${variantContext}`
-                    const res = await fetch(
-                      `${import.meta.env.VITE_PUBLIC_API_URL}/v1/products/generate-field`,
-                      {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ field: 'faqs', context }),
-                      }
+                    const generatedFaqs = JSON.parse(
+                      data.data
+                        .replace(/```json/g, '')
+                        .replace(/```/g, '')
+                        .trim()
                     )
-                    const data = await res.json()
-                    if (data.success && typeof data.data === 'string') {
-                      // Try to parse the JSON array
-                      try {
-                        const generatedFaqs = JSON.parse(data.data.replace(/```json/g, '').replace(/```/g, '').trim())
-                        if (Array.isArray(generatedFaqs)) {
-                          setFormData((prev: ProductFormData) => ({
-                            ...prev,
-                            faqs: [...prev.faqs, ...generatedFaqs.map((f: any) => ({ question: f.question, answer: f.answer }))]
-                          }))
-                        }
-                      } catch (e) {
-                        console.error('Failed to parse FAQ JSON', e)
-                      }
+                    if (Array.isArray(generatedFaqs)) {
+                      setFormData((prev: ProductFormData) => ({
+                        ...prev,
+                        faqs: [
+                          ...prev.faqs,
+                          ...generatedFaqs.map((faq: any) => ({
+                            question: faq.question,
+                            answer: faq.answer,
+                          })),
+                        ],
+                      }))
                     }
-                  } catch (err) {
-                    toast.error('AI generation failed')
-                  } finally {
-                    setAiLoading((prev: any) => ({ ...prev, faqs: false }))
+                  } catch {
+                    toast.error('Generated FAQs could not be applied')
                   }
-                }}
-              />
-            </div>
-          </>
+                }
+              } catch {
+                toast.error('AI generation failed')
+              } finally {
+                setAiLoading((prev: any) => ({ ...prev, faqs: false }))
+              }
+            }}
+          />
         )
       default:
         return null
     }
   }
 
-  const steps = [
-    {
-      title: 'Basics',
-      icon: PackagePlus,
-    },
-    {
-      title: 'Variants & Visibility',
-      icon: Layers3,
-    },
-    {
-      title: 'SEO & FAQs',
-      icon: Search,
-    },
-  ]
+  const steps = useMemo(
+    () => [
+      {
+        step: 1,
+        title: 'Basics',
+        description: 'Product title, category mapping, and buyer-facing copy.',
+        icon: PackagePlus,
+        meta: `${selectedMainCategoryIds.length} main, ${selectedCategoryIds.length} categories`,
+        complete: Boolean(
+          toTrimmedText(formData.productName) &&
+            (selectedMainCategoryIds.length || selectedCategoryIds.length) &&
+            (toTrimmedText(formData.shortDescription) ||
+              toTrimmedText(formData.description))
+        ),
+      },
+      {
+        step: 2,
+        title: 'Media',
+        description:
+          'Default gallery images used across previews and listings.',
+        icon: ImagePlus,
+        meta: `${formData.defaultImages.length} gallery image${formData.defaultImages.length === 1 ? '' : 's'}`,
+        complete: formData.defaultImages.length > 0,
+      },
+      {
+        step: 3,
+        title: 'Variants',
+        description:
+          'Variant options, pricing, stock, visibility, and website publishing.',
+        icon: Layers3,
+        meta: `${formData.variants.length} variant${formData.variants.length === 1 ? '' : 's'}, ${formData.websiteIds.length} website${formData.websiteIds.length === 1 ? '' : 's'}`,
+        complete: formData.variants.length > 0,
+      },
+      {
+        step: 4,
+        title: 'SEO',
+        description: 'Meta title, description, and search keyword controls.',
+        icon: Search,
+        meta: `${formData.metaKeywords.length} keyword${formData.metaKeywords.length === 1 ? '' : 's'}`,
+        complete: Boolean(
+          toTrimmedText(formData.metaTitle) &&
+            toTrimmedText(formData.metaDescription)
+        ),
+      },
+      {
+        step: 5,
+        title: 'FAQs',
+        description: 'Answer buyer objections and common product questions.',
+        icon: CircleHelp,
+        meta: `${formData.faqs.length} FAQ${formData.faqs.length === 1 ? '' : 's'}`,
+        complete: formData.faqs.some(
+          (faq) => toTrimmedText(faq.question) && toTrimmedText(faq.answer)
+        ),
+      },
+    ],
+    [
+      formData.defaultImages.length,
+      formData.description,
+      formData.faqs,
+      formData.metaDescription,
+      formData.metaKeywords.length,
+      formData.metaTitle,
+      formData.productName,
+      formData.shortDescription,
+      formData.variants.length,
+      formData.websiteIds.length,
+      selectedCategoryIds.length,
+      selectedMainCategoryIds.length,
+    ]
+  )
+
+  const currentSection = steps[currentStep - 1] || steps[0]
+  const editorTitle = isEditMode
+    ? formData.productName || 'Edit product'
+    : formData.productName || 'Create product'
+  const editorShellStyle = {
+    '--sidebar-width': '18.5rem',
+    '--sidebar-width-icon': '3rem',
+  } as React.CSSProperties
 
   return (
-    <div className='min-h-screen px-4 py-6 sm:py-8'>
-      <div className='mx-auto max-w-7xl space-y-6'>
-        <section className='rounded-3xl border border-border bg-card p-6 shadow-sm'>
-          <div className='flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'>
-            {!isVendor ? (
-              <div>
-                <h1 className='mt-2 text-3xl tracking-tight text-foreground sm:text-3xl'>
-                  {isEditMode ? 'Update product' : 'Create product'}
-                </h1>
-              </div>
-            ) : null}
-            <div className='flex flex-wrap items-center gap-2'>
-              <div className='rounded-full border border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground'>
-                Step {currentStep} of {steps.length}
-              </div>
-              <div className='rounded-full border border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground'>
-                Autosaved locally
-              </div>
-              {lastSavedLabel ? (
-                <div className='rounded-full border border-border bg-background px-3 py-2 text-xs font-medium text-muted-foreground'>
-                  Saved {lastSavedLabel}
-                </div>
-              ) : null}
-              <Link to='/products'>
-                <Button variant='outline' className='h-10 rounded-full px-4'>
-                  <ArrowLeft className='mr-2 h-4 w-4' />
-                  Back to Products
-                </Button>
-              </Link>
-              <Link to='/upload-products'>
-                <Button variant='outline' className='h-10 rounded-full px-4'>
-                  <PackagePlus className='mr-2 h-4 w-4' />
-                  Upload Excel
-                </Button>
-              </Link>
-              <Button
-                type='button'
-                variant='outline'
-                onClick={() => {
-                  if (isEditMode) {
-                    if (typeof window !== 'undefined') {
-                      window.location.assign(
-                        `/products/create-products?mode=edit&productId=${encodeURIComponent(initialEditorSearch.productId)}`
-                      )
-                    }
-                    return
-                  }
-                  if (
-                    typeof window !== 'undefined' &&
-                    !window.confirm('Clear the saved product draft for this vendor?')
-                  ) {
-                    return
-                  }
-                  clearDraftStorage()
-                  resetDraftState()
-                }}
-                className='h-10 rounded-full px-4'
-              >
-                {isEditMode ? 'Reset Changes' : 'Reset Draft'}
-              </Button>
-            </div>
-          </div>
-        </section>
+    <div
+      style={editorShellStyle}
+      className='flex min-h-screen w-full bg-[#f6f6f7] dark:bg-[#101216]'
+    >
+      <ProductEditorSidebar
+        currentStep={currentStep}
+        sections={steps}
+        productName={formData.productName}
+        isEditMode={isEditMode}
+        lastSavedLabel={lastSavedLabel}
+        isAvailable={formData.isAvailable}
+        selectedWebsiteCount={formData.websiteIds.length}
+        onStepSelect={goToStep}
+        onPrevious={() => goToStep(currentStep - 1)}
+        onNext={() => goToStep(currentStep + 1)}
+        canGoPrevious={currentStep > 1}
+        canGoNext={currentStep < steps.length}
+        onReset={handleResetEditor}
+        resetLabel={isEditMode ? 'Reset changes' : 'Reset draft'}
+      />
 
-        <div ref={formTopRef} className='rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6'>
-          {isEditProductLoading ? (
-            <div className='mb-6 flex items-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground'>
-              <Loader2 className='h-4 w-4 animate-spin' />
-              Loading product details...
-            </div>
-          ) : null}
-          <div className='mb-6 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between'>
-            <div>
-              <div className='rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground inline-flex'>
-                Step {currentStep}
-              </div>
-              <h2 className='mt-3 text-xl font-semibold text-foreground'>
-                {steps[currentStep - 1]?.title}
-              </h2>
-            </div>
-
-            <div className='grid gap-2 md:grid-cols-3 xl:min-w-[520px]'>
-              {steps.map((step, i) => {
-                const stepIndex = i + 1
-                const isActive = currentStep === stepIndex
-                const isCompleted = currentStep > stepIndex
-                const StepIcon = step.icon
-
-                return (
-                  <button
-                    key={step.title}
-                    type='button'
-                    onClick={() => goToStep(stepIndex)}
-                    aria-current={isActive ? 'step' : undefined}
-                    className={`rounded-2xl border px-4 py-3 text-left transition ${
-                      isActive
-                        ? 'border-cyan-500/30 bg-cyan-500/10'
-                        : isCompleted
-                          ? 'border-emerald-500/30 bg-emerald-500/10'
-                          : 'border-border bg-background/60'
-                    } hover:border-cyan-500/30 hover:bg-cyan-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400`}
-                  >
-                    <div className='flex items-start gap-3'>
-                      <div className='inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background'>
-                        <StepIcon
-                          className={`h-4 w-4 ${
-                            isActive
-                              ? 'text-cyan-600'
-                              : isCompleted
-                                ? 'text-emerald-600'
-                                : 'text-muted-foreground'
-                          }`}
-                        />
-                      </div>
-                      <div className='min-w-0'>
-                        <div className='mb-1 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground'>
-                          {isCompleted ? <CheckCircle2 className='h-3.5 w-3.5 text-emerald-600' /> : null}
-                          Step {stepIndex}
-                        </div>
-                        <p className='text-sm font-semibold text-foreground'>{step.title}</p>
+      <SidebarInset className='min-w-0 flex-1 bg-transparent shadow-none md:m-0 md:rounded-none'>
+        <div className='min-h-screen px-4 py-4 sm:px-6 sm:py-5'>
+          <div className='mx-auto max-w-[1360px] space-y-4'>
+            <section className='border-border/80 dark:bg-card/95 sticky top-4 z-20 rounded-2xl border bg-white/95 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur dark:shadow-[0_10px_30px_rgba(0,0,0,0.24)]'>
+              <div className='flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between'>
+                <div className='flex items-start gap-3'>
+                  <SidebarTrigger className='border-border bg-background mt-0.5 h-10 w-10 rounded-lg border shadow-sm' />
+                  <div className='min-w-0'>
+                    <div className='text-muted-foreground text-[11px] font-semibold tracking-[0.18em] uppercase'>
+                      Products
+                    </div>
+                    <div className='flex flex-wrap items-center gap-3'>
+                      <h1 className='text-foreground text-2xl font-semibold tracking-tight sm:text-3xl'>
+                        {editorTitle}
+                      </h1>
+                      <div
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          formData.isAvailable
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                        }`}
+                      >
+                        {formData.isAvailable ? 'Active' : 'Hidden'}
                       </div>
                     </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+                  </div>
+                </div>
 
-          <form onSubmit={(e) => e.preventDefault()} className='space-y-6'>
-            {renderCurrentStep()}
-
-            <div className='flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4'>
-              <button
-                type='button'
-                onClick={() => goToStep(currentStep - 1)}
-                disabled={currentStep === 1}
-                className='inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-background px-5 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50'
-              >
-                <ArrowLeft className='h-4 w-4' />
-                Previous
-              </button>
-
-              <div className='flex flex-wrap items-center gap-3'>
-                <button
-                  type='button'
-                  onClick={() => void handleProductPreview()}
-                  disabled={isPreviewLoading || loading || isEditProductLoading}
-                  className='inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-background px-5 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-70'
-                >
-                  {isPreviewLoading ? (
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                  ) : (
-                    <Search className='h-4 w-4' />
-                  )}
-                  {isPreviewLoading ? 'Opening preview...' : 'Product Preview'}
-                </button>
-
-                {currentStep < steps.length ? (
-                  <button
+                <div className='flex flex-wrap items-center gap-2'>
+                  {lastSavedLabel ? (
+                    <div className='text-muted-foreground px-2 text-sm'>
+                      Saved {lastSavedLabel}
+                    </div>
+                  ) : null}
+                  <Button
                     type='button'
-                    onClick={() => goToStep(currentStep + 1)}
-                    className='inline-flex h-11 items-center gap-2 rounded-xl bg-cyan-600 px-5 text-sm font-semibold text-white transition hover:bg-cyan-700'
+                    variant='outline'
+                    onClick={() => void handleProductPreview()}
+                    disabled={
+                      isPreviewLoading || loading || isEditProductLoading
+                    }
+                    className='h-11 rounded-lg px-4 hover:bg-white hover:text-black'
                   >
-                    Next
-                    <ArrowRight className='h-4 w-4' />
-                  </button>
-                ) : null}
-
-                {isEditMode || currentStep === steps.length ? (
-                  <button
+                    {isPreviewLoading ? (
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    ) : (
+                      <Eye className='mr-2 h-4 w-4' />
+                    )}
+                    {isPreviewLoading ? 'Opening preview...' : 'Preview'}
+                  </Button>
+                  <Button
                     type='button'
                     onClick={handleSubmit}
                     disabled={loading || isEditProductLoading}
-                    className='inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70'
+                    className='h-11 rounded-lg bg-slate-900 px-5 text-white hover:bg-white hover:text-black dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100'
                   >
-                    {loading && <Loader2 className='h-4 w-4 animate-spin' />}
-                    {isEditMode ? 'Update Product' : 'Create Product'}
-                  </button>
-                ) : null}
+                    {loading ? (
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    ) : null}
+                    {isEditMode ? 'Save changes' : 'Save product'}
+                  </Button>
+                </div>
               </div>
+            </section>
+
+            <div ref={formTopRef} className='space-y-4'>
+              {isEditProductLoading ? (
+                <div className='border-border text-muted-foreground dark:bg-card flex items-center gap-2 rounded-2xl border bg-white px-4 py-3 text-sm shadow-sm'>
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                  Loading product details...
+                </div>
+              ) : null}
+
+              <section className='border-border/70 dark:bg-card rounded-2xl border bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] sm:p-6 dark:shadow-[0_12px_32px_rgba(0,0,0,0.22)]'>
+                <div className='border-border/70 mb-6 border-b pb-5'>
+                  <h2 className='text-foreground text-lg font-semibold'>
+                    {currentSection?.title}
+                  </h2>
+                  {lastSavedLabel ? (
+                    <p className='text-muted-foreground mt-1 text-sm'>
+                      Saved {lastSavedLabel}
+                    </p>
+                  ) : null}
+                </div>
+
+                <form
+                  onSubmit={(event) => event.preventDefault()}
+                  className='space-y-6'
+                >
+                  {renderCurrentStep()}
+
+                  <div className='border-border grid gap-3 border-t pt-4 sm:grid-cols-2 xl:hidden'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      onClick={() => goToStep(currentStep - 1)}
+                      disabled={currentStep === 1}
+                      className='h-11 rounded-xl hover:bg-white hover:text-black'
+                    >
+                      <ArrowLeft className='mr-2 h-4 w-4' />
+                      Previous
+                    </Button>
+                    <Button
+                      type='button'
+                      onClick={() => goToStep(currentStep + 1)}
+                      disabled={currentStep === steps.length}
+                      className='h-11 rounded-xl bg-slate-900 text-white hover:bg-white hover:text-black dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100'
+                    >
+                      Next
+                      <ArrowRight className='ml-2 h-4 w-4' />
+                    </Button>
+                  </div>
+                </form>
+              </section>
             </div>
-          </form>
+          </div>
         </div>
-      </div>
+      </SidebarInset>
 
       <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
-        <DialogContent className='max-w-md rounded-[28px] border-border p-0 shadow-2xl'>
-          <div className='rounded-t-[28px] border-b border-border bg-card px-6 py-5'>
+        <DialogContent className='border-border max-w-md rounded-[28px] p-0 shadow-2xl'>
+          <div className='border-border bg-card rounded-t-[28px] border-b px-6 py-5'>
             <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white'>
               <CheckCircle2 className='h-6 w-6' />
             </div>
             <DialogHeader className='text-left'>
-              <DialogTitle className='text-2xl font-semibold text-foreground'>
+              <DialogTitle className='text-foreground text-2xl font-semibold'>
                 {isEditMode ? 'Product Updated' : 'Product Created'}
               </DialogTitle>
-              <DialogDescription className='text-sm leading-6 text-muted-foreground'>
+              <DialogDescription className='text-muted-foreground text-sm leading-6'>
                 {successDialogMessage}
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className='space-y-4 px-6 py-5'>
-            <div className='rounded-2xl border border-border bg-background p-4 text-sm leading-6 text-muted-foreground'>
-              The form has been cleared, draft data has been removed, and you have been returned to the Basic Information step so you can create the next product immediately.
+            <div className='border-border bg-background text-muted-foreground rounded-2xl border p-4 text-sm leading-6'>
+              The form has been cleared, draft data has been removed, and you
+              have been returned to the Basic Information step so you can create
+              the next product immediately.
             </div>
             <DialogFooter className='sm:justify-start'>
               <Button
                 type='button'
                 onClick={() => setSuccessDialogOpen(false)}
-                className='h-10 rounded-xl bg-emerald-600 px-5 text-white hover:bg-emerald-700'
+                className='h-10 rounded-xl bg-emerald-600 px-5 text-white hover:bg-white hover:text-black'
               >
                 Create Another Product
               </Button>

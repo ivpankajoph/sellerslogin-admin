@@ -1,20 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   ChevronsUpDown,
-  CircleHelp,
-  Copy,
-  Layers3,
+  ImageOff,
   Loader2,
-  Package2,
   Plus,
-  ToggleLeft,
   Trash2,
-  Upload,
   X,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
 import {
   Command,
   CommandEmpty,
@@ -29,27 +24,21 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
+import { Switch } from '@/components/ui/switch'
 import type { Variant } from '../types/type'
 import {
   StudioFieldLabel,
   studioCardClass,
   studioInputClass,
-  studioSubtleCardClass,
 } from './studio-ui'
+import Step3Specifications from './Step3Specifications'
+import type { ProductSpecification } from '../types/type'
 
 type WebsiteOption = {
   _id: string
@@ -62,6 +51,7 @@ type WebsiteOption = {
 interface Props {
   productName: string
   variants: Variant[]
+  specifications: ProductSpecification[]
   recommendedAttributeKeys: string[]
   variantKeySuggestions: string[]
   variantKeyContextLabel: string
@@ -70,6 +60,7 @@ interface Props {
   isWebsiteLoading: boolean
   isAvailable: boolean
   aiLoading: boolean
+  specificationAiLoading: boolean
   onPrimaryVariantNameChange: (value: string) => void
   onAddAttributeKey: (variantIndex: number, key: string) => void
   onAddSuggestedAttributeKeys: (variantIndex: number, keys: string[]) => void
@@ -96,6 +87,9 @@ interface Props {
   ) => void
   onVariantImageDrop: (variantIndex: number, files: File[]) => void
   onVariantImageDelete: (variantIndex: number, imageIndex: number) => void
+  onSpecificationChange: (key: string, value: string) => void
+  onAddSpecificationKey: (key: string) => void
+  onReplaceVariants: (variants: Variant[]) => void
 }
 
 type SelectOption = {
@@ -103,8 +97,93 @@ type SelectOption = {
   label: string
 }
 
-const sanitizeKeyList = (values: string[]) =>
-  Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)))
+type VariantRow = {
+  id: string
+  key: string
+  values: string[]
+}
+
+const SHOPIFY_VARIANT_KEYS = [
+  'Color',
+  'Size',
+  'Storage',
+  'Material',
+  'Style',
+  'Finish',
+  'Pack Size',
+  'Capacity',
+  'Length',
+  'Width',
+  'Weight',
+  'Flavor',
+]
+
+const MAX_VARIANT_IMAGES = 3
+const VARIANT_IMAGE_GRID_CLASS =
+  'grid-cols-[minmax(0,1.4fr)_repeat(3,96px)]'
+
+const PRESET_VARIANT_VALUE_OPTIONS: Record<string, string[]> = {
+  color: [
+    'Black',
+    'White',
+    'Blue',
+    'Brown',
+    'Green',
+    'Grey',
+    'Pink',
+    'Purple',
+    'Red',
+    'Silver',
+    'Gold',
+    'Yellow',
+    'Orange',
+  ],
+  size: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  storage: ['64 GB', '128 GB', '256 GB', '512 GB', '1 TB'],
+  material: [
+    'Cotton',
+    'Leather',
+    'Metal',
+    'Plastic',
+    'Polyester',
+    'Silicone',
+    'Stainless Steel',
+    'Wood',
+  ],
+  style: ['Regular', 'Slim', 'Oversized', 'Classic', 'Modern', 'Sport'],
+  finish: ['Matte', 'Glossy', 'Satin', 'Brushed', 'Polished'],
+  flavor: ['Vanilla', 'Chocolate', 'Strawberry', 'Mango', 'Mixed Fruit'],
+  'pack size': [
+    'Pack of 1',
+    'Pack of 2',
+    'Pack of 3',
+    'Pack of 5',
+    'Pack of 10',
+  ],
+  capacity: ['250 ml', '500 ml', '750 ml', '1 L', '2 L'],
+}
+
+const COLOR_SWATCHES: Record<string, string> = {
+  black: '#111827',
+  white: '#ffffff',
+  blue: '#2563eb',
+  brown: '#92400e',
+  green: '#16a34a',
+  grey: '#6b7280',
+  gray: '#6b7280',
+  pink: '#ec4899',
+  purple: '#7c3aed',
+  red: '#dc2626',
+  silver: '#9ca3af',
+  gold: '#d4a017',
+  yellow: '#eab308',
+  orange: '#f97316',
+}
+
+const sanitizeStringList = (values: string[]) =>
+  Array.from(
+    new Set(values.map((value) => String(value || '').trim()).filter(Boolean))
+  )
 
 const normalizeSearchText = (value: string) =>
   String(value || '')
@@ -112,6 +191,9 @@ const normalizeSearchText = (value: string) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
+
+const normalizeOptionKey = (value: string) =>
+  normalizeSearchText(value).replace(/\s+/g, ' ')
 
 const filterOptions = (options: SelectOption[], search: string) => {
   const normalizedSearch = normalizeSearchText(search)
@@ -127,10 +209,30 @@ const filterOptions = (options: SelectOption[], search: string) => {
   })
 }
 
+const buildVariantSignature = (attributes: Record<string, string>) =>
+  Object.entries(attributes)
+    .filter(([, value]) => String(value || '').trim())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}:${String(value || '').trim()}`)
+    .join('|')
+
+const buildRowSignature = (rows: VariantRow[]) =>
+  rows
+    .map((row) => `${row.key}:${sanitizeStringList(row.values).join(',')}`)
+    .join('|')
+
+const createRowId = () =>
+  `variant-row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+const isColorKey = (key: string) => normalizeOptionKey(key) === 'color'
+
+const getColorSwatch = (value: string) =>
+  COLOR_SWATCHES[normalizeOptionKey(value)] || null
+
 const getVariantDisplayName = (
   variant: Variant,
-  variantIndex: number,
-  productName?: string
+  productName?: string,
+  index?: number
 ) => {
   const customName = String(variant.variantDisplayName || '').trim()
   if (customName) return customName
@@ -141,26 +243,80 @@ const getVariantDisplayName = (
     .join(' / ')
 
   if (summary) return summary
-  if (variantIndex === 0) {
-    const baseProductName = String(productName || '').trim()
-    if (baseProductName) return baseProductName
-  }
-  return `Variant ${variantIndex + 1}`
+  if (index === 0 && String(productName || '').trim())
+    return String(productName)
+  return `Variant ${(index || 0) + 1}`
 }
+
+const getPresetValueOptions = (key: string, values: string[] = []) =>
+  sanitizeStringList([
+    ...(PRESET_VARIANT_VALUE_OPTIONS[normalizeOptionKey(key)] || []),
+    ...values,
+  ])
+
+const hasPresetValueOptions = (key: string) =>
+  Boolean(PRESET_VARIANT_VALUE_OPTIONS[normalizeOptionKey(key)]?.length)
+
+const buildVariantRowsFromVariants = (variants: Variant[]): VariantRow[] => {
+  const keys = sanitizeStringList(
+    variants.flatMap((variant) => Object.keys(variant.variantAttributes || {}))
+  )
+
+  return keys.map((key) => ({
+    id: createRowId(),
+    key,
+    values: sanitizeStringList(
+      variants.map((variant) => String(variant.variantAttributes?.[key] || ''))
+    ),
+  }))
+}
+
+const buildVariantCombinations = (rows: VariantRow[]) => {
+  const filledRows = rows.filter((row) => row.key && row.values.length)
+  if (!filledRows.length) return []
+
+  return filledRows.reduce<Record<string, string>[]>(
+    (combinations, row) =>
+      combinations.flatMap((combination) =>
+        row.values.map((value) => ({
+          ...combination,
+          [row.key]: value,
+        }))
+      ),
+    [{}]
+  )
+}
+
+const serializeVariants = (variants: Variant[]) =>
+  JSON.stringify(
+    variants.map((variant) => ({
+      variantDisplayName: variant.variantDisplayName || '',
+      variantAttributes: variant.variantAttributes || {},
+      actualPrice: Number(variant.actualPrice || 0),
+      finalPrice: Number(variant.finalPrice || 0),
+      stockQuantity: Number(variant.stockQuantity || 0),
+      isActive: Boolean(variant.isActive),
+      variantsImageUrls: (variant.variantsImageUrls || []).map((image) => ({
+        url: image.url,
+        publicId: image.publicId,
+      })),
+      variantMetaTitle: variant.variantMetaTitle || '',
+      variantMetaDescription: variant.variantMetaDescription || '',
+      variantMetaKeywords: variant.variantMetaKeywords || [],
+      variantCanonicalUrl: variant.variantCanonicalUrl || '',
+    }))
+  )
 
 const WebsiteMultiSelect: React.FC<{
   values: string[]
   options: SelectOption[]
   loading: boolean
   onChange: (values: string[]) => void
-}> = ({ values, options, loading, onChange }) => {
+  triggerClassName?: string
+}> = ({ values, options, loading, onChange, triggerClassName }) => {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-
-  const selectedLabels = useMemo(() => {
-    const optionMap = new Map(options.map((option) => [option.value, option.label]))
-    return values.map((value) => optionMap.get(value)).filter(Boolean) as string[]
-  }, [options, values])
+  const allSelected = options.length > 0 && values.length === options.length
 
   const visibleOptions = useMemo(
     () => filterOptions(options, search),
@@ -169,9 +325,19 @@ const WebsiteMultiSelect: React.FC<{
 
   const buttonText = useMemo(() => {
     if (loading) return 'Loading websites...'
-    if (!selectedLabels.length) return 'No websites selected'
-    return `${selectedLabels.length} website${selectedLabels.length > 1 ? 's' : ''} selected`
-  }, [loading, selectedLabels])
+    if (allSelected) return 'All websites'
+    if (!values.length) return 'Websites'
+    return `Websites (${values.length})`
+  }, [allSelected, loading, values.length])
+
+  const toggleAll = () => {
+    if (allSelected) {
+      onChange([])
+      return
+    }
+
+    onChange(options.map((option) => option.value))
+  }
 
   const toggleValue = (value: string) => {
     if (values.includes(value)) {
@@ -197,15 +363,18 @@ const WebsiteMultiSelect: React.FC<{
           role='combobox'
           aria-expanded={open}
           className={cn(
-            'h-11 w-full justify-between rounded-xl border-border bg-background text-left text-foreground shadow-sm hover:bg-secondary',
-            !selectedLabels.length && 'text-muted-foreground'
+            'border-input bg-white h-9 rounded-full border px-4 text-sm shadow-sm hover:bg-white hover:text-black',
+            triggerClassName
           )}
         >
           <span className='truncate'>{buttonText}</span>
-          <ChevronsUpDown className='h-4 w-4 shrink-0 opacity-50' />
+          <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className='w-[--radix-popover-trigger-width] p-0' align='start'>
+      <PopoverContent
+        className='w-[--radix-popover-trigger-width] p-0'
+        align='end'
+      >
         <Command shouldFilter={false}>
           <CommandInput
             value={search}
@@ -215,24 +384,32 @@ const WebsiteMultiSelect: React.FC<{
           <CommandList className='max-h-72'>
             <CommandEmpty>No websites found.</CommandEmpty>
             <CommandGroup>
-              {visibleOptions.map((option) => {
-                const checked = values.includes(option.value)
-                return (
-                  <CommandItem
-                    key={option.value}
-                    value={`${option.label} ${option.value}`}
-                    onSelect={() => toggleValue(option.value)}
-                  >
-                    <Check
-                      className={cn(
-                        'mr-2 h-4 w-4',
-                        checked ? 'opacity-100' : 'opacity-0'
-                      )}
-                    />
-                    {option.label}
-                  </CommandItem>
-                )
-              })}
+              <CommandItem value='__all__' onSelect={toggleAll}>
+                <Check
+                  className={cn(
+                    'mr-2 h-4 w-4',
+                    allSelected ? 'opacity-100' : 'opacity-0'
+                  )}
+                />
+                Select all websites
+              </CommandItem>
+              {visibleOptions.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={`${option.label} ${option.value}`}
+                  onSelect={() => toggleValue(option.value)}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      values.includes(option.value)
+                        ? 'opacity-100'
+                        : 'opacity-0'
+                    )}
+                  />
+                  {option.label}
+                </CommandItem>
+              ))}
             </CommandGroup>
           </CommandList>
         </Command>
@@ -241,1026 +418,910 @@ const WebsiteMultiSelect: React.FC<{
   )
 }
 
+const VariantValuesMultiSelect: React.FC<{
+  rowKey: string
+  values: string[]
+  onChange: (values: string[]) => void
+}> = ({ rowKey, values, onChange }) => {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const presetOptions = useMemo(
+    () =>
+      getPresetValueOptions(
+        rowKey,
+        search.trim() ? [...values, search.trim()] : values
+      ).map((value) => ({ value, label: value })),
+    [rowKey, search, values]
+  )
+
+  const visibleOptions = useMemo(
+    () => filterOptions(presetOptions, search),
+    [presetOptions, search]
+  )
+
+  const normalizedSearch = String(search || '').trim()
+  const canCreate =
+    Boolean(normalizedSearch) &&
+    !presetOptions.some(
+      (option) =>
+        normalizeSearchText(option.value) === normalizeSearchText(search)
+    )
+
+  const toggleValue = (value: string) => {
+    if (values.includes(value)) {
+      onChange(values.filter((item) => item !== value))
+      return
+    }
+
+    onChange([...values, value])
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen)
+        if (!nextOpen) setSearch('')
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type='button'
+          variant='outline'
+          className='border-input bg-white h-11 w-full justify-between rounded-xl border px-4 text-left shadow-sm hover:bg-white hover:text-black'
+          disabled={!rowKey}
+        >
+          <span className='truncate'>
+            {values.length
+              ? `${values.length} values selected`
+              : 'Select values'}
+          </span>
+          <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className='w-[--radix-popover-trigger-width] p-0'>
+        <Command shouldFilter={false}>
+          <CommandInput
+            value={search}
+            onValueChange={setSearch}
+            placeholder={`Search ${rowKey.toLowerCase()} values...`}
+          />
+          <CommandList className='max-h-72'>
+            <CommandEmpty>No values found.</CommandEmpty>
+            <CommandGroup>
+              {visibleOptions.map((option) => (
+                <CommandItem
+                  key={`${rowKey}-${option.value}`}
+                  value={option.value}
+                  onSelect={() => toggleValue(option.value)}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      values.includes(option.value)
+                        ? 'opacity-100'
+                        : 'opacity-0'
+                    )}
+                  />
+                  {isColorKey(rowKey) && getColorSwatch(option.value) ? (
+                    <span
+                      className='mr-2 h-3 w-3 rounded-full border border-black/10'
+                      style={{
+                        backgroundColor:
+                          getColorSwatch(option.value) || undefined,
+                      }}
+                    />
+                  ) : null}
+                  {option.label}
+                </CommandItem>
+              ))}
+              {canCreate ? (
+                <CommandItem
+                  value={`create-${normalizedSearch}`}
+                  onSelect={() => {
+                    onChange(sanitizeStringList([...values, normalizedSearch]))
+                    setSearch('')
+                  }}
+                >
+                  <Plus className='mr-2 h-4 w-4' />
+                  Add {normalizedSearch}
+                </CommandItem>
+              ) : null}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+const CustomVariantValuesInput: React.FC<{
+  rowKey: string
+  values: string[]
+  onChange: (values: string[]) => void
+}> = ({ rowKey, values, onChange }) => {
+  const [inputValue, setInputValue] = useState('')
+
+  const addValue = () => {
+    const nextValue = String(inputValue || '').trim()
+    if (!nextValue) return
+    onChange(sanitizeStringList([...values, nextValue]))
+    setInputValue('')
+  }
+
+  return (
+    <div className='flex gap-2'>
+      <input
+        type='text'
+        value={inputValue}
+        onChange={(event) => setInputValue(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            addValue()
+          }
+        }}
+        placeholder={
+          rowKey
+            ? `Type ${rowKey.toLowerCase()} value and press Enter`
+            : 'Type value'
+        }
+        className={studioInputClass}
+        disabled={!rowKey}
+      />
+      <Button
+        type='button'
+        variant='outline'
+        className='h-11 rounded-xl px-4 hover:bg-white hover:text-black'
+        onClick={addValue}
+        disabled={!String(inputValue || '').trim() || !rowKey}
+      >
+        Add
+      </Button>
+    </div>
+  )
+}
+
+const VariantValuesEditor: React.FC<{
+  rowKey: string
+  values: string[]
+  onChange: (values: string[]) => void
+}> = ({ rowKey, values, onChange }) => {
+  if (!rowKey) {
+    return (
+      <input
+        type='text'
+        disabled
+        placeholder='Select variant first'
+        className={studioInputClass}
+      />
+    )
+  }
+
+  if (!hasPresetValueOptions(rowKey)) {
+    return (
+      <CustomVariantValuesInput
+        rowKey={rowKey}
+        values={values}
+        onChange={onChange}
+      />
+    )
+  }
+
+  return (
+    <VariantValuesMultiSelect rowKey={rowKey} values={values} onChange={onChange} />
+  )
+}
+
+const VariantTypePickerPopover: React.FC<{
+  options: SelectOption[]
+  onSelect: (value: string) => void
+  className?: string
+  label?: string
+  align?: 'start' | 'center' | 'end'
+}> = ({
+  options,
+  onSelect,
+  className,
+  label = 'Add variant',
+  align = 'start',
+}) => {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  const visibleOptions = useMemo(
+    () => filterOptions(options, search),
+    [options, search]
+  )
+  const normalizedSearch = String(search || '').trim()
+  const canCreate =
+    Boolean(normalizedSearch) &&
+    !options.some(
+      (option) =>
+        normalizeSearchText(option.value) === normalizeSearchText(normalizedSearch)
+    )
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [open])
+
+  return (
+    <div ref={containerRef} className='relative inline-flex'>
+      <Button
+        type='button'
+        className={className}
+        onClick={() => {
+          setOpen((prev) => !prev)
+          if (open) setSearch('')
+        }}
+      >
+        <Plus className='mr-2 h-4 w-4' />
+        {label}
+      </Button>
+
+      {open ? (
+        <div
+          className={cn(
+            'border-border bg-popover absolute top-full z-50 mt-2 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border shadow-xl',
+            align === 'end'
+              ? 'right-0'
+              : align === 'center'
+                ? 'left-1/2 -translate-x-1/2'
+                : 'left-0'
+          )}
+        >
+          <Command shouldFilter={false}>
+            <CommandInput
+              value={search}
+              onValueChange={setSearch}
+              placeholder='Search variants...'
+            />
+            <CommandList className='max-h-72'>
+              <CommandEmpty>No variants found.</CommandEmpty>
+              <CommandGroup heading='Recommended'>
+                {visibleOptions.map((option) => (
+                  <CommandItem
+                    key={option.value}
+                    value={option.value}
+                    onSelect={() => {
+                      onSelect(option.value)
+                      setOpen(false)
+                      setSearch('')
+                    }}
+                  >
+                    {option.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              {canCreate ? (
+                <CommandGroup heading='Custom'>
+                  <CommandItem
+                    value={`create-${normalizedSearch}`}
+                    onSelect={() => {
+                      onSelect(normalizedSearch)
+                      setOpen(false)
+                      setSearch('')
+                    }}
+                  >
+                    <Plus className='mr-2 h-4 w-4' />
+                    Add custom variant "{normalizedSearch}"
+                  </CommandItem>
+                </CommandGroup>
+              ) : null}
+            </CommandList>
+          </Command>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+const VariantImagesRow: React.FC<{
+  index: number
+  variant: Variant
+  onUpload: (event: React.ChangeEvent<HTMLInputElement>) => void
+  onDelete: (imageIndex: number) => void
+}> = ({ index, variant, onUpload, onDelete }) => {
+  const images = variant.variantsImageUrls || []
+  const slots = Array.from({ length: MAX_VARIANT_IMAGES }, (_, slotIndex) => ({
+    slotIndex,
+    image: images[slotIndex],
+    inputId: `variant-images-upload-${index}-${slotIndex}`,
+  }))
+
+  return (
+    <div
+      className={cn(
+        'border-border/70 bg-background grid min-w-[588px] gap-3 border-t px-4 py-4 first:border-t-0',
+        VARIANT_IMAGE_GRID_CLASS
+      )}
+    >
+      <div className='min-w-0'>
+        <div className='text-foreground truncate text-sm font-semibold'>
+          {getVariantDisplayName(variant, undefined, index)}
+        </div>
+        <div className='mt-2 flex flex-wrap gap-2'>
+          {Object.entries(variant.variantAttributes || {}).map(([key, value]) => (
+            <span
+              key={`${index}-${key}-${value}`}
+              className='border-border bg-secondary text-foreground inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium'
+            >
+              {isColorKey(key) && getColorSwatch(value) ? (
+                <span
+                  className='h-2.5 w-2.5 rounded-full border border-black/10'
+                  style={{
+                    backgroundColor: getColorSwatch(value) || undefined,
+                  }}
+                />
+              ) : null}
+              <span className='text-muted-foreground'>{key}:</span>
+              {value}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {slots.map(({ slotIndex, image, inputId }) => (
+        <div key={`${index}-${slotIndex}`} className='flex items-center justify-center'>
+          <input
+            id={inputId}
+            type='file'
+            accept='image/*'
+            className='hidden'
+            onChange={onUpload}
+          />
+
+          {image ? (
+            <div className='group border-border bg-card relative h-24 w-24 overflow-hidden rounded-2xl border shadow-sm'>
+              <img
+                src={image.url}
+                alt={`Variant ${index + 1} image ${slotIndex + 1}`}
+                className={cn(
+                  'h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]',
+                  image.uploading && 'opacity-40'
+                )}
+              />
+
+              <div className='absolute top-2 left-2 inline-flex rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white'>
+                {slotIndex + 1}
+              </div>
+
+              {image.uploading ? (
+                <div className='bg-background/70 absolute inset-0 flex items-center justify-center backdrop-blur-sm'>
+                  <Loader2 className='h-4 w-4 animate-spin text-sky-600' />
+                </div>
+              ) : (
+                <button
+                  type='button'
+                  onClick={() => onDelete(slotIndex)}
+                  className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-md transition hover:bg-red-500 hover:text-white'
+                  aria-label={`Remove variant ${index + 1} image ${slotIndex + 1}`}
+                >
+                  <Trash2 className='h-3.5 w-3.5' />
+                </button>
+              )}
+            </div>
+          ) : (
+            <label
+              htmlFor={inputId}
+              className='border-border bg-background hover:bg-secondary flex h-24 w-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed transition'
+            >
+              <ImageOff className='text-muted-foreground h-5 w-5' />
+              <span className='text-muted-foreground mt-1 text-[11px] font-medium'>
+                Add
+              </span>
+            </label>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const VariantImagesSection: React.FC<{
+  variants: Variant[]
+  onUpload: (
+    variantIndex: number,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => void
+  onDelete: (variantIndex: number, imageIndex: number) => void
+}> = ({ variants, onUpload, onDelete }) => {
+  return (
+    <section className={cn(studioCardClass, 'space-y-4 p-5')}>
+      <div>
+        <h3 className='text-foreground text-base font-semibold'>
+          Variant Images
+        </h3>
+        <p className='text-muted-foreground mt-1 text-sm'>
+          Upload up to {MAX_VARIANT_IMAGES} images per variant.
+        </p>
+      </div>
+
+      {variants.length ? (
+        <div className='border-border/70 overflow-x-auto rounded-2xl border'>
+          <div
+            className={cn(
+              'bg-muted/30 text-muted-foreground grid min-w-[588px] gap-3 px-4 py-3 text-xs font-semibold tracking-[0.16em] uppercase',
+              VARIANT_IMAGE_GRID_CLASS
+            )}
+          >
+            <span>Variant</span>
+            <span className='text-center'>Image 1</span>
+            <span className='text-center'>Image 2</span>
+            <span className='text-center'>Image 3</span>
+          </div>
+
+          {variants.map((variant, index) => (
+            <VariantImagesRow
+              key={
+                variant._id ||
+                buildVariantSignature(variant.variantAttributes || {}) ||
+                `variant-images-${index}`
+              }
+              index={index}
+              variant={variant}
+              onUpload={(event) => onUpload(index, event)}
+              onDelete={(imageIndex) => onDelete(index, imageIndex)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className='border-border text-muted-foreground rounded-2xl border border-dashed px-4 py-6 text-sm'>
+          Add variant values first. Image rows will appear here automatically.
+        </div>
+      )}
+    </section>
+  )
+}
+
 const Step5Variants: React.FC<Props> = ({
   productName,
   variants,
+  specifications,
   recommendedAttributeKeys,
   variantKeySuggestions,
-  variantKeyContextLabel,
   websiteOptions,
   selectedWebsiteIds,
   isWebsiteLoading,
   isAvailable,
-  aiLoading,
-  onPrimaryVariantNameChange,
-  onAddAttributeKey,
-  onAddSuggestedAttributeKeys,
-  onRemoveAttributeKey,
+  specificationAiLoading,
   onToggleAvailable,
   onSelectedWebsiteIdsChange,
-  onGenerateSuggestedKeys,
-  onAddVariant,
-  onCopyFromPreviousVariant,
-  onRemoveVariant,
   onVariantFieldChange,
-  onVariantAttributeChange,
   onVariantImageUpload,
-  onVariantImageDrop,
   onVariantImageDelete,
+  onSpecificationChange,
+  onAddSpecificationKey,
+  onReplaceVariants,
 }) => {
-  const [dragOverVariantIndex, setDragOverVariantIndex] = useState<number | null>(null)
-  const [variantCustomKeyInputs, setVariantCustomKeyInputs] = useState<
-    Record<number, string>
-  >({})
-  const [variantCustomInputOpen, setVariantCustomInputOpen] = useState<
-    Record<number, boolean>
-  >({})
-  const [variantOptionPickerOpen, setVariantOptionPickerOpen] = useState<
-    Record<number, boolean>
-  >({})
-  const [variantOptionSearch, setVariantOptionSearch] = useState<Record<number, string>>({})
-  const [variantOptionSelections, setVariantOptionSelections] = useState<
-    Record<number, string[]>
-  >({})
-  const [addVariantDialogOpen, setAddVariantDialogOpen] = useState(false)
-  const [selectedSuggestedVariantKey, setSelectedSuggestedVariantKey] = useState('')
-  const [newVariantCustomKey, setNewVariantCustomKey] = useState('')
-  const [showCustomVariantKeyInput, setShowCustomVariantKeyInput] = useState(false)
-  const [selectedPricingVariantIndex, setSelectedPricingVariantIndex] = useState(0)
+  const [rows, setRows] = useState<VariantRow[]>(() => {
+    const derivedRows = buildVariantRowsFromVariants(variants)
+    return derivedRows.length ? derivedRows : []
+  })
 
   const websiteSelectOptions = useMemo(
     () =>
-      websiteOptions.map((website) => ({
-        value: website._id,
-        label:
-          website.name ||
-          website.business_name ||
-          website.template_name ||
-          website.template_key ||
-          'Untitled website',
-      })),
+      websiteOptions
+        .map((website) => ({
+          value: String(website._id || '').trim(),
+          label: String(
+            website.template_name ||
+              website.business_name ||
+              website.name ||
+              website.template_key ||
+              'Untitled website'
+          ).trim(),
+        }))
+        .filter((option) => option.value && option.label),
     [websiteOptions]
   )
 
-  const suggestedVariantKeys = useMemo(
-    () => sanitizeKeyList(variantKeySuggestions),
-    [variantKeySuggestions]
-  )
-  const pricingVariantOptions = useMemo(
+  const variantSuggestions = useMemo(
     () =>
-      variants.map((variant, index) => ({
-        value: String(index),
-        label: getVariantDisplayName(variant, index, productName),
-      })),
-    [productName, variants]
+      sanitizeStringList([
+        ...recommendedAttributeKeys,
+        ...variantKeySuggestions,
+        ...SHOPIFY_VARIANT_KEYS,
+      ]).map((value) => ({ value, label: value })),
+    [recommendedAttributeKeys, variantKeySuggestions]
   )
-  const resolvedPricingVariantIndex =
-    variants.length === 0
-      ? -1
-      : Math.min(Math.max(selectedPricingVariantIndex, 0), variants.length - 1)
-  const selectedPricingVariant =
-    resolvedPricingVariantIndex >= 0 ? variants[resolvedPricingVariantIndex] : null
-  const resolvedSuggestedVariantKey =
-    selectedSuggestedVariantKey && suggestedVariantKeys.includes(selectedSuggestedVariantKey)
-      ? selectedSuggestedVariantKey
-      : suggestedVariantKeys[0] || ''
+
+  const visibleVariantSuggestions = useMemo(
+    () =>
+      variantSuggestions.filter(
+        (option) => !rows.some((row) => row.key === option.value)
+      ),
+    [rows, variantSuggestions]
+  )
+
+  const serializedVariants = useMemo(
+    () => serializeVariants(variants),
+    [variants]
+  )
+  const isSyncingLocalRowsRef = useRef(false)
 
   useEffect(() => {
-    if (!variants.length) {
-      setSelectedPricingVariantIndex(0)
+    if (isSyncingLocalRowsRef.current) {
+      isSyncingLocalRowsRef.current = false
       return
     }
 
-    if (selectedPricingVariantIndex > variants.length - 1) {
-      setSelectedPricingVariantIndex(variants.length - 1)
-    }
-  }, [selectedPricingVariantIndex, variants.length])
-
-  const handleAddVariantClick = () => {
-    onGenerateSuggestedKeys(variants.length)
-    setSelectedSuggestedVariantKey((currentValue) =>
-      currentValue || suggestedVariantKeys[0] || ''
+    const nextRows = buildVariantRowsFromVariants(variants)
+    setRows((currentRows) =>
+      buildRowSignature(nextRows) === buildRowSignature(currentRows)
+        ? currentRows
+        : nextRows
     )
-    setAddVariantDialogOpen(true)
-  }
+  }, [serializedVariants, variants])
 
-  const getVariantKeys = (variant: Variant) =>
-    Object.keys(variant.variantAttributes || {})
-      .map((key) => String(key || '').trim())
-      .filter(Boolean)
+  useEffect(() => {
+    const combinations = buildVariantCombinations(rows)
+    const currentVariantMap = new Map(
+      variants.map((variant) => [
+        buildVariantSignature(variant.variantAttributes || {}),
+        variant,
+      ])
+    )
 
-  const closeAddVariantDialog = () => {
-    setAddVariantDialogOpen(false)
-    setSelectedSuggestedVariantKey('')
-    setNewVariantCustomKey('')
-    setShowCustomVariantKeyInput(false)
-  }
-
-  const handleAddVariantWithKeys = (keys: string[]) => {
-    const normalizedKeys = sanitizeKeyList(keys)
-    if (!normalizedKeys.length) return
-    onAddVariant(normalizedKeys)
-    closeAddVariantDialog()
-  }
-
-  const handleAddVariantWithCustomKey = () => {
-    handleAddVariantWithKeys([newVariantCustomKey])
-  }
-
-  const toggleRecommendedKeySelection = (variantIndex: number, key: string) => {
-    setVariantOptionSelections((prev) => {
-      const currentSelections = prev[variantIndex] || []
-      const nextSelections = currentSelections.includes(key)
-        ? currentSelections.filter((selectedKey) => selectedKey !== key)
-        : [...currentSelections, key]
+    const nextVariants = combinations.map((attributes) => {
+      const signature = buildVariantSignature(attributes)
+      const matchedVariant = currentVariantMap.get(signature)
 
       return {
-        ...prev,
-        [variantIndex]: nextSelections,
+        _id: matchedVariant?._id,
+        variantDisplayName: matchedVariant?.variantDisplayName || '',
+        variantAttributes: attributes,
+        actualPrice: Number(matchedVariant?.actualPrice || 0),
+        finalPrice: Number(matchedVariant?.finalPrice || 0),
+        stockQuantity: Number(matchedVariant?.stockQuantity || 0),
+        variantsImageUrls: matchedVariant?.variantsImageUrls || [],
+        isActive: matchedVariant?.isActive ?? true,
+        variantMetaTitle: matchedVariant?.variantMetaTitle,
+        variantMetaDescription: matchedVariant?.variantMetaDescription,
+        variantMetaKeywords: matchedVariant?.variantMetaKeywords,
+        variantCanonicalUrl: matchedVariant?.variantCanonicalUrl,
       }
     })
-  }
 
-  const handleAddSelectedRecommendedKeys = (variantIndex: number) => {
-    const selectedKeys = sanitizeKeyList(variantOptionSelections[variantIndex] || [])
-    if (!selectedKeys.length) return
+    if (serializeVariants(nextVariants) === serializedVariants) return
+    isSyncingLocalRowsRef.current = true
+    onReplaceVariants(nextVariants)
+  }, [onReplaceVariants, rows, serializedVariants, variants])
 
-    onAddSuggestedAttributeKeys(variantIndex, selectedKeys)
-
-    setVariantOptionSelections((prev) => ({
-      ...prev,
-      [variantIndex]: [],
-    }))
-    setVariantOptionPickerOpen((prev) => ({ ...prev, [variantIndex]: false }))
-    setVariantOptionSearch((prev) => ({ ...prev, [variantIndex]: '' }))
-  }
-
-  const handleOptionPickerOpenChange = (variantIndex: number, open: boolean) => {
-    setVariantOptionPickerOpen((prev) => ({
-      ...prev,
-      [variantIndex]: open,
-    }))
-
-    if (open) {
-      setVariantOptionSelections((prev) => ({
-        ...prev,
-        [variantIndex]: [],
-      }))
-      onGenerateSuggestedKeys(variantIndex)
+  const addVariantRow = (key: string) => {
+    const normalizedKey = String(key || '').trim()
+    if (!normalizedKey) return
+    if (
+      rows.some(
+        (row) => normalizeOptionKey(row.key) === normalizeOptionKey(normalizedKey)
+      )
+    ) {
       return
     }
 
-    setVariantOptionSelections((prev) => ({
+    setRows((prev) => [
       ...prev,
-      [variantIndex]: [],
-    }))
-    setVariantOptionSearch((prev) => ({
-      ...prev,
-      [variantIndex]: '',
-    }))
+      {
+        id: createRowId(),
+        key: normalizedKey,
+        values: [],
+      },
+    ])
   }
 
-  const handleCustomKeySubmit = (variantIndex: number) => {
-    const normalizedKey = String(variantCustomKeyInputs[variantIndex] || '').trim()
-    if (!normalizedKey) return
+  const updateRowValues = (rowId: string, values: string[]) => {
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === rowId
+          ? {
+              ...row,
+              values: sanitizeStringList(values),
+            }
+          : row
+      )
+    )
+  }
 
-    onAddAttributeKey(variantIndex, normalizedKey)
-    setVariantCustomKeyInputs((prev) => ({ ...prev, [variantIndex]: '' }))
-    setVariantCustomInputOpen((prev) => ({ ...prev, [variantIndex]: false }))
+  const removeRow = (rowId: string) => {
+    setRows((prev) => prev.filter((row) => row.id !== rowId))
   }
 
   return (
     <div className='space-y-6'>
-      <div className={studioCardClass}>
-        <div className='flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-start lg:justify-between'>
+      <section className={cn(studioCardClass, 'space-y-5 p-5')}>
+        <div className='flex flex-wrap items-start justify-between gap-4'>
           <div>
-            <div className='flex items-center gap-2 text-base font-semibold text-foreground'>
-              <Layers3 className='h-4 w-4 text-cyan-600' />
-              Variants and visibility
+            <h3 className='text-foreground text-base font-semibold'>
+              Variants
+            </h3>
+          </div>
+
+          <div className='flex flex-wrap items-center justify-end gap-2'>
+            <div className='border-border bg-white flex h-9 items-center gap-2 rounded-full border px-3'>
+              <span className='text-muted-foreground text-xs font-medium'>
+                Visible
+              </span>
+              <Switch
+                checked={isAvailable}
+                onCheckedChange={onToggleAvailable}
+              />
             </div>
-            <p className='mt-2 max-w-2xl text-sm leading-6 text-muted-foreground'>
-              Set product visibility, then manage each variant card separately for option
-              values, pricing, stock etc.
-            </p>
+
+            {websiteSelectOptions.length ? (
+              <WebsiteMultiSelect
+                values={selectedWebsiteIds}
+                options={websiteSelectOptions}
+                loading={isWebsiteLoading}
+                onChange={onSelectedWebsiteIdsChange}
+                triggerClassName='min-w-[150px]'
+              />
+            ) : null}
+
+            {rows.length === 0 ? (
+              <VariantTypePickerPopover
+                options={visibleVariantSuggestions}
+                onSelect={addVariantRow}
+                className='h-10 rounded-xl px-4'
+                label='Add variant'
+                align='end'
+              />
+            ) : null}
           </div>
         </div>
 
-        <div className='mt-5'>
-          <div className='rounded-3xl border border-border/70 bg-gradient-to-br from-background via-background to-cyan-50/30 p-4 shadow-sm'>
-            <div className='grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)] lg:items-start'>
-              <div className={cn(studioSubtleCardClass, 'h-full border-0 bg-background/70 shadow-none')}>
-                <StudioFieldLabel
-                  label='Availability'
-                  help='Turn this off if the product should stay hidden even after approval.'
-                />
-                <div className='mt-3 flex items-center justify-between gap-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3'>
+        <div className='space-y-4'>
+          {rows.length ? (
+            rows.map((row, index) => (
+              <div
+                key={row.id}
+                className='border-border/70 bg-white rounded-2xl border p-4'
+              >
+                <div className='grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]'>
                   <div>
-                    <div className='text-sm font-medium text-foreground'>
-                      {isAvailable ? 'Visible' : 'Hidden'}
-                    </div>
-                    <p className='text-xs text-muted-foreground'>
-                      Product-level availability for the listing.
-                    </p>
-                  </div>
-                  <div className='flex items-center gap-3'>
-                    <ToggleLeft className='h-4 w-4 text-emerald-600' />
-                    <Switch checked={isAvailable} onCheckedChange={onToggleAvailable} />
-                  </div>
-                </div>
-              </div>
-
-              <div className={cn(studioSubtleCardClass, 'h-full border-0 bg-background/70 shadow-none')}>
-                <StudioFieldLabel
-                  label='Show on websites'
-                  help='Pick only the vendor websites where this product should appear. If nothing is selected, the product will stay hidden from storefront websites.'
-                />
-                {websiteSelectOptions.length ? (
-                  <>
-                    <div className='mt-3 rounded-2xl border border-border/70 bg-background px-3 py-3'>
-                      <WebsiteMultiSelect
-                        values={selectedWebsiteIds}
-                        options={websiteSelectOptions}
-                        loading={isWebsiteLoading}
-                        onChange={onSelectedWebsiteIdsChange}
-                      />
-                    </div>
-                    {selectedWebsiteIds.length ? (
-                      <div className='mt-3 flex flex-wrap gap-2'>
-                        {selectedWebsiteIds
-                          .map(
-                            (websiteId) =>
-                              websiteSelectOptions.find(
-                                (option) => option.value === websiteId
-                              )?.label
+                    <StudioFieldLabel label={`Variant ${index + 1}`} />
+                    <Select
+                      value={row.key}
+                      onValueChange={(value) => {
+                        setRows((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, key: value, values: [] }
+                              : item
                           )
-                          .filter(Boolean)
-                          .map((label) => (
-                            <button
-                              key={label}
-                              type='button'
-                              onClick={() =>
-                                onSelectedWebsiteIdsChange(
-                                  selectedWebsiteIds.filter((websiteId) => {
-                                    const optionLabel = websiteSelectOptions.find(
-                                      (option) => option.value === websiteId
-                                    )?.label
-                                    return optionLabel !== label
-                                  })
+                        )
+                      }}
+                    >
+                      <SelectTrigger className='border-input bg-white h-11 rounded-xl'>
+                        <SelectValue placeholder='Select variant' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sanitizeStringList([
+                          row.key,
+                          ...variantSuggestions
+                            .map((option) => option.value)
+                            .filter(
+                              (option) =>
+                                normalizeOptionKey(option) ===
+                                  normalizeOptionKey(row.key) ||
+                                !rows.some(
+                                  (item) =>
+                                    item.id !== row.id &&
+                                    normalizeOptionKey(item.key) ===
+                                      normalizeOptionKey(option)
                                 )
-                              }
-                              className='inline-flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-medium text-cyan-900 transition hover:border-cyan-300 hover:bg-cyan-100'
+                            ),
+                        ])
+                          .filter(Boolean)
+                          .map((option) => (
+                            <SelectItem
+                              key={`${row.id}-${option}`}
+                              value={option}
                             >
-                              {label}
-                              <X className='h-3.5 w-3.5' />
-                            </button>
+                              {option}
+                            </SelectItem>
                           ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <StudioFieldLabel label={row.key || 'Values'} />
+                    <VariantValuesEditor
+                      rowKey={row.key}
+                      values={row.values}
+                      onChange={(values) => updateRowValues(row.id, values)}
+                    />
+                    {row.values.length ? (
+                      <div className='mt-3 flex flex-wrap gap-2'>
+                        {row.values.map((value) => (
+                          <button
+                            type='button'
+                            key={`${row.id}-${value}`}
+                            onClick={() =>
+                              updateRowValues(
+                                row.id,
+                                row.values.filter((item) => item !== value)
+                              )
+                            }
+                            className='border-border bg-secondary text-foreground inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium'
+                          >
+                            {isColorKey(row.key) && getColorSwatch(value) ? (
+                              <span
+                                className='h-2.5 w-2.5 rounded-full border border-black/10'
+                                style={{
+                                  backgroundColor:
+                                    getColorSwatch(value) || undefined,
+                                }}
+                              />
+                            ) : null}
+                            {value}
+                            <X className='text-muted-foreground h-3 w-3' />
+                          </button>
+                        ))}
                       </div>
                     ) : null}
-                    <p className='mt-3 text-xs leading-5 text-muted-foreground'>
-                      Multi-select supported. This only controls storefront website visibility.
-                    </p>
-                  </>
-                ) : (
-                  <div className='mt-3 rounded-2xl border border-dashed border-border/70 bg-background/50 px-4 py-3 text-sm text-muted-foreground'>
-                    No vendor websites found yet. Create a website first if you want to limit product
-                    visibility by storefront.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {variants.length === 0 ? (
-        <div className={studioCardClass}>
-          <h3 className='text-base font-semibold text-foreground'>No variants yet</h3>
-          <p className='mt-2 text-sm text-muted-foreground'>
-            Add the first variant to start with a key like Size, Color, or Lens Power.
-
-          </p>
-          <span className='mt-4 inline-flex'>
-            <Button
-              type='button'
-              onClick={handleAddVariantClick}
-              className='h-11 bg-cyan-600 px-5 text-white hover:bg-cyan-700'
-            >
-              <Plus className='mr-2 h-4 w-4' />
-              Add Variant
-            </Button>
-          </span>
-        </div>
-      ) : (
-        <div className='space-y-5'>
-          {variants.map((variant, variantIndex) => {
-            const variantKeys = getVariantKeys(variant)
-            const summary = variantKeys
-              .map((key) => variant.variantAttributes[key])
-              .filter(Boolean)
-              .join(' / ')
-            const customVariantName = String(variant.variantDisplayName || '').trim()
-            const isPrimaryVariant = variantIndex === 0
-            const recommendedOptions = filterOptions(
-              recommendedAttributeKeys
-                .map((key) => ({
-                  value: key,
-                  label: key,
-                }))
-                .filter((option) => !variantKeys.includes(option.value)),
-              variantOptionSearch[variantIndex] || ''
-            )
-            const isCustomInputVisible = Boolean(variantCustomInputOpen[variantIndex])
-            const selectedRecommendedKeys = variantOptionSelections[variantIndex] || []
-            const primaryVariantKey = variantKeys[0] || ''
-            const variantTitle = primaryVariantKey
-              ? `${primaryVariantKey} variant`
-              : `Variant ${variantIndex + 1}`
-            const customerFacingVariantName = getVariantDisplayName(
-              variant,
-              variantIndex,
-              productName
-            )
-            const variantSubtitle = summary
-              ? summary
-              : primaryVariantKey
-                ? `Set ${primaryVariantKey.toLowerCase()} details and images.`
-                : 'Choose product details and images.'
-
-            return (
-              <article
-                key={variant._id || `variant-${variantIndex}`}
-                className={cn(
-                  studioCardClass,
-                  'overflow-hidden border-cyan-200/70 bg-gradient-to-br from-white via-cyan-50/20 to-slate-50/70 shadow-[0_16px_40px_-24px_rgba(8,145,178,0.35)]'
-                )}
-              >
-                <div className='-mx-5 -mt-5 mb-5 flex flex-col gap-4 border-b border-cyan-100 bg-gradient-to-r from-cyan-50/70 via-white to-white px-5 py-5 lg:flex-row lg:items-start lg:justify-between'>
-                  <div>
-                    <div className='mb-2 inline-flex items-center gap-2 border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300'>
-                      {variantTitle}
-                    </div>
-                    <h3 className='text-lg font-semibold text-foreground'>
-                      {customerFacingVariantName}
-                    </h3>
-                    <p className='text-sm text-muted-foreground'>
-                      Variant {variantIndex + 1}
-                      {variantSubtitle ? ` • ${variantSubtitle}` : ''}
-                    </p>
                   </div>
 
-                  <div className='flex flex-wrap items-center gap-3'>
-                    <div className='flex items-center gap-2 rounded-xl border border-cyan-100 bg-white/90 px-3 py-2 shadow-sm'>
-                      <Switch
-                        checked={variant.isActive}
-                        onCheckedChange={(checked) =>
-                          onVariantFieldChange(variantIndex, 'isActive', checked)
-                        }
-                      />
-                      <span className='text-sm font-medium text-foreground'>
-                        {variant.isActive ? 'Active' : 'Paused'}
-                      </span>
-                    </div>
+                  <div className='flex items-start justify-end'>
                     <Button
                       type='button'
-                      variant='outline'
-                      onClick={() => onCopyFromPreviousVariant(variantIndex)}
-                      disabled={variantIndex === 0}
-                      className='h-11 border-amber-500/25 bg-amber-500/10 px-4 text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 disabled:border-border disabled:bg-background disabled:text-muted-foreground'
+                      variant='ghost'
+                      onClick={() => removeRow(row.id)}
+                      className='text-muted-foreground hover:text-destructive h-11 rounded-xl px-3'
                     >
-                      <Copy className='mr-2 h-4 w-4' />
-                      Copy Above
+                      <X className='h-4 w-4' />
                     </Button>
                   </div>
                 </div>
-
-                <div className='space-y-4'>
-                  <section
-                    className={cn(
-                      studioSubtleCardClass,
-                      'rounded-3xl border border-border/70 bg-white shadow-sm'
-                    )}
-                  >
-                    {isPrimaryVariant ? (
-                      <div className='mb-4 rounded-2xl border border-cyan-100 bg-cyan-50/40 p-4'>
-                        <StudioFieldLabel
-                          label='Variant Name'
-                          help='The first variant stays synced with the main product name. Editing it here will also update Step 1.'
-                        />
-                        <input
-                          type='text'
-                          value={productName || ''}
-                          onChange={(event) =>
-                            onPrimaryVariantNameChange(event.target.value)
-                          }
-                          placeholder='Enter the main product name'
-                          className={studioInputClass}
-                        />
-                        <p className='mt-2 text-xs leading-5 text-muted-foreground'>
-                          This name is shared with Step 1, so any update here changes the main
-                          product name too.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className='mb-4 rounded-2xl border border-cyan-100 bg-cyan-50/40 p-4'>
-                        <StudioFieldLabel
-                          label='Variant Name'
-                          help='This is the customer-facing variant name. Vendors can keep it simple, like Black 256 GB, Large Blue, or Matte Finish.'
-                        />
-                        <input
-                          type='text'
-                          value={variant.variantDisplayName || ''}
-                          onChange={(event) =>
-                            onVariantFieldChange(
-                              variantIndex,
-                              'variantDisplayName',
-                              event.target.value
-                            )
-                          }
-                          placeholder={
-                            customVariantName
-                              ? customVariantName
-                              : summary || `Variant ${variantIndex + 1}`
-                          }
-                          className={studioInputClass}
-                        />
-                        <p className='mt-2 text-xs leading-5 text-muted-foreground'>
-                          Customers will see this name. If left blank, we will use the selected
-                          variant details automatically.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className='grid gap-4 sm:grid-cols-2 2xl:grid-cols-3'>
-                      {variantKeys.length ? (
-                        variantKeys.map((key) => (
-                          <div
-                            key={`${variantIndex}-${key}`}
-                            className='flex h-full flex-col border border-border/60 bg-background/50 p-4'
-                          >
-                            <StudioFieldLabel
-                              label={key}
-                              action={
-                                <button
-                                  type='button'
-                                  onClick={() => onRemoveAttributeKey(variantIndex, key)}
-                                  className='inline-flex h-7 w-7 items-center justify-center border border-border bg-background text-muted-foreground transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600'
-                                  aria-label={`Remove ${key}`}
-                                >
-                                  <X className='h-3.5 w-3.5' />
-                                </button>
-                              }
-                            />
-                            <input
-                              type='text'
-                              value={variant.variantAttributes[key] || ''}
-                              onChange={(event) =>
-                                onVariantAttributeChange(
-                                  variantIndex,
-                                  key,
-                                  event.target.value
-                                )
-                              }
-                              placeholder={`Enter ${key.toLowerCase()}`}
-                              className={studioInputClass}
-                            />
-                          </div>
-                        ))
-                      ) : (
-                        <div className='sm:col-span-2 2xl:col-span-3 bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
-                          Add detail dropdown se suggested keys choose karo, ya custom
-                          detail button se apni key banao.
-                        </div>
-                      )}
-                    </div>
-
-                    {isCustomInputVisible ? (
-                      <div className='mt-5 border border-dashed border-cyan-500/30 bg-cyan-500/5 p-4'>
-                        <div className='flex items-center justify-between gap-3'>
-                          <StudioFieldLabel label='Create custom detail' className='mb-0' />
-                          <Button
-                            type='button'
-                            variant='ghost'
-                            onClick={() =>
-                              setVariantCustomInputOpen((prev) => ({
-                                ...prev,
-                                [variantIndex]: false,
-                              }))
-                            }
-                            className='h-auto px-2 text-xs font-semibold text-muted-foreground hover:bg-transparent hover:text-foreground'
-                          >
-                            <X className='mr-1 h-3.5 w-3.5' />
-                            Hide
-                          </Button>
-                        </div>
-                        <div className='mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]'>
-                          <input
-                            type='text'
-                            value={variantCustomKeyInputs[variantIndex] || ''}
-                            onChange={(event) =>
-                              setVariantCustomKeyInputs((prev) => ({
-                                ...prev,
-                                [variantIndex]: event.target.value,
-                              }))
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.preventDefault()
-                                handleCustomKeySubmit(variantIndex)
-                              }
-                            }}
-                            placeholder='Add custom detail, e.g. color, material, finish'
-                            className={studioInputClass}
-                          />
-                          <Button
-                            type='button'
-                            onClick={() => handleCustomKeySubmit(variantIndex)}
-                            className='h-11 border border-border bg-card px-5 text-foreground hover:bg-secondary'
-                          >
-                            <Plus className='mr-2 h-4 w-4' />
-                            Add Detail
-                          </Button>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div className='mt-5 flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4'>
-                      <Popover
-                        open={Boolean(variantOptionPickerOpen[variantIndex])}
-                        onOpenChange={(open) =>
-                          handleOptionPickerOpenChange(variantIndex, open)
-                        }
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            type='button'
-                            variant='outline'
-                            className='h-10 border-border bg-background px-4'
-                          >
-                            <Plus className='mr-2 h-4 w-4' />
-                            Add detail
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className='w-[340px] p-0' align='end'>
-                          <Command shouldFilter={false}>
-                            <CommandInput
-                              value={variantOptionSearch[variantIndex] || ''}
-                              onValueChange={(value) =>
-                                setVariantOptionSearch((prev) => ({
-                                  ...prev,
-                                  [variantIndex]: value,
-                                }))
-                              }
-                              placeholder='Search suggested keys...'
-                            />
-                            <CommandList className='max-h-72'>
-                              {!aiLoading && recommendedOptions.length === 0 ? (
-                                <div className='px-4 py-6 text-center text-sm text-muted-foreground'>
-                                  No matching keys. Use the custom detail button below.
-                                </div>
-                              ) : null}
-                              <CommandGroup
-                                heading={aiLoading ? 'Loading suggestions' : 'Suggested details'}
-                              >
-                                {aiLoading ? (
-                                  <div className='flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground'>
-                                    <Loader2 className='h-4 w-4 animate-spin' />
-                                    Fetching category and AI suggestions...
-                                  </div>
-                                ) : null}
-                                {recommendedOptions.map((option) => (
-                                  <CommandItem
-                                    key={`${variantIndex}-${option.value}`}
-                                    value={`${option.label} ${option.value}`}
-                                    onSelect={() =>
-                                      toggleRecommendedKeySelection(
-                                        variantIndex,
-                                        option.value
-                                      )
-                                    }
-                                  >
-                                    <Check
-                                      className={cn(
-                                        'mr-2 h-4 w-4',
-                                        selectedRecommendedKeys.includes(option.value)
-                                          ? 'opacity-100'
-                                          : 'opacity-0'
-                                      )}
-                                    />
-                                    {option.label}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                          <div className='grid gap-2 border-t border-border/60 p-2'>
-                            <Button
-                              type='button'
-                              variant='outline'
-                              onClick={() =>
-                                handleAddSelectedRecommendedKeys(variantIndex)
-                              }
-                              disabled={!selectedRecommendedKeys.length}
-                              className='h-10 w-full justify-start px-3'
-                            >
-                              <Plus className='mr-2 h-4 w-4' />
-                              Add selected details
-                              {selectedRecommendedKeys.length
-                                ? ` (${selectedRecommendedKeys.length})`
-                                : ''}
-                            </Button>
-                            <Button
-                              type='button'
-                              variant='ghost'
-                              onClick={() => {
-                                handleOptionPickerOpenChange(variantIndex, false)
-                                setVariantCustomInputOpen((prev) => ({
-                                  ...prev,
-                                  [variantIndex]: true,
-                                }))
-                              }}
-                              className='h-10 w-full justify-start px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
-                            >
-                              <Plus className='mr-2 h-4 w-4' />
-                              Create custom detail
-                            </Button>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        onClick={() =>
-                          setVariantCustomInputOpen((prev) => ({
-                            ...prev,
-                            [variantIndex]: !prev[variantIndex],
-                          }))
-                        }
-                        className='h-10 px-3 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800'
-                      >
-                        <Plus className='mr-2 h-4 w-4' />
-                        Add custom detail
-                      </Button>
-                    </div>
-                  </section>
-                  <section
-                    className={cn(
-                      studioSubtleCardClass,
-                      'rounded-3xl border border-border/70 bg-white shadow-sm'
-                    )}
-                  >
-                    <div className='mb-4 flex items-center gap-2 text-sm font-semibold text-foreground'>
-                      <Upload className='h-4 w-4 text-indigo-600' />
-                      Variant images
-                    </div>
-                    <p className='mb-4 text-xs leading-5 text-muted-foreground'>
-                      Upload clean product shots for this specific variant so buyers can clearly
-                      see the selected color, finish, or model.
-                    </p>
-                    <div
-                      onDragOver={(event) => {
-                        event.preventDefault()
-                        event.dataTransfer.dropEffect = 'copy'
-                        setDragOverVariantIndex(variantIndex)
-                      }}
-                      onDragLeave={(event) => {
-                        const nextTarget = event.relatedTarget as Node | null
-                        if (nextTarget && event.currentTarget.contains(nextTarget)) return
-                        if (dragOverVariantIndex === variantIndex) {
-                          setDragOverVariantIndex(null)
-                        }
-                      }}
-                      onDrop={(event) => {
-                        event.preventDefault()
-                        setDragOverVariantIndex(null)
-                        const files = Array.from(event.dataTransfer.files || [])
-                        if (files.length) {
-                          onVariantImageDrop(variantIndex, files)
-                        }
-                      }}
-                      className={`rounded-2xl p-6 text-center transition ${dragOverVariantIndex === variantIndex
-                        ? 'bg-cyan-500/10'
-                        : 'bg-background/40'
-                        }`}
-                    >
-                      <input
-                        type='file'
-                        multiple
-                        accept='image/*'
-                        onChange={(event) => onVariantImageUpload(variantIndex, event)}
-                        className='hidden'
-                        id={`variant-image-upload-${variantIndex}`}
-                      />
-                      <label
-                        htmlFor={`variant-image-upload-${variantIndex}`}
-                        className='flex cursor-pointer flex-col items-center gap-2'
-                      >
-                        <div className='inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10'>
-                          <Upload className='h-5 w-5 text-cyan-600' />
-                        </div>
-                        <span className='text-sm font-semibold text-foreground'>
-                          Upload or drop images
-                        </span>
-                      </label>
-                    </div>
-
-                    {variant.variantsImageUrls.length > 0 ? (
-                      <div className='mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3'>
-                        {variant.variantsImageUrls.map((image, imageIndex) => (
-                          <div
-                            key={image.tempId || image.publicId || imageIndex}
-                            className='relative h-28 overflow-hidden rounded-2xl bg-card'
-                          >
-                            <img
-                              src={image.url}
-                              alt='Variant'
-                              className={`h-full w-full object-cover ${image.uploading ? 'opacity-45' : ''
-                                }`}
-                            />
-                            {image.uploading ? (
-                              <div className='absolute inset-0 flex items-center justify-center bg-background/55 backdrop-blur-sm'>
-                                <Loader2 className='h-5 w-5 animate-spin text-cyan-600' />
-                              </div>
-                            ) : (
-                              <button
-                                type='button'
-                                onClick={() =>
-                                  onVariantImageDelete(variantIndex, imageIndex)
-                                }
-                                className='absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white transition hover:bg-red-600'
-                                aria-label='Delete variant image'
-                              >
-                                <Trash2 className='h-4 w-4' />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className='mt-4 text-sm text-muted-foreground'>No images yet.</p>
-                    )}
-                  </section>
-
-                </div>
-
-                <div className='mt-6 flex justify-center border-t border-cyan-100 pt-5'>
-                  <Button
-                    type='button'
-                    variant='outline'
-                    onClick={() => onRemoveVariant(variantIndex)}
-                    className='h-11 border-red-500/25 bg-red-500/10 px-6 text-red-600 hover:bg-red-500/15 hover:text-red-700'
-                  >
-                    <Trash2 className='mr-2 h-4 w-4' />
-                    Remove
-                  </Button>
-                </div>
-              </article>
-            )
-          })}
-
-          <section
-            className={cn(
-              studioSubtleCardClass,
-              'rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/30 to-cyan-50/20 shadow-sm'
-            )}
-          >
-            <div className='mb-5 flex flex-col gap-2 border-b border-emerald-100/80 pb-4 sm:flex-row sm:items-center sm:justify-between'>
-              <div className='flex items-center gap-2 text-sm font-semibold text-foreground'>
-                <Package2 className='h-4 w-4 text-emerald-600' />
-                Pricing and stock
               </div>
-              <div className='w-full sm:w-[260px]'>
-                <StudioFieldLabel
-                  label='Choose variant'
-                  help='Select the variant whose pricing and stock you want to edit.'
-                  className='mb-2'
-                />
-                <Select
-                  value={String(resolvedPricingVariantIndex)}
-                  onValueChange={(value) =>
-                    setSelectedPricingVariantIndex(Number(value))
-                  }
-                >
-                  <SelectTrigger className='h-11 w-full rounded-xl border-border bg-white'>
-                    <SelectValue placeholder='Select variant' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pricingVariantOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            ))
+          ) : (
+            <div className='border-border text-muted-foreground rounded-2xl border border-dashed px-4 py-6 text-sm'>
+              Add variant and choose values like color, size, or storage.
             </div>
+          )}
 
-            <div className='grid gap-4 md:grid-cols-3'>
-              <div className='rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm'>
-                <StudioFieldLabel label='Actual Price' />
-                <div className='relative mt-2'>
-                  <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground'>
-                    Rs
-                  </span>
-                  <input
-                    type='number'
-                    min='0'
-                    step='0.01'
-                    value={selectedPricingVariant?.actualPrice ?? ''}
-                    onChange={(event) =>
-                      onVariantFieldChange(
-                        resolvedPricingVariantIndex,
-                        'actualPrice',
-                        event.target.value
-                      )
-                    }
-                    className={cn(studioInputClass, 'pl-11')}
-                  />
-                </div>
-              </div>
-              <div className='rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm'>
-                <StudioFieldLabel label='Final Price' />
-                <div className='relative mt-2'>
-                  <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground'>
-                    Rs
-                  </span>
-                  <input
-                    type='number'
-                    min='0'
-                    step='0.01'
-                    value={selectedPricingVariant?.finalPrice ?? ''}
-                    onChange={(event) =>
-                      onVariantFieldChange(
-                        resolvedPricingVariantIndex,
-                        'finalPrice',
-                        event.target.value
-                      )
-                    }
-                    className={cn(studioInputClass, 'pl-11')}
-                  />
-                </div>
-              </div>
-              <div className='rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm'>
-                <StudioFieldLabel label='Stock Quantity' />
-                <div className='relative mt-2'>
-                  <input
-                    type='number'
-                    min='0'
-                    value={selectedPricingVariant?.stockQuantity ?? ''}
-                    onChange={(event) =>
-                      onVariantFieldChange(
-                        resolvedPricingVariantIndex,
-                        'stockQuantity',
-                        event.target.value
-                      )
-                    }
-                    className={studioInputClass}
-                  />
-                  <span className='mt-2 inline-flex rounded-full border border-border/70 bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground'>
-                    Available units
-                  </span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <div className='flex justify-end pt-1'>
-            <Button
-              type='button'
-              variant='outline'
-              onClick={handleAddVariantClick}
-              className='h-11 border-cyan-500/20 bg-cyan-500/10 px-5 text-cyan-700 hover:bg-cyan-500/15 hover:text-cyan-800'
-            >
-              <Plus className='mr-2 h-4 w-4' />
-              Add Variant
-            </Button>
-          </div>
+          {rows.length ? (
+            <VariantTypePickerPopover
+              options={visibleVariantSuggestions}
+              onSelect={addVariantRow}
+              className='h-10 rounded-xl hover:bg-white hover:text-black'
+              label='Add another variant'
+              align='start'
+            />
+          ) : null}
         </div>
-      )}
+      </section>
 
-      <Dialog
-        open={addVariantDialogOpen}
-        onOpenChange={(open) => {
-          if (open) {
-            setAddVariantDialogOpen(true)
-            return
-          }
+      <VariantImagesSection
+        variants={variants}
+        onUpload={onVariantImageUpload}
+        onDelete={onVariantImageDelete}
+      />
 
-          closeAddVariantDialog()
-        }}
-      >
-        <DialogContent className='sm:max-w-[560px]'>
-          <DialogHeader>
-            <DialogTitle className='flex items-center gap-2'>
-              <CircleHelp className='h-5 w-5 text-cyan-600' />
-              Choose variant key
-            </DialogTitle>
-            <DialogDescription>
-              {variantKeyContextLabel
-                ? `Based on ${variantKeyContextLabel}, start this variant with one common key.`
-                : 'Start this variant with one common key so product variants are easier to understand.'}
-            </DialogDescription>
-          </DialogHeader>
+      <section className={cn(studioCardClass, 'space-y-4 p-5')}>
+        <div>
+          <h3 className='text-foreground text-base font-semibold'>Pricing</h3>
+        </div>
 
-          <div className='space-y-4'>
-            <div className='space-y-3'>
-              <StudioFieldLabel
-                label='Suggested keys'
-                help='These quick picks come from the selected category and the current product context.'
-                className='mb-0'
-              />
-              {aiLoading ? (
-                <div className='flex min-h-[72px] items-center gap-3 rounded-2xl border border-dashed border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
-                  <Loader2 className='h-4 w-4 animate-spin text-cyan-600' />
-                  Loading suggested keys...
-                </div>
-              ) : suggestedVariantKeys.length ? (
-                <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]'>
-                  <Select
-                    value={resolvedSuggestedVariantKey}
-                    onValueChange={setSelectedSuggestedVariantKey}
-                  >
-                    <SelectTrigger className='h-11 w-full'>
-                      <SelectValue placeholder='Select suggested key' />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suggestedVariantKeys.map((key) => (
-                        <SelectItem key={key} value={key}>
-                          {key}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Button
-                    type='button'
-                    variant='outline'
-                    onClick={() =>
-                      handleAddVariantWithKeys([resolvedSuggestedVariantKey])
-                    }
-                    disabled={!resolvedSuggestedVariantKey}
-                  >
-                    <Plus className='h-4 w-4' />
-                    Add Variant
-                  </Button>
-                </div>
-              ) : (
-                <div className='border border-dashed border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground'>
-                  No direct suggestions available for this category yet.
-                </div>
-              )}
-
-              <div className='rounded-2xl bg-cyan-50/60 px-4 py-3 text-sm text-cyan-900'>
-                <button
-                  type='button'
-                  onClick={() => setShowCustomVariantKeyInput((prev) => !prev)}
-                  className='font-medium underline decoration-cyan-300 underline-offset-4 transition hover:text-cyan-700'
-                >
-                  Can&apos;t find it? Create your key variant.
-                </button>
-              </div>
-
-              {showCustomVariantKeyInput ? (
-                <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]'>
-                  <input
-                    type='text'
-                    value={newVariantCustomKey}
-                    onChange={(event) => setNewVariantCustomKey(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        handleAddVariantWithCustomKey()
-                      }
-                    }}
-                    placeholder='Enter custom variant key'
-                    className={studioInputClass}
-                    autoFocus
-                  />
-                  <Button
-                    type='button'
-                    variant='outline'
-                    onClick={handleAddVariantWithCustomKey}
-                    disabled={!String(newVariantCustomKey || '').trim()}
-                  >
-                    <Plus className='h-4 w-4' />
-                    Add Variant
-                  </Button>
-                  <Button
-                    type='button'
-                    variant='outline'
-                    onClick={() => {
-                      setShowCustomVariantKeyInput(false)
-                      setNewVariantCustomKey('')
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              ) : null}
+        {variants.length ? (
+          <div className='border-border/70 overflow-hidden rounded-2xl border'>
+            <div className='bg-muted/30 text-muted-foreground grid grid-cols-[minmax(0,1.5fr)_150px_150px_150px] gap-3 px-4 py-3 text-xs font-semibold tracking-[0.16em] uppercase'>
+              <span>Variant</span>
+              <span>Actual price</span>
+              <span>Final price</span>
+              <span>Stock quantity</span>
             </div>
+
+            {variants.map((variant, index) => (
+              <div
+                key={
+                  variant._id ||
+                  buildVariantSignature(variant.variantAttributes || {}) ||
+                  `variant-${index}`
+                }
+                className='border-border/70 bg-background grid grid-cols-[minmax(0,1.5fr)_150px_150px_150px] gap-3 border-t px-4 py-4 first:border-t-0'
+              >
+                <div className='min-w-0'>
+                  <div className='text-foreground truncate text-sm font-semibold'>
+                    {getVariantDisplayName(variant, productName, index)}
+                  </div>
+                  <div className='mt-2 flex flex-wrap gap-2'>
+                    {Object.entries(variant.variantAttributes || {}).map(
+                      ([key, value]) => (
+                        <span
+                          key={`${index}-${key}-${value}`}
+                          className='border-border bg-secondary text-foreground inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium'
+                        >
+                          {isColorKey(key) && getColorSwatch(value) ? (
+                            <span
+                              className='h-2.5 w-2.5 rounded-full border border-black/10'
+                              style={{
+                                backgroundColor:
+                                  getColorSwatch(value) || undefined,
+                              }}
+                            />
+                          ) : null}
+                          <span className='text-muted-foreground'>{key}:</span>
+                          {value}
+                        </span>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                <input
+                  type='number'
+                  min='0'
+                  value={variant.actualPrice || ''}
+                  onChange={(event) =>
+                    onVariantFieldChange(
+                      index,
+                      'actualPrice',
+                      event.target.value
+                    )
+                  }
+                  placeholder='0'
+                  className={studioInputClass}
+                />
+
+                <input
+                  type='number'
+                  min='0'
+                  value={variant.finalPrice || ''}
+                  onChange={(event) =>
+                    onVariantFieldChange(
+                      index,
+                      'finalPrice',
+                      event.target.value
+                    )
+                  }
+                  placeholder='0'
+                  className={studioInputClass}
+                />
+
+                <input
+                  type='number'
+                  min='0'
+                  value={variant.stockQuantity || ''}
+                  onChange={(event) =>
+                    onVariantFieldChange(
+                      index,
+                      'stockQuantity',
+                      event.target.value
+                    )
+                  }
+                  placeholder='0'
+                  className={studioInputClass}
+                />
+              </div>
+            ))}
           </div>
-        </DialogContent>
-      </Dialog>
+        ) : (
+          <div className='border-border text-muted-foreground rounded-2xl border border-dashed px-4 py-6 text-sm'>
+            Add variant values first. Pricing rows will appear here
+            automatically.
+          </div>
+        )}
+      </section>
+
+      <Step3Specifications
+        specifications={specifications}
+        aiLoading={specificationAiLoading}
+        onSpecChange={onSpecificationChange}
+        onAddKey={onAddSpecificationKey}
+      />
     </div>
   )
 }
