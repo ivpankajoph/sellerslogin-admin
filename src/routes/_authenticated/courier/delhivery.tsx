@@ -325,6 +325,7 @@ function DelhiveryCourierPage() {
     () => openOrders.find((order) => order.id === selectedOrderId) || null,
     [openOrders, selectedOrderId]
   )
+
   const selectedWarehouse = useMemo(
     () =>
       warehouses.find(
