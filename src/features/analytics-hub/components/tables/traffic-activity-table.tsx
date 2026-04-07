@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAnalyticsContext } from "@/features/analytics-hub/hooks/use-analytics-context";
 import { buildAnalyticsDateParams, buildApiUrl, resolveStorefrontHref } from "@/features/analytics-hub/lib/api";
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/table";
 
 const PAGE_SIZE = 20;
-const TABLE_MIN_WIDTH = 1500;
+const TABLE_MIN_WIDTH = 1280;
 
 const titleCase = (value: string) =>
   value
@@ -146,9 +146,6 @@ export function TrafficActivityTable({ summary }: TrafficActivityTableProps) {
   const [selectedTrafficSource, setSelectedTrafficSource] = useState("all");
   const [selectedDevice, setSelectedDevice] = useState("all");
   const [selectedBrowser, setSelectedBrowser] = useState("all");
-  const topScrollRef = useRef<HTMLDivElement | null>(null);
-  const tableScrollRef = useRef<HTMLDivElement | null>(null);
-  const isSyncingScrollRef = useRef(false);
 
   const sourceParam = source === "all" ? undefined : source;
   const websiteParam =
@@ -264,43 +261,14 @@ export function TrafficActivityTable({ summary }: TrafficActivityTableProps) {
     setPage(1);
   };
 
-  useEffect(() => {
-    const topNode = topScrollRef.current;
-    const tableNode = tableScrollRef.current;
-    if (!topNode || !tableNode) return;
-
-    const syncScroll = (source: HTMLDivElement, target: HTMLDivElement) => {
-      if (isSyncingScrollRef.current) return;
-      isSyncingScrollRef.current = true;
-      target.scrollLeft = source.scrollLeft;
-      window.requestAnimationFrame(() => {
-        isSyncingScrollRef.current = false;
-      });
-    };
-
-    const handleTopScroll = () => syncScroll(topNode, tableNode);
-    const handleTableScroll = () => syncScroll(tableNode, topNode);
-
-    topNode.addEventListener("scroll", handleTopScroll);
-    tableNode.addEventListener("scroll", handleTableScroll);
-
-    topNode.scrollLeft = tableNode.scrollLeft;
-
-    return () => {
-      topNode.removeEventListener("scroll", handleTopScroll);
-      tableNode.removeEventListener("scroll", handleTableScroll);
-    };
-  }, []);
-
   return (
-    <Card className="border border-sky-100/80 bg-white/90 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card">
+    <Card className="overflow-hidden border border-sky-100/80 bg-white/90 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card">
       <CardHeader className="gap-4">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <CardTitle>User Traffic Activity</CardTitle>
-            
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{total} records</Badge>
             {isFetching && !isLoading ? <Badge variant="secondary">Refreshing</Badge> : null}
           </div>
@@ -308,7 +276,7 @@ export function TrafficActivityTable({ summary }: TrafficActivityTableProps) {
 
         <div className="flex flex-wrap items-center gap-3">
           <Select value={selectedTrafficSource} onValueChange={handleTrafficSourceChange}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Filter by source" />
             </SelectTrigger>
             <SelectContent>
@@ -322,7 +290,7 @@ export function TrafficActivityTable({ summary }: TrafficActivityTableProps) {
           </Select>
 
           <Select value={selectedDevice} onValueChange={handleDeviceChange}>
-            <SelectTrigger className="w-42">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Filter by device" />
             </SelectTrigger>
             <SelectContent>
@@ -336,7 +304,7 @@ export function TrafficActivityTable({ summary }: TrafficActivityTableProps) {
           </Select>
 
           <Select value={selectedBrowser} onValueChange={handleBrowserChange}>
-            <SelectTrigger className="w-42">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Filter by browser" />
             </SelectTrigger>
             <SelectContent>
@@ -353,28 +321,15 @@ export function TrafficActivityTable({ summary }: TrafficActivityTableProps) {
             type="button"
             size="sm"
             onClick={resetFilters}
-            className="h-9 min-w-[140px] border-rose-200 bg-rose-500 px-4 text-white shadow-sm hover:border-rose-300 hover:bg-rose-600 active:bg-rose-700"
+            className="h-9 w-full min-w-[140px] border-rose-200 bg-rose-500 px-4 text-white shadow-sm hover:border-rose-300 hover:bg-rose-600 active:bg-rose-700 sm:w-auto"
           >
             Reset Filters
           </Button>
         </div>
-
-        <div className="space-y-2">
-          
-          <div
-            ref={topScrollRef}
-            className="overflow-x-auto rounded-md border border-sky-100/80 bg-slate-50/80 dark:border-border dark:bg-muted/30"
-          >
-            <div className="h-3" style={{ width: TABLE_MIN_WIDTH }} />
-          </div>
-        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div
-          ref={tableScrollRef}
-          className="overflow-x-auto rounded-md border border-sky-100/80 dark:border-border"
-        >
+        <div className="min-w-0 overflow-hidden rounded-md border border-sky-100/80 dark:border-border">
           <Table className="min-w-full" style={{ minWidth: TABLE_MIN_WIDTH }}>
             <TableHeader className="bg-slate-50/90 dark:bg-muted/40">
               <TableRow>

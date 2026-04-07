@@ -78,7 +78,7 @@ export default function TrafficReport() {
   const newUsersPercent = totalUsers > 0 ? ((data?.newUsers || 0) / totalUsers) * 100 : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-page-title">Traffic Report</h1>
         <p className="text-muted-foreground text-sm mt-1">
@@ -122,8 +122,8 @@ export default function TrafficReport() {
           <CardTitle className="text-base font-semibold">New vs Returning Users</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-8">
-            <div className="flex-1 space-y-4">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-8">
+            <div className="min-w-0 flex-1 space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium flex items-center gap-2">
@@ -149,7 +149,7 @@ export default function TrafficReport() {
                 <Progress value={100 - newUsersPercent} className="h-2" />
               </div>
             </div>
-            <div className="text-center">
+            <div className="shrink-0 text-center lg:min-w-[140px]">
               <div className="text-4xl font-bold tabular-nums">{totalUsers.toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Total Users</div>
             </div>

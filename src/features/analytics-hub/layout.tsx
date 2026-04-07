@@ -277,9 +277,9 @@ function AnalyticsHubShell() {
 
   return (
     <SidebarProvider style={style}>
-      <div className="flex h-screen w-full">
+      <div className="flex h-screen w-full overflow-hidden">
         <AnalyticsAppSidebar />
-        <SidebarInset className="flex flex-1 flex-col overflow-hidden">
+        <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex h-14 min-w-0 items-center justify-between gap-3 px-4">
               <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
@@ -329,7 +329,7 @@ function AnalyticsHubShell() {
               </div>
             </div>
           </header>
-          <main className="flex-1 overflow-auto bg-[radial-gradient(60%_60%_at_10%_0%,rgba(254,243,199,0.7)_0%,rgba(255,255,255,0)_60%),radial-gradient(45%_45%_at_100%_0%,rgba(219,234,254,0.7)_0%,rgba(255,255,255,0)_55%),radial-gradient(50%_50%_at_0%_100%,rgba(220,252,231,0.6)_0%,rgba(255,255,255,0)_60%)] p-6 dark:bg-background">
+          <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-[radial-gradient(60%_60%_at_10%_0%,rgba(254,243,199,0.7)_0%,rgba(255,255,255,0)_60%),radial-gradient(45%_45%_at_100%_0%,rgba(219,234,254,0.7)_0%,rgba(255,255,255,0)_55%),radial-gradient(50%_50%_at_0%_100%,rgba(220,252,231,0.6)_0%,rgba(255,255,255,0)_60%)] p-4 sm:p-6 dark:bg-background">
             <Outlet />
           </main>
         </SidebarInset>
