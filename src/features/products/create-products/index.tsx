@@ -6,7 +6,7 @@ import {
   ArrowRight,
   CircleHelp,
   Eye,
-  ImagePlus,
+
   CheckCircle2,
   Layers3,
   Loader2,
@@ -2595,77 +2595,9 @@ const ProductCreateForm: React.FC = () => {
     })
   }
 
-  const uploadDefaultImageFiles = async (files: File[]) => {
-    const imageFiles = files.filter((file) => file.type.startsWith('image/'))
-    if (!imageFiles.length) return
 
-    const tempImages = imageFiles.map((file, idx) => ({
-      url: URL.createObjectURL(file),
-      publicId: '',
-      uploading: true,
-      tempId: `default-image-${Date.now()}-${idx}`,
-    }))
 
-    setFormData((prev: ProductFormData) => ({
-      ...prev,
-      defaultImages: [...prev.defaultImages, ...tempImages],
-    }))
 
-    for (let i = 0; i < imageFiles.length; i++) {
-      const result = await uploadToCloudinary(imageFiles[i])
-      if (!result) continue
-
-      setFormData((prev: ProductFormData) => {
-        const nextImages = [...prev.defaultImages]
-        const imageIndex = nextImages.findIndex(
-          (image) => image.tempId === tempImages[i].tempId
-        )
-
-        if (imageIndex !== -1) {
-          nextImages[imageIndex] = {
-            url: result.url,
-            publicId: result.publicId,
-            uploading: false,
-          }
-        }
-
-        return {
-          ...prev,
-          defaultImages: nextImages,
-        }
-      })
-    }
-  }
-
-  const handleDefaultImageUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const files = Array.from(event.target.files || [])
-    if (!files.length) return
-
-    event.target.value = ''
-    await uploadDefaultImageFiles(files)
-  }
-
-  const handleDefaultImageDrop = async (files: File[]) => {
-    await uploadDefaultImageFiles(files)
-  }
-
-  const handleDefaultImageDelete = async (imageIndex: number) => {
-    const image = formData.defaultImages[imageIndex]
-    if (!image) return
-
-    if (image.publicId) {
-      await deleteFromCloudinary(image.publicId)
-    }
-
-    setFormData((prev: ProductFormData) => ({
-      ...prev,
-      defaultImages: prev.defaultImages.filter(
-        (_, index) => index !== imageIndex
-      ),
-    }))
-  }
 
   const uploadVariantFiles = async (variantIndex: number, files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith('image/'))
