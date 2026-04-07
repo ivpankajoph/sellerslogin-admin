@@ -41,7 +41,7 @@ function StorefrontSelect() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select value={source} onValueChange={(value) => setSource(value as any)}>
-        <SelectTrigger className="h-8 w-44">
+        <SelectTrigger className="h-8 w-40">
           <SelectValue placeholder="Select storefront" />
         </SelectTrigger>
         <SelectContent>
@@ -95,7 +95,7 @@ function WebsiteSelect({
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger className="h-8 w-56">
+        <SelectTrigger className="h-8 w-44">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -279,50 +279,54 @@ function AnalyticsHubShell() {
     <SidebarProvider style={style}>
       <div className="flex h-screen w-full">
         <AnalyticsAppSidebar />
-        <SidebarInset className="flex flex-1 flex-col">
-          <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-2 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <span className="text-sm text-muted-foreground">E-commerce Analytics Platform</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {role !== "vendor" && <StorefrontSelect />}
-              {shouldShowWebsiteSelect && (
-                <WebsiteSelect
-                  value={websiteId}
-                  onValueChange={handleWebsiteChange}
-                  options={websiteOptions}
-                  placeholder={role === "vendor" ? "All websites" : "All storefronts"}
-                />
-              )}
-              <Select value={range} onValueChange={setRange}>
-                <SelectTrigger className="h-8 w-36">
-                  <SelectValue placeholder="Select range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="yesterday">Yesterday</SelectItem>
-                  <SelectItem value="7d">Last 7 Days</SelectItem>
-                  <SelectItem value="30d">Last 30 Days</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
-              {range === "custom" && (
-                <>
-                  <Input
-                    type="date"
-                    value={fromDate}
-                    onChange={(event) => setFromDate(event.target.value)}
-                    className="h-8 w-36"
+        <SidebarInset className="flex flex-1 flex-col overflow-hidden">
+          <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex h-14 min-w-0 items-center justify-between gap-3 px-4">
+              <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                <SidebarTrigger data-testid="button-sidebar-toggle" />
+                <span className="max-w-[220px] truncate text-sm text-muted-foreground lg:max-w-none">
+                  E-commerce Analytics Platform
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {role !== "vendor" && <StorefrontSelect />}
+                {shouldShowWebsiteSelect && (
+                  <WebsiteSelect
+                    value={websiteId}
+                    onValueChange={handleWebsiteChange}
+                    options={websiteOptions}
+                    placeholder={role === "vendor" ? "All websites" : "All storefronts"}
                   />
-                  <Input
-                    type="date"
-                    value={toDate}
-                    onChange={(event) => setToDate(event.target.value)}
-                    className="h-8 w-36"
-                  />
-                </>
-              )}
+                )}
+                <Select value={range} onValueChange={setRange}>
+                  <SelectTrigger className="h-8 w-28">
+                    <SelectValue placeholder="Select range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="yesterday">Yesterday</SelectItem>
+                    <SelectItem value="7d">Last 7 Days</SelectItem>
+                    <SelectItem value="30d">Last 30 Days</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+                {range === "custom" && (
+                  <>
+                    <Input
+                      type="date"
+                      value={fromDate}
+                      onChange={(event) => setFromDate(event.target.value)}
+                      className="h-8 w-34"
+                    />
+                    <Input
+                      type="date"
+                      value={toDate}
+                      onChange={(event) => setToDate(event.target.value)}
+                      className="h-8 w-34"
+                    />
+                  </>
+                )}
+              </div>
             </div>
           </header>
           <main className="flex-1 overflow-auto bg-[radial-gradient(60%_60%_at_10%_0%,rgba(254,243,199,0.7)_0%,rgba(255,255,255,0)_60%),radial-gradient(45%_45%_at_100%_0%,rgba(219,234,254,0.7)_0%,rgba(255,255,255,0)_55%),radial-gradient(50%_50%_at_0%_100%,rgba(220,252,231,0.6)_0%,rgba(255,255,255,0)_60%)] p-6 dark:bg-background">

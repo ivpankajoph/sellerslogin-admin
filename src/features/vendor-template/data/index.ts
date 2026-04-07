@@ -439,6 +439,16 @@ export const initialData: TemplateData = {
       },
     },
     social_page: {
+      product_benefits: {
+        enabled: true,
+        title: 'Shopping Benefits',
+        items: [
+          { text: 'Free shipping over Rs. 75', enabled: true },
+          { text: '30-day easy returns', enabled: true },
+          { text: '1-year warranty', enabled: true },
+          { text: 'Fast delivery in 3-7 days', enabled: true },
+        ],
+      },
       footer: {
         blog_label: 'Blog',
         blog_href: '/blog',

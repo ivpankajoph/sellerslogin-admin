@@ -31,6 +31,7 @@ import { Route as AuthenticatedAnalyticsRouteRouteImport } from './routes/_authe
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
 import { Route as AuthenticatedVendorIndexRouteImport } from './routes/_authenticated/vendor/index'
 import { Route as AuthenticatedVendorTemplateIndexRouteImport } from './routes/_authenticated/vendor-template/index'
+import { Route as AuthenticatedVendorTemplateProductBenefitsIndexRouteImport } from './routes/_authenticated/vendor-template-product-benefits/index'
 import { Route as AuthenticatedVendorTemplatePolicyIndexRouteImport } from './routes/_authenticated/vendor-template-policy/index'
 import { Route as AuthenticatedVendorTemplatePagesIndexRouteImport } from './routes/_authenticated/vendor-template-pages/index'
 import { Route as AuthenticatedVendorTemplateOtherIndexRouteImport } from './routes/_authenticated/vendor-template-other/index'
@@ -209,6 +210,12 @@ const AuthenticatedVendorTemplateIndexRoute =
   AuthenticatedVendorTemplateIndexRouteImport.update({
     id: '/vendor-template/',
     path: '/vendor-template/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVendorTemplateProductBenefitsIndexRoute =
+  AuthenticatedVendorTemplateProductBenefitsIndexRouteImport.update({
+    id: '/vendor-template-product-benefits/',
+    path: '/vendor-template-product-benefits/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedVendorTemplatePolicyIndexRoute =
@@ -681,6 +688,7 @@ export interface FileRoutesByFullPath {
   '/vendor-template-other': typeof AuthenticatedVendorTemplateOtherIndexRoute
   '/vendor-template-pages': typeof AuthenticatedVendorTemplatePagesIndexRoute
   '/vendor-template-policy': typeof AuthenticatedVendorTemplatePolicyIndexRoute
+  '/vendor-template-product-benefits': typeof AuthenticatedVendorTemplateProductBenefitsIndexRoute
   '/vendor-template': typeof AuthenticatedVendorTemplateIndexRoute
   '/vendor': typeof AuthenticatedVendorIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
@@ -766,6 +774,7 @@ export interface FileRoutesByTo {
   '/vendor-template-other': typeof AuthenticatedVendorTemplateOtherIndexRoute
   '/vendor-template-pages': typeof AuthenticatedVendorTemplatePagesIndexRoute
   '/vendor-template-policy': typeof AuthenticatedVendorTemplatePolicyIndexRoute
+  '/vendor-template-product-benefits': typeof AuthenticatedVendorTemplateProductBenefitsIndexRoute
   '/vendor-template': typeof AuthenticatedVendorTemplateIndexRoute
   '/vendor': typeof AuthenticatedVendorIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
@@ -857,6 +866,7 @@ export interface FileRoutesById {
   '/_authenticated/vendor-template-other/': typeof AuthenticatedVendorTemplateOtherIndexRoute
   '/_authenticated/vendor-template-pages/': typeof AuthenticatedVendorTemplatePagesIndexRoute
   '/_authenticated/vendor-template-policy/': typeof AuthenticatedVendorTemplatePolicyIndexRoute
+  '/_authenticated/vendor-template-product-benefits/': typeof AuthenticatedVendorTemplateProductBenefitsIndexRoute
   '/_authenticated/vendor-template/': typeof AuthenticatedVendorTemplateIndexRoute
   '/_authenticated/vendor/': typeof AuthenticatedVendorIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
@@ -946,6 +956,7 @@ export interface FileRouteTypes {
     | '/vendor-template-other'
     | '/vendor-template-pages'
     | '/vendor-template-policy'
+    | '/vendor-template-product-benefits'
     | '/vendor-template'
     | '/vendor'
     | '/wallet'
@@ -1031,6 +1042,7 @@ export interface FileRouteTypes {
     | '/vendor-template-other'
     | '/vendor-template-pages'
     | '/vendor-template-policy'
+    | '/vendor-template-product-benefits'
     | '/vendor-template'
     | '/vendor'
     | '/wallet'
@@ -1121,6 +1133,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vendor-template-other/'
     | '/_authenticated/vendor-template-pages/'
     | '/_authenticated/vendor-template-policy/'
+    | '/_authenticated/vendor-template-product-benefits/'
     | '/_authenticated/vendor-template/'
     | '/_authenticated/vendor/'
     | '/_authenticated/wallet/'
@@ -1299,6 +1312,13 @@ declare module '@tanstack/react-router' {
       path: '/vendor-template'
       fullPath: '/vendor-template'
       preLoaderRoute: typeof AuthenticatedVendorTemplateIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vendor-template-product-benefits/': {
+      id: '/_authenticated/vendor-template-product-benefits/'
+      path: '/vendor-template-product-benefits'
+      fullPath: '/vendor-template-product-benefits'
+      preLoaderRoute: typeof AuthenticatedVendorTemplateProductBenefitsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/vendor-template-policy/': {
@@ -1864,6 +1884,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVendorTemplateOtherIndexRoute: typeof AuthenticatedVendorTemplateOtherIndexRoute
   AuthenticatedVendorTemplatePagesIndexRoute: typeof AuthenticatedVendorTemplatePagesIndexRoute
   AuthenticatedVendorTemplatePolicyIndexRoute: typeof AuthenticatedVendorTemplatePolicyIndexRoute
+  AuthenticatedVendorTemplateProductBenefitsIndexRoute: typeof AuthenticatedVendorTemplateProductBenefitsIndexRoute
   AuthenticatedVendorTemplateIndexRoute: typeof AuthenticatedVendorTemplateIndexRoute
   AuthenticatedVendorIndexRoute: typeof AuthenticatedVendorIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
@@ -1949,6 +1970,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedVendorTemplatePagesIndexRoute,
   AuthenticatedVendorTemplatePolicyIndexRoute:
     AuthenticatedVendorTemplatePolicyIndexRoute,
+  AuthenticatedVendorTemplateProductBenefitsIndexRoute:
+    AuthenticatedVendorTemplateProductBenefitsIndexRoute,
   AuthenticatedVendorTemplateIndexRoute: AuthenticatedVendorTemplateIndexRoute,
   AuthenticatedVendorIndexRoute: AuthenticatedVendorIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,

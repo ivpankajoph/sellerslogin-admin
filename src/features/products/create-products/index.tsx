@@ -32,7 +32,7 @@ import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
 import { generateWithAI } from './aiHelpers'
 import { deleteFromCloudinary, uploadToCloudinary } from './cloudinary'
 import ProductEditorSidebar from './components/ProductEditorSidebar'
-import ProductMediaSection from './components/ProductMediaSection'
+// import ProductMediaSection from './components/ProductMediaSection'
 import Step1BasicInfo from './components/Step1BasicInfo'
 import Step4SEO from './components/Step4SEO'
 import Step5Variants from './components/Step5Variants'
@@ -2434,21 +2434,6 @@ const ProductCreateForm: React.FC = () => {
   // --- Variant Handlers ---
   // --- Variant Handlers ---
 
-  // Auto-scroll to new variant
-  // Auto-scroll to new variant
-
-  useEffect(() => {
-    if (formData.variants.length > 0) {
-      // Find the last variant element using a predictable ID or class is tricky inside the mapped component without refs on each.
-      // Easiest is to scroll window to bottom if variants are at the bottom, or attempt to scroll to the newly added item.
-      // Since Step5Variants renders the list, let's just scroll to bottom of window for now as the "Add Variant" button is usually there or near.
-      // A better way: Step5Variants should forward a ref or we simulate scroll.
-
-      // Let's assume we want to scroll to the bottom of the page when a new variant is added
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
-    }
-  }, [formData.variants.length])
-
   const handleAddVariant = (selectedKeys: string[]) => {
     const initialKeys = sanitizeStringList(
       selectedKeys.length ? selectedKeys : variantAttributeKeys
@@ -3370,15 +3355,15 @@ const ProductCreateForm: React.FC = () => {
             onCreateSubcategory={handleCreateSubcategory}
           />
         )
-      case 2:
-        return (
-          <ProductMediaSection
-            defaultImages={formData.defaultImages}
-            onUpload={handleDefaultImageUpload}
-            onDelete={handleDefaultImageDelete}
-            onDrop={handleDefaultImageDrop}
-          />
-        )
+      // case 2:
+        // return (
+        //   <ProductMediaSection
+        //     defaultImages={formData.defaultImages}
+        //     onUpload={handleDefaultImageUpload}
+        //     onDelete={handleDefaultImageDelete}
+        //     onDrop={handleDefaultImageDrop}
+        //   />
+        // )
       case 3:
         return (
           <Step5Variants
@@ -3593,15 +3578,15 @@ const ProductCreateForm: React.FC = () => {
               toTrimmedText(formData.description))
         ),
       },
-      {
-        step: 2,
-        title: 'Media',
-        description:
-          'Default gallery images used across previews and listings.',
-        icon: ImagePlus,
-        meta: `${formData.defaultImages.length} gallery image${formData.defaultImages.length === 1 ? '' : 's'}`,
-        complete: formData.defaultImages.length > 0,
-      },
+      // {
+      //   step: 2,
+      //   title: 'Media',
+      //   description:
+      //     'Default gallery images used across previews and listings.',
+      //   icon: ImagePlus,
+      //   meta: `${formData.defaultImages.length} gallery image${formData.defaultImages.length === 1 ? '' : 's'}`,
+      //   complete: formData.defaultImages.length > 0,
+      // },
       {
         step: 3,
         title: 'Variants',

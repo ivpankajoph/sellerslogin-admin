@@ -15,6 +15,22 @@ const storefrontBaseUrl = normalizeBase(
   ).trim()
 );
 
+const normalizeTemplatePreviewPath = (pathname: string) => {
+  const match = pathname.match(/^\/template\/([^/]+)\/preview\/([^/]+)(\/.*)?$/i);
+  if (!match) return pathname;
+
+  const vendorId = match[1];
+  const rest = match[3] || "";
+  return `/template/${vendorId}${rest}`;
+};
+
+const sanitizePreviewUrl = (url: URL) => {
+  url.pathname = normalizeTemplatePreviewPath(url.pathname);
+  url.searchParams.delete("previewDraft");
+  url.searchParams.delete("previewSessionId");
+  return url;
+};
+
 export const buildApiUrl = (
   path: string,
   params?: Record<string, string | number | undefined>
@@ -76,8 +92,21 @@ export const buildAnalyticsDateParams = ({
 export const resolveStorefrontHref = (value?: string) => {
   const rawValue = String(value || "").trim();
   if (!rawValue) return "";
-  if (/^https?:\/\//i.test(rawValue)) return rawValue;
+
+  if (/^https?:\/\//i.test(rawValue)) {
+    try {
+      return sanitizePreviewUrl(new URL(rawValue)).toString();
+    } catch {
+      return rawValue;
+    }
+  }
 
   const normalizedPath = rawValue.startsWith("/") ? rawValue : `/${rawValue}`;
-  return storefrontBaseUrl ? `${storefrontBaseUrl}${normalizedPath}` : normalizedPath;
+  if (!storefrontBaseUrl) return normalizedPath;
+
+  try {
+    return sanitizePreviewUrl(new URL(normalizedPath, `${storefrontBaseUrl}/`)).toString();
+  } catch {
+    return `${storefrontBaseUrl}${normalizedPath}`;
+  }
 };

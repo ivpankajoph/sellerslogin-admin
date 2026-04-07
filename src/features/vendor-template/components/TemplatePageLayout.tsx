@@ -23,6 +23,11 @@ const navItems = [
     label: 'Privacy / Terms / Shipping Policy',
     to: '/vendor-template-policy',
   },
+  {
+    key: 'product-benefits',
+    label: 'Product Benefits',
+    to: '/vendor-template-product-benefits',
+  },
 ]
 
 const MIN_EDITOR_PANEL_WIDTH = 340

@@ -1159,6 +1159,7 @@ function VendorTemplatePolicy() {
               </div>
             ) 
           })}
+
         </div>
       </TemplatePageLayout>
 

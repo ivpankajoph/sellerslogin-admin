@@ -4,7 +4,7 @@ import { buildAnalyticsDateParams, buildApiUrl } from "@/features/analytics-hub/
 import { StatsCard } from "@/features/analytics-hub/components/dashboard/stats-card";
 import { DonutChart } from "@/features/analytics-hub/components/charts/donut-chart";
 import { BarChart } from "@/features/analytics-hub/components/charts/bar-chart";
-import { DataTable } from "@/features/analytics-hub/components/tables/data-table";
+import { TrafficActivityTable } from "@/features/analytics-hub/components/tables/traffic-activity-table";
 import { Users, UserPlus, UserCheck, Globe } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -74,9 +74,6 @@ export default function TrafficReport() {
     name: item.country || 'Unknown',
     value: item.count,
   }));
-
-
-
   const totalUsers = (data?.newUsers || 0) + (data?.returningUsers || 0);
   const newUsersPercent = totalUsers > 0 ? ((data?.newUsers || 0) / totalUsers) * 100 : 0;
 
@@ -160,6 +157,8 @@ export default function TrafficReport() {
         </CardContent>
       </Card>
 
+      <TrafficActivityTable summary={data} />
+
       <div className="grid gap-6 lg:grid-cols-2">
         <DonutChart
           title="Traffic by Source"
@@ -186,31 +185,6 @@ export default function TrafficReport() {
           isLoading={isLoading}
           horizontal
           height={250}
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <DataTable
-          title="Top Countries"
-          data={trafficByCountry}
-          columns={[
-            { header: 'Country', accessorKey: 'name' },
-            { header: 'Users', accessorKey: 'value', className: 'text-right tabular-nums' },
-          ]}
-          isLoading={isLoading}
-          pageSize={8}
-          emptyMessage="No country data available"
-        />
-        <DataTable
-          title="Top Regions"
-          data={(data?.trafficByRegion || []).map(r => ({ name: r.region || 'Unknown', value: r.count }))}
-          columns={[
-            { header: 'Region', accessorKey: 'name' },
-            { header: 'Users', accessorKey: 'value', className: 'text-right tabular-nums' },
-          ]}
-          isLoading={isLoading}
-          pageSize={8}
-          emptyMessage="No region data available"
         />
       </div>
     </div>

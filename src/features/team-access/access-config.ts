@@ -149,6 +149,7 @@ const ROUTE_MATCHERS: RouteMatcher[] = [
       '/vendor-template-other',
       '/vendor-template-pages',
       '/vendor-template-policy',
+      '/vendor-template-product-benefits',
     ],
   },
   { key: 'location_workspace', exact: ['/location-workspace'] },

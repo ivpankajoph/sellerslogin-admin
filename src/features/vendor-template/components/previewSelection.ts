@@ -36,6 +36,10 @@ export const resolveEditorRouteFromComponent = (
     return "/vendor-template-policy";
   }
 
+  if (value.startsWith("components.social_page.product_benefits")) {
+    return "/vendor-template-product-benefits";
+  }
+
   if (value.startsWith("components.social_page")) {
     return "/vendor-template-other";
   }

@@ -35,7 +35,6 @@ type Summary = {
   topReferrers: Array<{ referrer: string; visits: number }>;
   topBrowsers: Array<{ browser: string; visits: number }>;
   topDevices: Array<{ device: string; visits: number }>;
-  topCountries: Array<{ country: string; visits: number }>;
   timeline: Array<{ date: string; views: number }>;
 };
 
@@ -380,30 +379,6 @@ export default function Analytics() {
                   {!summary?.topDevices?.length && (
                     <p className="text-sm text-muted-foreground">
                       No device data yet.
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Countries</CardTitle>
-                <CardDescription>Visitor locations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {(summary?.topCountries || []).map((item) => (
-                    <div
-                      key={item.country}
-                      className="flex items-center justify-between text-sm"
-                    >
-                      <span className="truncate pr-2">{item.country}</span>
-                      <span className="font-medium">{item.visits}</span>
-                    </div>
-                  ))}
-                  {!summary?.topCountries?.length && (
-                    <p className="text-sm text-muted-foreground">
-                      No location data yet.
                     </p>
                   )}
                 </div>
