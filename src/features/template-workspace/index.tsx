@@ -278,6 +278,15 @@ const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
     previewImage:
       'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&q=80&w=1200',
   },
+  {
+    key: 'pocofood',
+    name: 'Oph Food',
+    audience: 'b2c',
+    description:
+      'Food-delivery storefront with bold hero offers, cuisine rails, recipe cards, and promo-led merchandising.',
+    previewImage:
+      'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=1200',
+  },
 ]
 
 type StorefrontThumbnailProps = {
@@ -881,6 +890,7 @@ export default function TemplateWorkspace() {
       void navigate({
         to: '/vendor-template/$templateKey',
         params: { templateKey },
+        search: { website: website._id },
       })
       return
     }
@@ -1247,7 +1257,7 @@ export default function TemplateWorkspace() {
                   selectedCitySlug ||
                     effectiveDefaultCitySlug ||
                     vendorDefaultCitySlug,
-                  website.website_slug || website._id
+                  website._id
                 )
                 const thumbnail =
                   website.previewImage || websiteTemplate?.previewImage || ''

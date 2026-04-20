@@ -1,6 +1,7 @@
 import { FileText, Upload, Zap } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
 interface Type {
@@ -19,9 +20,21 @@ export function HeroSection({
 }: Type) {
   const titlePath = 'components.home_page.header_text'
   const kickerPath = 'components.home_page.hero_kicker'
+  const detailPath = 'components.home_page.hero_detail'
   const subtitlePath = 'components.home_page.header_text_small'
   const primaryButtonPath = 'components.home_page.button_header'
   const secondaryButtonPath = 'components.home_page.button_secondary'
+  const pricePath = 'components.home_page.hero_price'
+  const oldPricePath = 'components.home_page.hero_old_price'
+  const cardKickerPath = 'components.home_page.hero_card_kicker'
+  const cardTitlePath = 'components.home_page.hero_card_title'
+  const cardBadgePath = 'components.home_page.hero_card_badge'
+  const startingLabelPath = 'components.home_page.hero_starting_label'
+  const ratingLabelPath = 'components.home_page.hero_rating_label'
+  const ratingValuePath = 'components.home_page.hero_rating_value'
+  const offerEyebrowPath = 'components.home_page.offer_section_eyebrow'
+  const offerButtonPath = 'components.home_page.offer_section_button_label'
+  const offerBackgroundImagePath = 'components.home_page.offer_section_background_image'
   const badgePath = 'components.home_page.badge_text'
   const catalogLabelPath = 'components.home_page.catalog_button_label'
   const catalogPdfPath = 'components.home_page.catalog_pdf_url'
@@ -36,6 +49,15 @@ export function HeroSection({
         </div>
         Hero Section
       </h2>
+
+      <div className='mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4'>
+        <p className='text-xs font-semibold uppercase tracking-[0.25em] text-amber-700'>
+          Top Hero Section
+        </p>
+        <p className='mt-1 text-xs text-amber-800/80'>
+          These fields control the first banner visitors see on the website.
+        </p>
+      </div>
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
         <div
@@ -109,6 +131,30 @@ export function HeroSection({
             className='h-12'
           />
         </div>
+      </div>
+
+      <div
+        className={cn(
+          'mt-4 space-y-2',
+          selectedComponent === detailPath &&
+            'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+        )}
+        data-editor-component={detailPath}
+      >
+        <label className='text-sm font-medium text-gray-700'>
+          Hero Small Description
+        </label>
+        <Textarea
+          placeholder='Bundle pricing for a ready-to-order combo meal.'
+          value={data.components.home_page.hero_detail || ''}
+          onChange={(e) =>
+            updateField(
+              ['components', 'home_page', 'hero_detail'],
+              e.target.value
+            )
+          }
+          className='min-h-[90px]'
+        />
       </div>
 
       <div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-2'>
@@ -203,6 +249,261 @@ export function HeroSection({
             }
             className='h-12'
           />
+        </div>
+        <div
+          className={cn(
+            'space-y-2',
+            selectedComponent === pricePath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={pricePath}
+        >
+          <label className='text-sm font-medium text-gray-700'>Hero Price</label>
+          <Input
+            placeholder='197'
+            value={data.components.home_page.hero_price || ''}
+            onChange={(e) =>
+              updateField(['components', 'home_page', 'hero_price'], e.target.value)
+            }
+            className='h-12'
+          />
+        </div>
+        <div
+          className={cn(
+            'space-y-2',
+            selectedComponent === oldPricePath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+          )}
+          data-editor-component={oldPricePath}
+        >
+          <label className='text-sm font-medium text-gray-700'>Old Price</label>
+          <Input
+            placeholder='69'
+            value={data.components.home_page.hero_old_price || ''}
+            onChange={(e) =>
+              updateField(
+                ['components', 'home_page', 'hero_old_price'],
+                e.target.value
+              )
+            }
+            className='h-12'
+          />
+        </div>
+      </div>
+
+      <div className='mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+        <p className='text-xs font-semibold uppercase tracking-[0.25em] text-slate-500'>
+          Hero Side Card
+        </p>
+        <div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-2'>
+          {[
+            ['Card Kicker', cardKickerPath, 'Spice Route Kitchen', 'hero_card_kicker'],
+            ['Card Title', cardTitlePath, 'Paneer Tikka Wrap + Masala Loaded Fries', 'hero_card_title'],
+            ['Card Badge', cardBadgePath, 'Live', 'hero_card_badge'],
+            ['Starting Label', startingLabelPath, 'Starting at', 'hero_starting_label'],
+            ['Rating Label', ratingLabelPath, 'Rating', 'hero_rating_label'],
+            ['Rating Value', ratingValuePath, '4.9/5', 'hero_rating_value'],
+          ].map(([label, path, placeholder, key]) => (
+            <div
+              key={key}
+              className={cn(
+                'space-y-2',
+                selectedComponent === path &&
+                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              )}
+              data-editor-component={path}
+            >
+              <label className='text-sm font-medium text-gray-700'>{label}</label>
+              <Input
+                placeholder={placeholder}
+                value={data.components.home_page?.[key] || ''}
+                onChange={(e) =>
+                  updateField(['components', 'home_page', key], e.target.value)
+                }
+                className='h-12'
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className='mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+        <p className='text-xs font-semibold uppercase tracking-[0.25em] text-slate-500'>
+          Hero Feature Pills
+        </p>
+        <p className='mt-1 text-xs text-slate-500'>
+          Controls the three pill labels below the hero buttons.
+        </p>
+        <div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-3'>
+          {Array.from({ length: 3 }, (_, index) => {
+            const path = `components.home_page.hero_features.${index}`
+            const features = Array.isArray(data.components.home_page.hero_features)
+              ? data.components.home_page.hero_features
+              : []
+            return (
+              <div
+                key={path}
+                className={cn(
+                  'space-y-2',
+                  selectedComponent === path &&
+                    'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                )}
+                data-editor-component={path}
+              >
+                <label className='text-sm font-medium text-gray-700'>
+                  Pill {index + 1}
+                </label>
+                <Input
+                  placeholder={
+                    ['30 min delivery', 'Premium toppings', 'Fresh oven baked'][index]
+                  }
+                  value={features[index] || ''}
+                  onChange={(e) => {
+                    const nextFeatures = [...features]
+                    nextFeatures[index] = e.target.value
+                    updateField(
+                      ['components', 'home_page', 'hero_features'],
+                      nextFeatures
+                    )
+                  }}
+                  className='h-12'
+                />
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className='mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4'>
+        <p className='text-xs font-semibold uppercase tracking-[0.25em] text-amber-700'>
+          Offer Banner
+        </p>
+        <p className='mt-1 text-xs text-amber-800/80'>
+          Controls the combo offer section. Leave the background image empty to auto-use the current combo item image.
+        </p>
+        <div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-2'>
+          <div
+            className={cn(
+              'space-y-2',
+              selectedComponent === offerEyebrowPath &&
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component={offerEyebrowPath}
+          >
+            <Label>Offer Eyebrow</Label>
+            <Input
+              placeholder='combo price'
+              value={data.components.home_page.offer_section_eyebrow || ''}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'offer_section_eyebrow'],
+                  e.target.value
+                )
+              }
+              className='h-12'
+            />
+          </div>
+          <div
+            className={cn(
+              'space-y-2',
+              selectedComponent === offerButtonPath &&
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component={offerButtonPath}
+          >
+            <Label>Offer Button Text</Label>
+            <Input
+              placeholder='Order now'
+              value={data.components.home_page.offer_section_button_label || ''}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'offer_section_button_label'],
+                  e.target.value
+                )
+              }
+              className='h-12'
+            />
+          </div>
+          <div
+            className={cn(
+              'space-y-2 md:col-span-2',
+              selectedComponent === offerBackgroundImagePath &&
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component={offerBackgroundImagePath}
+          >
+            <Label>Manual Background Image URL</Label>
+            <Input
+              placeholder='Leave blank for dynamic combo image'
+              value={data.components.home_page.offer_section_background_image || ''}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'offer_section_background_image'],
+                  e.target.value
+                )
+              }
+              className='h-12'
+            />
+          </div>
+        </div>
+
+        <div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-2'>
+          {[
+            ['Section Background', 'offer_section_background_color', '#1b1a1f'],
+            ['Offer Title Color', 'offer_section_title_color', '#ffca1a'],
+            ['Eyebrow Color', 'offer_section_eyebrow_color', '#fffdf8'],
+            ['Price Text Color', 'offer_section_price_color', '#ffc222'],
+            ['Price Circle Background', 'offer_section_price_background', '#ffffff'],
+            ['Button Background', 'offer_section_button_background', '#ffffff'],
+            ['Button Text Color', 'offer_section_button_text_color', '#171717'],
+          ].map(([label, key, fallback]) => {
+            const path = `components.home_page.${key}`
+            return (
+              <div
+                key={key}
+                className={cn(
+                  'space-y-2',
+                  selectedComponent === path &&
+                    'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                )}
+                data-editor-component={path}
+              >
+                <Label>{label}</Label>
+                <Input
+                  type='color'
+                  value={data.components.home_page?.[key] || fallback}
+                  onChange={(e) =>
+                    updateField(['components', 'home_page', key], e.target.value)
+                  }
+                  className='h-12'
+                />
+              </div>
+            )
+          })}
+          <div
+            className={cn(
+              'space-y-2',
+              selectedComponent === 'components.home_page.offer_section_overlay_opacity' &&
+                'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component='components.home_page.offer_section_overlay_opacity'
+          >
+            <Label>
+              Image Dark Overlay {data.components.home_page.offer_section_overlay_opacity ?? 48}%
+            </Label>
+            <Input
+              type='range'
+              min={0}
+              max={90}
+              value={data.components.home_page.offer_section_overlay_opacity ?? 48}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'offer_section_overlay_opacity'],
+                  Number(e.target.value)
+                )
+              }
+            />
+          </div>
         </div>
       </div>
 

@@ -54,8 +54,24 @@ export const getStoredActiveWebsite = (vendorId?: string) => {
   }
 }
 
+const getWebsiteIdFromUrl = () => {
+  if (typeof window === 'undefined') return undefined
+
+  try {
+    const value = new URL(window.location.href).searchParams.get(
+      WEBSITE_QUERY_PARAM
+    )
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export const getStoredActiveWebsiteId = (vendorId?: string) => {
   if (typeof window === 'undefined') return undefined
+
+  const urlWebsiteId = getWebsiteIdFromUrl()
+  if (urlWebsiteId) return urlWebsiteId
 
   const website = getStoredActiveWebsite(vendorId)
   if (website?.id) return website.id
@@ -137,10 +153,12 @@ export const useActiveWebsiteSelection = (vendorId?: string) => {
 
     window.addEventListener(ACTIVE_WEBSITE_STORAGE_EVENT, sync)
     window.addEventListener('storage', sync)
+    window.addEventListener('popstate', sync)
 
     return () => {
       window.removeEventListener(ACTIVE_WEBSITE_STORAGE_EVENT, sync)
       window.removeEventListener('storage', sync)
+      window.removeEventListener('popstate', sync)
     }
   }, [vendorId])
 

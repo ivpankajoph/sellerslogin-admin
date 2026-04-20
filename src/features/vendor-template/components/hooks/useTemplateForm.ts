@@ -19,7 +19,7 @@ type TemplateCatalogItem = {
   deletable?: boolean
 }
 
-const CORE_TEMPLATE_KEYS = new Set(['mquiq', 'poupqz', 'oragze', 'whiterose'])
+const CORE_TEMPLATE_KEYS = new Set(['mquiq', 'poupqz', 'oragze', 'whiterose', 'pocofood'])
 
 const normalizeTemplateKey = (value: unknown) =>
   String(value || '')
@@ -169,8 +169,19 @@ export function useTemplateForm() {
           payload.contact_page as typeof base.components.contact_page
       }
       if (payload.social_page) {
-        merged.components.social_page =
-          payload.social_page as typeof base.components.social_page
+        const incomingSocial = payload.social_page as Record<string, any>
+        merged.components.social_page = {
+          ...base.components.social_page,
+          ...incomingSocial,
+          footer: {
+            ...base.components.social_page.footer,
+            ...(incomingSocial?.footer || {}),
+          },
+          faqs: {
+            ...base.components.social_page.faqs,
+            ...(incomingSocial?.faqs || {}),
+          },
+        } as typeof base.components.social_page
       }
 
       return merged
@@ -322,12 +333,15 @@ export function useTemplateForm() {
         section_order: sectionOrder,
       }
 
-      const res = await axios.put(`${BASE_URL}/v1/templates/home`, payload, {
+      const websiteQuery = activeWebsiteId
+        ? `?website_id=${encodeURIComponent(activeWebsiteId)}`
+        : ''
+      const res = await axios.put(`${BASE_URL}/v1/templates/home${websiteQuery}`, payload, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       })
 
       await axios.put(
-        `${BASE_URL}/v1/templates/social-faqs`,
+        `${BASE_URL}/v1/templates/social-faqs${websiteQuery}`,
         {
           vendor_id,
           website_id: activeWebsiteId,
@@ -342,6 +356,28 @@ export function useTemplateForm() {
       )
 
       if (res.status === 200 || res.status === 201) {
+        const savedComponents = res.data?.data?.components
+        if (savedComponents && typeof savedComponents === 'object') {
+          setData((current) => ({
+            ...current,
+            components: {
+              ...current.components,
+              ...(savedComponents as typeof current.components),
+              home_page: {
+                ...current.components.home_page,
+                ...((savedComponents as any).home_page || {}),
+              },
+              theme: {
+                ...current.components.theme,
+                ...((savedComponents as any).theme || {}),
+              },
+              vendor_profile: {
+                ...current.components.vendor_profile,
+                ...((savedComponents as any).vendor_profile || {}),
+              },
+            },
+          }))
+        }
         setSubmitStatus('success')
         if (!options?.silent) {
           toast.success('Template saved successfully')
