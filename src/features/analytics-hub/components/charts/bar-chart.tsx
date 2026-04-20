@@ -38,6 +38,12 @@ export function BarChart({
     "border border-sky-100/80 bg-white/85 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card",
     className
   );
+  const chartData = horizontal
+    ? data.map((item) => ({
+        ...item,
+        shortName: item.name.length > 18 ? `${item.name.slice(0, 18)}...` : item.name,
+      }))
+    : data;
 
   if (isLoading) {
     return (
@@ -66,9 +72,9 @@ export function BarChart({
           <div style={{ height }}>
             <ResponsiveContainer width="100%" height="100%">
               <RechartsBar
-                data={data}
+                data={chartData}
                 layout={horizontal ? 'vertical' : 'horizontal'}
-                margin={{ top: 10, right: 10, left: horizontal ? 80 : 10, bottom: 5 }}
+                margin={{ top: 10, right: 10, left: horizontal ? 24 : 10, bottom: 5 }}
               >
                 {showGrid && (
                   <CartesianGrid 
@@ -83,9 +89,9 @@ export function BarChart({
                     <XAxis type="number" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} />
                     <YAxis 
                       type="category" 
-                      dataKey="name" 
+                      dataKey="shortName" 
                       tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                      width={70}
+                      width={56}
                     />
                   </>
                 ) : (

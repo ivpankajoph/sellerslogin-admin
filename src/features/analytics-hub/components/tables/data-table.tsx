@@ -102,11 +102,11 @@ export function DataTable<T extends Record<string, any>>({
           </div>
         ) : (
           <>
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   {columns.map((col, i) => (
-                    <TableHead key={i} className={col.className}>
+                    <TableHead key={i} className={cn("px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground whitespace-normal", col.className)}>
                       {col.header}
                     </TableHead>
                   ))}
@@ -116,7 +116,7 @@ export function DataTable<T extends Record<string, any>>({
                 {paginatedData.map((row, rowIndex) => (
                   <TableRow key={rowIndex} data-testid={`table-row-${rowIndex}`}>
                     {columns.map((col, colIndex) => (
-                      <TableCell key={colIndex} className={col.className}>
+                      <TableCell key={colIndex} className={cn("px-4 py-3 align-top whitespace-normal break-words", col.className)}>
                         {typeof col.accessorKey === 'function'
                           ? col.accessorKey(row)
                           : row[col.accessorKey]}

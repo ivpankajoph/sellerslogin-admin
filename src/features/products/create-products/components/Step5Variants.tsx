@@ -221,6 +221,11 @@ const buildRowSignature = (rows: VariantRow[]) =>
     .map((row) => `${row.key}:${sanitizeStringList(row.values).join(',')}`)
     .join('|')
 
+const buildVariantKey = (variant: Variant, index?: number) =>
+  variant._id ||
+  buildVariantSignature(variant.variantAttributes || {}) ||
+  `variant-${index || 0}`
+
 const createRowId = () =>
   `variant-row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
@@ -736,7 +741,8 @@ const VariantImagesRow: React.FC<{
   variant: Variant
   onUpload: (event: React.ChangeEvent<HTMLInputElement>) => void
   onDelete: (imageIndex: number) => void
-}> = ({ index, variant, onUpload, onDelete }) => {
+  onRemoveVariant: () => void
+}> = ({ index, variant, onUpload, onDelete, onRemoveVariant }) => {
   const images = variant.variantsImageUrls || []
   const slots = Array.from({ length: MAX_VARIANT_IMAGES }, (_, slotIndex) => ({
     slotIndex,
@@ -752,8 +758,19 @@ const VariantImagesRow: React.FC<{
       )}
     >
       <div className='min-w-0'>
-        <div className='text-foreground truncate text-sm font-semibold'>
-          {getVariantDisplayName(variant, undefined, index)}
+        <div className='flex items-start justify-between gap-3'>
+          <div className='text-foreground truncate text-sm font-semibold'>
+            {getVariantDisplayName(variant, undefined, index)}
+          </div>
+          <button
+            type='button'
+            onClick={onRemoveVariant}
+            className='text-muted-foreground hover:text-destructive inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-transparent transition hover:border-red-200 hover:bg-red-50'
+            aria-label={`Remove ${getVariantDisplayName(variant, undefined, index)}`}
+            title='Remove this variant'
+          >
+            <X className='h-4 w-4' />
+          </button>
         </div>
         <div className='mt-2 flex flex-wrap gap-2'>
           {Object.entries(variant.variantAttributes || {}).map(([key, value]) => (
@@ -840,7 +857,8 @@ const VariantImagesSection: React.FC<{
     event: React.ChangeEvent<HTMLInputElement>
   ) => void
   onDelete: (variantIndex: number, imageIndex: number) => void
-}> = ({ variants, onUpload, onDelete }) => {
+  onRemoveVariant: (variantIndex: number) => void
+}> = ({ variants, onUpload, onDelete, onRemoveVariant }) => {
   return (
     <section className={cn(studioCardClass, 'space-y-4 p-5')}>
       <div>
@@ -877,6 +895,7 @@ const VariantImagesSection: React.FC<{
               variant={variant}
               onUpload={(event) => onUpload(index, event)}
               onDelete={(imageIndex) => onDelete(index, imageIndex)}
+              onRemoveVariant={() => onRemoveVariant(index)}
             />
           ))}
         </div>
@@ -913,6 +932,7 @@ const Step5Variants: React.FC<Props> = ({
     const derivedRows = buildVariantRowsFromVariants(variants)
     return derivedRows.length ? derivedRows : []
   })
+  const [excludedVariantSignatures, setExcludedVariantSignatures] = useState<string[]>([])
 
   const websiteSelectOptions = useMemo(
     () =>
@@ -953,6 +973,7 @@ const Step5Variants: React.FC<Props> = ({
     () => serializeVariants(variants),
     [variants]
   )
+  const serializedRows = useMemo(() => buildRowSignature(rows), [rows])
   const isSyncingLocalRowsRef = useRef(false)
 
   useEffect(() => {
@@ -970,6 +991,19 @@ const Step5Variants: React.FC<Props> = ({
   }, [serializedVariants, variants])
 
   useEffect(() => {
+    const availableSignatures = new Set(
+      buildVariantCombinations(rows).map((attributes) =>
+        buildVariantSignature(attributes)
+      )
+    )
+
+    setExcludedVariantSignatures((current) => {
+      const next = current.filter((signature) => availableSignatures.has(signature))
+      return next.length === current.length ? current : next
+    })
+  }, [serializedRows, rows])
+
+  useEffect(() => {
     const combinations = buildVariantCombinations(rows)
     const currentVariantMap = new Map(
       variants.map((variant) => [
@@ -978,7 +1012,12 @@ const Step5Variants: React.FC<Props> = ({
       ])
     )
 
-    const nextVariants = combinations.map((attributes) => {
+    const nextVariants = combinations
+      .filter((attributes) => {
+        const signature = buildVariantSignature(attributes)
+        return !excludedVariantSignatures.includes(signature)
+      })
+      .map((attributes) => {
       const signature = buildVariantSignature(attributes)
       const matchedVariant = currentVariantMap.get(signature)
 
@@ -996,12 +1035,30 @@ const Step5Variants: React.FC<Props> = ({
         variantMetaKeywords: matchedVariant?.variantMetaKeywords,
         variantCanonicalUrl: matchedVariant?.variantCanonicalUrl,
       }
-    })
+      })
 
     if (serializeVariants(nextVariants) === serializedVariants) return
     isSyncingLocalRowsRef.current = true
     onReplaceVariants(nextVariants)
-  }, [onReplaceVariants, rows, serializedVariants, variants])
+  }, [
+    excludedVariantSignatures,
+    onReplaceVariants,
+    rows,
+    serializedVariants,
+    variants,
+  ])
+
+  const handleRemoveGeneratedVariant = (variantIndex: number) => {
+    const targetVariant = variants[variantIndex]
+    if (!targetVariant) return
+
+    const signature = buildVariantSignature(targetVariant.variantAttributes || {})
+    if (!signature) return
+
+    setExcludedVariantSignatures((current) =>
+      current.includes(signature) ? current : [...current, signature]
+    )
+  }
 
   const addVariantRow = (key: string) => {
     const normalizedKey = String(key || '').trim()
@@ -1212,6 +1269,7 @@ const Step5Variants: React.FC<Props> = ({
         variants={variants}
         onUpload={onVariantImageUpload}
         onDelete={onVariantImageDelete}
+        onRemoveVariant={handleRemoveGeneratedVariant}
       />
 
       <section className={cn(studioCardClass, 'space-y-4 p-5')}>
@@ -1230,11 +1288,7 @@ const Step5Variants: React.FC<Props> = ({
 
             {variants.map((variant, index) => (
               <div
-                key={
-                  variant._id ||
-                  buildVariantSignature(variant.variantAttributes || {}) ||
-                  `variant-${index}`
-                }
+                key={buildVariantKey(variant, index)}
                 className='border-border/70 bg-background grid grid-cols-[minmax(0,1.5fr)_150px_150px_150px] gap-3 border-t px-4 py-4 first:border-t-0'
               >
                 <div className='min-w-0'>

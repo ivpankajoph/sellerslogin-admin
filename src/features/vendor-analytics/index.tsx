@@ -314,10 +314,12 @@ export default function VendorAnalytics() {
                   {(summary?.topPages || []).map((page) => (
                     <div
                       key={page.path}
-                      className='flex items-center justify-between text-sm'
+                      className='flex items-start justify-between gap-3 text-sm'
                     >
-                      <span className='truncate pr-2'>{page.path}</span>
-                      <span className='font-medium'>{page.views}</span>
+                      <span className='min-w-0 flex-1 truncate pr-2' title={page.path}>
+                        {page.path}
+                      </span>
+                      <span className='shrink-0 font-medium tabular-nums'>{page.views}</span>
                     </div>
                   ))}
                   {!summary?.topPages?.length && (
@@ -339,10 +341,12 @@ export default function VendorAnalytics() {
                   {(summary?.topReferrers || []).map((item) => (
                     <div
                       key={item.referrer}
-                      className='flex items-center justify-between text-sm'
+                      className='flex items-start justify-between gap-3 text-sm'
                     >
-                      <span className='truncate pr-2'>{item.referrer}</span>
-                      <span className='font-medium'>{item.visits}</span>
+                      <span className='min-w-0 flex-1 truncate pr-2' title={item.referrer}>
+                        {item.referrer}
+                      </span>
+                      <span className='shrink-0 font-medium tabular-nums'>{item.visits}</span>
                     </div>
                   ))}
                   {!summary?.topReferrers?.length && (
@@ -420,10 +424,10 @@ export default function VendorAnalytics() {
                     <TableHead>Event</TableHead>
                     <TableHead>Path</TableHead>
                     <TableHead>User/IP</TableHead>
-                    <TableHead>Device</TableHead>
-                    <TableHead>Browser</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Duration</TableHead>
+                    <TableHead className='hidden lg:table-cell'>Device</TableHead>
+                    <TableHead className='hidden xl:table-cell'>Browser</TableHead>
+                    <TableHead className='hidden xl:table-cell'>Location</TableHead>
+                    <TableHead className='hidden lg:table-cell'>Duration</TableHead>
                     <TableHead>Time</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -433,7 +437,7 @@ export default function VendorAnalytics() {
                       <TableCell className='capitalize'>
                         {event.eventType.replace('_', ' ')}
                       </TableCell>
-                      <TableCell className='max-w-[240px] truncate'>
+                      <TableCell className='max-w-[220px] truncate' title={event.path}>
                         {event.path}
                       </TableCell>
                       <TableCell className='max-w-[200px] truncate'>
@@ -444,18 +448,18 @@ export default function VendorAnalytics() {
                             event.userId ||
                             'anonymous'}
                       </TableCell>
-                      <TableCell className='capitalize'>
+                      <TableCell className='hidden lg:table-cell capitalize'>
                         {event.device || '-'}
                       </TableCell>
-                      <TableCell className='max-w-[180px] truncate'>
+                      <TableCell className='hidden xl:table-cell max-w-[180px] truncate'>
                         {event.browser || '-'}
                       </TableCell>
-                      <TableCell className='max-w-[200px] truncate'>
+                      <TableCell className='hidden xl:table-cell max-w-[200px] truncate'>
                         {event.city || event.country
                           ? `${event.city ? `${event.city}, ` : ''}${event.country || ''}`
                           : '-'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className='hidden lg:table-cell'>
                         {event.eventType === 'page_duration'
                           ? formatDuration(event.durationMs || 0)
                           : '-'}

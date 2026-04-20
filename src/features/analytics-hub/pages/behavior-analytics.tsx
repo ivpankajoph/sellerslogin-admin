@@ -47,7 +47,7 @@ const renderPageLink = (path?: string | null, label?: string | null) => {
   const displayText = label || path || "/";
   if (!href) {
     return (
-      <span className="block max-w-[320px] truncate font-medium" title={displayText}>
+      <span className="block max-w-[180px] truncate font-medium sm:max-w-[240px] lg:max-w-[280px]" title={displayText}>
         {displayText}
       </span>
     );
@@ -58,7 +58,7 @@ const renderPageLink = (path?: string | null, label?: string | null) => {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="block max-w-[320px] truncate font-medium text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
+      className="block max-w-[180px] truncate font-medium text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline sm:max-w-[240px] lg:max-w-[280px]"
       title={href}
     >
       {displayText}
@@ -100,13 +100,10 @@ export default function BehaviorAnalytics() {
   const activityEvents = (eventsData?.events || []).filter((event) => event.eventType !== "page_duration");
 
   return (
-    <div className="overflow-x-auto pb-2">
-      <div className="min-w-[1260px] space-y-6">
+    <div className="space-y-6 pb-2">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Behavior Analytics</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Understand user journey, where visitors came from, what they clicked, and which products they touched.
-          </p>
+          
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -156,7 +153,7 @@ export default function BehaviorAnalytics() {
             data={topPages.slice(0, 10)}
             isLoading={isLoading}
             horizontal
-            height={350}
+            height={320}
           />
 
           <DataTable
@@ -170,16 +167,17 @@ export default function BehaviorAnalytics() {
               {
                 header: "Page",
                 accessorKey: (row) => renderPageLink(row.page, row.page),
+                className: "w-[50%]",
               },
               {
                 header: "Views",
                 accessorKey: (row) => row.views.toLocaleString(),
-                className: "text-right tabular-nums",
+                className: "w-[25%] text-right tabular-nums",
               },
               {
                 header: "Avg. Time",
                 accessorKey: (row) => formatDuration(row.avgTime),
-                className: "text-right tabular-nums",
+                className: "w-[25%] text-right tabular-nums",
               },
             ]}
             isLoading={isLoading}
@@ -198,6 +196,7 @@ export default function BehaviorAnalytics() {
             {
               header: "Page",
               accessorKey: (row) => renderPageLink(row.page, row.page),
+              className: "w-[65%]",
             },
             {
               header: "Exit Rate",
@@ -211,7 +210,7 @@ export default function BehaviorAnalytics() {
                   </Badge>
                 </div>
               ),
-              className: "text-right",
+              className: "w-[35%] text-right",
             },
           ]}
           isLoading={isLoading}
@@ -226,35 +225,41 @@ export default function BehaviorAnalytics() {
             {
               header: "Action",
               accessorKey: (row) => (
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <div className="font-medium">{formatEventLabel(row.eventType)}</div>
                   <div className="text-xs text-muted-foreground">
                     {row.createdAt ? formatDistanceToNow(new Date(row.createdAt), { addSuffix: true }) : "just now"}
                   </div>
                 </div>
               ),
+              className: "min-w-[140px]",
             },
             {
               header: "User / IP",
               accessorKey: (row) => (
-                <div className="space-y-1">
-                  <div className="font-medium">{row.user?.name || row.userId || row.visitorId || "Anonymous"}</div>
-                  <div className="text-xs text-muted-foreground">{row.ip || "IP unavailable"}</div>
+                <div className="min-w-0 space-y-1">
+                  <div className="truncate font-medium" title={row.user?.name || row.userId || row.visitorId || "Anonymous"}>
+                    {row.user?.name || row.userId || row.visitorId || "Anonymous"}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground" title={row.ip || "IP unavailable"}>
+                    {row.ip || "IP unavailable"}
+                  </div>
                 </div>
               ),
+              className: "min-w-[150px]",
             },
             {
               header: "Source",
               accessorKey: (row) => (
-                <div className="space-y-1">
-                  <div className="text-sm">{formatSourceLabel(row)}</div>
+                <div className="min-w-0 space-y-1">
+                  <div className="truncate text-sm" title={formatSourceLabel(row)}>{formatSourceLabel(row)}</div>
                   {row.referrer ? (
                     /^https?:\/\//i.test(row.referrer) ? (
                       <a
                         href={row.referrer}
                         target="_blank"
                         rel="noreferrer"
-                        className="block max-w-[220px] truncate text-xs text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
+                        className="block max-w-[160px] truncate text-xs text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline sm:max-w-[220px]"
                         title={row.referrer}
                       >
                         {row.referrer}
@@ -269,15 +274,17 @@ export default function BehaviorAnalytics() {
                   )}
                 </div>
               ),
+              className: "hidden 2xl:table-cell",
             },
             {
               header: "Page",
               accessorKey: (row) => renderPageLink(row.fullUrl || row.path, row.title || row.path || "/"),
+              className: "w-[40%]",
             },
             {
               header: "Product / Value",
               accessorKey: (row) => (
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <div className="max-w-[200px] truncate font-medium" title={row.productName || undefined}>
                     {row.productName || "-"}
                   </div>
@@ -292,6 +299,7 @@ export default function BehaviorAnalytics() {
                   </div>
                 </div>
               ),
+              className: "w-[25%] hidden xl:table-cell",
             },
             {
               header: "Session",
@@ -300,13 +308,13 @@ export default function BehaviorAnalytics() {
                   {row.sessionId || "-"}
                 </span>
               ),
+              className: "hidden",
             },
           ]}
           isLoading={eventsLoading}
           pageSize={12}
           emptyMessage="No user activity available"
         />
-      </div>
     </div>
   );
 }

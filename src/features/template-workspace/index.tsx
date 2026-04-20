@@ -143,6 +143,7 @@ const REQUEST_TIMEOUT_MS = 10000
 const LIVE_PREVIEW_SCALE = 0.25
 const LIVE_PREVIEW_DIMENSION = `${100 / LIVE_PREVIEW_SCALE}%`
 const B2B_TEMPLATE_KEYS = new Set(['mquiq', 'poupqz'])
+const FREE_PLAN_WEBSITE_LIMIT = 5
 const TEMPLATE_AUDIENCE_COPY: Record<
   TemplateAudience,
   {
@@ -799,9 +800,9 @@ export default function TemplateWorkspace() {
     if (!isAdmin && vendorProfile) {
       const sub = vendorProfile.subscription || {}
       const isFree = sub.current_plan === 'free' || !sub.current_plan
-      if (isFree && websites.length >= 1) {
+      if (isFree && websites.length >= FREE_PLAN_WEBSITE_LIMIT) {
         toast.error(
-          'Free plan allows only 1 website. Please upgrade to premium to create more.'
+          `Free plan allows only ${FREE_PLAN_WEBSITE_LIMIT} websites. Please upgrade to premium to create more.`
         )
         return
       }
