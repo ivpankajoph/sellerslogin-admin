@@ -1,6 +1,8 @@
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
 const PREVIEW_CITY_STORAGE_KEY = 'template_preview_city_slug'
 const normalizePathIdentifier = (value?: string) => String(value || '').trim().replace(/^\/+|\/+$/g, '')
+const isLocalhostOrigin = (value: string) =>
+  /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(value)
 
 const normalizeCitySlug = (value?: string) => {
   const slug = String(value || '')
@@ -65,11 +67,34 @@ export const resolvePreviewCityFromVendorProfile = (
   }
 }
 
-export const STOREFRONT_URL = trimTrailingSlash(
-  import.meta.env.VITE_PUBLIC_STOREFRONT_URL ||
-    import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND ||
-    ''
-)
+const resolveStorefrontBaseUrl = () => {
+  const explicitUrl = trimTrailingSlash(
+    String(import.meta.env.VITE_PUBLIC_STOREFRONT_URL || '').trim()
+  )
+  const legacyUrl = trimTrailingSlash(
+    String(import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND || '').trim()
+  )
+  const candidateUrl = explicitUrl || legacyUrl
+
+  if (
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    candidateUrl
+  ) {
+    try {
+      const candidateOrigin = new URL(candidateUrl).origin
+      if (candidateOrigin === window.location.origin && isLocalhostOrigin(candidateOrigin)) {
+        return 'http://localhost:3001'
+      }
+    } catch {
+      // Fall through to the configured value below.
+    }
+  }
+
+  return candidateUrl
+}
+
+export const STOREFRONT_URL = resolveStorefrontBaseUrl()
 
 export const getStoredTemplatePreviewCity = () => {
   return readStoredTemplatePreviewCity() || 'all'
