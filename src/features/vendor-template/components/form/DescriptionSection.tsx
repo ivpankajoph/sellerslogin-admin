@@ -38,10 +38,22 @@ export function DescriptionSection({
   const advantageImagePath = 'components.home_page.advantage.image'
   const advantageBadgeValuePath = 'components.home_page.advantage.badgeValue'
   const advantageBadgeLabelPath = 'components.home_page.advantage.badgeLabel'
+  const advantageVisualCardTitlePath = 'components.home_page.advantage.visualCardTitle'
+  const advantageVisualCardImagePath = 'components.home_page.advantage.visualCardImage'
+  const advantagePromiseLabelPath = 'components.home_page.advantage.promiseLabel'
+  const advantagePromiseTextPath = 'components.home_page.advantage.promiseText'
+  const advantagePremiumLabelPath = 'components.home_page.advantage.premiumLabel'
+  const advantagePremiumImageOnePath = 'components.home_page.advantage.premiumImageOne'
+  const advantagePremiumImageTwoPath = 'components.home_page.advantage.premiumImageTwo'
+  const advantageAccentColorPath = 'components.home_page.advantage.accentColor'
+  const advantageGlowColorPath = 'components.home_page.advantage.glowColor'
   const industryKickerPath = 'components.home_page.industries.kicker'
   const industryHeadingPath = 'components.home_page.industries.heading'
   const industrySubtitlePath = 'components.home_page.industries.subtitle'
   const isUploadingAdvantageImage = uploadingPaths.has(advantageImagePath)
+  const isUploadingAdvantageVisualCardImage = uploadingPaths.has(advantageVisualCardImagePath)
+  const isUploadingAdvantagePremiumImageOne = uploadingPaths.has(advantagePremiumImageOnePath)
+  const isUploadingAdvantagePremiumImageTwo = uploadingPaths.has(advantagePremiumImageTwoPath)
   const heroStats = Array.from({ length: 4 }, (_, index) => {
     const stats = Array.isArray(data.components.home_page.heroStats)
       ? data.components.home_page.heroStats
@@ -62,7 +74,7 @@ export function DescriptionSection({
     }
   })
 
-  const benefitCards = Array.from({ length: 3 }, (_, index) => {
+  const benefitCards = Array.from({ length: 4 }, (_, index) => {
     const cards = Array.isArray(benefits.cards) ? benefits.cards : []
     const current = cards[index] || {}
 
@@ -341,10 +353,10 @@ export function DescriptionSection({
 
       <div className='mt-8 rounded-2xl border border-slate-200 bg-slate-50/70 p-4'>
         <h3 className='text-base font-semibold text-slate-900'>
-          Benefits Section (Home)
+          Services Section (Home)
         </h3>
         <p className='mt-1 text-xs text-slate-500'>
-          Controls the yellow benefits block with 3 cards on the live page.
+          Controls the services/why choose us block on the live home page.
         </p>
 
         <div className='mt-4 grid gap-4 md:grid-cols-2'>
@@ -357,7 +369,7 @@ export function DescriptionSection({
             data-editor-component={benefitKickerPath}
           >
             <label className='text-sm font-medium text-gray-700'>
-              Benefits Kicker
+              Services Kicker
             </label>
             <Input
               placeholder='Benefits'
@@ -381,7 +393,7 @@ export function DescriptionSection({
             data-editor-component={benefitHeadingPath}
           >
             <label className='text-sm font-medium text-gray-700'>
-              Benefits Heading
+              Services Heading
             </label>
             <Input
               placeholder='Why Our Storage Solutions Stand Apart'
@@ -406,7 +418,7 @@ export function DescriptionSection({
           data-editor-component={benefitSubtitlePath}
         >
           <label className='text-sm font-medium text-gray-700'>
-            Benefits Subtitle
+            Services Subtitle
           </label>
           <Textarea
             placeholder='Trusted advantages that enhance your storage management and operational efficiency'
@@ -850,6 +862,190 @@ export function DescriptionSection({
               }
               className='h-12'
             />
+          </div>
+        </div>
+
+        <div className='mt-4 rounded-xl border border-slate-200 bg-white p-4'>
+          <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
+            Visual Cards
+          </p>
+          <div className='mt-4 grid gap-4 md:grid-cols-2'>
+            <div
+              className={cn(
+                'space-y-2',
+                selectedComponent === advantageVisualCardTitlePath &&
+                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              )}
+              data-editor-component={advantageVisualCardTitlePath}
+            >
+              <label className='text-sm font-medium text-gray-700'>
+                Top White Card Title
+              </label>
+              <Input
+                placeholder='Daily quality meals'
+                value={advantage?.visualCardTitle || ''}
+                onChange={(e) =>
+                  updateField(
+                    ['components', 'home_page', 'advantage', 'visualCardTitle'],
+                    e.target.value
+                  )
+                }
+                className='h-12'
+              />
+            </div>
+            <div
+              className={cn(
+                'space-y-2',
+                selectedComponent === advantagePromiseLabelPath &&
+                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              )}
+              data-editor-component={advantagePromiseLabelPath}
+            >
+              <label className='text-sm font-medium text-gray-700'>
+                Promise Label
+              </label>
+              <Input
+                placeholder='Healthy Promise'
+                value={advantage?.promiseLabel || ''}
+                onChange={(e) =>
+                  updateField(
+                    ['components', 'home_page', 'advantage', 'promiseLabel'],
+                    e.target.value
+                  )
+                }
+                className='h-12'
+              />
+            </div>
+            <div
+              className={cn(
+                'space-y-2 md:col-span-2',
+                selectedComponent === advantagePromiseTextPath &&
+                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              )}
+              data-editor-component={advantagePromiseTextPath}
+            >
+              <label className='text-sm font-medium text-gray-700'>
+                Promise Text
+              </label>
+              <Textarea
+                placeholder={'Crisp ingredients.\nBetter taste.'}
+                value={advantage?.promiseText || ''}
+                onChange={(e) =>
+                  updateField(
+                    ['components', 'home_page', 'advantage', 'promiseText'],
+                    e.target.value
+                  )
+                }
+                className='min-h-[86px]'
+              />
+            </div>
+            <div
+              className={cn(
+                'space-y-2',
+                selectedComponent === advantagePremiumLabelPath &&
+                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              )}
+              data-editor-component={advantagePremiumLabelPath}
+            >
+              <label className='text-sm font-medium text-gray-700'>
+                Premium Picks Label
+              </label>
+              <Input
+                placeholder='Premium Picks'
+                value={advantage?.premiumLabel || ''}
+                onChange={(e) =>
+                  updateField(
+                    ['components', 'home_page', 'advantage', 'premiumLabel'],
+                    e.target.value
+                  )
+                }
+                className='h-12'
+              />
+            </div>
+            <div
+              className={cn(
+                'space-y-2',
+                selectedComponent === advantageAccentColorPath &&
+                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              )}
+              data-editor-component={advantageAccentColorPath}
+            >
+              <label className='text-sm font-medium text-gray-700'>
+                Accent Color
+              </label>
+              <Input
+                type='color'
+                value={advantage?.accentColor || '#d94b2b'}
+                onChange={(e) =>
+                  updateField(
+                    ['components', 'home_page', 'advantage', 'accentColor'],
+                    e.target.value
+                  )
+                }
+                className='h-12'
+              />
+            </div>
+            <div
+              className={cn(
+                'space-y-2',
+                selectedComponent === advantageGlowColorPath &&
+                  'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+              )}
+              data-editor-component={advantageGlowColorPath}
+            >
+              <label className='text-sm font-medium text-gray-700'>
+                Background Glow Color
+              </label>
+              <Input
+                type='color'
+                value={advantage?.glowColor || '#7d9920'}
+                onChange={(e) =>
+                  updateField(
+                    ['components', 'home_page', 'advantage', 'glowColor'],
+                    e.target.value
+                  )
+                }
+                className='h-12'
+              />
+            </div>
+          </div>
+
+          <div className='mt-4 grid gap-4 md:grid-cols-3'>
+            {[
+              ['Top Card Image', advantageVisualCardImagePath, 'visualCardImage', isUploadingAdvantageVisualCardImage],
+              ['Premium Image 1', advantagePremiumImageOnePath, 'premiumImageOne', isUploadingAdvantagePremiumImageOne],
+              ['Premium Image 2', advantagePremiumImageTwoPath, 'premiumImageTwo', isUploadingAdvantagePremiumImageTwo],
+            ].map(([label, path, key, isUploading]) => (
+              <div
+                key={String(key)}
+                className={cn(
+                  'rounded-xl border border-slate-200 bg-slate-50 p-3',
+                  selectedComponent === path &&
+                    'ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                )}
+                data-editor-component={String(path)}
+              >
+                <ImageInput
+                  label={String(label)}
+                  name={String(key)}
+                  value={advantage?.[String(key)] || ''}
+                  onChange={(file) =>
+                    handleImageChange(
+                      ['components', 'home_page', 'advantage', String(key)],
+                      file
+                    )
+                  }
+                  isFileInput={true}
+                  dimensions='600 x 600'
+                />
+                {isUploading ? (
+                  <p className='mt-1 flex items-center text-sm text-gray-600'>
+                    <Upload className='mr-2 h-4 w-4 animate-pulse' />
+                    Uploading image...
+                  </p>
+                ) : null}
+              </div>
+            ))}
           </div>
         </div>
 

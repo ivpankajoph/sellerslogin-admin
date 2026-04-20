@@ -40,6 +40,29 @@ const looksLikeImagePath = (path: string[]) => {
   )
 }
 
+const looksLikeColorPath = (path: string[]) => {
+  const joined = path.join('.').toLowerCase()
+  return (
+    joined.includes('color') ||
+    joined.includes('background') ||
+    joined.includes('accent') ||
+    joined.includes('surface') ||
+    joined.includes('border')
+  )
+}
+
+const looksLikeNumericStylePath = (path: string[]) => {
+  const joined = path.join('.').toLowerCase()
+  return (
+    joined.includes('opacity') ||
+    joined.includes('size') ||
+    joined.includes('scale')
+  )
+}
+
+const normalizeColorValue = (value: string) =>
+  /^#[0-9a-f]{6}$/i.test(value.trim()) ? value.trim() : '#000000'
+
 const prefersTextarea = (path: string[], value: unknown) => {
   if (typeof value === 'string' && value.includes('\n')) return true
   const joined = path.join('.').toLowerCase()
@@ -82,6 +105,8 @@ export function SelectedFieldEditor({
         : ''
   const label = toLabel(path)
   const isImageField = looksLikeImagePath(path)
+  const isColorField = looksLikeColorPath(path)
+  const isNumericStyleField = looksLikeNumericStylePath(path)
   const useTextarea = prefersTextarea(path, rawValue)
 
   return (
@@ -103,6 +128,37 @@ export function SelectedFieldEditor({
             onChange={(file) => void handleImageChange(path, file)}
             isFileInput
           />
+        ) : isColorField ? (
+          <div className='space-y-2'>
+            <Label>{label || 'Selected color'}</Label>
+            <div className='flex gap-2'>
+              <Input
+                type='color'
+                value={normalizeColorValue(value)}
+                onChange={(event) => updateField(path, event.target.value)}
+                className='h-11 w-16 shrink-0 cursor-pointer p-1'
+              />
+              <Input
+                value={value}
+                onChange={(event) => updateField(path, event.target.value)}
+                placeholder='#000000'
+              />
+            </div>
+          </div>
+        ) : isNumericStyleField ? (
+          <div className='space-y-2'>
+            <Label>{label || 'Selected value'}</Label>
+            <Input
+              type='number'
+              value={value}
+              onChange={(event) =>
+                updateField(
+                  path,
+                  event.target.value === '' ? '' : Number(event.target.value)
+                )
+              }
+            />
+          </div>
         ) : useTextarea ? (
           <div className='space-y-2'>
             <Label>{label || 'Selected field'}</Label>

@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Truck,
+  UtensilsCrossed,
   Users,
 } from 'lucide-react'
 import type { SidebarData } from '../types'
@@ -222,6 +223,19 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
               roles: [ROLES.ADMIN],
             },
           ],
+        },
+      ],
+    },
+    {
+      title: 'Food Commerce',
+      roles: [ROLES.VENDOR],
+      items: [
+        {
+          title: 'Food Hub',
+          url: '/food',
+          icon: UtensilsCrossed,
+          roles: [ROLES.VENDOR],
+          pageKey: 'products',
         },
       ],
     },

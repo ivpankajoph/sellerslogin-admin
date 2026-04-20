@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ExternalLink,
   RefreshCcw,
@@ -101,23 +101,25 @@ export function TemplatePreviewPanel({
     }
   }
 
-  useEffect(() => {
+  const postPreviewUpdate = useCallback(() => {
     if (!iframeRef.current || !vendorId || !previewData) return
-    const timeout = window.setTimeout(() => {
-      iframeRef.current?.contentWindow?.postMessage(
-        {
-          type: 'template-preview-update',
-          vendorId,
-          page,
-          payload: previewData,
-          sectionOrder,
-        },
-        previewOrigin || '*'
-      )
-    }, 250)
+    iframeRef.current.contentWindow?.postMessage(
+      {
+        type: 'template-preview-update',
+        vendorId,
+        page,
+        payload: previewData,
+        sectionOrder,
+      },
+      previewOrigin || '*'
+    )
+  }, [page, previewData, previewOrigin, sectionOrder, vendorId])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(postPreviewUpdate, 250)
 
     return () => window.clearTimeout(timeout)
-  }, [previewData, sectionOrder, vendorId, page, previewOrigin])
+  }, [postPreviewUpdate])
 
   useEffect(() => {
     setPreviewPath(defaultPath || '')
@@ -283,7 +285,10 @@ export function TemplatePreviewPanel({
                       : undefined,
                 }}
                 ref={iframeRef}
-                onLoad={updateIframeHeight}
+                onLoad={() => {
+                  updateIframeHeight()
+                  window.setTimeout(postPreviewUpdate, 100)
+                }}
               />
             </div>
           ) : (

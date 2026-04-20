@@ -20,6 +20,13 @@ export type TemplateData = {
     theme: {
       templateColor: string
       bannerColor: string
+      accentColor?: string
+      headerTopBackground?: string
+      headerBackground?: string
+      headerTextColor?: string
+      footerBackground?: string
+      footerBottomBackground?: string
+      footerAccentColor?: string
       fontScale: number
       headingFont: string
       bodyFont: string
@@ -30,7 +37,38 @@ export type TemplateData = {
       borderColor: string
     }
     home_page: {
+      header?: {
+        brandLabel?: string
+        topAnnouncement?: string
+        callLabel?: string
+        navHomeLabel?: string
+        navMenuLabel?: string
+        navComboLabel?: string
+        navBlogLabel?: string
+        navContactLabel?: string
+      }
       hero_kicker?: string
+      hero_detail?: string
+      hero_price?: string
+      hero_old_price?: string
+      hero_card_kicker?: string
+      hero_card_title?: string
+      hero_card_badge?: string
+      hero_starting_label?: string
+      hero_rating_label?: string
+      hero_rating_value?: string
+      hero_features?: string[]
+      offer_section_eyebrow?: string
+      offer_section_button_label?: string
+      offer_section_background_image?: string
+      offer_section_background_color?: string
+      offer_section_title_color?: string
+      offer_section_eyebrow_color?: string
+      offer_section_price_color?: string
+      offer_section_price_background?: string
+      offer_section_button_background?: string
+      offer_section_button_text_color?: string
+      offer_section_overlay_opacity?: number
       badge_text?: string
       header_text: string
       header_text_small: string
@@ -55,6 +93,7 @@ export type TemplateData = {
       products_heading?: string
       products_kicker?: string
       products_subtitle?: string
+      recipe_section_heading?: string
       products_style?: {
         titleColor?: string
         titleSize?: number
@@ -79,6 +118,15 @@ export type TemplateData = {
         image?: string
         badgeValue?: string
         badgeLabel?: string
+        visualCardTitle?: string
+        visualCardImage?: string
+        promiseLabel?: string
+        promiseText?: string
+        premiumLabel?: string
+        premiumImageOne?: string
+        premiumImageTwo?: string
+        accentColor?: string
+        glowColor?: string
         cards?: Array<{
           title?: string
           description?: string
@@ -208,6 +256,13 @@ export const initialData: TemplateData = {
     theme: {
       templateColor: '#0f172a',
       bannerColor: '#0f172a',
+      accentColor: '#ffc222',
+      headerTopBackground: '#1f1d23',
+      headerBackground: '#ffffff',
+      headerTextColor: '#171717',
+      footerBackground: '#18171c',
+      footerBottomBackground: '#d94b2b',
+      footerAccentColor: '#ffc222',
       fontScale: 1,
       headingFont: 'Poppins',
       bodyFont: 'Poppins',
@@ -218,7 +273,38 @@ export const initialData: TemplateData = {
       borderColor: '#e2e8f0',
     },
     home_page: {
+      header: {
+        brandLabel: 'Oph!',
+        topAnnouncement: 'Fresh combos, quick checkout, and delivery-first merchandising.',
+        callLabel: 'Call and order in',
+        navHomeLabel: 'Home',
+        navMenuLabel: 'Menu',
+        navComboLabel: 'Combo',
+        navBlogLabel: 'Blog',
+        navContactLabel: 'Contact',
+      },
       hero_kicker: '',
+      hero_detail: '',
+      hero_price: '',
+      hero_old_price: '',
+      hero_card_kicker: '',
+      hero_card_title: '',
+      hero_card_badge: '',
+      hero_starting_label: 'Starting at',
+      hero_rating_label: 'Rating',
+      hero_rating_value: '4.9/5',
+      hero_features: ['30 min delivery', 'Premium toppings', 'Fresh oven baked'],
+      offer_section_eyebrow: '',
+      offer_section_button_label: 'Order now',
+      offer_section_background_image: '',
+      offer_section_background_color: '#1b1a1f',
+      offer_section_title_color: '#ffca1a',
+      offer_section_eyebrow_color: '#fffdf8',
+      offer_section_price_color: '#ffc222',
+      offer_section_price_background: '#ffffff',
+      offer_section_button_background: '#ffffff',
+      offer_section_button_text_color: '#171717',
+      offer_section_overlay_opacity: 48,
       badge_text: '',
       header_text: '',
       header_text_small: '',
@@ -243,6 +329,7 @@ export const initialData: TemplateData = {
       products_heading: '',
       products_kicker: '',
       products_subtitle: '',
+      recipe_section_heading: 'Top recipes',
       products_style: {
         titleColor: '',
         titleSize: 0,
@@ -257,6 +344,7 @@ export const initialData: TemplateData = {
           { title: '', description: '' },
           { title: '', description: '' },
           { title: '', description: '' },
+          { title: '', description: '' },
         ],
       },
       advantage: {
@@ -268,6 +356,15 @@ export const initialData: TemplateData = {
         image: '',
         badgeValue: '',
         badgeLabel: '',
+        visualCardTitle: '',
+        visualCardImage: '',
+        promiseLabel: '',
+        promiseText: '',
+        premiumLabel: '',
+        premiumImageOne: '',
+        premiumImageTwo: '',
+        accentColor: '#d94b2b',
+        glowColor: '#7d9920',
         cards: [
           { title: '', description: '' },
           { title: '', description: '' },
@@ -450,6 +547,15 @@ export const initialData: TemplateData = {
         ],
       },
       footer: {
+        brand_heading: 'Oph!',
+        book_heading: 'Book a Table',
+        book_text: 'Fresh burgers, pizzas, combos, and chef specials for your everyday cravings.',
+        opening_heading: 'Opening Hours',
+        newsletter_heading: 'Newsletter',
+        newsletter_text: 'Subscribe for weekly offers, new combos, and latest storefront updates.',
+        newsletter_placeholder: 'Your Email...',
+        newsletter_button: 'SUBSCRIBE',
+        orders_label: 'My Orders',
         blog_label: 'Blog',
         blog_href: '/blog',
         policy_primary_label: 'Privacy Policy',

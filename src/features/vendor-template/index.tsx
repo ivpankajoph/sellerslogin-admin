@@ -99,11 +99,13 @@ export default function TemplateForm() {
   const [builderSearchTerm, setBuilderSearchTerm] = useState('')
   const [expandedSectionId, setExpandedSectionId] = useState('hero')
   const [sectionOrder, setSectionOrder] = useState([
+    'header',
     'branding',
     'hero',
     'description',
     'faqs',
     'products',
+    'footer',
   ])
   const pathnameTemplateKey = useMemo(() => {
     const segments = pathname.split('/').filter(Boolean)
@@ -118,7 +120,7 @@ export default function TemplateForm() {
   useEffect(() => {
     if (loadedSectionOrder.length) {
       const normalized = [...loadedSectionOrder]
-      ;['branding', 'hero', 'description', 'faqs', 'products'].forEach((id) => {
+      ;['header', 'branding', 'hero', 'description', 'faqs', 'products', 'footer'].forEach((id) => {
         if (!normalized.includes(id)) normalized.push(id)
       })
       setSectionOrder(normalized)
@@ -236,6 +238,14 @@ export default function TemplateForm() {
   ])
 
   useEffect(() => {
+    if (!activeWebsiteId || typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('website') === activeWebsiteId) return
+    url.searchParams.set('website', activeWebsiteId)
+    window.history.replaceState(window.history.state, '', `${url.pathname}?${url.searchParams.toString()}`)
+  }, [activeWebsiteId, pathname])
+
+  useEffect(() => {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
     let changed = false
@@ -270,6 +280,9 @@ export default function TemplateForm() {
     previewCity.slug,
     activeWebsiteId
   )
+  const previewOpenUrl = previewBaseUrl
+    ? `${previewBaseUrl}${previewBaseUrl.includes('?') ? '&' : '?'}template_refresh=${Date.now()}`
+    : ''
   const { connectedDomain, connectedDomainState } = useConnectedTemplateDomain({
     vendorId: vendor_id,
     token,
@@ -316,6 +329,11 @@ export default function TemplateForm() {
   const sections = useMemo(
     () => [
       {
+        id: 'header',
+        title: 'Header',
+        description: 'Top bar, navigation labels, and header copy',
+      },
+      {
         id: 'branding',
         title: 'Branding + Media',
         description: 'Hero banner and logo assets',
@@ -327,13 +345,18 @@ export default function TemplateForm() {
       },
       {
         id: 'description',
-        title: 'Story + Metrics',
-        description: 'Long-form description and highlight stats',
+        title: 'Home Sections',
+        description: 'Services, story content, and highlight stats',
       },
       {
         id: 'faqs',
         title: 'FAQ Content',
         description: 'Questions and answers shown on template pages',
+      },
+      {
+        id: 'footer',
+        title: 'Footer',
+        description: 'Footer headings, newsletter copy, and links',
       },
       {
         id: 'products',
@@ -356,9 +379,40 @@ export default function TemplateForm() {
   const productsKickerPath = 'components.home_page.products_kicker'
   const productsHeadingPath = 'components.home_page.products_heading'
   const productsSubtitlePath = 'components.home_page.products_subtitle'
+  const recipeSectionHeadingPath = 'components.home_page.recipe_section_heading'
+  const headerAnnouncementPath = 'components.home_page.header.topAnnouncement'
+  const footerNewsletterPath = 'components.social_page.footer.newsletter_text'
 
   const builderSearchTargets = useMemo<BuilderSearchTarget[]>(
     () => [
+      {
+        id: 'header-announcement',
+        label: 'Header Announcement',
+        sectionId: 'header',
+        componentId: headerAnnouncementPath,
+        keywords: ['top bar', 'promo text', 'announcement'],
+      },
+      {
+        id: 'header-call-label',
+        label: 'Header Call Label',
+        sectionId: 'header',
+        componentId: 'components.home_page.header.callLabel',
+        keywords: ['phone label', 'call text'],
+      },
+      {
+        id: 'header-menu-label',
+        label: 'Menu Nav Label',
+        sectionId: 'header',
+        componentId: 'components.home_page.header.navMenuLabel',
+        keywords: ['navigation', 'menu'],
+      },
+      {
+        id: 'header-combo-label',
+        label: 'Combo Nav Label',
+        sectionId: 'header',
+        componentId: 'components.home_page.header.navComboLabel',
+        keywords: ['navigation', 'combo'],
+      },
       {
         id: 'branding-banner',
         label: 'Banner Image',
@@ -395,6 +449,13 @@ export default function TemplateForm() {
         keywords: ['subheading'],
       },
       {
+        id: 'hero-detail',
+        label: 'Hero Small Description',
+        sectionId: 'hero',
+        componentId: 'components.home_page.hero_detail',
+        keywords: ['top section', 'description', 'offer detail'],
+      },
+      {
         id: 'hero-primary-button',
         label: 'Header Button Text',
         sectionId: 'hero',
@@ -416,6 +477,48 @@ export default function TemplateForm() {
         keywords: ['badge'],
       },
       {
+        id: 'hero-price',
+        label: 'Hero Price',
+        sectionId: 'hero',
+        componentId: 'components.home_page.hero_price',
+        keywords: ['price', 'top section'],
+      },
+      {
+        id: 'hero-card-title',
+        label: 'Hero Side Card Title',
+        sectionId: 'hero',
+        componentId: 'components.home_page.hero_card_title',
+        keywords: ['side card', 'top section'],
+      },
+      {
+        id: 'hero-rating',
+        label: 'Hero Rating',
+        sectionId: 'hero',
+        componentId: 'components.home_page.hero_rating_value',
+        keywords: ['rating', 'side card'],
+      },
+      {
+        id: 'hero-feature-1',
+        label: 'Hero Pill 1',
+        sectionId: 'hero',
+        componentId: 'components.home_page.hero_features.0',
+        keywords: ['feature pill', 'delivery'],
+      },
+      {
+        id: 'hero-feature-2',
+        label: 'Hero Pill 2',
+        sectionId: 'hero',
+        componentId: 'components.home_page.hero_features.1',
+        keywords: ['feature pill', 'toppings'],
+      },
+      {
+        id: 'hero-feature-3',
+        label: 'Hero Pill 3',
+        sectionId: 'hero',
+        componentId: 'components.home_page.hero_features.2',
+        keywords: ['feature pill', 'oven'],
+      },
+      {
         id: 'hero-catalog-label',
         label: 'Catalog Button Label',
         sectionId: 'hero',
@@ -428,6 +531,27 @@ export default function TemplateForm() {
         sectionId: 'hero',
         componentId: 'components.home_page.catalog_pdf_url',
         keywords: ['pdf', 'download file', 'catalog document'],
+      },
+      {
+        id: 'offer-banner-eyebrow',
+        label: 'Offer Banner Eyebrow',
+        sectionId: 'hero',
+        componentId: 'components.home_page.offer_section_eyebrow',
+        keywords: ['combo offer', 'offer section', 'banner text'],
+      },
+      {
+        id: 'offer-banner-image',
+        label: 'Offer Banner Image',
+        sectionId: 'hero',
+        componentId: 'components.home_page.offer_section_background_image',
+        keywords: ['combo offer', 'offer section', 'background image'],
+      },
+      {
+        id: 'offer-banner-colors',
+        label: 'Offer Banner Colors',
+        sectionId: 'hero',
+        componentId: 'components.home_page.offer_section_title_color',
+        keywords: ['combo offer', 'offer section', 'color'],
       },
       {
         id: 'description-large',
@@ -500,6 +624,27 @@ export default function TemplateForm() {
         componentId: 'components.home_page.advantage.image',
       },
       {
+        id: 'advantage-visual-card',
+        label: 'Advantage Visual Card',
+        sectionId: 'description',
+        componentId: 'components.home_page.advantage.visualCardTitle',
+        keywords: ['quality card', 'daily quality', 'visual card'],
+      },
+      {
+        id: 'advantage-promise',
+        label: 'Advantage Promise Text',
+        sectionId: 'description',
+        componentId: 'components.home_page.advantage.promiseText',
+        keywords: ['healthy promise', 'crisp ingredients'],
+      },
+      {
+        id: 'advantage-colors',
+        label: 'Advantage Colors',
+        sectionId: 'description',
+        componentId: 'components.home_page.advantage.accentColor',
+        keywords: ['advantage color', 'health section color'],
+      },
+      {
         id: 'hero-stat-1',
         label: 'Hero Stat 1',
         sectionId: 'description',
@@ -544,8 +689,42 @@ export default function TemplateForm() {
         sectionId: 'products',
         componentId: productsSubtitlePath,
       },
+      {
+        id: 'recipe-section-heading',
+        label: 'Top Recipes Heading',
+        sectionId: 'products',
+        componentId: recipeSectionHeadingPath,
+        keywords: ['top recipes', 'recipes heading', 'section heading'],
+      },
+      {
+        id: 'footer-book-text',
+        label: 'Footer Book Text',
+        sectionId: 'footer',
+        componentId: 'components.social_page.footer.book_text',
+        keywords: ['footer', 'book table'],
+      },
+      {
+        id: 'footer-newsletter',
+        label: 'Footer Newsletter Text',
+        sectionId: 'footer',
+        componentId: footerNewsletterPath,
+        keywords: ['footer', 'subscribe'],
+      },
+      {
+        id: 'footer-orders-label',
+        label: 'Footer Orders Label',
+        sectionId: 'footer',
+        componentId: 'components.social_page.footer.orders_label',
+        keywords: ['footer', 'my orders'],
+      },
     ],
-    [productsHeadingPath, productsKickerPath, productsSubtitlePath]
+    [
+      footerNewsletterPath,
+      headerAnnouncementPath,
+      productsHeadingPath,
+      productsKickerPath,
+      productsSubtitlePath,
+    ]
   )
 
   const filteredTemplateCatalog = useMemo(() => {
@@ -583,11 +762,19 @@ export default function TemplateForm() {
     () => [
       {
         title: 'Header',
-        items: orderedSections.filter((section) => section.id === 'branding'),
+        items: orderedSections.filter((section) =>
+          ['header', 'branding'].includes(section.id)
+        ),
       },
       {
         title: 'Template',
-        items: orderedSections.filter((section) => section.id !== 'branding'),
+        items: orderedSections.filter(
+          (section) => !['header', 'branding', 'footer'].includes(section.id)
+        ),
+      },
+      {
+        title: 'Footer',
+        items: orderedSections.filter((section) => section.id === 'footer'),
       },
       {
         title: 'Settings',
@@ -662,9 +849,9 @@ export default function TemplateForm() {
                 : 'Connect Domain'}
         </Button>
       )}
-      {previewBaseUrl ? (
+      {previewOpenUrl ? (
         <a
-          href={previewBaseUrl}
+          href={previewOpenUrl}
           target='_blank'
           rel='noopener noreferrer'
           className='shrink-0'
@@ -680,7 +867,87 @@ export default function TemplateForm() {
     </>
   ) : null
 
+  const headerConfig: any = data.components.home_page.header || {}
+  const footerConfig: any = data.components.social_page?.footer || {}
+  const themeConfig: any = data.components.theme || {}
+
   const sectionBlocks: Record<string, JSX.Element> = {
+    header: (
+      <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
+        <div className='space-y-5'>
+          <div>
+            <p className='text-xs font-semibold uppercase tracking-[0.3em] text-slate-400'>
+              Header
+            </p>
+            <h3 className='mt-1 text-lg font-semibold text-slate-900'>
+              Top bar and navigation
+            </h3>
+          </div>
+          <div className='grid gap-4 md:grid-cols-2'>
+            {[
+              ['Brand Label', 'brandLabel', 'Oph!'],
+              ['Top Announcement', 'topAnnouncement', 'Fresh combos, quick checkout...'],
+              ['Call Label', 'callLabel', 'Call and order in'],
+              ['Home Label', 'navHomeLabel', 'Home'],
+              ['Menu Label', 'navMenuLabel', 'Menu'],
+              ['Combo Label', 'navComboLabel', 'Combo'],
+              ['Blog Label', 'navBlogLabel', 'Blog'],
+              ['Contact Label', 'navContactLabel', 'Contact'],
+            ].map(([label, key, placeholder]) => {
+              const path = `components.home_page.header.${key}`
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    'space-y-2',
+                    selectedComponent === path &&
+                      'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                  )}
+                  data-editor-component={path}
+                >
+                  <Label>{label}</Label>
+                  <Input
+                    value={headerConfig?.[key] || ''}
+                    onChange={(event) =>
+                      updateField(
+                        ['components', 'home_page', 'header', key],
+                        event.target.value
+                      )
+                    }
+                    placeholder={placeholder}
+                  />
+                </div>
+              )
+            })}
+          </div>
+          <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+            <p className='text-xs font-semibold uppercase tracking-[0.25em] text-slate-500'>
+              Header Colors
+            </p>
+            <div className='mt-4 grid gap-4 md:grid-cols-2'>
+              {[
+                ['Top Bar Background', 'headerTopBackground', '#1f1d23'],
+                ['Header Background', 'headerBackground', '#ffffff'],
+                ['Header Text', 'headerTextColor', '#171717'],
+                ['Accent Color', 'accentColor', '#ffc222'],
+              ].map(([label, key, fallback]) => (
+                <div key={key} className='space-y-2'>
+                  <Label>{label}</Label>
+                  <Input
+                    type='color'
+                    value={themeConfig?.[key] || fallback}
+                    onChange={(event) =>
+                      updateField(['components', 'theme', key], event.target.value)
+                    }
+                    className='h-11 p-1'
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
     branding: (
       <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
         <BasicInfoSection
@@ -910,6 +1177,29 @@ export default function TemplateForm() {
               placeholder='Auto-populated from your dashboard inventory.'
             />
           </div>
+          <div
+            className={cn(
+              'space-y-2',
+              selectedComponent === recipeSectionHeadingPath &&
+              'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+            )}
+            data-editor-component={recipeSectionHeadingPath}
+          >
+            <label className='text-sm font-medium text-gray-700'>
+              Top Recipes Heading
+            </label>
+            <input
+              className='h-12 w-full rounded-md border border-slate-200 px-3'
+              value={data.components.home_page.recipe_section_heading || ''}
+              onChange={(e) =>
+                updateField(
+                  ['components', 'home_page', 'recipe_section_heading'],
+                  e.target.value
+                )
+              }
+              placeholder='Top recipes'
+            />
+          </div>
           <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
             <p className='text-xs font-semibold uppercase tracking-[0.3em] text-slate-500'>
               Products Style
@@ -993,6 +1283,110 @@ export default function TemplateForm() {
             Upload products from your dashboard to show them in the live
             template preview.
           </p>
+        </div>
+      </div>
+    ),
+    footer: (
+      <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
+        <div className='space-y-5'>
+          <div>
+            <p className='text-xs font-semibold uppercase tracking-[0.3em] text-slate-400'>
+              Footer
+            </p>
+            <h3 className='mt-1 text-lg font-semibold text-slate-900'>
+              Footer content and newsletter
+            </h3>
+          </div>
+          <div className='grid gap-4 md:grid-cols-2'>
+            {[
+              ['Brand Heading', 'brand_heading', 'Oph!'],
+              ['Book Heading', 'book_heading', 'Book a Table'],
+              ['Opening Heading', 'opening_heading', 'Opening Hours'],
+              ['Newsletter Heading', 'newsletter_heading', 'Newsletter'],
+              ['Newsletter Placeholder', 'newsletter_placeholder', 'Your Email...'],
+              ['Newsletter Button', 'newsletter_button', 'SUBSCRIBE'],
+              ['Orders Link Label', 'orders_label', 'My Orders'],
+            ].map(([label, key, placeholder]) => {
+              const path = `components.social_page.footer.${key}`
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    'space-y-2',
+                    selectedComponent === path &&
+                      'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                  )}
+                  data-editor-component={path}
+                >
+                  <Label>{label}</Label>
+                  <Input
+                    value={footerConfig?.[key] || ''}
+                    onChange={(event) =>
+                      updateField(
+                        ['components', 'social_page', 'footer', key],
+                        event.target.value
+                      )
+                    }
+                    placeholder={placeholder}
+                  />
+                </div>
+              )
+            })}
+          </div>
+          {[
+            ['Book Text', 'book_text', 'Fresh burgers, pizzas, combos...'],
+            ['Newsletter Text', 'newsletter_text', 'Subscribe for weekly offers...'],
+          ].map(([label, key, placeholder]) => {
+            const path = `components.social_page.footer.${key}`
+            return (
+              <div
+                key={key}
+                className={cn(
+                  'space-y-2',
+                  selectedComponent === path &&
+                    'rounded-lg ring-2 ring-slate-900/25 ring-offset-2 ring-offset-white'
+                )}
+                data-editor-component={path}
+              >
+                <Label>{label}</Label>
+                <Textarea
+                  value={footerConfig?.[key] || ''}
+                  onChange={(event) =>
+                    updateField(
+                      ['components', 'social_page', 'footer', key],
+                      event.target.value
+                    )
+                  }
+                  placeholder={placeholder}
+                  className='min-h-[92px]'
+                />
+              </div>
+            )
+          })}
+          <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+            <p className='text-xs font-semibold uppercase tracking-[0.25em] text-slate-500'>
+              Footer Colors
+            </p>
+            <div className='mt-4 grid gap-4 md:grid-cols-3'>
+              {[
+                ['Footer Background', 'footerBackground', '#18171c'],
+                ['Bottom Bar', 'footerBottomBackground', '#d94b2b'],
+                ['Footer Accent', 'footerAccentColor', '#ffc222'],
+              ].map(([label, key, fallback]) => (
+                <div key={key} className='space-y-2'>
+                  <Label>{label}</Label>
+                  <Input
+                    type='color'
+                    value={themeConfig?.[key] || fallback}
+                    onChange={(event) =>
+                      updateField(['components', 'theme', key], event.target.value)
+                    }
+                    className='h-11 p-1'
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     ),
@@ -1120,37 +1514,54 @@ export default function TemplateForm() {
                       {group.items.map((item) => {
                         const isExpanded = expandedSectionId === item.id
                         const isSelected = selectedSection === item.id
+                        const isEditableSection = !item.id.startsWith('__')
                         return (
-                          <button
-                            key={item.id}
-                            type='button'
-                            data-editor-section={item.id}
-                            onClick={() => {
-                              setExpandedSectionId(item.id)
-                              if (!item.id.startsWith('__')) {
-                                setSelectedSection(item.id)
-                              } else {
-                                setSelectedSection(null)
-                                setSelectedComponent(null)
-                              }
-                            }}
-                            className={cn(
-                              'flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left transition',
-                              isExpanded || isSelected
-                                ? 'bg-slate-100 text-slate-900'
-                                : 'bg-transparent text-slate-700 hover:bg-slate-50'
-                            )}
-                          >
-                            <div className='flex items-center gap-3'>
-                              <ChevronRight
-                                className={cn(
-                                  'h-4 w-4 text-slate-400 transition',
-                                  isExpanded && 'rotate-90 text-slate-700'
-                                )}
-                              />
-                              <span className='text-[15px] font-medium'>{item.title}</span>
-                            </div>
-                          </button>
+                          <div key={item.id} className='space-y-3'>
+                            <button
+                              type='button'
+                              data-editor-section={item.id}
+                              onClick={() => {
+                                setExpandedSectionId(item.id)
+                                if (isEditableSection) {
+                                  setSelectedSection(item.id)
+                                } else {
+                                  setSelectedSection(null)
+                                  setSelectedComponent(null)
+                                }
+                              }}
+                              className={cn(
+                                'flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left transition',
+                                isExpanded || isSelected
+                                  ? 'bg-slate-100 text-slate-900'
+                                  : 'bg-transparent text-slate-700 hover:bg-slate-50'
+                              )}
+                            >
+                              <div className='flex items-center gap-3'>
+                                <ChevronRight
+                                  className={cn(
+                                    'h-4 w-4 text-slate-400 transition',
+                                    isExpanded && 'rotate-90 text-slate-700'
+                                  )}
+                                />
+                                <span className='text-[15px] font-medium'>{item.title}</span>
+                              </div>
+                            </button>
+                            {isExpanded && isEditableSection ? (
+                              <div className='rounded-2xl border border-slate-200 bg-slate-50/60 p-3'>
+                                {selectedComponent ? (
+                                  <SelectedFieldEditor
+                                    data={data}
+                                    selectedComponent={selectedComponent}
+                                    updateField={updateField}
+                                    handleImageChange={handleImageChange}
+                                  />
+                                ) : null}
+                                <div data-editor-section={item.id}>
+                                  {sectionBlocks[item.id]}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
                         )
                       })}
                     </div>
@@ -1218,19 +1629,7 @@ export default function TemplateForm() {
                 setOrder={setSectionOrder}
               />
             ) : expandedSectionId ? (
-              <div className='space-y-4'>
-                {selectedComponent ? (
-                  <SelectedFieldEditor
-                    data={data}
-                    selectedComponent={selectedComponent}
-                    updateField={updateField}
-                    handleImageChange={handleImageChange}
-                  />
-                ) : null}
-                <div data-editor-section={expandedSectionId}>
-                  {sectionBlocks[expandedSectionId]}
-                </div>
-              </div>
+              null
             ) : null}
           </>
         ) : null}
