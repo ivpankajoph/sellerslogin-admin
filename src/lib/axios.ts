@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from "axios";
-import { store } from "../store"; // import your Redux store
+import { persistor, store } from "../store"; // import your Redux store
 import { logout } from "@/store/slices/authSlice";
 
 
@@ -57,8 +57,13 @@ const handleExpiredSession = () => {
   isSessionRedirectInProgress = true;
 
   store.dispatch(logout());
+  void persistor.flush().catch(() => undefined);
 
   if (typeof window !== "undefined") {
+    window.localStorage.removeItem("persist:root");
+    window.localStorage.removeItem("token");
+    window.sessionStorage.removeItem("seller_autologin_cache_v1");
+
     if (!window.location.pathname.startsWith("/sign-in")) {
       const redirectPath =
         `${window.location.pathname}${window.location.search}${window.location.hash}` ||
