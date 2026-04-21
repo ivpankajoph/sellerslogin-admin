@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   studioCardClass,
@@ -31,8 +31,6 @@ const REQUIRED_SPECIFICATION_KEYS = [
   'Minimum Order Quantity (MOQ)',
   'Country of Origin',
   'Supply Ability',
-  'Dispatch Time',
-  'Delivery Time',
   'Shipping Charges',
   'Replacement Policy',
   'Customer Support',
@@ -55,7 +53,26 @@ const Step3Specifications: React.FC<Props> = ({
   const [newKey, setNewKey] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
 
-  const activeSpecs = useMemo(() => specifications[0] || {}, [specifications])
+  const activeSpecs = useMemo(() => {
+    const raw = specifications[0] || {}
+    const filtered: Record<string, string> = {}
+    const excludedKeys = [
+      'size',
+      'brand',
+      'material',
+      'type',
+      'dispatch time',
+      'delivery time',
+    ]
+
+    Object.keys(raw).forEach((key) => {
+      if (!excludedKeys.includes(key.toLowerCase().trim())) {
+        filtered[key] = raw[key]
+      }
+    })
+    return filtered
+  }, [specifications])
+
   const activeSpecKeys = useMemo(() => Object.keys(activeSpecs), [activeSpecs])
   const missingRequiredKeys = useMemo(() => {
     const activeKeySet = new Set(activeSpecKeys.map(normalizeKey))
@@ -74,6 +91,9 @@ const Step3Specifications: React.FC<Props> = ({
 
   return (
     <section className={studioCardClass}>
+      <div className='border-border/60 mb-4 border-b pb-3'>
+        <h3 className='text-foreground text-lg font-bold'>Product Features</h3>
+      </div>
       {activeSpecKeys.length ? (
         <div className='grid gap-4 lg:grid-cols-2'>
           {activeSpecKeys.map((key) => {
@@ -135,7 +155,7 @@ const Step3Specifications: React.FC<Props> = ({
 
         {showCustomInput ? (
           <div className='space-y-3'>
-            <div className='grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]'>
+            <div className='grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto]'>
               <input
                 type='text'
                 value={newKey}
@@ -156,6 +176,14 @@ const Step3Specifications: React.FC<Props> = ({
               >
                 <Plus className='mr-2 h-4 w-4' />
                 Add Field
+              </Button>
+              <Button
+                type='button'
+                variant='ghost'
+                onClick={() => setShowCustomInput(false)}
+                className='text-muted-foreground h-11 w-11 rounded-xl p-0 hover:bg-red-50 hover:text-red-500'
+              >
+                <X className='h-4 w-4' />
               </Button>
             </div>
           </div>

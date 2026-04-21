@@ -1140,8 +1140,9 @@ const Step5Variants: React.FC<Props> = ({
   return (
     <div className='space-y-6'>
       <section className={cn(studioCardClass, 'space-y-5 p-5')}>
-        <div className='flex flex-wrap justify-end gap-4'>
-          <div className='flex flex-wrap items-center justify-end gap-2'>
+        <div className='border-border/60 flex flex-wrap items-center justify-between gap-4 border-b pb-3'>
+          <h3 className='text-foreground text-lg font-bold'>Variant</h3>
+          <div className='flex flex-wrap items-center gap-2'>
             <div className='border-border flex h-9 items-center gap-2 rounded-full border bg-white px-3'>
               <span className='text-muted-foreground text-xs font-medium'>
                 Visible
@@ -1176,14 +1177,22 @@ const Step5Variants: React.FC<Props> = ({
 
         <div className='space-y-4'>
           {rows.length
-            ? rows.map((row, index) => (
+            ? rows.map((row) => (
                 <div
                   key={row.id}
-                  className='border-border/70 rounded-2xl border bg-white p-4'
+                  className='border-border/70 relative rounded-2xl border border-dashed p-5 pt-7'
                 >
-                  <div className='grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]'>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    onClick={() => removeRow(row.id)}
+                    className='text-muted-foreground absolute top-2 right-2 h-8 w-8 rounded-full p-0 transition-colors hover:bg-red-50 hover:text-red-500'
+                  >
+                    <X className='h-4 w-4' />
+                  </Button>
+                  <div className='grid gap-5 md:grid-cols-2 lg:grid-cols-[1.5fr_2fr]'>
                     <div>
-                      <StudioFieldLabel label={`Variant ${index + 1}`} />
+                      <StudioFieldLabel label={`Option name`} />
                       <Select
                         value={row.key}
                         onValueChange={(value) => {
@@ -1197,7 +1206,7 @@ const Step5Variants: React.FC<Props> = ({
                         }}
                       >
                         <SelectTrigger className='border-input h-11 rounded-xl bg-white'>
-                          <SelectValue placeholder='Select variant' />
+                          <SelectValue placeholder='e.g. Color or Size' />
                         </SelectTrigger>
                         <SelectContent>
                           {sanitizeStringList([
@@ -1230,7 +1239,7 @@ const Step5Variants: React.FC<Props> = ({
                     </div>
 
                     <div>
-                      <StudioFieldLabel label={row.key || 'Values'} />
+                      <StudioFieldLabel label={`Option values`} />
                       <VariantValuesEditor
                         rowKey={row.key}
                         values={row.values}
@@ -1265,17 +1274,6 @@ const Step5Variants: React.FC<Props> = ({
                           ))}
                         </div>
                       ) : null}
-                    </div>
-
-                    <div className='flex items-start justify-end'>
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        onClick={() => removeRow(row.id)}
-                        className='text-muted-foreground hover:text-destructive h-11 rounded-xl px-3'
-                      >
-                        <X className='h-4 w-4' />
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -1332,7 +1330,14 @@ const Step5Variants: React.FC<Props> = ({
           </div>
         </div>
 
-        <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]'>
+        <div
+          className={cn(
+            'grid gap-4',
+            replacementPolicyType !== 'none'
+              ? 'lg:grid-cols-[minmax(0,1fr)_220px]'
+              : 'lg:grid-cols-1'
+          )}
+        >
           <div>
             <StudioFieldLabel label='Product Replacement / Return' />
             <Select
@@ -1354,21 +1359,22 @@ const Step5Variants: React.FC<Props> = ({
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <StudioFieldLabel label='Days' />
-            <input
-              type='number'
-              min='0'
-              step='1'
-              value={replacementPolicyDays}
-              onChange={(event) =>
-                onReplacementPolicyDaysChange(event.target.value)
-              }
-              placeholder='e.g. 7'
-              disabled={replacementPolicyType === 'none'}
-              className={studioInputClass}
-            />
-          </div>
+          {replacementPolicyType !== 'none' && (
+            <div>
+              <StudioFieldLabel label='Days' />
+              <input
+                type='number'
+                min='0'
+                step='1'
+                value={replacementPolicyDays}
+                onChange={(event) =>
+                  onReplacementPolicyDaysChange(event.target.value)
+                }
+                placeholder='e.g. 7'
+                className={studioInputClass}
+              />
+            </div>
+          )}
         </div>
       </section>
 
@@ -1381,6 +1387,9 @@ const Step5Variants: React.FC<Props> = ({
 
       {variants.length ? (
         <section className={cn(studioCardClass, 'space-y-4 p-5')}>
+          <div className='border-border/60 border-b pb-3'>
+            <h3 className='text-foreground text-lg font-bold'>Variant</h3>
+          </div>
           <div className='border-border/70 overflow-hidden rounded-2xl border'>
             <div className='bg-muted/30 text-muted-foreground grid grid-cols-[minmax(0,1.5fr)_150px_150px_150px] gap-3 px-4 py-3 text-xs font-semibold tracking-[0.16em] uppercase'>
               <span>Variant</span>

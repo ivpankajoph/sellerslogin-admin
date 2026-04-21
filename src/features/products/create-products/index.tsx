@@ -60,6 +60,7 @@ const MAX_PRODUCT_IMAGES = 8
 const MAX_VARIANT_IMAGES = 3
 const MIN_SPECIFICATION_KEY_COUNT = 6
 const MAX_DESCRIPTION_WORDS = 2000
+const PRODUCT_PREVIEW_MESSAGE_TYPE = 'template-product-preview-draft'
 
 type VariantContextRule = {
   patterns: RegExp[]
@@ -69,6 +70,21 @@ type VariantContextRule = {
   detailKeys?: string[]
   allowedDetailKeyPatterns?: RegExp[]
 }
+
+const createProductPreviewPayload = (
+  sessionId: string,
+  vendorId: string | undefined,
+  formData: ProductFormData
+) => ({
+  type: PRODUCT_PREVIEW_MESSAGE_TYPE,
+  sessionId,
+  vendorId,
+  payload: {
+    savedAt: Date.now(),
+    expiresAt: Date.now() + PRODUCT_PREVIEW_STORAGE_TTL_MS,
+    formData,
+  },
+})
 
 const GENERIC_VARIANT_KEY_PATTERNS = [
   /color/i,
@@ -1142,6 +1158,10 @@ const ProductCreateForm: React.FC = () => {
       null
   )
   const vendorId = String(authUser?.id || authUser?._id || '')
+  const previewWindowRef = useRef<Window | null>(null)
+  const [previewSessionId, setPreviewSessionId] = useState<string | null>(null)
+  const [previewTargetOrigin, setPreviewTargetOrigin] = useState<string>('*')
+
   const initialEditorSearch = useMemo(() => {
     if (typeof window === 'undefined') {
       return { mode: 'create', productId: '' }
@@ -1189,6 +1209,50 @@ const ProductCreateForm: React.FC = () => {
   const [recommendedVariantKeys, setRecommendedVariantKeys] = useState<
     string[]
   >([])
+
+  // Live Preview Update
+  useEffect(() => {
+    const previewWin = previewWindowRef.current
+    if (!previewWin || previewWin.closed || !previewSessionId) return
+
+    const timer = setTimeout(() => {
+      const previewPayload = createProductPreviewPayload(
+        previewSessionId,
+        vendorId,
+        formData
+      )
+      previewWin.postMessage(previewPayload, previewTargetOrigin)
+    }, 250)
+
+    return () => clearTimeout(timer)
+  }, [formData, previewSessionId, vendorId, previewTargetOrigin])
+
+  // Listen for the preview window signaling it's ready (e.g. after a refresh)
+  useEffect(() => {
+    if (!previewSessionId) return
+
+    const handleMessage = (event: MessageEvent) => {
+      if (
+        event.data?.type === 'preview-window-ready' &&
+        event.data?.sessionId === previewSessionId
+      ) {
+        const previewPayload = createProductPreviewPayload(
+          previewSessionId,
+          vendorId,
+          formData
+        )
+        previewWindowRef.current?.postMessage(
+          previewPayload,
+          previewTargetOrigin
+        )
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [formData, previewSessionId, vendorId, previewTargetOrigin])
+
+  // Initial load
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState<any>({
     metaTitle: false,
@@ -3494,11 +3558,16 @@ const ProductCreateForm: React.FC = () => {
         return
       }
 
-      const previewSessionId = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
-      const previewWindow = window.open(
-        `${previewUrl}?previewDraft=1&previewSessionId=${encodeURIComponent(previewSessionId)}`,
-        '_blank'
+      const sessionId = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+      const previewHref = `${previewUrl}?previewDraft=1&previewSessionId=${encodeURIComponent(
+        sessionId
+      )}`
+      const previewPayload = createProductPreviewPayload(
+        sessionId,
+        vendorId,
+        formData
       )
+      const previewWindow = window.open('about:blank', '_blank')
 
       if (!previewWindow) {
         toast.error(
@@ -3506,6 +3575,14 @@ const ProductCreateForm: React.FC = () => {
         )
         return
       }
+
+      try {
+        previewWindow.name = JSON.stringify(previewPayload)
+      } catch {
+        // The postMessage retry below still handles browsers that block window.name.
+      }
+
+      previewWindow.location.href = previewHref
 
       const targetOrigin = (() => {
         try {
@@ -3515,19 +3592,12 @@ const ProductCreateForm: React.FC = () => {
         }
       })()
 
-      const previewPayload = {
-        type: 'template-product-preview-draft',
-        sessionId: previewSessionId,
-        vendorId,
-        payload: {
-          savedAt: Date.now(),
-          expiresAt: Date.now() + PRODUCT_PREVIEW_STORAGE_TTL_MS,
-          formData,
-        },
-      }
+      previewWindowRef.current = previewWindow
+      setPreviewSessionId(sessionId)
+      setPreviewTargetOrigin(targetOrigin)
 
       let attempts = 0
-      const maxAttempts = 20
+      const maxAttempts = 90
       const postPreviewPayload = () => {
         if (previewWindow.closed) {
           window.clearInterval(intervalId)
@@ -3869,7 +3939,7 @@ const ProductCreateForm: React.FC = () => {
       },
       {
         step: 3,
-        title: 'Prices',
+        title: 'Prices and Variations',
         description:
           'Default price, return policy, optional variants, stock, and website publishing.',
         icon: Layers3,

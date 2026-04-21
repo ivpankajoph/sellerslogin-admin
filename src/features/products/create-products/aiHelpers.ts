@@ -1,5 +1,6 @@
 // src/components/ProductCreate/utils/aiHelpers.ts
 
+import { toast } from 'sonner';
 import type { Dispatch, SetStateAction } from 'react';
 
 type AiLoadingSetter = Dispatch<SetStateAction<Record<string, boolean>>>;
@@ -22,10 +23,10 @@ export const generateWithAI = async (
       }
     );
     const data = await res.json();
-    if (!data.success) throw new Error();
+    if (!data.success) throw new Error(data.message || 'AI generation failed');
     setFormData((prev: any) => ({ ...prev, [field]: data.data }));
-  } catch (err) {
-    alert('AI generation failed');
+  } catch (err: any) {
+    toast.error(err.message || 'AI generation failed');
   } finally {
     setAiLoading((prev: any) => ({ ...prev, [field]: false }));
   }
@@ -60,14 +61,14 @@ Brand: ${formData.brand}
       }
     );
     const data = await res.json();
-    if (!data.success) throw new Error();
+    if (!data.success) throw new Error(data.message || 'Specification generation failed');
 
     setFormData((prev: any) => ({
       ...prev,
       specifications: [data.data],
     }));
-  } catch (err) {
-    alert('Specification generation failed');
+  } catch (err: any) {
+    toast.error(err.message || 'Specification generation failed');
   } finally {
     setAiLoading((prev: any) => ({ ...prev, specifications: false }));
   }
@@ -93,7 +94,7 @@ export const generateSpecificationKeysHelper = async (
       }
     );
     const data = await res.json();
-    if (!data.success || !Array.isArray(data.data)) throw new Error();
+    if (!data.success || !Array.isArray(data.data)) throw new Error(data.message || 'Failed to generate specification keys');
 
     const newKeys = data.data;
     setSpecificationKeys(newKeys);
@@ -107,9 +108,9 @@ export const generateSpecificationKeysHelper = async (
       specifications: [initialSpec],
     }));
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("Failed to generate spec keys", err);
-    // Fallback logic could go here, or just alert
+    toast.error(err.message || 'Failed to generate specification keys');
   } finally {
     setAiLoading((prev: any) => ({ ...prev, specificationKeys: false }));
   }

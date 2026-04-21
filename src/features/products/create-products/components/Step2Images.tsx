@@ -29,19 +29,7 @@ const Step2Images: React.FC<Props> = ({
   return (
     <div className='space-y-6'>
       <section className={studioCardClass}>
-        <div className='flex justify-end'>
-          <Button
-            type='button'
-            variant='outline'
-            className='h-11 rounded-xl hover:bg-white hover:text-black'
-            asChild
-          >
-            <label htmlFor='default-images' className='cursor-pointer'>
-              <UploadCloud className='mr-2 h-4 w-4' />
-              Upload images
-            </label>
-          </Button>
-        </div>
+
 
         <input
           type='file'
@@ -70,16 +58,24 @@ const Step2Images: React.FC<Props> = ({
             if (files.length) onDrop(files)
           }}
           className={cn(
-            'mt-6 rounded-2xl border border-dashed px-6 py-8 text-center transition',
+            'rounded-2xl border border-dashed px-6 py-8 text-center transition',
             isDragging
               ? 'border-indigo-400 bg-indigo-50/80 dark:bg-indigo-500/10'
               : 'border-border bg-background/60'
           )}
         >
           <div className='mx-auto flex max-w-md flex-col items-center gap-3'>
-            <div className='border-border bg-card flex h-12 w-12 items-center justify-center rounded-xl border shadow-sm'>
-              <UploadCloud className='h-5 w-5 text-indigo-600' />
-            </div>
+            <Button
+              type='button'
+              variant='outline'
+              className='h-11 rounded-xl hover:bg-white hover:text-black'
+              asChild
+            >
+              <label htmlFor='default-images' className='cursor-pointer'>
+                <UploadCloud className='mr-2 h-4 w-4' />
+                Upload images
+              </label>
+            </Button>
           </div>
         </div>
 

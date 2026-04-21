@@ -55,8 +55,7 @@ interface Props {
 const panelClass =
   'rounded-[28px] border border-border bg-card p-5 shadow-[0_20px_60px_-48px_rgba(15,23,42,0.45)] sm:p-6 dark:shadow-[0_20px_60px_-48px_rgba(0,0,0,0.8)]'
 
-const innerCardClass =
-  'rounded-2xl border border-border bg-background/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
+const innerCardClass = ''
 
 const aiButtonClass =
   'inline-flex items-center gap-1 rounded-full border border-cyan-500/25 bg-white px-4 py-2 text-xs font-semibold text-cyan-700 shadow-sm transition hover:border-cyan-500/40 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-60 dark:text-cyan-200'
