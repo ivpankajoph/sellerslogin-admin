@@ -9,6 +9,7 @@ const TEMPLATE_NAME_BY_KEY: Record<string, string> = {
   poupqz: 'RackFlow Blue',
   oragze: 'Organic Freshmart',
   whiterose: 'White Rose',
+  pocofood: 'Oph Food',
 }
 
 export const normalizeTemplateParam = (value: unknown) => {

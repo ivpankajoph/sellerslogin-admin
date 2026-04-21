@@ -143,7 +143,6 @@ const REQUEST_TIMEOUT_MS = 10000
 const LIVE_PREVIEW_SCALE = 0.25
 const LIVE_PREVIEW_DIMENSION = `${100 / LIVE_PREVIEW_SCALE}%`
 const B2B_TEMPLATE_KEYS = new Set(['mquiq', 'poupqz'])
-const FREE_PLAN_WEBSITE_LIMIT = 5
 const TEMPLATE_AUDIENCE_COPY: Record<
   TemplateAudience,
   {
@@ -278,6 +277,15 @@ const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
       'Premium furniture storefront with clean white-blue utility navigation and launch-first merchandising.',
     previewImage:
       'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&q=80&w=1200',
+  },
+  {
+    key: 'pocofood',
+    name: 'Oph Food',
+    audience: 'b2c',
+    description:
+      'Food-delivery storefront with bold hero offers, cuisine rails, recipe cards, and promo-led merchandising.',
+    previewImage:
+      'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=1200',
   },
 ]
 
@@ -797,17 +805,6 @@ export default function TemplateWorkspace() {
   }, [activeWebsiteId, isAdmin, vendorId, websites])
 
   const openCreateDialog = () => {
-    if (!isAdmin && vendorProfile) {
-      const sub = vendorProfile.subscription || {}
-      const isFree = sub.current_plan === 'free' || !sub.current_plan
-      if (isFree && websites.length >= FREE_PLAN_WEBSITE_LIMIT) {
-        toast.error(
-          `Free plan allows only ${FREE_PLAN_WEBSITE_LIMIT} websites. Please upgrade to premium to create more.`
-        )
-        return
-      }
-    }
-
     setOpeningCreateDialog(true)
 
     const runOpen = () => {
@@ -882,6 +879,7 @@ export default function TemplateWorkspace() {
       void navigate({
         to: '/vendor-template/$templateKey',
         params: { templateKey },
+        search: { website: website._id },
       })
       return
     }
@@ -1248,7 +1246,7 @@ export default function TemplateWorkspace() {
                   selectedCitySlug ||
                     effectiveDefaultCitySlug ||
                     vendorDefaultCitySlug,
-                  website.website_slug || website._id
+                  website._id
                 )
                 const thumbnail =
                   website.previewImage || websiteTemplate?.previewImage || ''

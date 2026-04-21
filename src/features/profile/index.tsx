@@ -83,19 +83,29 @@ const ADMIN_PROFILE_SECTIONS: EditableSection[] = [
 const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
   {
     title: 'Business Details',
-    description: 'Core business identity details.',
+    description: 'Core business identity details from your onboarding flow.',
     icon: Store,
     fields: [
       { key: 'name', label: 'Store Name', placeholder: 'Store name' },
       {
-        key: 'business_name',
-        label: 'Business Name',
-        placeholder: 'Registered business name',
-      },
-      {
         key: 'registrar_name',
         label: 'Registrar Name',
         placeholder: 'Owner or registrar name',
+      },
+      {
+        key: 'designation',
+        label: 'Designation',
+        placeholder: 'Owner, Founder, Director',
+      },
+      {
+        key: 'business_type',
+        label: 'Business Type',
+        placeholder: 'Manufacturer, Wholesaler, Retailer',
+      },
+      {
+        key: 'established_year',
+        label: 'Established Year',
+        placeholder: '2024',
       },
     ],
   },
@@ -122,11 +132,16 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
         placeholder: '+91 9000000000',
         type: 'tel',
       },
+      {
+        key: 'upi_id',
+        label: 'UPI ID',
+        placeholder: 'your-store@upi',
+      },
     ],
   },
   {
     title: 'Address',
-    description: 'Business address and location.',
+    description: 'Business address and location from the skipped registration steps.',
     icon: MapPin,
     fields: [
       {
@@ -139,6 +154,47 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
       { key: 'state', label: 'State', placeholder: 'State' },
       { key: 'pincode', label: 'Pincode', placeholder: '400001' },
       { key: 'country', label: 'Country', placeholder: 'India' },
+      { key: 'street', label: 'Street', placeholder: 'Street or locality' },
+    ],
+  },
+  {
+    title: 'Business Profile',
+    description: 'Finish the profile information that was previously collected during registration.',
+    icon: Store,
+    fields: [
+      {
+        key: 'business_nature',
+        label: 'Business Nature',
+        placeholder: 'Exporter, Manufacturer, Trader',
+        type: 'textarea',
+      },
+      {
+        key: 'categories',
+        label: 'Categories',
+        placeholder: 'Category names separated by commas',
+        type: 'textarea',
+      },
+      {
+        key: 'dealing_area',
+        label: 'Dealing Area',
+        placeholder: 'India, UAE, Global',
+        type: 'textarea',
+      },
+      {
+        key: 'annual_turnover',
+        label: 'Annual Turnover',
+        placeholder: '0 - 25 Lakh',
+      },
+      {
+        key: 'office_employees',
+        label: 'Employees',
+        placeholder: '1 - 10',
+      },
+      {
+        key: 'return_policy',
+        label: 'Return Policy',
+        placeholder: '7 days replacement',
+      },
     ],
   },
 ]
@@ -187,6 +243,26 @@ const toArray = (value: unknown): string[] => {
       : []
   }
   return []
+}
+
+const clampPercent = (value: number) => Math.max(0, Math.min(100, value))
+
+function ProfileCompletionRing({ value }: { value: number }) {
+  const safeValue = clampPercent(value)
+  return (
+    <div className='relative flex h-20 w-20 items-center justify-center rounded-full bg-white'>
+      <div
+        className='absolute inset-0 rounded-full'
+        style={{
+          background: `conic-gradient(rgb(109 40 217) ${safeValue}%, rgb(226 232 240) ${safeValue}% 100%)`,
+        }}
+      />
+      <div className='absolute inset-[6px] rounded-full bg-white' />
+      <div className='relative text-center'>
+        <div className='text-lg font-bold text-slate-950'>{safeValue}%</div>
+      </div>
+    </div>
+  )
 }
 
 export default function ProfilePage() {
@@ -331,6 +407,15 @@ export default function ProfilePage() {
   const displayEmail = readString(profile?.email || user?.email) || '-'
   const displayPhone = readString(profile?.phone || user?.phone) || '-'
   const registeredEmail = readString(profile?.email || user?.email).trim()
+  const completionPercent = clampPercent(
+    Number(profile?.profile_complete_level || user?.profile_complete_level || 0)
+  )
+  const completionLabel =
+    completionPercent >= 100
+      ? 'Profile complete'
+      : completionPercent >= 60
+        ? 'Almost there'
+        : 'Needs attention'
   const avatarInitials =
     displayName
       .split(/\s+/)
@@ -536,6 +621,24 @@ export default function ProfilePage() {
                   >
                     <Camera className='mr-2 h-4 w-4' /> Change Photo
                   </Button>
+                )}
+                {isVendor && (
+                  <div className='rounded-2xl border border-violet-100 bg-violet-50/70 p-4 text-left'>
+                    <div className='flex items-center gap-4'>
+                      <ProfileCompletionRing value={completionPercent} />
+                      <div className='space-y-1'>
+                        <p className='text-[11px] font-bold uppercase tracking-[0.18em] text-violet-700'>
+                          Profile Completion
+                        </p>
+                        <p className='text-sm font-semibold text-slate-900'>
+                          {completionLabel}
+                        </p>
+                        <p className='text-xs leading-5 text-slate-600'>
+                          Finish the skipped registration details from this profile page.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 )}
                 <div className='space-y-2 border-t pt-4 text-left text-sm'>
                   <div className='flex items-center gap-2 text-slate-600'>

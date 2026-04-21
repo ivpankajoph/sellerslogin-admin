@@ -62,6 +62,7 @@ import { Route as AuthenticatedLiveChatIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './routes/_authenticated/inventory-management/index'
 import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
+import { Route as AuthenticatedFoodIndexRouteImport } from './routes/_authenticated/food/index'
 import { Route as AuthenticatedDeliveryChargesIndexRouteImport } from './routes/_authenticated/delivery-charges/index'
 import { Route as AuthenticatedCustomerReviewsIndexRouteImport } from './routes/_authenticated/customer-reviews/index'
 import { Route as AuthenticatedCustomerQueriesIndexRouteImport } from './routes/_authenticated/customer-queries/index'
@@ -394,6 +395,11 @@ const AuthenticatedHelpCenterIndexRoute =
     path: '/help-center/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFoodIndexRoute = AuthenticatedFoodIndexRouteImport.update({
+  id: '/food/',
+  path: '/food/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDeliveryChargesIndexRoute =
   AuthenticatedDeliveryChargesIndexRouteImport.update({
     id: '/delivery-charges/',
@@ -658,6 +664,7 @@ export interface FileRoutesByFullPath {
   '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
+  '/food': typeof AuthenticatedFoodIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
@@ -744,6 +751,7 @@ export interface FileRoutesByTo {
   '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
+  '/food': typeof AuthenticatedFoodIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/inventory-management': typeof AuthenticatedInventoryManagementIndexRoute
@@ -836,6 +844,7 @@ export interface FileRoutesById {
   '/_authenticated/customer-queries/': typeof AuthenticatedCustomerQueriesIndexRoute
   '/_authenticated/customer-reviews/': typeof AuthenticatedCustomerReviewsIndexRoute
   '/_authenticated/delivery-charges/': typeof AuthenticatedDeliveryChargesIndexRoute
+  '/_authenticated/food/': typeof AuthenticatedFoodIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/inventory-management/': typeof AuthenticatedInventoryManagementIndexRoute
@@ -926,6 +935,7 @@ export interface FileRouteTypes {
     | '/customer-queries'
     | '/customer-reviews'
     | '/delivery-charges'
+    | '/food'
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
@@ -1012,6 +1022,7 @@ export interface FileRouteTypes {
     | '/customer-queries'
     | '/customer-reviews'
     | '/delivery-charges'
+    | '/food'
     | '/help-center'
     | '/integrations'
     | '/inventory-management'
@@ -1103,6 +1114,7 @@ export interface FileRouteTypes {
     | '/_authenticated/customer-queries/'
     | '/_authenticated/customer-reviews/'
     | '/_authenticated/delivery-charges/'
+    | '/_authenticated/food/'
     | '/_authenticated/help-center/'
     | '/_authenticated/integrations/'
     | '/_authenticated/inventory-management/'
@@ -1531,6 +1543,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHelpCenterIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/food/': {
+      id: '/_authenticated/food/'
+      path: '/food'
+      fullPath: '/food'
+      preLoaderRoute: typeof AuthenticatedFoodIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/delivery-charges/': {
       id: '/_authenticated/delivery-charges/'
       path: '/delivery-charges'
@@ -1855,6 +1874,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCustomerQueriesIndexRoute: typeof AuthenticatedCustomerQueriesIndexRoute
   AuthenticatedCustomerReviewsIndexRoute: typeof AuthenticatedCustomerReviewsIndexRoute
   AuthenticatedDeliveryChargesIndexRoute: typeof AuthenticatedDeliveryChargesIndexRoute
+  AuthenticatedFoodIndexRoute: typeof AuthenticatedFoodIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedInventoryManagementIndexRoute: typeof AuthenticatedInventoryManagementIndexRoute
@@ -1927,6 +1947,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedCustomerReviewsIndexRoute,
   AuthenticatedDeliveryChargesIndexRoute:
     AuthenticatedDeliveryChargesIndexRoute,
+  AuthenticatedFoodIndexRoute: AuthenticatedFoodIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,
   AuthenticatedInventoryManagementIndexRoute:

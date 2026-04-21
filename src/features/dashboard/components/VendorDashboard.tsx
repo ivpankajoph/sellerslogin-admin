@@ -55,6 +55,57 @@ type DashboardCard = {
   ctaTo?: '/products/create-products'
 }
 
+const clampPercent = (value: number) => Math.max(0, Math.min(100, value))
+
+const readText = (value: unknown) => String(value || '').trim()
+
+const hasListValue = (value: unknown) => {
+  if (Array.isArray(value)) return value.some((item) => readText(item))
+  return readText(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean).length > 0
+}
+
+const PROFILE_SETUP_ITEMS = [
+  { label: 'store name', test: (user: any) => Boolean(readText(user?.name)) },
+  {
+    label: 'registrar name',
+    test: (user: any) => Boolean(readText(user?.registrar_name)),
+  },
+  {
+    label: 'business type',
+    test: (user: any) => Boolean(readText(user?.business_type)),
+  },
+  { label: 'address', test: (user: any) => Boolean(readText(user?.address)) },
+  { label: 'city', test: (user: any) => Boolean(readText(user?.city)) },
+  { label: 'state', test: (user: any) => Boolean(readText(user?.state)) },
+  { label: 'pincode', test: (user: any) => Boolean(readText(user?.pincode)) },
+  {
+    label: 'categories',
+    test: (user: any) => hasListValue(user?.categories),
+  },
+]
+
+function DashboardCompletionRing({ value }: { value: number }) {
+  const safeValue = clampPercent(value)
+
+  return (
+    <div className='relative flex h-24 w-24 items-center justify-center rounded-full bg-white'>
+      <div
+        className='absolute inset-0 rounded-full'
+        style={{
+          background: `conic-gradient(rgb(79 70 229) ${safeValue}%, rgb(226 232 240) ${safeValue}% 100%)`,
+        }}
+      />
+      <div className='absolute inset-[7px] rounded-full bg-white' />
+      <div className='relative text-center'>
+        <div className='text-2xl font-bold text-slate-950'>{safeValue}%</div>
+      </div>
+    </div>
+  )
+}
+
 const VendorDashboard = () => {
   const token = useSelector((state: any) => state.auth?.token)
   const user = useSelector((state: any) => state.auth?.user)
@@ -471,9 +522,47 @@ const VendorDashboard = () => {
   ]
 
   const cardsToRender = isAdminRole ? adminCards : vendorCards
+  const profileCompletion = clampPercent(
+    Number(user?.profile_complete_level || 0)
+  )
+  const missingSetupItems = PROFILE_SETUP_ITEMS.filter((item) => !item.test(user))
+    .map((item) => item.label)
+    .slice(0, 3)
 
   return (
     <>
+      {!isAdminRole && (
+        <Card className='mb-4 overflow-hidden border-0 bg-gradient-to-r from-indigo-50 via-white to-violet-50'>
+          <CardContent className='flex flex-col gap-5 p-6 md:flex-row md:items-center md:justify-between'>
+            <div className='flex items-center gap-4'>
+              <DashboardCompletionRing value={profileCompletion} />
+              <div className='space-y-2'>
+                <div className='text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700'>
+                  Profile Completion
+                </div>
+                <h3 className='text-xl font-bold text-slate-950'>
+                  Finish your seller profile from the dashboard
+                </h3>
+                <p className='text-sm text-slate-600'>
+                  {profileCompletion >= 100
+                    ? 'Your onboarding details are complete.'
+                    : missingSetupItems.length
+                      ? `Next: ${missingSetupItems.join(', ')}`
+                      : 'Add the remaining business details from your profile page.'}
+                </p>
+              </div>
+            </div>
+            <div className='flex flex-col items-start gap-3 md:items-end'>
+              <div className='text-sm font-medium text-slate-700'>
+                {profileCompletion >= 100 ? 'Ready to go' : 'Continue setup'}
+              </div>
+              <Button asChild className='bg-indigo-600 hover:bg-indigo-700'>
+                <Link to='/profile'>Open Profile</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
         {cardsToRender.map((card) => {
           const Icon = card.icon
