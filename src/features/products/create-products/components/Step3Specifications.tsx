@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { FileText, Loader2, Plus, Settings2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   studioCardClass,
@@ -22,9 +22,33 @@ const toLabel = (value: string) =>
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase())
 
+const REQUIRED_SPECIFICATION_KEYS = [
+  'Product Features',
+  'Packaging Type',
+  'Net Quantity',
+  'Units per Pack',
+  'Sales Package / In The Box',
+  'Minimum Order Quantity (MOQ)',
+  'Country of Origin',
+  'Supply Ability',
+  'Dispatch Time',
+  'Delivery Time',
+  'Shipping Charges',
+  'Replacement Policy',
+  'Customer Support',
+  'Connectivity',
+  'Compatibility',
+  'Battery Life',
+]
+
+const normalizeKey = (value: string) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+
 const Step3Specifications: React.FC<Props> = ({
   specifications,
-  aiLoading,
   onSpecChange,
   onAddKey,
 }) => {
@@ -33,6 +57,12 @@ const Step3Specifications: React.FC<Props> = ({
 
   const activeSpecs = useMemo(() => specifications[0] || {}, [specifications])
   const activeSpecKeys = useMemo(() => Object.keys(activeSpecs), [activeSpecs])
+  const missingRequiredKeys = useMemo(() => {
+    const activeKeySet = new Set(activeSpecKeys.map(normalizeKey))
+    return REQUIRED_SPECIFICATION_KEYS.filter(
+      (key) => !activeKeySet.has(normalizeKey(key))
+    )
+  }, [activeSpecKeys])
 
   const handleAddKey = () => {
     const normalized = newKey.trim()
@@ -44,25 +74,8 @@ const Step3Specifications: React.FC<Props> = ({
 
   return (
     <section className={studioCardClass}>
-      <div className='flex flex-col gap-3 border-b border-border/60 pb-4'>
-        <div className='flex items-center gap-2 text-base font-semibold text-foreground'>
-          <Settings2 className='h-4 w-4 text-emerald-600' />
-          Product Details
-        </div>
-        <div className='text-sm text-muted-foreground'>
-          {aiLoading ? (
-            <span className='inline-flex items-center gap-2'>
-              <Loader2 className='h-4 w-4 animate-spin text-emerald-600' />
-              Generating fields from the categories selected in Basics...
-            </span>
-          ) : (
-            'Fields are generated automatically from the categories selected in Basics.'
-          )}
-        </div>
-      </div>
-
       {activeSpecKeys.length ? (
-        <div className='mt-6 grid gap-4 lg:grid-cols-2'>
+        <div className='grid gap-4 lg:grid-cols-2'>
           {activeSpecKeys.map((key) => {
             const value = activeSpecs[key] || ''
             const isLongField =
@@ -70,10 +83,14 @@ const Step3Specifications: React.FC<Props> = ({
 
             return (
               <div key={key} className={studioCardClass}>
-                <label className='text-sm font-medium text-foreground'>
+                <label className='text-foreground text-sm font-medium'>
                   {toLabel(key)}
                 </label>
-                {isLongField ? (
+                {isLongField ||
+                key.toLowerCase().includes('features') ||
+                key.toLowerCase().includes('package') ||
+                key.toLowerCase().includes('policy') ||
+                key.toLowerCase().includes('support') ? (
                   <textarea
                     rows={4}
                     value={value}
@@ -94,25 +111,30 @@ const Step3Specifications: React.FC<Props> = ({
             )
           })}
         </div>
-      ) : (
-        <div className='mt-6 rounded-2xl border border-dashed border-border/70 bg-background/40 px-5 py-6'>
-          <div className='flex items-center gap-2 text-base font-semibold text-foreground'>
-            <FileText className='h-4 w-4 text-emerald-600' />
-            No fields available yet
-          </div>
-          <p className='mt-2 text-sm text-muted-foreground'>
-            Select categories in Basics and the product detail fields will appear
-            here automatically.
-          </p>
-        </div>
-      )}
+      ) : null}
 
-      <div className='mt-6 border-t border-border/60 pt-4'>
+      <div className='border-border/60 mt-6 border-t pt-4'>
+        {missingRequiredKeys.length ? (
+          <div className='mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4'>
+            <div className='flex flex-wrap gap-2'>
+              {missingRequiredKeys.map((key) => (
+                <Button
+                  key={key}
+                  type='button'
+                  variant='outline'
+                  onClick={() => onAddKey(key)}
+                  className='h-9 rounded-xl bg-white px-3 text-xs hover:bg-white hover:text-black'
+                >
+                  <Plus className='mr-1.5 h-3.5 w-3.5' />
+                  {key}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {showCustomInput ? (
           <div className='space-y-3'>
-            <p className='text-sm font-medium text-foreground'>
-              Create custom product detail key
-            </p>
             <div className='grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]'>
               <input
                 type='text'
@@ -130,7 +152,7 @@ const Step3Specifications: React.FC<Props> = ({
               <Button
                 type='button'
                 onClick={handleAddKey}
-                className='h-11 rounded-xl border border-border bg-card px-5 text-foreground hover:bg-white hover:text-black'
+                className='border-border bg-card text-foreground h-11 rounded-xl border px-5 hover:bg-white hover:text-black'
               >
                 <Plus className='mr-2 h-4 w-4' />
                 Add Field

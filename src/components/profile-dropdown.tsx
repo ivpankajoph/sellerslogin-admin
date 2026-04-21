@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { type AppDispatch } from '@/store'
 import { logout } from '@/store/slices/authSlice'
 import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
+import { getImageUrl } from '@/lib/utils'
 import { KeyRound, UserRound } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -56,11 +57,11 @@ export function ProfileDropdown() {
       .slice(0, 2)
       .toUpperCase() ||
     'V'
-  const avatarCandidate = (isVendorTeamUser ? user?.avatar : vendorProfile?.avatar) || user?.avatar
-  const avatarSrc =
-    avatarCandidate && String(avatarCandidate).trim()
-      ? String(avatarCandidate)
-      : undefined
+  const avatarCandidate =
+    (isVendorTeamUser ? user?.avatar : vendorProfile?.avatar) ||
+    vendorProfile?.avatar ||
+    user?.avatar
+  const avatarSrc = getImageUrl(avatarCandidate)
 
   useEffect(() => {
     if (!isVendor || vendorLoading || vendorProfile) return

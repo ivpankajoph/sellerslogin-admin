@@ -58,3 +58,34 @@ export function getPageNumbers(currentPage: number, totalPages: number) {
 
   return rangeWithDots
 }
+
+/**
+ * Resolves an image path to an absolute URL.
+ * Handles existing full URLs (http/data) and relative upload paths.
+ */
+export function getImageUrl(path: unknown): string | undefined {
+  const rawPath =
+    typeof path === 'string'
+      ? path
+      : path && typeof path === 'object'
+        ? String(
+            (path as any).url ||
+              (path as any).secure_url ||
+              (path as any).secureUrl ||
+              (path as any).src ||
+              ''
+          )
+        : ''
+
+  if (!rawPath) return undefined
+  
+  const trimmed = rawPath.trim()
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+    return trimmed
+  }
+
+  const baseUrl = (import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/api\/?$/, '')
+  const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed
+  
+  return baseUrl ? `${baseUrl}/${cleanPath}` : `/${cleanPath}`
+}

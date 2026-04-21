@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { type AppDispatch, type RootState } from '@/store'
 import api from '@/lib/axios'
+import { getImageUrl } from '@/lib/utils'
 import { logout } from '@/store/slices/authSlice'
 import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import { ChevronsUpDown, Crown, KeyRound, LogOut, UserRound } from 'lucide-react'
@@ -98,11 +99,11 @@ export function NavUser() {
       .slice(0, 2)
       .toUpperCase() ||
     'V'
-  const avatarCandidate = (isVendorTeamUser ? user?.avatar : vendorProfile?.avatar) || user?.avatar
-  const avatarSrc =
-    avatarCandidate && String(avatarCandidate).trim()
-      ? String(avatarCandidate)
-      : undefined
+  const avatarCandidate =
+    (isVendorTeamUser ? user?.avatar : vendorProfile?.avatar) ||
+    vendorProfile?.avatar ||
+    user?.avatar
+  const avatarSrc = getImageUrl(avatarCandidate)
 
   useEffect(() => {
     if (!isVendor || vendorLoading || vendorProfile) return

@@ -7,6 +7,7 @@ import {
   CircleHelp,
   Eye,
   CheckCircle2,
+  ImagePlus,
   Layers3,
   Loader2,
   PackagePlus,
@@ -33,6 +34,7 @@ import { deleteFromCloudinary, uploadToCloudinary } from './cloudinary'
 import ProductEditorSidebar from './components/ProductEditorSidebar'
 // import ProductMediaSection from './components/ProductMediaSection'
 import Step1BasicInfo from './components/Step1BasicInfo'
+import Step2Images from './components/Step2Images'
 import Step4SEO from './components/Step4SEO'
 import Step5Variants from './components/Step5Variants'
 import Step6FAQs from './components/Step6FAQs'
@@ -54,8 +56,10 @@ const PRODUCT_CREATE_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const PRODUCT_CREATE_STEP_COUNT = 5
 const VARIANT_SUGGESTION_DISPLAY_LIMIT = 15
 const PRODUCT_PREVIEW_STORAGE_TTL_MS = 30 * 60 * 1000
+const MAX_PRODUCT_IMAGES = 8
 const MAX_VARIANT_IMAGES = 3
-const MIN_SPECIFICATION_KEY_COUNT = 10
+const MIN_SPECIFICATION_KEY_COUNT = 6
+const MAX_DESCRIPTION_WORDS = 2000
 
 type VariantContextRule = {
   patterns: RegExp[]
@@ -465,6 +469,11 @@ const createInitialFormData = (): ProductFormData => ({
   brand: '',
   shortDescription: '',
   description: '',
+  actualPrice: 0,
+  salePrice: 0,
+  stockQuantity: 0,
+  replacementPolicyType: 'replacement_return',
+  replacementPolicyDays: '',
   defaultImages: [],
   isAvailable: true,
   metaTitle: '',
@@ -508,6 +517,13 @@ const toText = (value: unknown) =>
   typeof value === 'string' ? value : value == null ? '' : String(value)
 
 const toTrimmedText = (value: unknown) => toText(value).trim()
+
+const countWords = (value: unknown) =>
+  toText(value)
+    .replace(/<[^>]*>/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
 
 const normalizeCitySlug = (value: unknown) =>
   toTrimmedText(value)
@@ -741,20 +757,27 @@ const filterExcludedKeys = (keys: string[], excludedKeys: string[] = []) => {
 
 const COMMON_SPECIFICATION_KEYS = [
   'Brand',
-  'Model Number',
-  'Product Type',
-  'Features',
-  'Dimensions',
-  'Weight',
-  'Warranty Summary',
-  'Sales Package',
-  'Material',
-  'Care Instructions',
-  'Usage Instructions',
-  'Battery Life',
+  'Product Features',
+  'Packaging Type',
+  'Net Quantity',
+  'Units per Pack',
+  'Sales Package / In The Box',
+  'Minimum Order Quantity (MOQ)',
+  'Country of Origin',
+  'Supply Ability',
+  'Dispatch Time',
+  'Delivery Time',
+  'Shipping Charges',
+  'Replacement Policy',
+  'Customer Support',
   'Connectivity',
   'Compatibility',
-  'In The Box',
+  'Battery Life',
+  'Model Number',
+  'Product Type',
+  'Dimensions',
+  'Weight',
+  'Material',
 ]
 
 const PRODUCT_DETAIL_BLOCKED_KEY_PATTERNS = [
@@ -979,6 +1002,23 @@ const buildEditModeHydratedFormData = (
     brand: product.brand,
     shortDescription: product.shortDescription,
     description: product.description,
+    actualPrice:
+      product.actualPrice ??
+      (Array.isArray(product.variants) && isRecord(product.variants[0])
+        ? product.variants[0].actualPrice
+        : 0),
+    salePrice:
+      product.salePrice ??
+      (Array.isArray(product.variants) && isRecord(product.variants[0])
+        ? product.variants[0].finalPrice
+        : 0),
+    stockQuantity:
+      product.stockQuantity ??
+      (Array.isArray(product.variants) && isRecord(product.variants[0])
+        ? product.variants[0].stockQuantity
+        : 0),
+    replacementPolicyType: product.replacementPolicyType,
+    replacementPolicyDays: product.replacementPolicyDays,
     defaultImages: product.defaultImages,
     isAvailable: product.isAvailable,
     metaTitle: product.metaTitle,
@@ -1015,6 +1055,12 @@ const sanitizeProductFormData = (value: unknown): ProductFormData => {
     brand: toText(raw.brand),
     shortDescription: toText(raw.shortDescription),
     description: toText(raw.description),
+    actualPrice: toNumberValue(raw.actualPrice),
+    salePrice: toNumberValue(raw.salePrice),
+    stockQuantity: toNumberValue(raw.stockQuantity),
+    replacementPolicyType:
+      toTrimmedText(raw.replacementPolicyType) || 'replacement_return',
+    replacementPolicyDays: toText(raw.replacementPolicyDays),
     defaultImages: sanitizeImageUploads(raw.defaultImages),
     isAvailable: raw.isAvailable !== false,
     metaTitle: toText(raw.metaTitle),
@@ -2222,10 +2268,38 @@ const ProductCreateForm: React.FC = () => {
   }, [defaultMetaDescription, isDraftHydrated])
 
   // --- AI Handlers ---
+  const buildProductAiContext = (
+    target: 'shortDescription' | 'description'
+  ) => {
+    const specificationSummary = Object.entries(
+      formData.specifications[0] || {}
+    )
+      .map(([key, value]) => {
+        const cleanValue = toTrimmedText(value)
+        return cleanValue ? `${key}: ${cleanValue}` : ''
+      })
+      .filter(Boolean)
+      .slice(0, 12)
+      .join('; ')
+
+    return [
+      `Target field: ${target}`,
+      `Product name: ${toTrimmedText(formData.productName) || 'N/A'}`,
+      `Brand: ${toTrimmedText(formData.brand) || 'N/A'}`,
+      `Product category: ${selectedMainCategoryName || 'N/A'}`,
+      `Product sub categories: ${selectedCategoryNames.join(', ') || 'N/A'}`,
+      `Product sub category 2: ${selectedSubcategoryNames.join(', ') || 'N/A'}`,
+      `Actual price: ${formData.actualPrice || 'N/A'}`,
+      `Sale price: ${formData.salePrice || 'N/A'}`,
+      `Existing short description: ${toTrimmedText(formData.shortDescription) || 'N/A'}`,
+      `Specifications/features: ${specificationSummary || 'N/A'}`,
+    ].join('\n')
+  }
+
   const generateShortDesc = () =>
     generateWithAI(
       'shortDescription',
-      `Product: ${formData.productName}, Brand: ${formData.brand}`,
+      buildProductAiContext('shortDescription'),
       setAiLoading,
       setFormData
     )
@@ -2233,7 +2307,7 @@ const ProductCreateForm: React.FC = () => {
   const generateDescription = () =>
     generateWithAI(
       'description',
-      `Product: ${formData.productName}, Brand: ${formData.brand}, Short: ${formData.shortDescription}`,
+      buildProductAiContext('description'),
       setAiLoading,
       setFormData
     )
@@ -2587,13 +2661,130 @@ const ProductCreateForm: React.FC = () => {
     })
   }
 
-  const uploadVariantFiles = async (variantIndex: number, files: File[]) => {
+  const uploadDefaultImageFiles = async (
+    files: File[],
+    replaceIndex?: number
+  ) => {
     const imageFiles = files.filter((file) => file.type.startsWith('image/'))
     if (!imageFiles.length) return
 
+    const isReplacing = typeof replaceIndex === 'number' && replaceIndex >= 0
+    const filesToUpload = isReplacing ? imageFiles.slice(0, 1) : imageFiles
+    const existingImageCount = formData.defaultImages.length
+    const availableSlots = isReplacing
+      ? 1
+      : Math.max(0, MAX_PRODUCT_IMAGES - existingImageCount)
+
+    if (!availableSlots) {
+      toast.error(`You can upload up to ${MAX_PRODUCT_IMAGES} product images.`)
+      return
+    }
+
+    const nextFiles = filesToUpload.slice(0, availableSlots)
+    if (!isReplacing && nextFiles.length < imageFiles.length) {
+      toast.error(`Only ${MAX_PRODUCT_IMAGES} product images are allowed.`)
+    }
+
+    const tempImages = nextFiles.map((file, index) => ({
+      url: URL.createObjectURL(file),
+      publicId: '',
+      uploading: true,
+      tempId: `default-upload-${Date.now()}-${index}`,
+    }))
+
+    const previousPublicId = isReplacing
+      ? formData.defaultImages[replaceIndex]?.publicId
+      : ''
+
+    setFormData((prev: ProductFormData) => {
+      if (!isReplacing) {
+        return {
+          ...prev,
+          defaultImages: [...prev.defaultImages, ...tempImages],
+        }
+      }
+
+      const nextImages = [...prev.defaultImages]
+      nextImages[replaceIndex] = tempImages[0]
+      return {
+        ...prev,
+        defaultImages: nextImages,
+      }
+    })
+
+    for (let i = 0; i < nextFiles.length; i++) {
+      const result = await uploadToCloudinary(nextFiles[i])
+      if (!result) continue
+
+      setFormData((prev: ProductFormData) => ({
+        ...prev,
+        defaultImages: prev.defaultImages.map((image) =>
+          image.tempId === tempImages[i].tempId
+            ? {
+                url: result.url,
+                publicId: result.publicId,
+                uploading: false,
+              }
+            : image
+        ),
+      }))
+
+      if (isReplacing && previousPublicId) {
+        await deleteFromCloudinary(previousPublicId)
+      }
+    }
+  }
+
+  const handleDefaultImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    await uploadDefaultImageFiles(files)
+  }
+
+  const handleDefaultImageDrop = async (files: File[]) => {
+    await uploadDefaultImageFiles(files)
+  }
+
+  const handleDefaultImageReplace = async (
+    imageIndex: number,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    await uploadDefaultImageFiles(files, imageIndex)
+  }
+
+  const handleDefaultImageDelete = async (imageIndex: number) => {
+    const publicId = formData.defaultImages[imageIndex]?.publicId
+    if (publicId) {
+      await deleteFromCloudinary(publicId)
+    }
+
+    setFormData((prev: ProductFormData) => ({
+      ...prev,
+      defaultImages: prev.defaultImages.filter(
+        (_, index) => index !== imageIndex
+      ),
+    }))
+  }
+
+  const uploadVariantFiles = async (
+    variantIndex: number,
+    files: File[],
+    replaceIndex?: number
+  ) => {
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'))
+    if (!imageFiles.length) return
+
+    const isReplacing = typeof replaceIndex === 'number' && replaceIndex >= 0
+    const filesToUpload = isReplacing ? imageFiles.slice(0, 1) : imageFiles
     const existingImageCount =
       formData.variants[variantIndex]?.variantsImageUrls?.length || 0
-    const availableSlots = Math.max(0, MAX_VARIANT_IMAGES - existingImageCount)
+    const availableSlots = isReplacing
+      ? 1
+      : Math.max(0, MAX_VARIANT_IMAGES - existingImageCount)
 
     if (!availableSlots) {
       toast.error(
@@ -2602,9 +2793,9 @@ const ProductCreateForm: React.FC = () => {
       return
     }
 
-    const nextFiles = imageFiles.slice(0, availableSlots)
+    const nextFiles = filesToUpload.slice(0, availableSlots)
 
-    if (nextFiles.length < imageFiles.length) {
+    if (!isReplacing && nextFiles.length < imageFiles.length) {
       toast.error(`Only ${MAX_VARIANT_IMAGES} images are allowed per variant.`)
     }
 
@@ -2615,9 +2806,25 @@ const ProductCreateForm: React.FC = () => {
       tempId: `upload-${variantIndex}-${Date.now()}-${idx}`,
     }))
 
+    const previousPublicId = isReplacing
+      ? formData.variants[variantIndex]?.variantsImageUrls?.[replaceIndex]
+          ?.publicId
+      : ''
+
     setFormData((prev: ProductFormData) => {
       const variants = [...prev.variants]
       if (!variants[variantIndex]) return prev
+
+      if (isReplacing) {
+        const nextImages = [...variants[variantIndex].variantsImageUrls]
+        nextImages[replaceIndex] = tempImages[0]
+        variants[variantIndex] = {
+          ...variants[variantIndex],
+          variantsImageUrls: nextImages,
+        }
+        return { ...prev, variants }
+      }
+
       variants[variantIndex] = {
         ...variants[variantIndex],
         variantsImageUrls: [
@@ -2656,18 +2863,23 @@ const ProductCreateForm: React.FC = () => {
 
         return { ...prev, variants }
       })
+
+      if (isReplacing && previousPublicId) {
+        await deleteFromCloudinary(previousPublicId)
+      }
     }
   }
 
   const handleVariantImageUpload = async (
     variantIndex: number,
+    imageIndex: number,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
 
     e.target.value = '' // prevent reselect bug
-    await uploadVariantFiles(variantIndex, files)
+    await uploadVariantFiles(variantIndex, files, imageIndex)
   }
 
   const handleVariantImageDrop = async (
@@ -3028,12 +3240,118 @@ const ProductCreateForm: React.FC = () => {
     setFormData((prev: ProductFormData) => ({ ...prev, faqs: newFaqs }))
   }
 
+  const buildSubmitVariants = (sourceFormData: ProductFormData) => {
+    const fallbackImages = sanitizeImageUploads(sourceFormData.defaultImages)
+    const baseActualPrice = Number(sourceFormData.actualPrice || 0)
+    const baseSalePrice = Number(sourceFormData.salePrice || 0)
+    const baseStockQuantity = Number(sourceFormData.stockQuantity || 0)
+    const isDefaultVariant = (variant: Variant) => {
+      const attributes = variant.variantAttributes || {}
+      const entries = Object.entries(attributes)
+        .map(([key, value]) => [
+          toTrimmedText(key).toLowerCase(),
+          toTrimmedText(value).toLowerCase(),
+        ])
+        .filter(([, value]) => Boolean(value))
+
+      return (
+        !entries.length ||
+        (entries.length === 1 &&
+          entries[0][0] === 'option' &&
+          entries[0][1] === 'default')
+      )
+    }
+
+    const sourceVariants: Variant[] = sourceFormData.variants.length
+      ? sourceFormData.variants
+      : [
+          {
+            _id: '',
+            variantDisplayName: '',
+            variantAttributes: { Option: 'Default' },
+            actualPrice: baseActualPrice,
+            finalPrice: baseSalePrice,
+            stockQuantity: baseStockQuantity,
+            variantsImageUrls: fallbackImages,
+            isActive: true,
+            variantMetaTitle: '',
+            variantMetaDescription: '',
+            variantMetaKeywords: [],
+            variantCanonicalUrl: '',
+          },
+        ]
+
+    return sourceVariants.map((variant) => {
+      const actualPrice = Number(variant.actualPrice || baseActualPrice || 0)
+      const finalPrice = Number(variant.finalPrice || baseSalePrice || 0)
+      const stockQuantity = Number(
+        variant.stockQuantity || baseStockQuantity || 0
+      )
+
+      return {
+        ...variant,
+        _id: toTrimmedText(variant._id),
+        variantAttributes: Object.keys(variant.variantAttributes || {}).length
+          ? variant.variantAttributes
+          : { Option: 'Default' },
+        actualPrice,
+        finalPrice,
+        stockQuantity,
+        variantsImageUrls: isDefaultVariant(variant)
+          ? fallbackImages
+          : sanitizeImageUploads(variant.variantsImageUrls).length
+            ? sanitizeImageUploads(variant.variantsImageUrls)
+            : fallbackImages,
+        variantMetaKeywords: sanitizeStringList(variant.variantMetaKeywords),
+      }
+    })
+  }
+
   // --- Submit Handler ---
   const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
     if (e) e.preventDefault()
 
     setLoading(true)
     try {
+      const descriptionWordCount = countWords(formData.description)
+      const filledSpecificationCount = Object.values(
+        formData.specifications[0] || {}
+      ).filter((value) => Boolean(toTrimmedText(value))).length
+      const submitVariants = buildSubmitVariants(formData)
+
+      if (!toTrimmedText(formData.productName)) {
+        throw new Error('Product name is required')
+      }
+      if (!selectedMainCategoryIds.length) {
+        throw new Error('Product category is required')
+      }
+      if (!selectedCategoryIds.length) {
+        throw new Error('Product sub category is required')
+      }
+      if (!formData.productSubCategories.length) {
+        throw new Error('Product sub category 2 is required')
+      }
+      if (!sanitizeImageUploads(formData.defaultImages).length) {
+        throw new Error('At least one product image is required')
+      }
+      if (
+        !Number(formData.actualPrice || 0) ||
+        !Number(formData.salePrice || 0)
+      ) {
+        throw new Error('Actual price and sale price are required')
+      }
+      if (Number(formData.salePrice || 0) > Number(formData.actualPrice || 0)) {
+        throw new Error('Sale price cannot exceed actual price')
+      }
+      if (descriptionWordCount > MAX_DESCRIPTION_WORDS) {
+        throw new Error('Product description must not exceed 2000 words')
+      }
+      if (filledSpecificationCount < MIN_SPECIFICATION_KEY_COUNT) {
+        throw new Error(
+          `Add at least ${MIN_SPECIFICATION_KEY_COUNT} product specification values`
+        )
+      }
+
       const autoAvailableCityIds = cities
         .map((city: any) => String(city?._id || '').trim())
         .filter(Boolean)
@@ -3054,15 +3372,9 @@ const ProductCreateForm: React.FC = () => {
         productCategories: selectedCategoryIds,
         availableCities: nextAvailableCityIds,
         websiteIds: sanitizeStringList(formData.websiteIds),
+        defaultImages: sanitizeImageUploads(formData.defaultImages),
         specifications: sanitizeSpecifications(formData.specifications),
-        variants: formData.variants.map((v) => ({
-          ...v,
-          _id: toTrimmedText(v._id),
-          actualPrice: !v.actualPrice ? 0 : Number(v.actualPrice),
-          finalPrice: !v.finalPrice ? 0 : Number(v.finalPrice),
-          stockQuantity: !v.stockQuantity ? 0 : Number(v.stockQuantity),
-          variantMetaKeywords: sanitizeStringList(v.variantMetaKeywords),
-        })),
+        variants: submitVariants,
       }
 
       const res = await fetch(
@@ -3283,19 +3595,25 @@ const ProductCreateForm: React.FC = () => {
             onCreateSubcategory={handleCreateSubcategory}
           />
         )
-      // case 2:
-      // return (
-      //   <ProductMediaSection
-      //     defaultImages={formData.defaultImages}
-      //     onUpload={handleDefaultImageUpload}
-      //     onDelete={handleDefaultImageDelete}
-      //     onDrop={handleDefaultImageDrop}
-      //   />
-      // )
+      case 2:
+        return (
+          <Step2Images
+            defaultImages={formData.defaultImages}
+            onUpload={handleDefaultImageUpload}
+            onReplace={handleDefaultImageReplace}
+            onDelete={handleDefaultImageDelete}
+            onDrop={handleDefaultImageDrop}
+          />
+        )
       case 3:
         return (
           <Step5Variants
             productName={formData.productName}
+            actualPrice={formData.actualPrice}
+            salePrice={formData.salePrice}
+            stockQuantity={formData.stockQuantity}
+            replacementPolicyType={formData.replacementPolicyType}
+            replacementPolicyDays={formData.replacementPolicyDays}
             variants={formData.variants}
             specifications={formData.specifications}
             recommendedAttributeKeys={recommendedVariantKeys}
@@ -3311,6 +3629,38 @@ const ProductCreateForm: React.FC = () => {
               setFormData((prev: ProductFormData) => ({
                 ...prev,
                 productName: value,
+              }))
+            }
+            onActualPriceChange={(value) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                actualPrice: value === '' ? 0 : Number(value),
+              }))
+            }
+            onSalePriceChange={(value) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                salePrice: value === '' ? 0 : Number(value),
+              }))
+            }
+            onStockQuantityChange={(value) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                stockQuantity: value === '' ? 0 : Number(value),
+              }))
+            }
+            onReplacementPolicyTypeChange={(value) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                replacementPolicyType: value,
+                replacementPolicyDays:
+                  value === 'none' ? '' : prev.replacementPolicyDays,
+              }))
+            }
+            onReplacementPolicyDaysChange={(value) =>
+              setFormData((prev: ProductFormData) => ({
+                ...prev,
+                replacementPolicyDays: value,
               }))
             }
             onAddAttributeKey={handleAddVariantOptionKey}
@@ -3498,31 +3848,33 @@ const ProductCreateForm: React.FC = () => {
         title: 'Basics',
         description: 'Product title, category mapping, and buyer-facing copy.',
         icon: PackagePlus,
-        meta: `${selectedMainCategoryIds.length} main, ${selectedCategoryIds.length} categories`,
+        meta: `${selectedMainCategoryIds.length} category, ${selectedCategoryIds.length} sub categories`,
         complete: Boolean(
           toTrimmedText(formData.productName) &&
-            (selectedMainCategoryIds.length || selectedCategoryIds.length) &&
+            selectedMainCategoryIds.length &&
+            selectedCategoryIds.length &&
+            formData.productSubCategories.length &&
             (toTrimmedText(formData.shortDescription) ||
               toTrimmedText(formData.description))
         ),
       },
-      // {
-      //   step: 2,
-      //   title: 'Media',
-      //   description:
-      //     'Default gallery images used across previews and listings.',
-      //   icon: ImagePlus,
-      //   meta: `${formData.defaultImages.length} gallery image${formData.defaultImages.length === 1 ? '' : 's'}`,
-      //   complete: formData.defaultImages.length > 0,
-      // },
+      {
+        step: 2,
+        title: 'Images',
+        description:
+          'Main product gallery used across previews, listings, and fallback variant images.',
+        icon: ImagePlus,
+        meta: `${formData.defaultImages.length} image${formData.defaultImages.length === 1 ? '' : 's'}`,
+        complete: sanitizeImageUploads(formData.defaultImages).length > 0,
+      },
       {
         step: 3,
-        title: 'Variants',
+        title: 'Prices',
         description:
-          'Variant options, pricing, stock, visibility, and website publishing.',
+          'Default price, return policy, optional variants, stock, and website publishing.',
         icon: Layers3,
-        meta: `${formData.variants.length} variant${formData.variants.length === 1 ? '' : 's'}, ${formData.websiteIds.length} website${formData.websiteIds.length === 1 ? '' : 's'}`,
-        complete: formData.variants.length > 0,
+        meta: `${formData.variants.length || 1} price row${(formData.variants.length || 1) === 1 ? '' : 's'}, ${formData.websiteIds.length} website${formData.websiteIds.length === 1 ? '' : 's'}`,
+        complete: Boolean(formData.actualPrice && formData.salePrice),
       },
       {
         step: 4,
@@ -3554,7 +3906,10 @@ const ProductCreateForm: React.FC = () => {
       formData.metaKeywords.length,
       formData.metaTitle,
       formData.productName,
+      formData.productSubCategories.length,
       formData.shortDescription,
+      formData.actualPrice,
+      formData.salePrice,
       formData.variants.length,
       formData.websiteIds.length,
       selectedCategoryIds.length,
@@ -3562,7 +3917,6 @@ const ProductCreateForm: React.FC = () => {
     ]
   )
 
-  const currentSection = steps[currentStep - 1] || steps[0]
   const editorTitle = isEditMode
     ? formData.productName || 'Edit product'
     : formData.productName || 'Create product'
@@ -3601,32 +3955,13 @@ const ProductCreateForm: React.FC = () => {
                 <div className='flex items-start gap-3'>
                   <SidebarTrigger className='border-border bg-background mt-0.5 h-10 w-10 rounded-lg border shadow-sm' />
                   <div className='min-w-0'>
-                    <div className='text-muted-foreground text-[11px] font-semibold tracking-[0.18em] uppercase'>
-                      Products
-                    </div>
-                    <div className='flex flex-wrap items-center gap-3'>
-                      <h1 className='text-foreground text-2xl font-semibold tracking-tight sm:text-3xl'>
-                        {editorTitle}
-                      </h1>
-                      <div
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          formData.isAvailable
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
-                        }`}
-                      >
-                        {formData.isAvailable ? 'Active' : 'Hidden'}
-                      </div>
-                    </div>
+                    <h1 className='text-foreground text-2xl font-semibold tracking-tight sm:text-3xl'>
+                      {editorTitle}
+                    </h1>
                   </div>
                 </div>
 
                 <div className='flex flex-wrap items-center gap-2'>
-                  {lastSavedLabel ? (
-                    <div className='text-muted-foreground px-2 text-sm'>
-                      Saved {lastSavedLabel}
-                    </div>
-                  ) : null}
                   <Button
                     type='button'
                     variant='outline'
@@ -3667,17 +4002,6 @@ const ProductCreateForm: React.FC = () => {
               ) : null}
 
               <section className='border-border/70 dark:bg-card rounded-2xl border bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] sm:p-6 dark:shadow-[0_12px_32px_rgba(0,0,0,0.22)]'>
-                <div className='border-border/70 mb-6 border-b pb-5'>
-                  <h2 className='text-foreground text-lg font-semibold'>
-                    {currentSection?.title}
-                  </h2>
-                  {lastSavedLabel ? (
-                    <p className='text-muted-foreground mt-1 text-sm'>
-                      Saved {lastSavedLabel}
-                    </p>
-                  ) : null}
-                </div>
-
                 <form
                   onSubmit={(event) => event.preventDefault()}
                   className='space-y-6'

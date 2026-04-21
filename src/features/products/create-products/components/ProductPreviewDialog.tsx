@@ -50,6 +50,24 @@ const getVariantDisplayName = (
   return `Variant ${index + 1}`
 }
 
+const isDefaultVariant = (
+  variant: ProductFormData['variants'][number] | null
+) => {
+  const entries = Object.entries(variant?.variantAttributes || {})
+    .map(([key, value]) => [
+      String(key || '').trim().toLowerCase(),
+      String(value || '').trim().toLowerCase(),
+    ])
+    .filter(([, value]) => Boolean(value))
+
+  return (
+    !entries.length ||
+    (entries.length === 1 &&
+      entries[0][0] === 'option' &&
+      entries[0][1] === 'default')
+  )
+}
+
 const ProductPreviewDialog: React.FC<Props> = ({
   open,
   onOpenChange,
@@ -67,7 +85,9 @@ const ProductPreviewDialog: React.FC<Props> = ({
   const selectedVariant = variants[selectedVariantIndex] || null 
 
   const images = useMemo(() => {
-    return selectedVariant?.variantsImageUrls?.length
+    return selectedVariant &&
+      !isDefaultVariant(selectedVariant) &&
+      selectedVariant.variantsImageUrls?.length
       ? selectedVariant.variantsImageUrls
       : formData.defaultImages || []
   }, [selectedVariant, formData.defaultImages])
@@ -77,7 +97,7 @@ const ProductPreviewDialog: React.FC<Props> = ({
   const selectedVariantLabel = selectedVariant
     ? getVariantDisplayName(selectedVariant, selectedVariantIndex, formData.productName)
     : ''
-  const previewTitle = selectedVariantLabel || fallbackName
+  const previewTitle = fallbackName
 
   const discountPercent = useMemo(() => {
     if (!selectedVariant?.actualPrice || !selectedVariant?.finalPrice) return 0

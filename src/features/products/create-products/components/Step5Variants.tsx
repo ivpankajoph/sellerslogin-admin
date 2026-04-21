@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   ChevronsUpDown,
+  ImageIcon,
   ImageOff,
   Loader2,
   Plus,
@@ -32,13 +33,13 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import type { Variant } from '../types/type'
+import type { ProductSpecification } from '../types/type'
+import Step3Specifications from './Step3Specifications'
 import {
   StudioFieldLabel,
   studioCardClass,
   studioInputClass,
 } from './studio-ui'
-import Step3Specifications from './Step3Specifications'
-import type { ProductSpecification } from '../types/type'
 
 type WebsiteOption = {
   _id: string
@@ -50,6 +51,11 @@ type WebsiteOption = {
 
 interface Props {
   productName: string
+  actualPrice: number
+  salePrice: number
+  stockQuantity: number
+  replacementPolicyType: string
+  replacementPolicyDays: string
   variants: Variant[]
   specifications: ProductSpecification[]
   recommendedAttributeKeys: string[]
@@ -62,6 +68,11 @@ interface Props {
   aiLoading: boolean
   specificationAiLoading: boolean
   onPrimaryVariantNameChange: (value: string) => void
+  onActualPriceChange: (value: string) => void
+  onSalePriceChange: (value: string) => void
+  onStockQuantityChange: (value: string) => void
+  onReplacementPolicyTypeChange: (value: string) => void
+  onReplacementPolicyDaysChange: (value: string) => void
   onAddAttributeKey: (variantIndex: number, key: string) => void
   onAddSuggestedAttributeKeys: (variantIndex: number, keys: string[]) => void
   onRemoveAttributeKey: (variantIndex: number, key: string) => void
@@ -83,6 +94,7 @@ interface Props {
   ) => void
   onVariantImageUpload: (
     variantIndex: number,
+    imageIndex: number,
     event: React.ChangeEvent<HTMLInputElement>
   ) => void
   onVariantImageDrop: (variantIndex: number, files: File[]) => void
@@ -119,8 +131,7 @@ const SHOPIFY_VARIANT_KEYS = [
 ]
 
 const MAX_VARIANT_IMAGES = 3
-const VARIANT_IMAGE_GRID_CLASS =
-  'grid-cols-[minmax(0,1.4fr)_repeat(3,96px)]'
+const VARIANT_IMAGE_GRID_CLASS = 'grid-cols-[minmax(0,1.4fr)_repeat(3,96px)]'
 
 const PRESET_VARIANT_VALUE_OPTIONS: Record<string, string[]> = {
   color: [
@@ -368,7 +379,7 @@ const WebsiteMultiSelect: React.FC<{
           role='combobox'
           aria-expanded={open}
           className={cn(
-            'border-input bg-white h-9 rounded-full border px-4 text-sm shadow-sm hover:bg-white hover:text-black',
+            'border-input h-9 rounded-full border bg-white px-4 text-sm shadow-sm hover:bg-white hover:text-black',
             triggerClassName
           )}
         >
@@ -474,7 +485,7 @@ const VariantValuesMultiSelect: React.FC<{
         <Button
           type='button'
           variant='outline'
-          className='border-input bg-white h-11 w-full justify-between rounded-xl border px-4 text-left shadow-sm hover:bg-white hover:text-black'
+          className='border-input h-11 w-full justify-between rounded-xl border bg-white px-4 text-left shadow-sm hover:bg-white hover:text-black'
           disabled={!rowKey}
         >
           <span className='truncate'>
@@ -619,7 +630,11 @@ const VariantValuesEditor: React.FC<{
   }
 
   return (
-    <VariantValuesMultiSelect rowKey={rowKey} values={values} onChange={onChange} />
+    <VariantValuesMultiSelect
+      rowKey={rowKey}
+      values={values}
+      onChange={onChange}
+    />
   )
 }
 
@@ -649,7 +664,8 @@ const VariantTypePickerPopover: React.FC<{
     Boolean(normalizedSearch) &&
     !options.some(
       (option) =>
-        normalizeSearchText(option.value) === normalizeSearchText(normalizedSearch)
+        normalizeSearchText(option.value) ===
+        normalizeSearchText(normalizedSearch)
     )
 
   useEffect(() => {
@@ -739,7 +755,10 @@ const VariantTypePickerPopover: React.FC<{
 const VariantImagesRow: React.FC<{
   index: number
   variant: Variant
-  onUpload: (event: React.ChangeEvent<HTMLInputElement>) => void
+  onUpload: (
+    imageIndex: number,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => void
   onDelete: (imageIndex: number) => void
   onRemoveVariant: () => void
 }> = ({ index, variant, onUpload, onDelete, onRemoveVariant }) => {
@@ -773,34 +792,39 @@ const VariantImagesRow: React.FC<{
           </button>
         </div>
         <div className='mt-2 flex flex-wrap gap-2'>
-          {Object.entries(variant.variantAttributes || {}).map(([key, value]) => (
-            <span
-              key={`${index}-${key}-${value}`}
-              className='border-border bg-secondary text-foreground inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium'
-            >
-              {isColorKey(key) && getColorSwatch(value) ? (
-                <span
-                  className='h-2.5 w-2.5 rounded-full border border-black/10'
-                  style={{
-                    backgroundColor: getColorSwatch(value) || undefined,
-                  }}
-                />
-              ) : null}
-              <span className='text-muted-foreground'>{key}:</span>
-              {value}
-            </span>
-          ))}
+          {Object.entries(variant.variantAttributes || {}).map(
+            ([key, value]) => (
+              <span
+                key={`${index}-${key}-${value}`}
+                className='border-border bg-secondary text-foreground inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium'
+              >
+                {isColorKey(key) && getColorSwatch(value) ? (
+                  <span
+                    className='h-2.5 w-2.5 rounded-full border border-black/10'
+                    style={{
+                      backgroundColor: getColorSwatch(value) || undefined,
+                    }}
+                  />
+                ) : null}
+                <span className='text-muted-foreground'>{key}:</span>
+                {value}
+              </span>
+            )
+          )}
         </div>
       </div>
 
       {slots.map(({ slotIndex, image, inputId }) => (
-        <div key={`${index}-${slotIndex}`} className='flex items-center justify-center'>
+        <div
+          key={`${index}-${slotIndex}`}
+          className='flex items-center justify-center'
+        >
           <input
             id={inputId}
             type='file'
             accept='image/*'
             className='hidden'
-            onChange={onUpload}
+            onChange={(event) => onUpload(slotIndex, event)}
           />
 
           {image ? (
@@ -823,14 +847,24 @@ const VariantImagesRow: React.FC<{
                   <Loader2 className='h-4 w-4 animate-spin text-sky-600' />
                 </div>
               ) : (
-                <button
-                  type='button'
-                  onClick={() => onDelete(slotIndex)}
-                  className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-md transition hover:bg-red-500 hover:text-white'
-                  aria-label={`Remove variant ${index + 1} image ${slotIndex + 1}`}
-                >
-                  <Trash2 className='h-3.5 w-3.5' />
-                </button>
+                <>
+                  <label
+                    htmlFor={inputId}
+                    className='absolute top-2 right-10 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-md transition hover:bg-sky-600 hover:text-white'
+                    aria-label={`Replace variant ${index + 1} image ${slotIndex + 1}`}
+                    title={`Replace variant ${index + 1} image ${slotIndex + 1}`}
+                  >
+                    <ImageIcon className='h-3.5 w-3.5' />
+                  </label>
+                  <button
+                    type='button'
+                    onClick={() => onDelete(slotIndex)}
+                    className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-md transition hover:bg-red-500 hover:text-white'
+                    aria-label={`Remove variant ${index + 1} image ${slotIndex + 1}`}
+                  >
+                    <Trash2 className='h-3.5 w-3.5' />
+                  </button>
+                </>
               )}
             </div>
           ) : (
@@ -854,62 +888,55 @@ const VariantImagesSection: React.FC<{
   variants: Variant[]
   onUpload: (
     variantIndex: number,
+    imageIndex: number,
     event: React.ChangeEvent<HTMLInputElement>
   ) => void
   onDelete: (variantIndex: number, imageIndex: number) => void
   onRemoveVariant: (variantIndex: number) => void
 }> = ({ variants, onUpload, onDelete, onRemoveVariant }) => {
+  if (!variants.length) return null
+
   return (
     <section className={cn(studioCardClass, 'space-y-4 p-5')}>
-      <div>
-        <h3 className='text-foreground text-base font-semibold'>
-          Variant Images
-        </h3>
-        <p className='text-muted-foreground mt-1 text-sm'>
-          Upload up to {MAX_VARIANT_IMAGES} images per variant.
-        </p>
+      <div className='border-border/70 overflow-x-auto rounded-2xl border'>
+        <div
+          className={cn(
+            'bg-muted/30 text-muted-foreground grid min-w-[588px] gap-3 px-4 py-3 text-xs font-semibold tracking-[0.16em] uppercase',
+            VARIANT_IMAGE_GRID_CLASS
+          )}
+        >
+          <span>Variant</span>
+          <span className='text-center'>Image 1</span>
+          <span className='text-center'>Image 2</span>
+          <span className='text-center'>Image 3</span>
+        </div>
+
+        {variants.map((variant, index) => (
+          <VariantImagesRow
+            key={
+              variant._id ||
+              buildVariantSignature(variant.variantAttributes || {}) ||
+              `variant-images-${index}`
+            }
+            index={index}
+            variant={variant}
+            onUpload={(imageIndex, event) => onUpload(index, imageIndex, event)}
+            onDelete={(imageIndex) => onDelete(index, imageIndex)}
+            onRemoveVariant={() => onRemoveVariant(index)}
+          />
+        ))}
       </div>
-
-      {variants.length ? (
-        <div className='border-border/70 overflow-x-auto rounded-2xl border'>
-          <div
-            className={cn(
-              'bg-muted/30 text-muted-foreground grid min-w-[588px] gap-3 px-4 py-3 text-xs font-semibold tracking-[0.16em] uppercase',
-              VARIANT_IMAGE_GRID_CLASS
-            )}
-          >
-            <span>Variant</span>
-            <span className='text-center'>Image 1</span>
-            <span className='text-center'>Image 2</span>
-            <span className='text-center'>Image 3</span>
-          </div>
-
-          {variants.map((variant, index) => (
-            <VariantImagesRow
-              key={
-                variant._id ||
-                buildVariantSignature(variant.variantAttributes || {}) ||
-                `variant-images-${index}`
-              }
-              index={index}
-              variant={variant}
-              onUpload={(event) => onUpload(index, event)}
-              onDelete={(imageIndex) => onDelete(index, imageIndex)}
-              onRemoveVariant={() => onRemoveVariant(index)}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className='border-border text-muted-foreground rounded-2xl border border-dashed px-4 py-6 text-sm'>
-          Add variant values first. Image rows will appear here automatically.
-        </div>
-      )}
     </section>
   )
 }
 
 const Step5Variants: React.FC<Props> = ({
   productName,
+  actualPrice,
+  salePrice,
+  stockQuantity,
+  replacementPolicyType,
+  replacementPolicyDays,
   variants,
   specifications,
   recommendedAttributeKeys,
@@ -919,6 +946,11 @@ const Step5Variants: React.FC<Props> = ({
   isWebsiteLoading,
   isAvailable,
   specificationAiLoading,
+  onActualPriceChange,
+  onSalePriceChange,
+  onStockQuantityChange,
+  onReplacementPolicyTypeChange,
+  onReplacementPolicyDaysChange,
   onToggleAvailable,
   onSelectedWebsiteIdsChange,
   onVariantFieldChange,
@@ -932,7 +964,9 @@ const Step5Variants: React.FC<Props> = ({
     const derivedRows = buildVariantRowsFromVariants(variants)
     return derivedRows.length ? derivedRows : []
   })
-  const [excludedVariantSignatures, setExcludedVariantSignatures] = useState<string[]>([])
+  const [excludedVariantSignatures, setExcludedVariantSignatures] = useState<
+    string[]
+  >([])
 
   const websiteSelectOptions = useMemo(
     () =>
@@ -998,7 +1032,9 @@ const Step5Variants: React.FC<Props> = ({
     )
 
     setExcludedVariantSignatures((current) => {
-      const next = current.filter((signature) => availableSignatures.has(signature))
+      const next = current.filter((signature) =>
+        availableSignatures.has(signature)
+      )
       return next.length === current.length ? current : next
     })
   }, [serializedRows, rows])
@@ -1018,23 +1054,23 @@ const Step5Variants: React.FC<Props> = ({
         return !excludedVariantSignatures.includes(signature)
       })
       .map((attributes) => {
-      const signature = buildVariantSignature(attributes)
-      const matchedVariant = currentVariantMap.get(signature)
+        const signature = buildVariantSignature(attributes)
+        const matchedVariant = currentVariantMap.get(signature)
 
-      return {
-        _id: matchedVariant?._id,
-        variantDisplayName: matchedVariant?.variantDisplayName || '',
-        variantAttributes: attributes,
-        actualPrice: Number(matchedVariant?.actualPrice || 0),
-        finalPrice: Number(matchedVariant?.finalPrice || 0),
-        stockQuantity: Number(matchedVariant?.stockQuantity || 0),
-        variantsImageUrls: matchedVariant?.variantsImageUrls || [],
-        isActive: matchedVariant?.isActive ?? true,
-        variantMetaTitle: matchedVariant?.variantMetaTitle,
-        variantMetaDescription: matchedVariant?.variantMetaDescription,
-        variantMetaKeywords: matchedVariant?.variantMetaKeywords,
-        variantCanonicalUrl: matchedVariant?.variantCanonicalUrl,
-      }
+        return {
+          _id: matchedVariant?._id,
+          variantDisplayName: matchedVariant?.variantDisplayName || '',
+          variantAttributes: attributes,
+          actualPrice: Number(matchedVariant?.actualPrice || 0),
+          finalPrice: Number(matchedVariant?.finalPrice || 0),
+          stockQuantity: Number(matchedVariant?.stockQuantity || 0),
+          variantsImageUrls: matchedVariant?.variantsImageUrls || [],
+          isActive: matchedVariant?.isActive ?? true,
+          variantMetaTitle: matchedVariant?.variantMetaTitle,
+          variantMetaDescription: matchedVariant?.variantMetaDescription,
+          variantMetaKeywords: matchedVariant?.variantMetaKeywords,
+          variantCanonicalUrl: matchedVariant?.variantCanonicalUrl,
+        }
       })
 
     if (serializeVariants(nextVariants) === serializedVariants) return
@@ -1052,7 +1088,9 @@ const Step5Variants: React.FC<Props> = ({
     const targetVariant = variants[variantIndex]
     if (!targetVariant) return
 
-    const signature = buildVariantSignature(targetVariant.variantAttributes || {})
+    const signature = buildVariantSignature(
+      targetVariant.variantAttributes || {}
+    )
     if (!signature) return
 
     setExcludedVariantSignatures((current) =>
@@ -1065,7 +1103,8 @@ const Step5Variants: React.FC<Props> = ({
     if (!normalizedKey) return
     if (
       rows.some(
-        (row) => normalizeOptionKey(row.key) === normalizeOptionKey(normalizedKey)
+        (row) =>
+          normalizeOptionKey(row.key) === normalizeOptionKey(normalizedKey)
       )
     ) {
       return
@@ -1101,15 +1140,9 @@ const Step5Variants: React.FC<Props> = ({
   return (
     <div className='space-y-6'>
       <section className={cn(studioCardClass, 'space-y-5 p-5')}>
-        <div className='flex flex-wrap items-start justify-between gap-4'>
-          <div>
-            <h3 className='text-foreground text-base font-semibold'>
-              Variants
-            </h3>
-          </div>
-
+        <div className='flex flex-wrap justify-end gap-4'>
           <div className='flex flex-wrap items-center justify-end gap-2'>
-            <div className='border-border bg-white flex h-9 items-center gap-2 rounded-full border px-3'>
+            <div className='border-border flex h-9 items-center gap-2 rounded-full border bg-white px-3'>
               <span className='text-muted-foreground text-xs font-medium'>
                 Visible
               </span>
@@ -1142,116 +1175,112 @@ const Step5Variants: React.FC<Props> = ({
         </div>
 
         <div className='space-y-4'>
-          {rows.length ? (
-            rows.map((row, index) => (
-              <div
-                key={row.id}
-                className='border-border/70 bg-white rounded-2xl border p-4'
-              >
-                <div className='grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]'>
-                  <div>
-                    <StudioFieldLabel label={`Variant ${index + 1}`} />
-                    <Select
-                      value={row.key}
-                      onValueChange={(value) => {
-                        setRows((prev) =>
-                          prev.map((item) =>
-                            item.id === row.id
-                              ? { ...item, key: value, values: [] }
-                              : item
+          {rows.length
+            ? rows.map((row, index) => (
+                <div
+                  key={row.id}
+                  className='border-border/70 rounded-2xl border bg-white p-4'
+                >
+                  <div className='grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_auto]'>
+                    <div>
+                      <StudioFieldLabel label={`Variant ${index + 1}`} />
+                      <Select
+                        value={row.key}
+                        onValueChange={(value) => {
+                          setRows((prev) =>
+                            prev.map((item) =>
+                              item.id === row.id
+                                ? { ...item, key: value, values: [] }
+                                : item
+                            )
                           )
-                        )
-                      }}
-                    >
-                      <SelectTrigger className='border-input bg-white h-11 rounded-xl'>
-                        <SelectValue placeholder='Select variant' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sanitizeStringList([
-                          row.key,
-                          ...variantSuggestions
-                            .map((option) => option.value)
-                            .filter(
-                              (option) =>
-                                normalizeOptionKey(option) ===
-                                  normalizeOptionKey(row.key) ||
-                                !rows.some(
-                                  (item) =>
-                                    item.id !== row.id &&
-                                    normalizeOptionKey(item.key) ===
-                                      normalizeOptionKey(option)
+                        }}
+                      >
+                        <SelectTrigger className='border-input h-11 rounded-xl bg-white'>
+                          <SelectValue placeholder='Select variant' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sanitizeStringList([
+                            row.key,
+                            ...variantSuggestions
+                              .map((option) => option.value)
+                              .filter(
+                                (option) =>
+                                  normalizeOptionKey(option) ===
+                                    normalizeOptionKey(row.key) ||
+                                  !rows.some(
+                                    (item) =>
+                                      item.id !== row.id &&
+                                      normalizeOptionKey(item.key) ===
+                                        normalizeOptionKey(option)
+                                  )
+                              ),
+                          ])
+                            .filter(Boolean)
+                            .map((option) => (
+                              <SelectItem
+                                key={`${row.id}-${option}`}
+                                value={option}
+                              >
+                                {option}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <StudioFieldLabel label={row.key || 'Values'} />
+                      <VariantValuesEditor
+                        rowKey={row.key}
+                        values={row.values}
+                        onChange={(values) => updateRowValues(row.id, values)}
+                      />
+                      {row.values.length ? (
+                        <div className='mt-3 flex flex-wrap gap-2'>
+                          {row.values.map((value) => (
+                            <button
+                              type='button'
+                              key={`${row.id}-${value}`}
+                              onClick={() =>
+                                updateRowValues(
+                                  row.id,
+                                  row.values.filter((item) => item !== value)
                                 )
-                            ),
-                        ])
-                          .filter(Boolean)
-                          .map((option) => (
-                            <SelectItem
-                              key={`${row.id}-${option}`}
-                              value={option}
+                              }
+                              className='border-border bg-secondary text-foreground inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium'
                             >
-                              {option}
-                            </SelectItem>
+                              {isColorKey(row.key) && getColorSwatch(value) ? (
+                                <span
+                                  className='h-2.5 w-2.5 rounded-full border border-black/10'
+                                  style={{
+                                    backgroundColor:
+                                      getColorSwatch(value) || undefined,
+                                  }}
+                                />
+                              ) : null}
+                              {value}
+                              <X className='text-muted-foreground h-3 w-3' />
+                            </button>
                           ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                        </div>
+                      ) : null}
+                    </div>
 
-                  <div>
-                    <StudioFieldLabel label={row.key || 'Values'} />
-                    <VariantValuesEditor
-                      rowKey={row.key}
-                      values={row.values}
-                      onChange={(values) => updateRowValues(row.id, values)}
-                    />
-                    {row.values.length ? (
-                      <div className='mt-3 flex flex-wrap gap-2'>
-                        {row.values.map((value) => (
-                          <button
-                            type='button'
-                            key={`${row.id}-${value}`}
-                            onClick={() =>
-                              updateRowValues(
-                                row.id,
-                                row.values.filter((item) => item !== value)
-                              )
-                            }
-                            className='border-border bg-secondary text-foreground inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium'
-                          >
-                            {isColorKey(row.key) && getColorSwatch(value) ? (
-                              <span
-                                className='h-2.5 w-2.5 rounded-full border border-black/10'
-                                style={{
-                                  backgroundColor:
-                                    getColorSwatch(value) || undefined,
-                                }}
-                              />
-                            ) : null}
-                            {value}
-                            <X className='text-muted-foreground h-3 w-3' />
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className='flex items-start justify-end'>
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      onClick={() => removeRow(row.id)}
-                      className='text-muted-foreground hover:text-destructive h-11 rounded-xl px-3'
-                    >
-                      <X className='h-4 w-4' />
-                    </Button>
+                    <div className='flex items-start justify-end'>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        onClick={() => removeRow(row.id)}
+                        className='text-muted-foreground hover:text-destructive h-11 rounded-xl px-3'
+                      >
+                        <X className='h-4 w-4' />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          ) : (
-            <div className='border-border text-muted-foreground rounded-2xl border border-dashed px-4 py-6 text-sm'>
-              Add variant and choose values like color, size, or storage.
-            </div>
-          )}
+              ))
+            : null}
 
           {rows.length ? (
             <VariantTypePickerPopover
@@ -1265,6 +1294,84 @@ const Step5Variants: React.FC<Props> = ({
         </div>
       </section>
 
+      <section className={cn(studioCardClass, 'space-y-4 p-5')}>
+        <div className='grid gap-4 lg:grid-cols-3'>
+          <div>
+            <StudioFieldLabel label='Actual Price' required />
+            <input
+              type='number'
+              min='0'
+              value={actualPrice || ''}
+              onChange={(event) => onActualPriceChange(event.target.value)}
+              placeholder='0'
+              className={studioInputClass}
+            />
+          </div>
+          <div>
+            <StudioFieldLabel label='Sale Price' required />
+            <input
+              type='number'
+              min='0'
+              value={salePrice || ''}
+              onChange={(event) => onSalePriceChange(event.target.value)}
+              placeholder='0'
+              className={studioInputClass}
+            />
+          </div>
+          <div>
+            <StudioFieldLabel label='Stock Quantity' required />
+            <input
+              type='number'
+              min='0'
+              step='1'
+              value={stockQuantity || ''}
+              onChange={(event) => onStockQuantityChange(event.target.value)}
+              placeholder='0'
+              className={studioInputClass}
+            />
+          </div>
+        </div>
+
+        <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]'>
+          <div>
+            <StudioFieldLabel label='Product Replacement / Return' />
+            <Select
+              value={replacementPolicyType || 'replacement_return'}
+              onValueChange={onReplacementPolicyTypeChange}
+            >
+              <SelectTrigger className='border-input h-11 rounded-xl bg-white'>
+                <SelectValue placeholder='Select policy' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='replacement_return'>
+                  Replacement / Return
+                </SelectItem>
+                <SelectItem value='replacement_only'>
+                  Replacement only
+                </SelectItem>
+                <SelectItem value='return_only'>Return only</SelectItem>
+                <SelectItem value='none'>No replacement or return</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <StudioFieldLabel label='Days' />
+            <input
+              type='number'
+              min='0'
+              step='1'
+              value={replacementPolicyDays}
+              onChange={(event) =>
+                onReplacementPolicyDaysChange(event.target.value)
+              }
+              placeholder='e.g. 7'
+              disabled={replacementPolicyType === 'none'}
+              className={studioInputClass}
+            />
+          </div>
+        </div>
+      </section>
+
       <VariantImagesSection
         variants={variants}
         onUpload={onVariantImageUpload}
@@ -1272,12 +1379,8 @@ const Step5Variants: React.FC<Props> = ({
         onRemoveVariant={handleRemoveGeneratedVariant}
       />
 
-      <section className={cn(studioCardClass, 'space-y-4 p-5')}>
-        <div>
-          <h3 className='text-foreground text-base font-semibold'>Pricing</h3>
-        </div>
-
-        {variants.length ? (
+      {variants.length ? (
+        <section className={cn(studioCardClass, 'space-y-4 p-5')}>
           <div className='border-border/70 overflow-hidden rounded-2xl border'>
             <div className='bg-muted/30 text-muted-foreground grid grid-cols-[minmax(0,1.5fr)_150px_150px_150px] gap-3 px-4 py-3 text-xs font-semibold tracking-[0.16em] uppercase'>
               <span>Variant</span>
@@ -1366,13 +1469,8 @@ const Step5Variants: React.FC<Props> = ({
               </div>
             ))}
           </div>
-        ) : (
-          <div className='border-border text-muted-foreground rounded-2xl border border-dashed px-4 py-6 text-sm'>
-            Add variant values first. Pricing rows will appear here
-            automatically.
-          </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <Step3Specifications
         specifications={specifications}

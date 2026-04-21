@@ -934,7 +934,11 @@ function ProductDetailsDialog({
 
 export default function VendorProductsTable() {
   const vendorId = useSelector(
-    (state: RootState) => state.auth?.user?.id || state.auth?.user?._id || ''
+    (state: RootState) =>
+      state.auth?.user?.vendor_id ||
+      state.auth?.user?.id ||
+      state.auth?.user?._id ||
+      ''
   )
   const token = useSelector((state: RootState) => state.auth?.token || '')
   const [products, setProducts] = useState<Product[]>([])

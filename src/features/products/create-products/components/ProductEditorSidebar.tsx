@@ -14,13 +14,10 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator,
 } from '@/components/ui/sidebar'
 
 export type ProductEditorSidebarSection = {
@@ -52,8 +49,6 @@ type Props = {
 export default function ProductEditorSidebar({
   currentStep,
   sections,
-  productName,
-  isEditMode,
   onStepSelect,
   onPrevious,
   onNext,
@@ -62,28 +57,13 @@ export default function ProductEditorSidebar({
   onReset,
   resetLabel,
 }: Props) {
-  const resolvedProductName = String(productName || '').trim()
-
   return (
     <Sidebar
       className='[&_[data-slot=sidebar-inner]]:border-sidebar-border/70 [&_[data-slot=sidebar-inner]]:bg-sidebar/98 [&_[data-slot=sidebar-inner]]:border-r [&_[data-slot=sidebar-inner]]:shadow-[0_14px_34px_rgba(15,23,42,0.06)] dark:[&_[data-slot=sidebar-inner]]:shadow-[0_14px_34px_rgba(2,6,23,0.28)]'
       id='product-editor-sidebar'
     >
-      <SidebarHeader className='border-sidebar-border/70 border-b p-4'>
-        <div className='px-1 py-1'>
-          <div className='text-sidebar-foreground/60 text-[11px] font-semibold tracking-[0.18em] uppercase'>
-            Products
-          </div>
-          <div className='mt-2 truncate text-sm leading-5 font-semibold'>
-            {resolvedProductName ||
-              (isEditMode ? 'Edit product' : 'Create product')}
-          </div>
-        </div>
-      </SidebarHeader>
-
       <SidebarContent className='p-3'>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {sections.map((section) => {
@@ -106,10 +86,7 @@ export default function ProductEditorSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarSeparator />
-
         <SidebarGroup>
-          <SidebarGroupLabel>Actions</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>

@@ -761,7 +761,9 @@ async function fetchInventoryAdjustments(vendorId: string, token: string) {
 export default function InventoryDashboard() {
   const authUser = useSelector((state: RootState) => state.auth?.user)
   const token = useSelector((state: RootState) => state.auth?.token || '')
-  const authVendorId = normalizeText(authUser?.id || authUser?._id)
+  const authVendorId = normalizeText(
+    authUser?.vendor_id || authUser?.id || authUser?._id
+  )
   const role = normalizeText(authUser?.role).toLowerCase()
   const isAdmin = role === 'admin' || role === 'superadmin'
 

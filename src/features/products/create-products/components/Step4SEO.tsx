@@ -1,5 +1,5 @@
 import React from 'react'
-import { Loader2, Search, Sparkles, X } from 'lucide-react'
+import { Loader2, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   StudioFieldLabel,
@@ -47,13 +47,6 @@ const Step4SEO: React.FC<Props> = ({
 }) => {
   return (
     <div className='space-y-6'>
-      <div className={studioCardClass}>
-        <div className='text-foreground flex items-center gap-2 text-base font-semibold'>
-          <Search className='h-4 w-4 text-cyan-600' />
-          Search engine listing
-        </div>
-      </div>
-
       <div className={studioCardClass}>
         <StudioFieldLabel
           label='Meta Title'

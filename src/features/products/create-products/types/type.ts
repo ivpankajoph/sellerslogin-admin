@@ -41,6 +41,11 @@ export interface ProductFormData {
   brand: string
   shortDescription: string
   description: string
+  actualPrice: number
+  salePrice: number
+  stockQuantity: number
+  replacementPolicyType: string
+  replacementPolicyDays: string
   defaultImages: ImageUpload[]
   isAvailable: boolean
   metaTitle: string

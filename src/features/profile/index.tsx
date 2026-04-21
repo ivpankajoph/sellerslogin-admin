@@ -4,6 +4,7 @@ import { setUser } from '@/store/slices/authSlice'
 import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 import {
   Camera,
+  ChevronDown,
   Mail,
   MapPin,
   Phone,
@@ -15,8 +16,9 @@ import {
 import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import api from '@/lib/axios'
+import { uploadImage } from '@/lib/upload-image'
 import { PASSWORD_REQUIREMENTS, isStrongPassword } from '@/lib/password-rules'
-import { cn } from '@/lib/utils'
+import { cn, getImageUrl } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,6 +38,11 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp'
 import { Label } from '@/components/ui/label'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { Textarea } from '@/components/ui/textarea'
 import { Main } from '@/components/layout/main'
 import { PasswordInput } from '@/components/password-input'
@@ -45,6 +52,8 @@ type EditableField = {
   label: string
   placeholder: string
   type?: 'text' | 'email' | 'tel' | 'textarea'
+  control?: 'input' | 'textarea' | 'select' | 'multiselect' | 'country' | 'state' | 'city'
+  options?: string[]
 }
 
 type EditableSection = {
@@ -52,6 +61,12 @@ type EditableSection = {
   description: string
   icon: typeof Store
   fields: EditableField[]
+}
+
+type CountryOption = {
+  name: string
+  code?: string
+  flagUrl?: string
 }
 
 const ADMIN_PROFILE_SECTIONS: EditableSection[] = [
@@ -93,16 +108,19 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
         key: 'designation',
         label: 'Designation',
         placeholder: 'Owner, Founder, Director',
+        control: 'select',
       },
       {
         key: 'business_type',
         label: 'Business Type',
         placeholder: 'Manufacturer, Wholesaler, Retailer',
+        control: 'multiselect',
       },
       {
         key: 'established_year',
         label: 'Established Year',
         placeholder: '2024',
+        control: 'select',
       },
     ],
   },
@@ -129,11 +147,6 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
         placeholder: '+91 9000000000',
         type: 'tel',
       },
-      {
-        key: 'upi_id',
-        label: 'UPI ID',
-        placeholder: 'your-store@upi',
-      },
     ],
   },
   {
@@ -147,10 +160,10 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
         placeholder: 'Full business address',
         type: 'textarea',
       },
-      { key: 'city', label: 'City', placeholder: 'City' },
-      { key: 'state', label: 'State', placeholder: 'State' },
+      { key: 'country', label: 'Country', placeholder: 'India', control: 'country' },
+      { key: 'state', label: 'State', placeholder: 'State', control: 'state' },
+      { key: 'city', label: 'City', placeholder: 'City', control: 'city' },
       { key: 'pincode', label: 'Pincode', placeholder: '400001' },
-      { key: 'country', label: 'Country', placeholder: 'India' },
       { key: 'street', label: 'Street', placeholder: 'Street or locality' },
     ],
   },
@@ -163,34 +176,37 @@ const VENDOR_PROFILE_SECTIONS: EditableSection[] = [
         key: 'business_nature',
         label: 'Business Nature',
         placeholder: 'Exporter, Manufacturer, Trader',
-        type: 'textarea',
+        control: 'multiselect',
       },
       {
         key: 'categories',
         label: 'Categories',
         placeholder: 'Category names separated by commas',
-        type: 'textarea',
+        control: 'multiselect',
       },
       {
         key: 'dealing_area',
         label: 'Dealing Area',
         placeholder: 'India, UAE, Global',
-        type: 'textarea',
+        control: 'multiselect',
       },
       {
         key: 'annual_turnover',
         label: 'Annual Turnover',
         placeholder: '0 - 25 Lakh',
+        control: 'select',
       },
       {
         key: 'office_employees',
         label: 'Employees',
         placeholder: '1 - 10',
+        control: 'select',
       },
       {
         key: 'return_policy',
         label: 'Return Policy',
         placeholder: '7 days replacement',
+        control: 'select',
       },
     ],
   },
@@ -242,6 +258,129 @@ const toArray = (value: unknown): string[] => {
 
 const clampPercent = (value: number) => Math.max(0, Math.min(100, value))
 
+const currentYear = new Date().getFullYear()
+
+const MULTI_SELECT_FIELD_KEYS = new Set([
+  'business_type',
+  'business_nature',
+  'categories',
+  'dealing_area',
+])
+
+const FIELD_OPTIONS: Record<string, string[]> = {
+  designation: [
+    'Owner',
+    'Founder',
+    'Co-Founder',
+    'Director',
+    'Managing Director',
+    'CEO',
+    'Partner',
+    'Manager',
+    'Sales Head',
+    'Operations Head',
+    'Authorized Representative',
+  ],
+  business_type: [
+    'Manufacturer',
+    'Wholesaler',
+    'Retailer',
+    'Distributor',
+    'Exporter',
+    'Importer',
+    'Trader',
+    'Service Provider',
+    'Marketplace Seller',
+  ],
+  established_year: Array.from({ length: 80 }, (_, index) =>
+    String(currentYear - index)
+  ),
+  business_nature: [
+    'Manufacturer',
+    'Wholesaler',
+    'Retailer',
+    'Exporter',
+    'Importer',
+    'Trader',
+    'Distributor',
+    'Service Provider',
+    'Supplier',
+  ],
+  categories: [
+    'Electronics',
+    'Fashion',
+    'Home & Kitchen',
+    'Beauty & Personal Care',
+    'Health & Wellness',
+    'Grocery',
+    'Sports & Fitness',
+    'Toys & Baby Products',
+    'Automotive',
+    'Industrial Supplies',
+    'Food & Beverages',
+  ],
+  dealing_area: [
+    'Local',
+    'City-wide',
+    'State-wide',
+    'Pan India',
+    'International',
+    'Wholesale Market',
+    'Retail Market',
+    'Online Only',
+  ],
+  annual_turnover: [
+    'Below 10 Lakh',
+    '10 Lakh - 25 Lakh',
+    '25 Lakh - 50 Lakh',
+    '50 Lakh - 1 Crore',
+    '1 Crore - 5 Crore',
+    '5 Crore - 10 Crore',
+    'Above 10 Crore',
+  ],
+  office_employees: [
+    '1 - 5',
+    '6 - 10',
+    '11 - 25',
+    '26 - 50',
+    '51 - 100',
+    '101 - 250',
+    '250+',
+  ],
+  return_policy: [
+    'No return',
+    'Replacement only',
+    '3 days return',
+    '7 days return',
+    '10 days return',
+    '15 days return',
+    '30 days return',
+  ],
+}
+
+const FALLBACK_COUNTRIES = [
+  { name: 'India', code: 'IN', flagUrl: '' },
+  { name: 'United Arab Emirates', code: 'AE', flagUrl: '' },
+  { name: 'United States', code: 'US', flagUrl: '' },
+  { name: 'United Kingdom', code: 'GB', flagUrl: '' },
+  { name: 'Canada', code: 'CA', flagUrl: '' },
+  { name: 'Australia', code: 'AU', flagUrl: '' },
+]
+
+const getProfileImageValue = (source: Record<string, unknown> | null, fallback: any) =>
+  source?.avatar ||
+  source?.profile_pic ||
+  source?.profilePic ||
+  source?.profile_image ||
+  source?.profileImage ||
+  source?.logo ||
+  fallback?.avatar ||
+  fallback?.profile_pic ||
+  fallback?.profilePic ||
+  fallback?.profile_image ||
+  fallback?.profileImage ||
+  fallback?.logo
+
 function ProfileCompletionRing({ value }: { value: number }) {
   const safeValue = clampPercent(value)
   return (
@@ -265,6 +404,7 @@ export default function ProfilePage() {
   const dispatch = useDispatch<AppDispatch>()
 
   const user = useSelector((state: any) => state.auth.user)
+  const token = useSelector((state: any) => state.auth.token)
   const isVendor = normalizeRole(user?.role) === 'vendor'
 
   const profileSections = isVendor
@@ -285,7 +425,18 @@ export default function ProfilePage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [form, setForm] = useState<Record<string, string>>({})
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [countries, setCountries] = useState<CountryOption[]>(FALLBACK_COUNTRIES)
+  const [states, setStates] = useState<string[]>([])
+  const [cities, setCities] = useState<string[]>([])
+  const [customSelectFields, setCustomSelectFields] = useState<Record<string, boolean>>({})
+  const [customSelectValues, setCustomSelectValues] = useState<Record<string, string>>({})
+  const [locationLoading, setLocationLoading] = useState({
+    countries: false,
+    states: false,
+    cities: false,
+  })
 
   const [passwordForm, setPasswordForm] = useState({
     newPassword: '',
@@ -341,7 +492,6 @@ export default function ProfilePage() {
         label: 'Return policy',
         value: readString(profile?.return_policy || form.return_policy),
       },
-      { label: 'UPI ID', value: readString(profile?.upi_id) },
     ],
     [profile, form]
   )
@@ -360,6 +510,22 @@ export default function ProfilePage() {
   )
   const categoryChips = toArray(profile?.categories || form.categories)
   const dealingAreaChips = toArray(profile?.dealing_area || form.dealing_area)
+  const selectedCountry = countries.find(
+    (country) =>
+      country.name.toLowerCase() === String(form.country || '').trim().toLowerCase()
+  )
+  const profileEndpoint = isVendor ? '/vendor/profile' : '/admin/profile'
+  const passwordEndpoint = isVendor ? '/vendor/profile/password' : '/profile/admin'
+
+  const fetchCatalog = async (path: string) => {
+    const baseUrl = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/$/, '')
+    const response = await fetch(`${baseUrl}/v1${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+
+    if (!response.ok) throw new Error('Catalog request failed')
+    return response.json()
+  }
 
   const syncLocalState = (source: Record<string, unknown> | null) => {
     const nextProfile = source && typeof source === 'object' ? source : {}
@@ -372,15 +538,23 @@ export default function ProfilePage() {
     )
     setProfile(nextProfile)
     setForm(nextForm)
-    setAvatarPreview(readString(nextProfile.avatar || user?.avatar) || null)
+    setCustomSelectFields({})
+    setCustomSelectValues({})
+    const nextAvatar = getImageUrl(getProfileImageValue(nextProfile, user)) || ''
+    setAvatarUrl(nextAvatar)
+    setAvatarPreview(nextAvatar || null)
   }
 
   useEffect(() => {
-    if (!user?.id && !user?._id) return
+    if (!user?.id && !user?._id && !user?.vendor_id) return
     const loadProfile = async () => {
       try {
         setLoading(true)
-        const res = await api.get('/profile')
+        setErrorMessage('')
+        const res = await api.get(profileEndpoint).catch((firstError) => {
+          if (!isVendor) throw firstError
+          return api.get('/vendors/profile')
+        })
         const fetched = extractProfile(res.data)
         if (fetched) {
           dispatch(setUser({ ...user, ...fetched }))
@@ -396,7 +570,81 @@ export default function ProfilePage() {
       }
     }
     loadProfile()
-  }, [user?.id, user?._id])
+  }, [dispatch, isVendor, profileEndpoint, user?.id, user?._id, user?.vendor_id])
+
+  useEffect(() => {
+    if (!isVendor || !token) return
+
+    const loadCountries = async () => {
+      try {
+        setLocationLoading((prev) => ({ ...prev, countries: true }))
+        const payload = await fetchCatalog('/cities/countries')
+        const nextCountries = Array.isArray(payload?.data)
+          ? payload.data
+              .map((country: any) => ({
+                name: String(country?.name || '').trim(),
+                code: String(country?.code || '').trim(),
+                flagUrl: String(country?.flagUrl || '').trim(),
+              }))
+              .filter((country: CountryOption) => country.name)
+          : []
+
+        if (nextCountries.length) setCountries(nextCountries)
+      } catch {
+        setCountries(FALLBACK_COUNTRIES)
+      } finally {
+        setLocationLoading((prev) => ({ ...prev, countries: false }))
+      }
+    }
+
+    void loadCountries()
+  }, [isVendor, token])
+
+  useEffect(() => {
+    if (!isVendor || !token || !form.country) {
+      setStates([])
+      return
+    }
+
+    const loadStates = async () => {
+      try {
+        setLocationLoading((prev) => ({ ...prev, states: true }))
+        const payload = await fetchCatalog(
+          `/cities/states?country=${encodeURIComponent(form.country)}`
+        )
+        setStates(Array.isArray(payload?.states) ? payload.states : [])
+      } catch {
+        setStates([])
+      } finally {
+        setLocationLoading((prev) => ({ ...prev, states: false }))
+      }
+    }
+
+    void loadStates()
+  }, [form.country, isVendor, token])
+
+  useEffect(() => {
+    if (!isVendor || !token || !form.country || !form.state) {
+      setCities([])
+      return
+    }
+
+    const loadCities = async () => {
+      try {
+        setLocationLoading((prev) => ({ ...prev, cities: true }))
+        const payload = await fetchCatalog(
+          `/cities/discover?country=${encodeURIComponent(form.country)}&state=${encodeURIComponent(form.state)}`
+        )
+        setCities(Array.isArray(payload?.cities) ? payload.cities : [])
+      } catch {
+        setCities([])
+      } finally {
+        setLocationLoading((prev) => ({ ...prev, cities: false }))
+      }
+    }
+
+    void loadCities()
+  }, [form.country, form.state, isVendor, token])
 
   const displayName =
     readString(profile?.name || user?.name || user?.business_name) || 'Profile'
@@ -426,29 +674,132 @@ export default function ProfilePage() {
       setForm((prev) => ({ ...prev, [key]: e.target.value }))
     }
 
-  const handleAvatarSelect = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFieldValueChange = (key: string, value: string) => {
+    setForm((prev) => {
+      const next = { ...prev, [key]: value }
+      if (key === 'country') {
+        next.state = ''
+        next.city = ''
+      }
+      if (key === 'state') {
+        next.city = ''
+      }
+      return next
+    })
+  }
+
+  const setSelectValues = (
+    key: string,
+    values: string[],
+    allowsMultiple: boolean
+  ) => {
+    handleFieldValueChange(key, allowsMultiple ? values.join(', ') : values[0] || '')
+  }
+
+  const toggleManualField = (key: string, visible: boolean) => {
+    setCustomSelectFields((prev) => ({ ...prev, [key]: visible }))
+    if (!visible) {
+      setCustomSelectValues((prev) => ({ ...prev, [key]: '' }))
+    }
+  }
+
+  const addManualSelectValue = (field: EditableField, allowsMultiple: boolean) => {
+    const manualValue = String(customSelectValues[field.key] || '').trim()
+    if (!manualValue) return
+
+    const currentValues = toArray(form[field.key])
+    const exists = currentValues.some(
+      (item) => item.toLowerCase() === manualValue.toLowerCase()
+    )
+
+    const nextValues = allowsMultiple
+      ? exists
+        ? currentValues
+        : [...currentValues, manualValue]
+      : [manualValue]
+
+    setSelectValues(field.key, nextValues, allowsMultiple)
+    toggleManualField(field.key, false)
+  }
+
+  const handleSelectOptionToggle = (
+    field: EditableField,
+    value: string,
+    allowsMultiple: boolean
+  ) => {
+    const currentValues = toArray(form[field.key])
+    const exists = currentValues.some(
+      (item) => item.toLowerCase() === value.toLowerCase()
+    )
+    const nextValues = allowsMultiple
+      ? exists
+        ? currentValues.filter((item) => item.toLowerCase() !== value.toLowerCase())
+        : [...currentValues, value]
+      : [value]
+
+    setSelectValues(field.key, nextValues, allowsMultiple)
+  }
+
+  const removeSelectValue = (
+    field: EditableField,
+    value: string,
+    allowsMultiple: boolean
+  ) => {
+    const nextValues = toArray(form[field.key]).filter(
+      (item) => item.toLowerCase() !== value.toLowerCase()
+    )
+    setSelectValues(field.key, nextValues, allowsMultiple)
+  }
+
+  const handleAvatarSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (!file) return
     if (!/image\/(jpeg|png|webp|jpg)/i.test(file.type)) {
       setErrorMessage('Please upload a valid image.')
       return
     }
-    setAvatarFile(file)
-    setAvatarPreview(URL.createObjectURL(file))
+
+    const localPreviewUrl = URL.createObjectURL(file)
+    setAvatarPreview(localPreviewUrl)
+    setAvatarUploading(true)
+    setErrorMessage('')
+
+    try {
+      const uploadedUrl = await uploadImage(file, 'ophmart/profile')
+      if (!uploadedUrl) {
+        throw new Error('Image upload failed')
+      }
+      setAvatarUrl(uploadedUrl)
+      setAvatarPreview(uploadedUrl)
+      toast.success('Profile photo uploaded. Click Save Changes to apply it.')
+    } catch {
+      setAvatarPreview(avatarUrl || null)
+      setErrorMessage('Profile photo upload failed. Please try again.')
+    } finally {
+      URL.revokeObjectURL(localPreviewUrl)
+      setAvatarUploading(false)
+    }
   }
 
   const handleSave = async () => {
     try {
       setSaving(true)
-      const payload = new FormData()
-      editableFieldKeys.forEach((key) => payload.append(key, form[key] || ''))
-      if (avatarFile) payload.append('avatar', avatarFile)
+      const payload = editableFieldKeys.reduce<Record<string, string>>(
+        (acc, key) => {
+          acc[key] = form[key] || ''
+          return acc
+        },
+        {}
+      )
+      if (avatarUrl) payload.avatar = avatarUrl
 
-      const res = await api.put('/profile', payload)
+      const res = await api.put(profileEndpoint, payload)
       const updated = extractProfile(res.data)
       if (updated) {
         dispatch(setUser({ ...user, ...updated }))
         syncLocalState(updated)
+        if (isVendor) void dispatch(fetchVendorProfile())
       }
       setSuccessMessage('Profile updated successfully.')
       setIsEditing(false)
@@ -509,7 +860,7 @@ export default function ProfilePage() {
         otp: passwordOtp,
         purpose: 'password_change',
       })
-      await api.put('/password', {
+      await api.put(passwordEndpoint, {
         newPassword: passwordForm.newPassword,
         confirmPassword: passwordForm.confirmPassword,
       })
@@ -540,6 +891,210 @@ export default function ProfilePage() {
     }
   }
 
+  const renderEditableField = (field: EditableField) => {
+    const value = form[field.key] || ''
+    const selectOptions =
+      field.key === 'country'
+        ? countries.map((country) => country.name)
+        : field.key === 'state'
+          ? states
+          : field.key === 'city'
+            ? cities
+            : field.options || FIELD_OPTIONS[field.key] || []
+    const isTextarea = field.type === 'textarea' || field.control === 'textarea'
+    const isSelect =
+      field.control === 'select' ||
+      field.control === 'country' ||
+      field.control === 'state' ||
+      field.control === 'city'
+
+    if (field.control === 'multiselect' || isSelect) {
+      const allowsMultiple = MULTI_SELECT_FIELD_KEYS.has(field.key)
+      const selectedValues = toArray(value)
+      const options = Array.from(new Set([...selectOptions, ...selectedValues]))
+      const hasSelections = selectedValues.length > 0
+      const triggerLabel = hasSelections
+        ? selectedValues.length === 1
+          ? selectedValues[0]
+          : `${selectedValues.slice(0, 2).join(', ')}${selectedValues.length > 2 ? ` +${selectedValues.length - 2}` : ''}`
+        : `Select ${field.label.toLowerCase()}`
+      const loadingText =
+        field.control === 'country' && locationLoading.countries
+          ? 'Loading countries...'
+          : field.control === 'state' && locationLoading.states
+            ? 'Loading states...'
+            : field.control === 'city' && locationLoading.cities
+              ? 'Loading cities...'
+              : ''
+
+      return (
+        <div className='space-y-2'>
+          {field.control === 'country' && selectedCountry?.flagUrl ? (
+            <div className='flex items-center gap-2 text-xs font-medium text-slate-500'>
+              <img
+                src={selectedCountry.flagUrl}
+                alt={selectedCountry.name}
+                className='h-4 w-6 rounded-sm object-cover ring-1 ring-slate-200'
+              />
+              <span>{selectedCountry.name}</span>
+            </div>
+          ) : null}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type='button'
+                variant='outline'
+                disabled={!isEditing}
+                className={cn(
+                  'h-11 w-full justify-between rounded-none border-slate-200 bg-white/80 px-4 text-left text-sm font-normal shadow-sm hover:bg-white',
+                  !hasSelections && 'text-slate-500'
+                )}
+              >
+                <span className='truncate'>{loadingText || triggerLabel}</span>
+                <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-60' />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align='start' className='w-[--radix-popover-trigger-width] p-0'>
+              <div className='max-h-72 overflow-y-auto p-2'>
+                <div className='mb-2 rounded-lg border border-dashed border-violet-200 bg-violet-50/60 p-2'>
+                  {customSelectFields[field.key] ? (
+                    <div className='flex gap-2'>
+                      <Input
+                        className='h-9 bg-white'
+                        value={customSelectValues[field.key] || ''}
+                        placeholder={`Enter ${field.label.toLowerCase()}`}
+                        onChange={(event) =>
+                          setCustomSelectValues((prev) => ({
+                            ...prev,
+                            [field.key]: event.target.value,
+                          }))
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            addManualSelectValue(field, allowsMultiple)
+                          }
+                        }}
+                      />
+                      <Button
+                        type='button'
+                        size='sm'
+                        className='h-9 shrink-0'
+                        onClick={() => addManualSelectValue(field, allowsMultiple)}
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='icon'
+                        className='h-9 w-9 shrink-0 bg-white'
+                        aria-label={`Remove manual ${field.label}`}
+                        onClick={() => toggleManualField(field.key, false)}
+                      >
+                        <X className='h-4 w-4' />
+                      </Button>
+                    </div>
+                  ) : (
+                    <button
+                      type='button'
+                      className='flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm font-medium text-violet-800 hover:bg-violet-100'
+                      onClick={() => toggleManualField(field.key, true)}
+                    >
+                      <span>Other / add manually</span>
+                      <span className='text-lg leading-none'>+</span>
+                    </button>
+                  )}
+                </div>
+                {options.map((option) => {
+                  const checked = selectedValues.some(
+                    (item) => item.toLowerCase() === option.toLowerCase()
+                  )
+
+                  return (
+                    <label
+                      key={`${field.key}-${option}`}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm transition',
+                        checked
+                          ? 'bg-violet-50 text-violet-800'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      )}
+                    >
+                      <input
+                        type={allowsMultiple ? 'checkbox' : 'radio'}
+                        name={`${field.key}-option`}
+                        className='h-4 w-4 accent-violet-700'
+                        checked={checked}
+                        onChange={() =>
+                          handleSelectOptionToggle(field, option, allowsMultiple)
+                        }
+                      />
+                      <span>{option}</span>
+                    </label>
+                  )
+                })}
+                {!options.length ? (
+                  <div className='px-2 py-3 text-sm text-slate-500'>
+                    {loadingText || 'No options available'}
+                  </div>
+                ) : null}
+              </div>
+            </PopoverContent>
+          </Popover>
+          {selectedValues.length ? (
+            <div className='flex flex-wrap gap-2'>
+              {selectedValues.map((selected) => (
+                <Badge
+                  key={`${field.key}-${selected}`}
+                  variant='secondary'
+                  className='gap-1 border-violet-100 bg-violet-50 text-violet-700'
+                >
+                  <span>{selected}</span>
+                  {isEditing ? (
+                    <button
+                      type='button'
+                      className='rounded-full p-0.5 hover:bg-violet-100'
+                      aria-label={`Remove ${selected}`}
+                      onClick={() =>
+                        removeSelectValue(field, selected, allowsMultiple)
+                      }
+                    >
+                      <X className='h-3 w-3' />
+                    </button>
+                  ) : null}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )
+    }
+
+    if (isTextarea) {
+      return (
+        <Textarea
+          className='resize-none bg-white/80 backdrop-blur-sm transition-all hover:bg-white focus:bg-white focus:ring-2 focus:ring-violet-500/20 shadow-sm border-slate-200'
+          value={value}
+          onChange={handleInputChange(field.key)}
+          disabled={!isEditing}
+          placeholder={field.placeholder}
+        />
+      )
+    }
+
+    return (
+      <Input
+        className='h-11 bg-white/80 backdrop-blur-sm transition-all hover:bg-white focus:bg-white focus:ring-2 focus:ring-violet-500/20 shadow-sm border-slate-200'
+        value={value}
+        onChange={handleInputChange(field.key)}
+        type={field.type}
+        disabled={!isEditing}
+        placeholder={field.placeholder}
+      />
+    )
+  }
+
   return (
     <>
       <Main className='flex flex-col gap-6 pb-8'>
@@ -567,6 +1122,7 @@ export default function ProfilePage() {
                   <input
                     ref={fileInputRef}
                     type='file'
+                    accept='image/*'
                     className='hidden'
                     onChange={handleAvatarSelect}
                   />
@@ -589,8 +1145,10 @@ export default function ProfilePage() {
                     size='sm'
                     className='w-full bg-white/50 backdrop-blur hover:bg-violet-50 hover:text-violet-700 hover:border-violet-300 transition-all border-dashed shadow-sm'
                     onClick={() => fileInputRef.current?.click()}
+                    disabled={avatarUploading}
                   >
-                    <Camera className='mr-2 h-4 w-4' /> Change Photo
+                    <Camera className='mr-2 h-4 w-4' />
+                    {avatarUploading ? 'Uploading...' : 'Change Photo'}
                   </Button>
                 )}
                 {isVendor && completionPercent < 100 && (
@@ -646,14 +1204,14 @@ export default function ProfilePage() {
                         syncLocalState(profile)
                       }}
                       variant='outline'
-                      disabled={saving}
+                      disabled={saving || avatarUploading}
                       className="h-9"
                     >
                       <X className='mr-2 h-4 w-4' /> Cancel
                     </Button>
-                    <Button onClick={handleSave} disabled={saving} className="h-9 bg-violet-700 hover:bg-violet-800 shadow-md">
+                    <Button onClick={handleSave} disabled={saving || avatarUploading} className="h-9 bg-violet-700 hover:bg-violet-800 shadow-md">
                       <Save className='mr-2 h-4 w-4' />{' '}
-                      {saving ? 'Saving...' : 'Save Changes'}
+                      {saving ? 'Saving...' : avatarUploading ? 'Uploading...' : 'Save Changes'}
                     </Button>
                   </>
                 )}
@@ -688,26 +1246,14 @@ export default function ProfilePage() {
                               key={field.key}
                               className={cn(
                                 'space-y-2',
-                                field.type === 'textarea' && 'md:col-span-2'
+                                (field.type === 'textarea' ||
+                                  field.control === 'textarea' ||
+                                  field.control === 'multiselect') &&
+                                  'md:col-span-2'
                               )}
                             >
                               <Label className='text-slate-700 font-medium ml-1'>{field.label}</Label>
-                              {field.type === 'textarea' ? (
-                                <Textarea
-                                  className='resize-none bg-white/80 backdrop-blur-sm transition-all hover:bg-white focus:bg-white focus:ring-2 focus:ring-violet-500/20 shadow-sm border-slate-200'
-                                  value={form[field.key] || ''}
-                                  onChange={handleInputChange(field.key)}
-                                  disabled={!isEditing}
-                                />
-                              ) : (
-                                <Input
-                                  className='h-11 bg-white/80 backdrop-blur-sm transition-all hover:bg-white focus:bg-white focus:ring-2 focus:ring-violet-500/20 shadow-sm border-slate-200'
-                                  value={form[field.key] || ''}
-                                  onChange={handleInputChange(field.key)}
-                                  type={field.type}
-                                  disabled={!isEditing}
-                                />
-                              )}
+                              {renderEditableField(field)}
                             </div>
                           ))}
                         </div>

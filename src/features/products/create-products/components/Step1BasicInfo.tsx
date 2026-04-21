@@ -1,15 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import {
-  Building2,
-  Check,
-  ChevronsUpDown,
-  FileText,
-  FolderOpen,
-  Loader2,
-  Plus,
-  Sparkles,
-  X,
-} from 'lucide-react'
+import { Check, ChevronsUpDown, Loader2, Plus, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -70,8 +60,6 @@ const innerCardClass =
 
 const aiButtonClass =
   'inline-flex items-center gap-1 rounded-full border border-cyan-500/25 bg-white px-4 py-2 text-xs font-semibold text-cyan-700 shadow-sm transition hover:border-cyan-500/40 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-60 dark:text-cyan-200'
-
-const helperTextClass = 'mt-2 text-xs leading-5 text-muted-foreground'
 
 const linkButtonClass =
   'mt-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 transition hover:text-cyan-900 disabled:cursor-not-allowed disabled:text-muted-foreground dark:text-cyan-300 dark:hover:text-cyan-100'
@@ -189,7 +177,7 @@ const SearchableMultiSelect: React.FC<{
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'border-border bg-white text-foreground hover:bg-white hover:text-black h-11 w-full justify-between rounded-xl text-left shadow-sm',
+            'border-border text-foreground h-11 w-full justify-between rounded-xl bg-white text-left shadow-sm hover:bg-white hover:text-black',
             !selectedLabels.length && 'text-muted-foreground'
           )}
         >
@@ -534,20 +522,9 @@ const Step1BasicInfo: React.FC<Props> = ({
   return (
     <div className='space-y-6'>
       <section className={panelClass}>
-        <div className='mb-5 flex items-center gap-3'>
-          <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/20 bg-cyan-500/10'>
-            <Building2 className='h-4 w-4 text-cyan-700 dark:text-cyan-300' />
-          </div>
-          <h3 className='text-foreground text-lg font-semibold'>Title</h3>
-        </div>
-
         <div className='grid gap-4 lg:grid-cols-2'>
           <div className={innerCardClass}>
-            <StudioFieldLabel
-              label='Product Name'
-              required
-              help='Use the exact customer-facing name you want to publish.'
-            />
+            <StudioFieldLabel label='Product Name' required />
             <input
               type='text'
               value={formData.productName}
@@ -561,16 +538,10 @@ const Step1BasicInfo: React.FC<Props> = ({
               placeholder='Example: Stainless Steel Water Bottle 1L'
               required
             />
-            <p className={helperTextClass}>
-              Keep it clear and searchable. Avoid vendor-only naming.
-            </p>
           </div>
 
           <div className={innerCardClass}>
-            <StudioFieldLabel
-              label='Brand'
-              help='Optional. Add the brand only if it matters for buyers or cataloging.'
-            />
+            <StudioFieldLabel label='Brand' />
             <input
               type='text'
               value={formData.brand}
@@ -583,35 +554,19 @@ const Step1BasicInfo: React.FC<Props> = ({
               className={studioInputClass}
               placeholder='Optional brand name'
             />
-            <p className={helperTextClass}>
-              If the product is unbranded, you can leave this blank.
-            </p>
           </div>
         </div>
       </section>
 
       <section className={panelClass}>
-        <div className='mb-5 flex items-center gap-3'>
-          <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/10'>
-            <FolderOpen className='h-4 w-4 text-indigo-700 dark:text-indigo-300' />
-          </div>
-          <h3 className='text-foreground text-lg font-semibold'>
-            Product organization
-          </h3>
-        </div>
-
         <div className='grid gap-4 xl:grid-cols-2'>
           <div className={innerCardClass}>
-            <StudioFieldLabel
-              label='Main Category'
-              required
-              help='Choose the high-level catalog bucket first so the rest of the form can adapt correctly.'
-            />
+            <StudioFieldLabel label='Product Category' required />
             <SearchableMultiSelect
               values={selectedMainCategoryIds}
               onChange={applyMainCategorySelection}
               options={mainCategoryOptions}
-              placeholder='Select one or more main categories'
+              placeholder='Select one or more product categories'
               loading={isMainCategoryLoading}
             />
             <SelectedOptionsChips
@@ -624,30 +579,24 @@ const Step1BasicInfo: React.FC<Props> = ({
                 applyMainCategorySelection(nextValues)
               }}
             />
-            <p className={helperTextClass}>
-              Main category controls the category list shown below.
-            </p>
             <button
               type='button'
               onClick={() => setShowMainCategoryCreator((prev) => !prev)}
               className={linkButtonClass}
             >
               <Plus className='h-3.5 w-3.5' />
-              Can&apos;t find it? Create main category
+              Create product category
             </button>
             {showMainCategoryCreator ? (
               <div className='bg-background mt-3 rounded-2xl border border-cyan-500/20 p-4'>
-                <p className='text-foreground text-sm font-semibold'>
-                  Create a new main category
-                </p>
-                <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
+                <div className='flex flex-col gap-2 sm:flex-row'>
                   <Input
                     value={newMainCategoryName}
                     onChange={(event) =>
                       setNewMainCategoryName(event.target.value)
                     }
                     placeholder='Enter main category name'
-                    className='border-border bg-white h-11 rounded-xl'
+                    className='border-border h-11 rounded-xl bg-white'
                   />
                   <div className='flex gap-2'>
                     <Button
@@ -679,11 +628,7 @@ const Step1BasicInfo: React.FC<Props> = ({
           </div>
 
           <div className={innerCardClass}>
-            <StudioFieldLabel
-              label='Categories'
-              required
-              help='Pick the browsing categories customers should see. Keep the list focused to avoid confusion.'
-            />
+            <StudioFieldLabel label='Product Sub Category' required />
             <SearchableMultiSelect
               values={selectedCategoryIds}
               onChange={(values) => {
@@ -699,7 +644,7 @@ const Step1BasicInfo: React.FC<Props> = ({
               placeholder={
                 selectedMainCategoryIds.length
                   ? 'Select one or more categories'
-                  : 'Select main category first'
+                  : 'Select product category first'
               }
               loading={isCategoryLoading}
               disabled={!selectedMainCategoryIds.length}
@@ -720,9 +665,6 @@ const Step1BasicInfo: React.FC<Props> = ({
                 }))
               }}
             />
-            <p className={helperTextClass}>
-              Choose only the categories that genuinely match this product.
-            </p>
             <button
               type='button'
               onClick={() => setShowCategoryCreator((prev) => !prev)}
@@ -730,19 +672,16 @@ const Step1BasicInfo: React.FC<Props> = ({
               className={linkButtonClass}
             >
               <Plus className='h-3.5 w-3.5' />
-              Can&apos;t find it? Create category
+              Create product sub category
             </button>
             {showCategoryCreator ? (
               <div className='bg-background mt-3 rounded-2xl border border-cyan-500/20 p-4'>
-                <p className='text-foreground text-sm font-semibold'>
-                  Create a new category
-                </p>
-                <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
+                <div className='flex flex-col gap-2 sm:flex-row'>
                   <Input
                     value={newCategoryName}
                     onChange={(event) => setNewCategoryName(event.target.value)}
                     placeholder='Enter category name'
-                    className='border-border bg-white h-11 rounded-xl'
+                    className='border-border h-11 rounded-xl bg-white'
                   />
                   <div className='flex gap-2'>
                     <Button
@@ -778,10 +717,7 @@ const Step1BasicInfo: React.FC<Props> = ({
 
         <div className='mt-4'>
           <div className={innerCardClass}>
-            <StudioFieldLabel
-              label='Subcategories'
-              help='Use subcategories to narrow down product placement only when they genuinely apply.'
-            />
+            <StudioFieldLabel label='Product Sub Category 2' required />
             <SearchableMultiSelect
               values={formData.productSubCategories}
               onChange={(values) =>
@@ -816,10 +752,6 @@ const Step1BasicInfo: React.FC<Props> = ({
                 }))
               }
             />
-            <p className={helperTextClass}>
-              Subcategories are optional, but useful when buyers expect a more
-              specific product path.
-            </p>
             <button
               type='button'
               onClick={() => setShowSubCategoryCreator((prev) => !prev)}
@@ -827,20 +759,17 @@ const Step1BasicInfo: React.FC<Props> = ({
               className={linkButtonClass}
             >
               <Plus className='h-3.5 w-3.5' />
-              Can&apos;t find it? Create subcategory
+              Create product sub category 2
             </button>
             {showSubCategoryCreator ? (
               <div className='bg-background mt-3 rounded-2xl border border-cyan-500/20 p-4'>
-                <p className='text-foreground text-sm font-semibold'>
-                  Create a new subcategory
-                </p>
-                <div className='mt-3 grid gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto]'>
+                <div className='grid gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto]'>
                   <select
                     value={newSubCategoryCategoryId}
                     onChange={(event) =>
                       setNewSubCategoryCategoryId(event.target.value)
                     }
-                    className='border-input bg-white h-11 rounded-xl border px-4 text-sm transition outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15'
+                    className='border-input h-11 rounded-xl border bg-white px-4 text-sm transition outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15'
                   >
                     <option value=''>Select parent category</option>
                     {selectedCategoryCreateOptions.map((option) => (
@@ -855,7 +784,7 @@ const Step1BasicInfo: React.FC<Props> = ({
                       setNewSubCategoryName(event.target.value)
                     }
                     placeholder='Enter subcategory name'
-                    className='border-border bg-white h-11 rounded-xl'
+                    className='border-border h-11 rounded-xl bg-white'
                   />
                   <div className='flex gap-2'>
                     <Button
@@ -894,26 +823,11 @@ const Step1BasicInfo: React.FC<Props> = ({
       </section>
 
       <section className={panelClass}>
-        <div className='mb-5 flex items-start gap-4'>
-          <div className='flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10'>
-            <FileText className='h-5 w-5 text-rose-700 dark:text-rose-300' />
-          </div>
-          <div className='space-y-1'>
-            <p className='text-xs font-semibold tracking-[0.2em] text-rose-700 uppercase dark:text-rose-300'>
-              Sales Copy
-            </p>
-            <h3 className='text-foreground text-xl font-semibold tracking-tight'>
-              Write the information buyers will read before purchasing
-            </h3>
-          </div>
-        </div>
-
         <div className='space-y-4'>
           <div className={innerCardClass}>
             <StudioFieldLabel
               label='Short Description'
               required
-              help='Keep this concise and easy to scan. Buyers should understand the product quickly.'
               action={
                 <button
                   type='button'
@@ -942,16 +856,12 @@ const Step1BasicInfo: React.FC<Props> = ({
               placeholder='Example: Durable stainless steel bottle with leak-proof lid, easy-carry handle, and 1 litre capacity.'
               className={studioTextareaClass}
             />
-            <p className={helperTextClass}>
-              Aim for 1-2 sentences. This is useful for quick catalog scanning.
-            </p>
           </div>
 
           <div className={innerCardClass}>
             <StudioFieldLabel
               label='Description'
               required
-              help='Use this for full product explanation, buyer confidence points, and important usage details.'
               action={
                 <button
                   type='button'
