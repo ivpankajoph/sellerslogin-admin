@@ -531,7 +531,7 @@ const VendorDashboard = () => {
 
   return (
     <>
-      {!isAdminRole && (
+      {!isAdminRole && profileCompletion < 100 && (
         <Card className='mb-4 overflow-hidden border-0 bg-gradient-to-r from-indigo-50 via-white to-violet-50'>
           <CardContent className='flex flex-col gap-5 p-6 md:flex-row md:items-center md:justify-between'>
             <div className='flex items-center gap-4'>

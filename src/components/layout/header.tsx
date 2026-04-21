@@ -29,7 +29,7 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
   return (
     <header
       className={cn(
-        isThemeEditor ? 'z-50 h-[68px]' : 'z-50 h-16',
+        isThemeEditor ? 'z-50 h-[68px]' : 'z-50 h-auto min-h-16 py-2',
         fixed &&
           (isThemeEditor
             ? 'sticky top-0 w-full'
@@ -43,7 +43,7 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
         className={cn(
           isThemeEditor
             ? 'relative flex h-full items-center gap-3 border-b border-slate-200 bg-white px-4 text-slate-900 sm:px-6 lg:px-8'
-            : 'relative flex h-full items-center gap-3 border border-border/70 bg-background/80 p-4 text-foreground shadow-sm backdrop-blur sm:gap-4',
+            : 'relative flex h-full flex-wrap items-center gap-y-3 gap-x-3 border border-border/70 bg-background/80 px-4 py-2 text-foreground shadow-sm backdrop-blur sm:gap-x-4',
           !isThemeEditor &&
             offset > 10 &&
             fixed &&

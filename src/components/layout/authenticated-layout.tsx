@@ -470,13 +470,14 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                 <div className='flex min-h-svh flex-col'>
                   {effectiveRole === 'vendor' || effectiveRole === 'admin' ? (
                     <Header fixed className='mb-4'>
-                      <div className='flex flex-1 flex-col gap-3 md:flex-row md:items-center md:justify-between'>
-                        <div className='min-w-0'>
+                      <div className='flex flex-1 flex-col gap-3 py-1 md:flex-row md:items-center md:justify-between'>
+                        <div className='flex min-w-0 items-center gap-4'>
                           <div className='text-foreground inline-flex max-w-full items-center rounded-lg px-1 py-1 text-xl font-bold tracking-tight'>
                             <span className='truncate'>
                               {currentSectionTitle}
                             </span>
                           </div>
+                          <div id="page-action-portal" className="flex items-center gap-2"></div>
                         </div>
                         <div className='flex flex-wrap items-center gap-2 md:justify-end md:gap-3'>
                           {pathname === '/vendor' || pathname === '/vendor/' ? (
