@@ -16,6 +16,7 @@ import {
   Search,
   Store,
   Trash2,
+  UtensilsCrossed,
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
@@ -47,7 +48,7 @@ import {
 } from '@/features/vendor-template/components/websiteStudioStorage'
 import { DomainModal } from '@/features/vendor-template/components/DomainModel'
 
-type TemplateAudience = 'b2b' | 'b2c'
+type TemplateAudience = 'b2b' | 'b2c' | 'food'
 type CreateWebsiteStep = 'audience' | 'template'
 
 type TemplateCatalogItem = {
@@ -143,6 +144,7 @@ const REQUEST_TIMEOUT_MS = 10000
 const LIVE_PREVIEW_SCALE = 0.25
 const LIVE_PREVIEW_DIMENSION = `${100 / LIVE_PREVIEW_SCALE}%`
 const B2B_TEMPLATE_KEYS = new Set(['mquiq', 'poupqz'])
+const FOOD_TEMPLATE_KEYS = new Set(['pocofood'])
 const TEMPLATE_AUDIENCE_COPY: Record<
   TemplateAudience,
   {
@@ -167,6 +169,14 @@ const TEMPLATE_AUDIENCE_COPY: Record<
       'Show ecommerce, D2C, and consumer-brand templates focused on storefront conversion.',
     emptyDescription:
       'No B2C templates are available right now. Add a consumer storefront layout to this catalog first.',
+  },
+  food: {
+    label: 'Food Website (Restaurant, Cafe, Cloud Kitchen)',
+    shortLabel: 'Food Website',
+    description:
+      'Show food-ordering templates built for menus, combos, offers, and live food orders.',
+    emptyDescription:
+      'No food website templates are available right now. Add a restaurant layout to this catalog first.',
   },
 }
 
@@ -219,6 +229,16 @@ const normalizeTemplateAudience = (
   const normalizedKey = String(templateKey || '')
     .trim()
     .toLowerCase()
+
+  if (
+    FOOD_TEMPLATE_KEYS.has(normalizedKey) ||
+    normalizedValue.includes('food') ||
+    normalizedValue.includes('restaurant') ||
+    normalizedValue.includes('cafe') ||
+    normalizedValue.includes('kitchen')
+  ) {
+    return 'food'
+  }
 
   if (normalizedValue.includes('b2b') || normalizedValue.includes('bulk')) {
     return 'b2b'
@@ -281,7 +301,7 @@ const DEFAULT_TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   {
     key: 'pocofood',
     name: 'Oph Food',
-    audience: 'b2c',
+    audience: 'food',
     description:
       'Food-delivery storefront with bold hero offers, cuisine rails, recipe cards, and promo-led merchandising.',
     previewImage:
@@ -964,9 +984,21 @@ export default function TemplateWorkspace() {
       })
       setStoredEditingTemplateKey(vendorId, createdTemplateKey)
       setDialogOpen(false)
-      toast.success('Website created. Opening builder...')
+      const opensFoodDashboard =
+        normalizeTemplateAudience(selectedTemplate.audience, createdTemplateKey) ===
+        'food'
+      toast.success(
+        opensFoodDashboard
+          ? 'Food website created. Opening Food Menu Manager...'
+          : 'Website created. Opening builder...'
+      )
 
       try {
+        if (opensFoodDashboard) {
+          window.location.assign('/food#restaurant-setup')
+          return
+        }
+
         await navigate({
           to: '/vendor-template/$templateKey',
           params: { templateKey: createdTemplateKey },
@@ -1467,7 +1499,7 @@ export default function TemplateWorkspace() {
 
             <div className='flex-1 overflow-y-auto px-6 py-6 sm:px-8'>
               {createWebsiteStep === 'audience' ? (
-                <div className='grid gap-4 md:grid-cols-2'>
+                <div className='grid gap-4 md:grid-cols-3'>
                   {(
                     Object.entries(TEMPLATE_AUDIENCE_COPY) as Array<
                       [
@@ -1477,7 +1509,18 @@ export default function TemplateWorkspace() {
                     >
                   ).map(([audienceKey, audience]) => {
                     const isSelected = selectedTemplateAudience === audienceKey
-                    const Icon = audienceKey === 'b2b' ? Building2 : Globe
+                    const Icon =
+                      audienceKey === 'b2b'
+                        ? Building2
+                        : audienceKey === 'food'
+                          ? UtensilsCrossed
+                          : Globe
+                    const audienceHint =
+                      audienceKey === 'b2b'
+                        ? 'Bulk orders'
+                        : audienceKey === 'food'
+                          ? 'Menu, offers, orders'
+                          : 'Online store'
 
                     return (
                       <button
@@ -1510,9 +1553,7 @@ export default function TemplateWorkspace() {
                             {audience.shortLabel}
                           </div>
                           <div className='text-muted-foreground mt-2 text-sm'>
-                            {audienceKey === 'b2b'
-                              ? 'Bulk orders'
-                              : 'Online store'}
+                            {audienceHint}
                           </div>
                         </div>
                       </button>

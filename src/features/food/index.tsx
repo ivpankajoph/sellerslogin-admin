@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
+import { useLocation } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import api from '@/lib/axios'
 import { Main } from '@/components/layout/main'
 import { uploadImage } from '@/lib/upload-image'
-import { getVendorTemplateProductUrl } from '@/lib/storefront-url'
+import {
+  getVendorTemplatePreviewUrl,
+  getVendorTemplateProductUrl,
+} from '@/lib/storefront-url'
+import { getStoredActiveWebsite } from '@/features/vendor-template/components/websiteStudioStorage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -25,7 +31,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 
 type Summary = {
@@ -109,10 +114,19 @@ type Order = {
   items: Array<{ product_name?: string; quantity?: number }>
 }
 
+type TemplateWebsiteLite = {
+  _id?: string
+  id?: string
+  template_key?: string
+  templateKey?: string
+  website_slug?: string
+}
+
 type OpeningHour = RestaurantProfile['opening_hours'][number]
 type MenuAddon = MenuItem['addons'][number]
 type MenuVariant = MenuItem['variants'][number]
 type OfferComboItem = Offer['combo_items'][number]
+type RestaurantFoodTypeValue = 'veg' | 'non_veg'
 
 type MenuFormState = {
   id: string
@@ -209,6 +223,40 @@ const formatLabel = (value?: string) =>
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ') || '-'
+const RESTAURANT_FOOD_TYPE_OPTIONS: Array<{
+  label: string
+  value: RestaurantFoodTypeValue
+}> = [
+  { label: 'Veg', value: 'veg' },
+  { label: 'Non veg', value: 'non_veg' },
+]
+const getRestaurantFoodTypeSelections = (
+  value?: string
+): RestaurantFoodTypeValue[] => {
+  const normalized = String(value || 'both')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+  if (normalized === 'both') return ['veg', 'non_veg']
+  if (normalized === 'non_veg' || normalized === 'nonveg') return ['non_veg']
+  return ['veg']
+}
+const getRestaurantFoodTypeValue = (
+  selections: RestaurantFoodTypeValue[]
+) => {
+  const uniqueSelections = Array.from(new Set(selections))
+  const hasVeg = uniqueSelections.includes('veg')
+  const hasNonVeg = uniqueSelections.includes('non_veg')
+  if (hasVeg && hasNonVeg) return 'both'
+  if (hasNonVeg) return 'non_veg'
+  return 'veg'
+}
+const getRestaurantFoodTypeLabels = (value?: string) => {
+  const selections = getRestaurantFoodTypeSelections(value)
+  return RESTAURANT_FOOD_TYPE_OPTIONS.filter((option) =>
+    selections.includes(option.value)
+  ).map((option) => option.label)
+}
 const getOrderAddress = (order: Order) =>
   [
     order.shipping_address?.line1,
@@ -289,8 +337,58 @@ const DEFAULT_OFFER_FORM = (): OfferFormState => ({
   combo_items: [createEmptyComboItem()],
 })
 
+function FieldLabel({
+  label,
+}: {
+  label: string
+  helper?: string
+}) {
+  return (
+    <p className='text-xs font-semibold uppercase tracking-[0.08em] text-slate-700'>
+      {label}
+    </p>
+  )
+}
+
+function FoodTypeMark({ type }: { type?: string }) {
+  const normalized = String(type || 'veg').toLowerCase().replace(/[\s-]+/g, '_')
+  const isNonVeg = normalized === 'non_veg' || normalized === 'nonveg'
+
+  return (
+    <span
+      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[2px] border bg-white ${
+        isNonVeg ? 'border-red-600' : 'border-green-600'
+      }`}
+      title={isNonVeg ? 'Non veg' : 'Veg'}
+    >
+      <span
+        className={`h-2 w-2 rounded-full ${isNonVeg ? 'bg-red-600' : 'bg-green-600'}`}
+      />
+    </span>
+  )
+}
+
+const FOOD_HUB_SECTION_IDS = [
+  'restaurant-setup',
+  'food-items',
+  'all-items',
+  'offer-form',
+  'all-offers',
+  'orders',
+] as const
+
+type FoodHubSectionId = (typeof FOOD_HUB_SECTION_IDS)[number]
+
+const getFoodHubSectionFromHash = (): FoodHubSectionId => {
+  if (typeof window === 'undefined') return 'restaurant-setup'
+  const section = window.location.hash.replace('#', '') as FoodHubSectionId
+  return FOOD_HUB_SECTION_IDS.includes(section) ? section : 'restaurant-setup'
+}
+
 export default function FoodHubPage() {
+  const routerHash = useLocation({ select: (location) => location.hash })
   const authUser = useSelector((state: any) => state.auth?.user || null)
+  const authToken = useSelector((state: any) => state.auth?.token || '')
   const vendorProfile = useSelector(
     (state: any) =>
       state.vendorprofile?.profile?.vendor ||
@@ -315,6 +413,16 @@ export default function FoodHubPage() {
   const [expandedAddressOrderId, setExpandedAddressOrderId] = useState('')
   const [addressModalOrder, setAddressModalOrder] = useState<Order | null>(null)
   const [restaurantEditorOpen, setRestaurantEditorOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState<FoodHubSectionId>(
+    getFoodHubSectionFromHash
+  )
+
+  useEffect(() => {
+    const section = String(routerHash || '').replace('#', '') as FoodHubSectionId
+    setActiveSection(
+      FOOD_HUB_SECTION_IDS.includes(section) ? section : 'restaurant-setup'
+    )
+  }, [routerHash])
 
   const loadAll = async () => {
     try {
@@ -344,6 +452,12 @@ export default function FoodHubPage() {
 
   useEffect(() => {
     loadAll()
+  }, [])
+
+  useEffect(() => {
+    const syncSection = () => setActiveSection(getFoodHubSectionFromHash())
+    window.addEventListener('hashchange', syncSection)
+    return () => window.removeEventListener('hashchange', syncSection)
   }, [])
 
   const copyOrderAddress = async (order: Order) => {
@@ -385,6 +499,94 @@ export default function FoodHubPage() {
     }
 
     window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const resolvePocoFoodWebsiteId = async () => {
+    const activeWebsite = getStoredActiveWebsite(vendorId)
+    if (
+      activeWebsite?.id &&
+      String(activeWebsite.templateKey || '').trim().toLowerCase() === 'pocofood'
+    ) {
+      return activeWebsite.id
+    }
+
+    try {
+      const apiBase = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/+$/, '')
+      if (!apiBase || !vendorId) return ''
+      const response = await fetch(
+        `${apiBase}/v1/templates/by-vendor?vendor_id=${encodeURIComponent(vendorId)}&_ts=${Date.now()}`,
+        {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+        }
+      )
+      const payload = await response.json().catch(() => null)
+      const websites = Array.isArray(payload?.data)
+        ? (payload.data as TemplateWebsiteLite[])
+        : []
+      const pocoFoodWebsite = websites.find((website) => {
+        const key = String(website?.template_key || website?.templateKey || '')
+          .trim()
+          .toLowerCase()
+        return key === 'pocofood' || key.includes('pocofood')
+      })
+      return String(pocoFoodWebsite?._id || pocoFoodWebsite?.id || '').trim()
+    } catch {
+      return ''
+    }
+  }
+
+  const previewFoodTemplate = async () => {
+    const previewCity =
+      String(vendorProfile?.default_city_slug || authUser?.default_city_slug || '').trim() ||
+      'all'
+    const websiteId =
+      (await resolvePocoFoodWebsiteId()) ||
+      String(
+        vendorProfile?.default_website_id ||
+          vendorProfile?.defaultWebsiteId ||
+          authUser?.default_website_id ||
+          ''
+      ).trim()
+    const url = getVendorTemplatePreviewUrl(
+      vendorId,
+      'pocofood',
+      previewCity,
+      websiteId || undefined
+    )
+
+    if (!url) {
+      toast.error('Storefront preview URL is not ready yet.')
+      return
+    }
+
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const previewFoodOffers = async () => {
+    const previewCity =
+      String(vendorProfile?.default_city_slug || authUser?.default_city_slug || '').trim() ||
+      'all'
+    const websiteId =
+      (await resolvePocoFoodWebsiteId()) ||
+      String(
+        vendorProfile?.default_website_id ||
+          vendorProfile?.defaultWebsiteId ||
+          authUser?.default_website_id ||
+          ''
+      ).trim()
+    const baseUrl = getVendorTemplatePreviewUrl(
+      vendorId,
+      'pocofood',
+      previewCity,
+      websiteId || undefined
+    )
+
+    if (!baseUrl) {
+      toast.error('Storefront preview URL is not ready yet.')
+      return
+    }
+
+    window.open(`${baseUrl}/combo`, '_blank', 'noopener,noreferrer')
   }
 
   const categoryOptions = Array.from(
@@ -455,15 +657,14 @@ export default function FoodHubPage() {
     const category = menuForm.category.trim()
     const price = parseFormNumber(menuForm.price)
     const offerPrice = parseFormNumber(menuForm.offer_price)
-    const prepTime = parseFormNumber(menuForm.prep_time_minutes)
     const foodType = menuForm.food_type.trim().toLowerCase().replace(/[\s-]+/g, '_')
 
     if (!itemName) {
-      toast.error('Item name required hai')
+      toast.error('Item name is required')
       return
     }
     if (!category) {
-      toast.error('Category required hai')
+      toast.error('Category is required')
       return
     }
     if (!isValidAmount(price) || price <= 0) {
@@ -474,12 +675,8 @@ export default function FoodHubPage() {
       toast.error('Offer price me sirf number dalo')
       return
     }
-    if (!isValidAmount(prepTime)) {
-      toast.error('Prep time valid number hona chahiye')
-      return
-    }
     if (!['veg', 'non_veg', 'egg'].includes(foodType)) {
-      toast.error('Food type sirf veg, non_veg, ya egg hona chahiye')
+      toast.error('Food type must be veg or non_veg')
       return
     }
 
@@ -522,7 +719,7 @@ export default function FoodHubPage() {
       gallery_images: menuForm.gallery_images.filter((image) => image.trim()),
       food_type: foodType,
       is_available: menuForm.is_available,
-      prep_time_minutes: prepTime || 20,
+      prep_time_minutes: parseFormNumber(menuForm.prep_time_minutes) || 20,
       addons,
       variants,
     }
@@ -548,11 +745,11 @@ export default function FoodHubPage() {
         (item) => item.item_name.trim() || item.menu_item_id
       )
       if (!selectedComboItems.length) {
-        toast.error('Combo builder me dropdown se at least one food item select karo')
+        toast.error('Select at least one food item from the combo builder')
         return
       }
       if (Number(offerForm.combo_price || 0) <= 0) {
-        toast.error('Combo price add karo')
+        toast.error('Add a combo price')
         return
       }
     }
@@ -759,6 +956,29 @@ export default function FoodHubPage() {
   const comboWorth = comboPreviewItems.reduce((sum, item) => sum + item.lineTotal, 0)
   const comboPrice = Number(offerForm.combo_price || 0)
   const comboSavings = comboWorth > comboPrice && comboPrice > 0 ? comboWorth - comboPrice : 0
+  const restaurantFoodTypeSelections = getRestaurantFoodTypeSelections(
+    restaurantDraft.veg_nonveg_type
+  )
+  const updateRestaurantFoodType = (
+    value: RestaurantFoodTypeValue,
+    checked: boolean
+  ) => {
+    setRestaurantDraft((current) => {
+      const currentSelections = getRestaurantFoodTypeSelections(
+        current.veg_nonveg_type
+      )
+      const nextSelections = checked
+        ? [...currentSelections, value]
+        : currentSelections.filter((selection) => selection !== value)
+
+      if (!nextSelections.length) return current
+
+      return {
+        ...current,
+        veg_nonveg_type: getRestaurantFoodTypeValue(nextSelections),
+      }
+    })
+  }
 
   return (
     <Main className='flex flex-1 flex-col gap-6'>
@@ -769,29 +989,35 @@ export default function FoodHubPage() {
         </p>
       </div>
 
-      <div className='grid gap-4 md:grid-cols-4'>
-        {[
-          ['Restaurant', summary?.restaurant_name || 'Not configured'],
-          ['Menu Items', String(summary?.menu_count || 0)],
-          ['Active Offers', String(summary?.active_offer_count || 0)],
-          ['Live Orders', String((summary?.pending_order_count || 0) + (summary?.live_order_count || 0))],
-        ].map(([label, value]) => (
-          <Card key={label}>
-            <CardHeader><CardTitle className='text-sm font-medium'>{label}</CardTitle></CardHeader>
-            <CardContent className='text-2xl font-semibold'>{value}</CardContent>
-          </Card>
-        ))}
-      </div>
+      {activeSection === 'restaurant-setup' ? (
+        <div className='grid gap-4 md:grid-cols-4'>
+          {[
+            ['Restaurant', summary?.restaurant_name || 'Not configured'],
+            ['Menu Items', String(summary?.menu_count || 0)],
+            ['Active Offers', String(summary?.active_offer_count || 0)],
+            [
+              'Live Orders',
+              String(
+                (summary?.pending_order_count || 0) +
+                  (summary?.live_order_count || 0)
+              ),
+            ],
+          ].map(([label, value]) => (
+            <Card key={label}>
+              <CardHeader>
+                <CardTitle className='text-sm font-medium'>{label}</CardTitle>
+              </CardHeader>
+              <CardContent className='text-2xl font-semibold'>
+                {value}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
 
-      <Tabs defaultValue='restaurant' className='space-y-4'>
-        <TabsList className='grid h-auto w-full grid-cols-2 gap-2 rounded-xl bg-muted/60 p-2 sm:grid-cols-4'>
-          <TabsTrigger value='restaurant'>Restaurant Setup</TabsTrigger>
-          <TabsTrigger value='menu'>Menu</TabsTrigger>
-          <TabsTrigger value='offers'>Offers</TabsTrigger>
-          <TabsTrigger value='orders'>Orders</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value='restaurant'>
+      <div className='space-y-6'>
+        {activeSection === 'restaurant-setup' ? (
+        <section id='restaurant-setup'>
           <div className='space-y-4'>
             <Card>
               <CardHeader className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
@@ -807,6 +1033,12 @@ export default function FoodHubPage() {
                   <Badge variant='outline'>
                     {restaurant.is_active ? 'Active' : 'Inactive'}
                   </Badge>
+                  <Button
+                    variant='outline'
+                    onClick={() => void previewFoodTemplate()}
+                  >
+                    Preview Template
+                  </Button>
                   <Button
                     onClick={() => {
                       setRestaurantDraft(restaurant)
@@ -839,8 +1071,13 @@ export default function FoodHubPage() {
                           {restaurant.address || 'No address added yet.'}
                         </p>
                         <div className='mt-4 flex flex-wrap gap-2'>
-                          <Badge variant='secondary'>{formatLabel(restaurant.veg_nonveg_type || 'both')}</Badge>
-                          <Badge variant='outline'>Prep {restaurant.default_preparation_time_minutes || 0} min</Badge>
+                          {getRestaurantFoodTypeLabels(
+                            restaurant.veg_nonveg_type || 'both'
+                          ).map((label) => (
+                            <Badge key={label} variant='secondary'>
+                              {label}
+                            </Badge>
+                          ))}
                           <Badge variant='outline'>Min order {money(restaurant.minimum_order_amount)}</Badge>
                           <Badge variant='outline'>Radius {restaurant.delivery_radius_km || 0} km</Badge>
                         </div>
@@ -863,7 +1100,7 @@ export default function FoodHubPage() {
                   </div>
                 </div>
 
-                <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]'>
+                <div className='grid gap-4'>
                   <div className='rounded-xl border border-slate-200 bg-white p-5'>
                     <p className='text-xs font-medium uppercase tracking-[0.08em] text-slate-500'>Opening hours</p>
                     <div className='mt-4 grid gap-2 sm:grid-cols-2'>
@@ -874,54 +1111,62 @@ export default function FoodHubPage() {
                       ))}
                     </div>
                   </div>
-                  <div className='rounded-xl border border-slate-200 bg-white p-5'>
-                    <p className='text-xs font-medium uppercase tracking-[0.08em] text-slate-500'>Cover image</p>
-                    <div className='mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-100'>
-                      {restaurant.cover_image_url ? (
-                        <img src={restaurant.cover_image_url} alt={restaurant.restaurant_name || 'Restaurant cover'} className='aspect-[4/3] w-full object-cover' />
-                      ) : (
-                        <div className='flex aspect-[4/3] items-center justify-center text-sm text-slate-400'>
-                          Cover image not added
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
+        </section>
+        ) : null}
 
-        <TabsContent value='menu'>
-          <div className='grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]'>
+        {activeSection === 'food-items' || activeSection === 'all-items' ? (
+        <section id={activeSection}>
+          <div className='space-y-4'>
+            {activeSection === 'food-items' ? (
             <Card>
-              <CardHeader><CardTitle>Menu / Product Form</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Food Item Form</CardTitle>
+                <p className='text-sm text-slate-600'>
+                  Create or update food items here. Saved items are listed below/alongside this form.
+                </p>
+              </CardHeader>
               <CardContent className='space-y-3'>
-                <Input placeholder='Item name' value={menuForm.item_name} onChange={(e) => setMenuForm((c) => ({ ...c, item_name: e.target.value }))} />
-                <Input
-                  placeholder='Category'
-                  list='food-category-options'
-                  value={menuForm.category}
-                  onChange={(e) => setMenuForm((c) => ({ ...c, category: e.target.value }))}
-                />
+                <div className='space-y-2'>
+                  <FieldLabel label='Food item name' helper='This name appears on the menu card.' />
+                  <Input placeholder='Example: Crispy Veg Burger' value={menuForm.item_name} onChange={(e) => setMenuForm((c) => ({ ...c, item_name: e.target.value }))} />
+                </div>
+                <div className='space-y-2'>
+                  <FieldLabel label='Category' helper='Group the item, such as Burger, Drinks, or Wrap.' />
+                  <Input
+                    placeholder='Example: Burger'
+                    list='food-category-options'
+                    value={menuForm.category}
+                    onChange={(e) => setMenuForm((c) => ({ ...c, category: e.target.value }))}
+                  />
+                </div>
                 <datalist id='food-category-options'>
                   {categoryOptions.map((item) => (
                     <option key={item} value={item} />
                   ))}
                 </datalist>
                 <div className='grid grid-cols-2 gap-3'>
-                  <Input
-                    type='number'
-                    placeholder='Regular price, e.g. 159'
-                    value={emptyWhenZero(menuForm.price)}
-                    onChange={(e) => setMenuForm((c) => ({ ...c, price: e.target.value }))}
-                  />
-                  <Input
-                    type='number'
-                    placeholder='Sale price, e.g. 119'
-                    value={emptyWhenZero(menuForm.offer_price)}
-                    onChange={(e) => setMenuForm((c) => ({ ...c, offer_price: e.target.value }))}
-                  />
+                  <div className='space-y-2'>
+                    <FieldLabel label='Regular price' helper='Original item price.' />
+                    <Input
+                      type='number'
+                      placeholder='Example: 159'
+                      value={emptyWhenZero(menuForm.price)}
+                      onChange={(e) => setMenuForm((c) => ({ ...c, price: e.target.value }))}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <FieldLabel label='Offer / sale price' helper='Discounted price. Use 0 if there is no discount.' />
+                    <Input
+                      type='number'
+                      placeholder='Example: 119'
+                      value={emptyWhenZero(menuForm.offer_price)}
+                      onChange={(e) => setMenuForm((c) => ({ ...c, offer_price: e.target.value }))}
+                    />
+                  </div>
                 </div>
                 <div className='space-y-2'>
                   <div className='space-y-1'>
@@ -935,7 +1180,7 @@ export default function FoodHubPage() {
                       onChange={(e) => void handleMenuGalleryUpload(e.target.files)}
                     />
                     <p className='text-xs text-slate-500'>
-                      Ek image ya multiple images select kar sakte ho. Pehli image automatic primary ban jayegi.
+                      Select one or more images. The first image becomes the primary image automatically.
                     </p>
                   </div>
                   {uploadingField === 'menu_gallery' ? (
@@ -946,7 +1191,7 @@ export default function FoodHubPage() {
                       <div>
                         <p className='text-sm font-medium text-slate-700'>Gallery images</p>
                         <p className='text-xs text-slate-500'>
-                          Product detail page aur future gallery thumbnails ke liye.
+                          For the product detail page and gallery thumbnails.
                         </p>
                       </div>
                       <Badge variant='secondary'>{menuForm.gallery_images.length} images</Badge>
@@ -1007,18 +1252,25 @@ export default function FoodHubPage() {
                         ))}
                       </div>
                     ) : (
-                      <p className='mt-3 text-xs text-slate-500'>Abhi gallery images add nahi ki gayi hain.</p>
+                      <p className='mt-3 text-xs text-slate-500'>No gallery images have been added yet.</p>
                     )}
                   </div>
                 </div>
-                <Input placeholder='Veg / non_veg / egg' value={menuForm.food_type} onChange={(e) => setMenuForm((c) => ({ ...c, food_type: e.target.value }))} />
-                <Input
-                  type='number'
-                  placeholder='Prep time in minutes, e.g. 20'
-                  value={emptyWhenZero(menuForm.prep_time_minutes)}
-                  onChange={(e) => setMenuForm((c) => ({ ...c, prep_time_minutes: e.target.value }))}
-                />
-                <Textarea className='min-h-[88px]' placeholder='Description' value={menuForm.description} onChange={(e) => setMenuForm((c) => ({ ...c, description: e.target.value }))} />
+                <div className='space-y-2'>
+                  <FieldLabel label='Food type' helper='Select whether this item is veg or non-veg.' />
+                  <select
+                    className='h-10 w-full rounded-md border border-input bg-background px-3 text-sm'
+                    value={menuForm.food_type}
+                    onChange={(e) => setMenuForm((c) => ({ ...c, food_type: e.target.value }))}
+                  >
+                    <option value='veg'>Veg</option>
+                    <option value='non_veg'>Non veg</option>
+                  </select>
+                </div>
+                <div className='space-y-2'>
+                  <FieldLabel label='Item description' helper='Add taste, ingredients, serving size, or short details.' />
+                  <Textarea className='min-h-[88px]' placeholder='Example: Crispy veg patty with cheese, lettuce, mayo, and fresh bun.' value={menuForm.description} onChange={(e) => setMenuForm((c) => ({ ...c, description: e.target.value }))} />
+                </div>
                 {offerForm.offer_type === 'combo_price' ? (
                 <div className='space-y-3 rounded-lg border border-slate-200 p-4'>
                   <div className='flex items-center justify-between gap-3'>
@@ -1049,7 +1301,7 @@ export default function FoodHubPage() {
                       <div className='flex items-center justify-between gap-3'>
                         <div>
                           <p className='text-sm font-semibold text-slate-900'>Addon {index + 1}</p>
-                          <p className='text-xs text-slate-500'>Extra item jo customer main food ke saath select karega.</p>
+                          <p className='text-xs text-slate-500'>Extra item customers can select with the main food item.</p>
                         </div>
                         <Button
                           type='button'
@@ -1145,7 +1397,7 @@ export default function FoodHubPage() {
                             Variant {index + 1}
                           </span>
                           <p className='text-xs text-slate-500'>
-                            Size ya option fill karo, jaise `Regular`, `Medium`, `Large`.
+                            Add a size or option, such as `Regular`, `Medium`, or `Large`.
                           </p>
                         </div>
                         <Button
@@ -1211,7 +1463,7 @@ export default function FoodHubPage() {
                           <div className='flex items-center justify-between gap-3'>
                             <div>
                               <p className='text-sm font-medium text-slate-900'>Default variant</p>
-                              <p className='text-xs text-slate-500'>Customer ko pehle se selected milega</p>
+                              <p className='text-xs text-slate-500'>Selected by default for customers.</p>
                             </div>
                             <Switch
                               checked={variant.is_default}
@@ -1231,7 +1483,7 @@ export default function FoodHubPage() {
                           <div className='flex items-center justify-between gap-3'>
                             <div>
                               <p className='text-sm font-medium text-slate-900'>Available</p>
-                              <p className='text-xs text-slate-500'>Abhi customer ko ye option dikhana hai</p>
+                              <p className='text-xs text-slate-500'>Show this option to customers.</p>
                             </div>
                             <Switch
                               checked={variant.is_available}
@@ -1255,15 +1507,25 @@ export default function FoodHubPage() {
                 </div>
               </CardContent>
             </Card>
+            ) : null}
+            {activeSection === 'all-items' ? (
             <Card>
-              <CardHeader><CardTitle>Menu Items</CardTitle></CardHeader>
+              <CardHeader><CardTitle>All Food Items</CardTitle></CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Price</TableHead><TableHead>Status</TableHead><TableHead className='text-right'>Action</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {menuItems.map((item) => (
                       <TableRow key={item._id}>
-                        <TableCell><div><p className='font-medium'>{item.item_name}</p><p className='text-xs text-slate-500'>{item.category || '-'}</p></div></TableCell>
+                        <TableCell>
+                          <div className='flex items-start gap-2'>
+                            <FoodTypeMark type={item.food_type} />
+                            <div>
+                              <p className='font-medium'>{item.item_name}</p>
+                              <p className='text-xs text-slate-500'>{item.category || '-'}</p>
+                            </div>
+                          </div>
+                        </TableCell>
                         <TableCell>{money(item.offer_price || item.price)}</TableCell>
                         <TableCell><Badge variant='outline'>{item.is_available ? 'available' : 'unavailable'}</Badge></TableCell>
                         <TableCell className='text-right'>
@@ -1280,16 +1542,21 @@ export default function FoodHubPage() {
                 </Table>
               </CardContent>
             </Card>
+            ) : null}
           </div>
-        </TabsContent>
+        </section>
+        ) : null}
 
-        <TabsContent value='offers'>
-          <div className='grid gap-4 xl:grid-cols-[520px_minmax(0,1fr)]'>
+        {activeSection === 'offer-form' || activeSection === 'all-offers' ? (
+        <section id={activeSection}>
+          <div className='space-y-4'>
+            {activeSection === 'offer-form' ? (
             <Card>
               <CardHeader><CardTitle>Combo / Offer Form</CardTitle></CardHeader>
               <CardContent className='space-y-3'>
                 <div className='space-y-2'>
-                  <Input placeholder='Offer title, e.g. 2 Chocolate Lava Cake + Mexican Bean Wrap' value={offerForm.offer_title} onChange={(e) => setOfferForm((c) => ({ ...c, offer_title: e.target.value }))} />
+                  <FieldLabel label='Offer title' helper='This name appears in the deals/combo section.' />
+                  <Input placeholder='Example: Coke + Crispy Veg Burger' value={offerForm.offer_title} onChange={(e) => setOfferForm((c) => ({ ...c, offer_title: e.target.value }))} />
                   {offerForm.offer_type === 'combo_price' && comboAutoTitle ? (
                     <Button
                       type='button'
@@ -1301,23 +1568,27 @@ export default function FoodHubPage() {
                     </Button>
                   ) : null}
                 </div>
-                <select
-                  className='h-10 rounded-md border border-input bg-background px-3 text-sm'
-                  value={offerForm.offer_type}
-                  onChange={(e) => setOfferForm((c) => ({ ...c, offer_type: e.target.value }))}
-                >
-                  <option value='combo_price'>Combo price</option>
-                  <option value='buy_x_get_y'>Buy X Get Y</option>
-                  <option value='free_item'>Free item</option>
-                  <option value='flat_discount'>Flat discount</option>
-                  <option value='percentage_discount'>Percentage discount</option>
-                  <option value='coupon'>Coupon</option>
-                </select>
+                <div className='space-y-2'>
+                  <FieldLabel label='Offer type' helper='Select how the discount should be applied.' />
+                  <select
+                    className='h-10 w-full rounded-md border border-input bg-background px-3 text-sm'
+                    value={offerForm.offer_type}
+                    onChange={(e) => setOfferForm((c) => ({ ...c, offer_type: e.target.value }))}
+                  >
+                    <option value='combo_price'>Combo price</option>
+                    <option value='buy_x_get_y'>Buy X Get Y</option>
+                    <option value='free_item'>Free item</option>
+                    <option value='flat_discount'>Flat discount</option>
+                    <option value='percentage_discount'>Percentage discount</option>
+                    <option value='coupon'>Coupon</option>
+                  </select>
+                </div>
                 {offerForm.offer_type === 'combo_price' ? (
                   <div className='space-y-2'>
+                    <FieldLabel label='Final combo price' helper='Combo me selected items ka final selling price.' />
                     <Input
                       type='number'
-                      placeholder='Final combo price, e.g. 249'
+                      placeholder='Example: 249'
                       value={emptyWhenZero(offerForm.combo_price)}
                       onChange={(e) => setOfferForm((c) => ({ ...c, combo_price: e.target.value }))}
                     />
@@ -1338,48 +1609,48 @@ export default function FoodHubPage() {
                   </div>
                 ) : null}
                 {offerForm.offer_type === 'percentage_discount' ? (
-                  <Input
-                    type='number'
-                    placeholder='Discount percent, e.g. 20'
-                    value={emptyWhenZero(offerForm.discount_percent)}
-                    onChange={(e) => setOfferForm((c) => ({ ...c, discount_percent: e.target.value }))}
-                  />
+                  <div className='space-y-2'>
+                    <FieldLabel label='Discount percentage' helper='Percentage discount customers will receive.' />
+                    <Input
+                      type='number'
+                      placeholder='Example: 20'
+                      value={emptyWhenZero(offerForm.discount_percent)}
+                      onChange={(e) => setOfferForm((c) => ({ ...c, discount_percent: e.target.value }))}
+                    />
+                  </div>
                 ) : null}
                 {offerForm.offer_type === 'flat_discount' ? (
-                  <Input
-                    type='number'
-                    placeholder='Flat discount amount, e.g. 50'
-                    value={emptyWhenZero(offerForm.flat_discount)}
-                    onChange={(e) => setOfferForm((c) => ({ ...c, flat_discount: e.target.value }))}
-                  />
+                  <div className='space-y-2'>
+                    <FieldLabel label='Flat discount amount' helper='Cart/order par fixed rupee discount.' />
+                    <Input
+                      type='number'
+                      placeholder='Example: 50'
+                      value={emptyWhenZero(offerForm.flat_discount)}
+                      onChange={(e) => setOfferForm((c) => ({ ...c, flat_discount: e.target.value }))}
+                    />
+                  </div>
                 ) : null}
                 {offerForm.offer_type === 'free_item' || offerForm.offer_type === 'buy_x_get_y' ? (
-                  <Input placeholder='Free item name' value={offerForm.free_item_name} onChange={(e) => setOfferForm((c) => ({ ...c, free_item_name: e.target.value }))} />
+                  <div className='space-y-2'>
+                    <FieldLabel label='Free item name' helper='Free item customers will receive with the offer.' />
+                    <Input placeholder='Example: Coke Can' value={offerForm.free_item_name} onChange={(e) => setOfferForm((c) => ({ ...c, free_item_name: e.target.value }))} />
+                  </div>
                 ) : null}
                 <div className='grid grid-cols-2 gap-3'>
-                  <Input placeholder='Coupon code' value={offerForm.coupon_code} onChange={(e) => setOfferForm((c) => ({ ...c, coupon_code: e.target.value }))} />
-                  <Input
-                    type='number'
-                    placeholder='Min cart value, e.g. 499'
-                    value={emptyWhenZero(offerForm.min_cart_value)}
-                    onChange={(e) => setOfferForm((c) => ({ ...c, min_cart_value: e.target.value }))}
-                  />
-                </div>
-                <Input
-                  type='number'
-                  placeholder='Max discount cap, e.g. 100'
-                  value={emptyWhenZero(offerForm.max_discount)}
-                  onChange={(e) => setOfferForm((c) => ({ ...c, max_discount: e.target.value }))}
-                />
-                <div className='grid grid-cols-2 gap-3'>
-                  <Input type='date' value={offerForm.start_date} onChange={(e) => setOfferForm((c) => ({ ...c, start_date: e.target.value }))} />
-                  <Input type='date' value={offerForm.end_date} onChange={(e) => setOfferForm((c) => ({ ...c, end_date: e.target.value }))} />
+                  <div className='space-y-2'>
+                    <FieldLabel label='Offer start date' helper='Is date se offer active maana jayega.' />
+                    <Input type='date' value={offerForm.start_date} onChange={(e) => setOfferForm((c) => ({ ...c, start_date: e.target.value }))} />
+                  </div>
+                  <div className='space-y-2'>
+                    <FieldLabel label='Offer end date' helper='Is date ke baad offer expire ho jayega.' />
+                    <Input type='date' value={offerForm.end_date} onChange={(e) => setOfferForm((c) => ({ ...c, end_date: e.target.value }))} />
+                  </div>
                 </div>
                 <div className='space-y-3 rounded-lg border border-slate-200 p-4'>
                   <div className='flex items-center justify-between gap-3'>
                     <div>
                       <p className='text-sm font-medium text-slate-700'>Combo builder</p>
-                      <p className='text-xs text-slate-500'>Dropdown se items select karo, quantity daalo, phir final combo price set karo.</p>
+                      <p className='text-xs text-slate-500'>Select items from the dropdown, add quantity, then set the final combo price.</p>
                     </div>
                     <Button
                       type='button'
@@ -1447,44 +1718,53 @@ export default function FoodHubPage() {
                               )}
                             </div>
                             <div className='grid gap-3 sm:grid-cols-[minmax(0,1fr)_90px_104px]'>
-                              <select
-                                value={item.menu_item_id || ''}
-                                onChange={(e) => selectComboMenuItem(index, e.target.value)}
-                                className='min-w-0 rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring'
-                              >
-                                <option value=''>Select food item</option>
-                                {menuItems.map((menuItem) => (
-                                  <option key={menuItem._id} value={menuItem._id}>
-                                    {menuItem.item_name} {menuItem.category ? `(${menuItem.category})` : ''}
-                                  </option>
-                                ))}
-                              </select>
-                              <Input
-                                type='number'
-                                min={1}
-                                placeholder='Qty'
-                                value={emptyWhenZero(item.quantity)}
-                                onChange={(e) =>
-                                  updateComboItem(index, 'quantity', Number(e.target.value || 1))
-                                }
-                                className='min-w-0 bg-white'
-                              />
-                              <Button
-                                type='button'
-                                variant='outline'
-                                className='w-full'
-                                onClick={() =>
-                                  setOfferForm((current) => ({
-                                    ...current,
-                                    combo_items:
-                                      current.combo_items.length === 1
-                                        ? [createEmptyComboItem()]
-                                        : current.combo_items.filter((_, itemIndex) => itemIndex !== index),
-                                  }))
-                                }
-                              >
-                                Remove
-                              </Button>
+                              <div className='space-y-1'>
+                                <FieldLabel label='Combo item' helper='Select an item from the menu.' />
+                                <select
+                                  value={item.menu_item_id || ''}
+                                  onChange={(e) => selectComboMenuItem(index, e.target.value)}
+                                  className='min-w-0 rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring'
+                                >
+                                  <option value=''>Select food item</option>
+                                  {menuItems.map((menuItem) => (
+                                    <option key={menuItem._id} value={menuItem._id}>
+                                      {menuItem.item_name} {menuItem.category ? `(${menuItem.category})` : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className='space-y-1'>
+                                <FieldLabel label='Quantity' helper='Kitni quantity.' />
+                                <Input
+                                  type='number'
+                                  min={1}
+                                  placeholder='Example: 1'
+                                  value={emptyWhenZero(item.quantity)}
+                                  onChange={(e) =>
+                                    updateComboItem(index, 'quantity', Number(e.target.value || 1))
+                                  }
+                                  className='min-w-0 bg-white'
+                                />
+                              </div>
+                              <div className='space-y-1'>
+                                <FieldLabel label='Action' helper='Remove this item.' />
+                                <Button
+                                  type='button'
+                                  variant='outline'
+                                  className='w-full'
+                                  onClick={() =>
+                                    setOfferForm((current) => ({
+                                      ...current,
+                                      combo_items:
+                                        current.combo_items.length === 1
+                                          ? [createEmptyComboItem()]
+                                          : current.combo_items.filter((_, itemIndex) => itemIndex !== index),
+                                    }))
+                                  }
+                                >
+                                  Remove
+                                </Button>
+                              </div>
                             </div>
                             {selectedMenuItem ? (
                               <p className='sm:col-start-2 text-xs text-slate-500'>
@@ -1507,6 +1787,8 @@ export default function FoodHubPage() {
                 </div>
               </CardContent>
             </Card>
+            ) : null}
+            {activeSection === 'all-offers' ? (
             <Card>
               <CardHeader><CardTitle>Offers</CardTitle></CardHeader>
               <CardContent>
@@ -1520,6 +1802,7 @@ export default function FoodHubPage() {
                         <TableCell><Badge variant='outline'>{offer.is_active ? 'active' : 'inactive'}</Badge></TableCell>
                         <TableCell className='text-right'>
                           <div className='flex justify-end gap-2'>
+                            <Button variant='outline' onClick={() => void previewFoodOffers()}>Preview</Button>
                             <Button variant='outline' onClick={() => startEditOffer(offer)}>Edit</Button>
                             <Button variant='outline' onClick={() => removeOffer(offer._id)}>Delete</Button>
                           </div>
@@ -1531,10 +1814,13 @@ export default function FoodHubPage() {
                 </Table>
               </CardContent>
             </Card>
+            ) : null}
           </div>
-        </TabsContent>
+        </section>
+        ) : null}
 
-        <TabsContent value='orders'>
+        {activeSection === 'orders' ? (
+        <section id='orders'>
           <Card>
             <CardHeader><CardTitle>Order Management Form / Panel</CardTitle></CardHeader>
             <CardContent className='space-y-4'>
@@ -1741,8 +2027,9 @@ export default function FoodHubPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </section>
+        ) : null}
+      </div>
 
       <Dialog open={restaurantEditorOpen} onOpenChange={setRestaurantEditorOpen}>
         <DialogContent className='w-[min(96vw,1100px)] max-h-[92vh] overflow-y-auto rounded-xl p-0'>
@@ -1757,11 +2044,22 @@ export default function FoodHubPage() {
             </DialogHeader>
           </div>
           <div className='grid gap-3 px-6 py-5 md:grid-cols-2'>
-            <Input placeholder='Restaurant name' value={restaurantDraft.restaurant_name} onChange={(e) => setRestaurantDraft((c) => ({ ...c, restaurant_name: e.target.value }))} />
-            <Input placeholder='Mobile' value={restaurantDraft.mobile} onChange={(e) => setRestaurantDraft((c) => ({ ...c, mobile: e.target.value }))} />
-            <Input placeholder='Email' value={restaurantDraft.email} onChange={(e) => setRestaurantDraft((c) => ({ ...c, email: e.target.value }))} />
             <div className='space-y-2'>
-              <Input placeholder='Logo URL' value={restaurantDraft.logo_url} onChange={(e) => setRestaurantDraft((c) => ({ ...c, logo_url: e.target.value }))} />
+              <FieldLabel label='Restaurant name' helper='This name appears in the storefront header, hero, and profile.' />
+              <Input placeholder='Example: Spice Route Kitchen' value={restaurantDraft.restaurant_name} onChange={(e) => setRestaurantDraft((c) => ({ ...c, restaurant_name: e.target.value }))} />
+            </div>
+            <div className='space-y-2'>
+              <FieldLabel label='Mobile number' helper='Customers use this number for calls and orders.' />
+              <Input placeholder='Example: 9876543210' value={restaurantDraft.mobile} onChange={(e) => setRestaurantDraft((c) => ({ ...c, mobile: e.target.value }))} />
+            </div>
+            <div className='space-y-2'>
+              <FieldLabel label='Email address' helper='Restaurant support/contact email.' />
+              <Input placeholder='Example: hello@spiceroutekitchen.com' value={restaurantDraft.email} onChange={(e) => setRestaurantDraft((c) => ({ ...c, email: e.target.value }))} />
+            </div>
+            <div className='space-y-2'>
+              <FieldLabel label='Restaurant logo URL' helper='Paste a logo URL or upload an image below.' />
+              <Input placeholder='Example: https://res.cloudinary.com/.../logo.png' value={restaurantDraft.logo_url} onChange={(e) => setRestaurantDraft((c) => ({ ...c, logo_url: e.target.value }))} />
+              <FieldLabel label='Upload logo' helper='Square logo best rahega, jaise 512 x 512 px.' />
               <Input
                 type='file'
                 accept='image/*'
@@ -1774,28 +2072,65 @@ export default function FoodHubPage() {
               ) : null}
             </div>
             <div className='space-y-2'>
-              <Input placeholder='Cover image URL' value={restaurantDraft.cover_image_url} onChange={(e) => setRestaurantDraft((c) => ({ ...c, cover_image_url: e.target.value }))} />
-              <Input
-                type='file'
-                accept='image/*'
-                onChange={(e) =>
-                  void handleUpload(e.target.files?.[0], 'cover_image_url')
-                }
-              />
-              {uploadingField === 'cover_image_url' ? (
-                <p className='text-xs text-slate-500'>Uploading cover...</p>
-              ) : null}
+              <FieldLabel label='Food type' helper='Select what type of food the restaurant serves.' />
+              <div className='grid gap-2 sm:grid-cols-2'>
+                {RESTAURANT_FOOD_TYPE_OPTIONS.map((option) => {
+                  const checked = restaurantFoodTypeSelections.includes(
+                    option.value
+                  )
+
+                  return (
+                    <label
+                      key={option.value}
+                      className='flex min-h-10 cursor-pointer items-center gap-3 rounded-md border border-input bg-background px-3 text-sm text-slate-800'
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(nextChecked) =>
+                          updateRestaurantFoodType(
+                            option.value,
+                            nextChecked === true
+                          )
+                        }
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  )
+                })}
+              </div>
             </div>
-            <Input placeholder='Veg / non_veg / both' value={restaurantDraft.veg_nonveg_type} onChange={(e) => setRestaurantDraft((c) => ({ ...c, veg_nonveg_type: e.target.value }))} />
-            <Input placeholder='FSSAI / License' value={restaurantDraft.fssai_license_number} onChange={(e) => setRestaurantDraft((c) => ({ ...c, fssai_license_number: e.target.value }))} />
-            <Input placeholder='GST number' value={restaurantDraft.gst_number} onChange={(e) => setRestaurantDraft((c) => ({ ...c, gst_number: e.target.value }))} />
-            <Input placeholder='City' value={restaurantDraft.city} onChange={(e) => setRestaurantDraft((c) => ({ ...c, city: e.target.value }))} />
-            <Input placeholder='State' value={restaurantDraft.state} onChange={(e) => setRestaurantDraft((c) => ({ ...c, state: e.target.value }))} />
-            <Input placeholder='Pincode' value={restaurantDraft.pincode} onChange={(e) => setRestaurantDraft((c) => ({ ...c, pincode: e.target.value }))} />
-            <Input type='number' placeholder='Delivery radius (KM)' value={restaurantDraft.delivery_radius_km} onChange={(e) => setRestaurantDraft((c) => ({ ...c, delivery_radius_km: Number(e.target.value || 0) }))} />
-            <Input type='number' placeholder='Minimum order amount' value={restaurantDraft.minimum_order_amount} onChange={(e) => setRestaurantDraft((c) => ({ ...c, minimum_order_amount: Number(e.target.value || 0) }))} />
-            <Input type='number' placeholder='Preparation time (minutes)' value={restaurantDraft.default_preparation_time_minutes} onChange={(e) => setRestaurantDraft((c) => ({ ...c, default_preparation_time_minutes: Number(e.target.value || 0) }))} />
-            <Textarea className='min-h-[88px] md:col-span-2' placeholder='Address' value={restaurantDraft.address} onChange={(e) => setRestaurantDraft((c) => ({ ...c, address: e.target.value }))} />
+            <div className='space-y-2'>
+              <FieldLabel label='FSSAI / license number' helper='Restaurant ka food license number.' />
+              <Input placeholder='Example: FSSAI-22724567000123' value={restaurantDraft.fssai_license_number} onChange={(e) => setRestaurantDraft((c) => ({ ...c, fssai_license_number: e.target.value }))} />
+            </div>
+            <div className='space-y-2'>
+              <FieldLabel label='GST number' helper='Add the GST number if available.' />
+              <Input placeholder='Example: 09ABCDE1234F1Z5' value={restaurantDraft.gst_number} onChange={(e) => setRestaurantDraft((c) => ({ ...c, gst_number: e.target.value }))} />
+            </div>
+            <div className='space-y-2'>
+              <FieldLabel label='City' />
+              <Input placeholder='Example: Greater Noida' value={restaurantDraft.city} onChange={(e) => setRestaurantDraft((c) => ({ ...c, city: e.target.value }))} />
+            </div>
+            <div className='space-y-2'>
+              <FieldLabel label='State' />
+              <Input placeholder='Example: Uttar Pradesh' value={restaurantDraft.state} onChange={(e) => setRestaurantDraft((c) => ({ ...c, state: e.target.value }))} />
+            </div>
+            <div className='space-y-2'>
+              <FieldLabel label='Pincode' />
+              <Input placeholder='Example: 201309' value={restaurantDraft.pincode} onChange={(e) => setRestaurantDraft((c) => ({ ...c, pincode: e.target.value }))} />
+            </div>
+            <div className='space-y-2'>
+              <FieldLabel label='Delivery radius (KM)' helper='Restaurant kitne KM tak delivery karega.' />
+              <Input type='number' placeholder='Example: 5' value={restaurantDraft.delivery_radius_km} onChange={(e) => setRestaurantDraft((c) => ({ ...c, delivery_radius_km: Number(e.target.value || 0) }))} />
+            </div>
+            <div className='space-y-2'>
+              <FieldLabel label='Minimum order amount' helper='Minimum cart value. 0 rakhenge to no minimum.' />
+              <Input type='number' placeholder='Example: 199' value={restaurantDraft.minimum_order_amount} onChange={(e) => setRestaurantDraft((c) => ({ ...c, minimum_order_amount: Number(e.target.value || 0) }))} />
+            </div>
+            <div className='space-y-2 md:col-span-2'>
+              <FieldLabel label='Full restaurant address' helper='Complete address shown in the storefront contact section.' />
+              <Textarea className='min-h-[88px]' placeholder='Example: Shop No. 12, Food Street Plaza, Sector 62, Noida, Uttar Pradesh, 201309' value={restaurantDraft.address} onChange={(e) => setRestaurantDraft((c) => ({ ...c, address: e.target.value }))} />
+            </div>
             <div className='space-y-3 md:col-span-2'>
               <p className='text-sm font-medium text-slate-700'>Opening hours</p>
               <div className='rounded-lg border border-slate-200 p-4'>
@@ -1807,22 +2142,31 @@ export default function FoodHubPage() {
                         className='rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid md:grid-cols-[180px_160px_160px_140px] md:items-center md:gap-3 md:rounded-none md:border-0 md:bg-transparent md:p-0'
                       >
                         <div className='grid gap-3 md:contents'>
-                          <Input value={slot.day} readOnly className='w-full bg-white' />
+                          <div className='space-y-1'>
+                            <FieldLabel label='Day' />
+                            <Input value={slot.day} readOnly className='w-full bg-white' />
+                          </div>
                           <div className='grid gap-3 sm:grid-cols-2 md:contents'>
-                            <Input
-                              type='time'
-                              value={slot.open}
-                              className='w-full bg-white'
-                              disabled={slot.is_closed}
-                              onChange={(e) => updateOpeningHour(index, 'open', e.target.value)}
-                            />
-                            <Input
-                              type='time'
-                              value={slot.close}
-                              className='w-full bg-white'
-                              disabled={slot.is_closed}
-                              onChange={(e) => updateOpeningHour(index, 'close', e.target.value)}
-                            />
+                            <div className='space-y-1'>
+                              <FieldLabel label='Opening time' />
+                              <Input
+                                type='time'
+                                value={slot.open}
+                                className='w-full bg-white'
+                                disabled={slot.is_closed}
+                                onChange={(e) => updateOpeningHour(index, 'open', e.target.value)}
+                              />
+                            </div>
+                            <div className='space-y-1'>
+                              <FieldLabel label='Closing time' />
+                              <Input
+                                type='time'
+                                value={slot.close}
+                                className='w-full bg-white'
+                                disabled={slot.is_closed}
+                                onChange={(e) => updateOpeningHour(index, 'close', e.target.value)}
+                              />
+                            </div>
                           </div>
                         </div>
                         <div className='mt-3 flex w-full items-center gap-3 md:mt-0 md:min-w-[140px]'>
