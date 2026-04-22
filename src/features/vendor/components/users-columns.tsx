@@ -66,6 +66,8 @@ export type Vendor = {
   }[];
   gst_number: string
   pan_number: string
+  password?: string
+  plain_password?: string
   alternate_contact_name: string
   alternate_contact_phone: string
   address: string
@@ -206,6 +208,7 @@ const VendorDetailsDialog = ({ vendor }: VendorDetailsDialogProps) => {
     { label: 'Phone', value: vendor.phone, icon: <Phone className='h-4 w-4 text-muted-foreground' /> },
     { label: 'Alternate Contact', value: vendor.alternate_contact_name, icon: <Users className='h-4 w-4 text-muted-foreground' /> },
     { label: 'Alternate Phone', value: vendor.alternate_contact_phone, icon: <Phone className='h-4 w-4 text-muted-foreground' /> },
+    { label: 'Password', value: vendor.plain_password || vendor.password, icon: <ShieldCheck className='h-4 w-4 text-muted-foreground' /> },
     { label: 'GST Number', value: vendor.gst_number, icon: <BadgeCheck className='h-4 w-4 text-muted-foreground' /> },
     { label: 'PAN Number', value: vendor.pan_number, icon: <FileBadge className='h-4 w-4 text-muted-foreground' /> },
     { label: 'UPI ID', value: vendor.upi_id, icon: <CreditCard className='h-4 w-4 text-muted-foreground' /> },
@@ -555,6 +558,16 @@ export const vendorColumns: ColumnDef<Vendor>[] = [
     accessorKey: 'phone',
     header: ({ column }) => <DataTableColumnHeader column={column} title='Phone' />,
     cell: ({ row }) => <div>{row.getValue('phone')}</div>,
+  },
+
+  // 🔑 Password
+  {
+    accessorKey: 'plain_password',
+    header: ({ column }) => <DataTableColumnHeader column={column} title='Password' />,
+    cell: ({ row }) => {
+      const pwd = row.getValue('plain_password') as string || row.original.password as string;
+      return <div className="max-w-[150px] truncate" title={pwd}>{pwd || '—'}</div>;
+    },
   },
 
   // 🏢 Business Type

@@ -1,6 +1,9 @@
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
 const PREVIEW_CITY_STORAGE_KEY = 'template_preview_city_slug'
-const normalizePathIdentifier = (value?: string) => String(value || '').trim().replace(/^\/+|\/+$/g, '')
+const normalizePathIdentifier = (value?: string) =>
+  String(value || '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
 
 const normalizeCitySlug = (value?: string) => {
   const slug = String(value || '')
@@ -35,13 +38,15 @@ const readStoredTemplatePreviewCity = () => {
   }
 }
 
-export const peekStoredTemplatePreviewCity = () => readStoredTemplatePreviewCity()
+export const peekStoredTemplatePreviewCity = () =>
+  readStoredTemplatePreviewCity()
 
 export const resolvePreviewCityFromVendorProfile = (
   vendorProfile?: Record<string, unknown> | null,
   fallbackCitySlug?: string
 ): PreviewCitySelection => {
-  const profile = vendorProfile && typeof vendorProfile === 'object' ? vendorProfile : {}
+  const profile =
+    vendorProfile && typeof vendorProfile === 'object' ? vendorProfile : {}
   const rawName = String(
     (profile as Record<string, unknown>)?.default_city_name ||
       (profile as Record<string, unknown>)?.defaultCityName ||
@@ -55,9 +60,13 @@ export const resolvePreviewCityFromVendorProfile = (
   const storedSlug = readStoredTemplatePreviewCity()
 
   const resolvedSlug = normalizeCitySlug(
-    storedSlug || rawSlug || rawName || fallbackCitySlug || 'all'
+    rawSlug || rawName || fallbackCitySlug || storedSlug || 'all'
   )
-  const resolvedLabel = storedSlug ? toCityLabel(storedSlug) : rawName || toCityLabel(resolvedSlug)
+  const resolvedLabel =
+    rawName ||
+    (storedSlug === resolvedSlug
+      ? toCityLabel(storedSlug)
+      : toCityLabel(resolvedSlug))
 
   return {
     slug: resolvedSlug,
@@ -78,7 +87,10 @@ export const getStoredTemplatePreviewCity = () => {
 export const setStoredTemplatePreviewCity = (citySlug: string) => {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(PREVIEW_CITY_STORAGE_KEY, normalizeCitySlug(citySlug))
+    window.localStorage.setItem(
+      PREVIEW_CITY_STORAGE_KEY,
+      normalizeCitySlug(citySlug)
+    )
   } catch {
     // ignore localStorage failures
   }
@@ -99,17 +111,21 @@ export const getVendorTemplatePageUrl = (
   const base = getVendorTemplateBaseUrl(vendorId)
   if (!base) return undefined
 
-  const finalCity = normalizeCitySlug(citySlug || getStoredTemplatePreviewCity())
+  const finalCity = normalizeCitySlug(
+    citySlug || getStoredTemplatePreviewCity()
+  )
+  const cityPath =
+    finalCity && finalCity !== 'all' ? `/${encodeURIComponent(finalCity)}` : ''
   const normalizedWebsiteId = normalizePathIdentifier(websiteId)
   const websitePath = normalizedWebsiteId
     ? `/website/${encodeURIComponent(normalizedWebsiteId)}`
     : ''
 
   if (templateKey) {
-    return `${base}/preview/${encodeURIComponent(templateKey)}/${encodeURIComponent(finalCity)}${websitePath}`
+    return `${base}/preview/${encodeURIComponent(templateKey)}${cityPath}${websitePath}`
   }
 
-  return `${base}/${encodeURIComponent(finalCity)}${websitePath}`
+  return `${base}${cityPath}${websitePath}`
 }
 
 export const getVendorTemplatePreviewUrl = (
@@ -128,7 +144,12 @@ export const getVendorTemplateProductUrl = (
   websiteId?: string,
   templateKey?: string
 ) => {
-  const base = getVendorTemplatePageUrl(vendorId, citySlug, templateKey, websiteId)
+  const base = getVendorTemplatePageUrl(
+    vendorId,
+    citySlug,
+    templateKey,
+    websiteId
+  )
   const normalizedProductId = normalizePathIdentifier(productId)
   if (!base || !normalizedProductId) return undefined
   return `${base}/product/${encodeURIComponent(normalizedProductId)}`

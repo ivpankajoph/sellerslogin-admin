@@ -151,7 +151,7 @@ export function DomainModal({
   const token = useSelector((state: any) => state?.auth?.token)
   const authUser = useSelector((state: any) => state?.auth?.user || null)
   const vendorId = String(
-    authUser?.id || authUser?._id || authUser?.vendor_id || authUser?.vendorId || ''
+    authUser?.vendor_id || authUser?.vendorId || authUser?.id || authUser?._id || ''
   ).trim()
   const { activeWebsite, activeWebsiteId } = useActiveWebsiteSelection(vendorId)
 

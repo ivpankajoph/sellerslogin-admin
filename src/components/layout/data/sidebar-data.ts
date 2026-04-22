@@ -16,6 +16,7 @@ import {
   Truck,
   UtensilsCrossed,
   Users,
+  AlignVerticalJustifyStart,
 } from 'lucide-react'
 import type { SidebarData } from '../types'
 
@@ -327,13 +328,14 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           roles: [ROLES.VENDOR],
           pageKey: 'my_websites',
         },
-        {
-          title: 'Location Workspace',
-          url: '/location-workspace',
-          icon: MapPinned,
-          roles: [ROLES.VENDOR],
-          pageKey: 'location_workspace',
-        },
+        // Location Workspace is temporarily hidden from the sidebar.
+        // {
+        //   title: 'Location Workspace',
+        //   url: '/location-workspace',
+        //   icon: MapPinned,
+        //   roles: [ROLES.VENDOR],
+        //   pageKey: 'location_workspace',
+        // },
         {
           title: 'Manage Locations',
           url: '/cities',
@@ -403,17 +405,20 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
       title: 'Marketing & SEO',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
-        {
-          title: 'SEO Manager',
-          icon: SearchCheck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-          items: [
-            {
+          {
               title: 'Store Management Analytics',
+               icon: AlignVerticalJustifyStart,
               url: '/analytics',
               roles: [ROLES.VENDOR],
               pageKey: 'storefront_analytics',
             },
+        {
+          
+          title: 'SEO Manager',
+          icon: SearchCheck,
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
+          items: [
+          
             {
               title: 'Sitemap',
               url: '/seo/sitemaps',

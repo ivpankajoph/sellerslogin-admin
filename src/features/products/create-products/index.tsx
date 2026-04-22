@@ -1157,7 +1157,17 @@ const ProductCreateForm: React.FC = () => {
       state.vendorprofile?.profile ||
       null
   )
-  const vendorId = String(authUser?.id || authUser?._id || '')
+  const vendorId = String(
+    authUser?.vendor_id ||
+      authUser?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
+      vendorProfile?.vendor_id ||
+      vendorProfile?.vendorId ||
+      vendorProfile?._id ||
+      vendorProfile?.id ||
+      ''
+  )
   const previewWindowRef = useRef<Window | null>(null)
   const [previewSessionId, setPreviewSessionId] = useState<string | null>(null)
   const [previewTargetOrigin, setPreviewTargetOrigin] = useState<string>('*')
@@ -3366,9 +3376,6 @@ const ProductCreateForm: React.FC = () => {
     setLoading(true)
     try {
       const descriptionWordCount = countWords(formData.description)
-      const filledSpecificationCount = Object.values(
-        formData.specifications[0] || {}
-      ).filter((value) => Boolean(toTrimmedText(value))).length
       const submitVariants = buildSubmitVariants(formData)
 
       if (!toTrimmedText(formData.productName)) {
@@ -3398,12 +3405,6 @@ const ProductCreateForm: React.FC = () => {
       if (descriptionWordCount > MAX_DESCRIPTION_WORDS) {
         throw new Error('Product description must not exceed 2000 words')
       }
-      if (filledSpecificationCount < MIN_SPECIFICATION_KEY_COUNT) {
-        throw new Error(
-          `Add at least ${MIN_SPECIFICATION_KEY_COUNT} product specification values`
-        )
-      }
-
       const autoAvailableCityIds = cities
         .map((city: any) => String(city?._id || '').trim())
         .filter(Boolean)

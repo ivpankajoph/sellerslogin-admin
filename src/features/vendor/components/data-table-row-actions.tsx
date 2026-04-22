@@ -81,9 +81,9 @@ export function DataTableRowActions({ row }: any) {
 
   const handleDelete = async () => {
     Swal.fire({
-      title: "Delete Vendor?",
+      title: `Delete ${vendor.name || 'Vendor'}?`,
       html:
-        "This will permanently delete the vendor and its related data, including products, websites, template data, team users, tickets, queries, reviews, inventory logs, SEO configs, notifications, analytics, wallet records, and vendor-only orders.<br/><br/><strong>Shared customer orders containing other vendors' items will be kept.</strong>",
+        `This will permanently delete the vendor <strong>${vendor.name}</strong> and its related data, including products, websites, template data, team users, tickets, queries, reviews, inventory logs, SEO configs, notifications, analytics, wallet records, and vendor-only orders.<br/><br/><strong>Shared customer orders containing other vendors' items will be kept.</strong>`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Yes, Delete",

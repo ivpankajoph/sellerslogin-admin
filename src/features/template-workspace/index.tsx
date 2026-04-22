@@ -35,18 +35,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
 import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { Main } from '@/components/layout/main'
+import { DomainModal } from '@/features/vendor-template/components/DomainModel'
 import { setStoredEditingTemplateKey } from '@/features/vendor-template/components/templateVariantParam'
 import {
   setStoredActiveWebsite,
   getStoredActiveWebsiteId,
   useActiveWebsiteSelection,
 } from '@/features/vendor-template/components/websiteStudioStorage'
-import { DomainModal } from '@/features/vendor-template/components/DomainModel'
 
 type TemplateAudience = 'b2b' | 'b2c' | 'food'
 type CreateWebsiteStep = 'audience' | 'template'
@@ -98,7 +97,9 @@ const normalizeDefaultWebsiteState = (
 ) => {
   const normalizedPreferredId = String(preferredDefaultWebsiteId || '').trim()
   const preferredExists = normalizedPreferredId
-    ? items.some((item) => String(item._id || '').trim() === normalizedPreferredId)
+    ? items.some(
+        (item) => String(item._id || '').trim() === normalizedPreferredId
+      )
     : false
 
   if (preferredExists) {
@@ -404,13 +405,14 @@ export default function TemplateWorkspace() {
       null
   )
   const vendorId = String(
-    authUser?.id ||
-      authUser?._id ||
-      authUser?.vendor_id ||
+    authUser?.vendor_id ||
       authUser?.vendorId ||
+      vendorProfile?.vendor_id ||
+      vendorProfile?.vendorId ||
+      authUser?.id ||
+      authUser?._id ||
       vendorProfile?._id ||
       vendorProfile?.id ||
-      vendorProfile?.vendor_id ||
       ''
   ).trim()
   const token = useSelector((state: any) => state.auth?.token)
@@ -512,31 +514,26 @@ export default function TemplateWorkspace() {
     [availableTemplates]
   )
 
-  const cityOptions = useMemo(() => {
-    const activeCities = cities
-      .filter((city) => city?.isActive !== false)
-      .sort((a, b) =>
-        String(a?.name || '').localeCompare(String(b?.name || ''), undefined, {
-          sensitivity: 'base',
-        })
-      )
-      .map((city) => ({
-        value: city.slug,
-        label: city.name || formatCityLabel(city.slug),
-      }))
+  const activeCityOptions = useMemo(
+    () =>
+      cities
+        .filter((city) => city?.isActive !== false)
+        .map((city) => ({
+          value: normalizeCitySlugValue(city.slug || city.name),
+          label: city.name || formatCityLabel(city.slug),
+          id: city._id,
+        }))
+        .filter((city) => city.value)
+        .sort((a, b) =>
+          a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+        ),
+    [cities]
+  )
 
-    const options = [{ value: 'all', label: 'All Cities' }, ...activeCities]
-    if (
-      selectedCitySlug &&
-      !options.some((option) => option.value === selectedCitySlug)
-    ) {
-      options.push({
-        value: selectedCitySlug,
-        label: formatCityLabel(selectedCitySlug),
-      })
-    }
-    return options
-  }, [cities, selectedCitySlug])
+  const cityOptions = useMemo(
+    () => [{ value: 'all', label: 'All Cities' }, ...activeCityOptions],
+    [activeCityOptions]
+  )
 
   const selectedCityOption = useMemo(
     () =>
@@ -549,33 +546,38 @@ export default function TemplateWorkspace() {
 
   const selectedCityId = useMemo(
     () =>
-      cities.find((city) => String(city.slug || '').trim() === selectedCitySlug)
-        ?._id || '',
-    [cities, selectedCitySlug]
+      activeCityOptions.find((city) => city.value === selectedCitySlug)?.id ||
+      '',
+    [activeCityOptions, selectedCitySlug]
   )
 
   const effectiveDefaultCitySlug = useMemo(() => {
     const normalizedDefaultSlug = normalizeCitySlugValue(vendorDefaultCitySlug)
     const normalizedDefaultName = normalizeCitySlugValue(vendorDefaultCityName)
-    if (normalizedDefaultSlug && normalizedDefaultSlug !== 'all') {
+    const availableSlugs = new Set(
+      activeCityOptions.map((city) => city.value).filter(Boolean)
+    )
+    const firstCitySlug = activeCityOptions[0]?.value || ''
+
+    if (
+      normalizedDefaultSlug &&
+      normalizedDefaultSlug !== 'all' &&
+      availableSlugs.has(normalizedDefaultSlug)
+    ) {
       return normalizedDefaultSlug
     }
-    if (!normalizedDefaultName) {
-      return normalizedDefaultSlug || 'all'
+
+    if (normalizedDefaultName) {
+      const matchedCity = activeCityOptions.find(
+        (city) =>
+          city.value === normalizedDefaultName ||
+          normalizeCitySlugValue(city.label) === normalizedDefaultName
+      )
+      if (matchedCity?.value) return matchedCity.value
     }
 
-    const matchedCity = cities.find((city) => {
-      return (
-        normalizeCitySlugValue(city.slug) === normalizedDefaultName ||
-        normalizeCitySlugValue(city.name) === normalizedDefaultName
-      )
-    })
-
-    return (
-      normalizeCitySlugValue(matchedCity?.slug || vendorDefaultCityName) ||
-      'all'
-    )
-  }, [cities, vendorDefaultCityName, vendorDefaultCitySlug])
+    return firstCitySlug || normalizedDefaultSlug || 'all'
+  }, [activeCityOptions, vendorDefaultCityName, vendorDefaultCitySlug])
 
   const visibleProductsCount = useMemo(() => {
     if (selectedCitySlug === 'all') return products.length
@@ -608,7 +610,12 @@ export default function TemplateWorkspace() {
         helper: 'Preview links and editors use this location.',
       },
     ],
-    [availableTemplates.length, selectedCityOption.label, visibleProductsCount, websites.length]
+    [
+      availableTemplates.length,
+      selectedCityOption.label,
+      visibleProductsCount,
+      websites.length,
+    ]
   )
 
   const loadWorkspace = async (preferredDefaultWebsiteId?: string) => {
@@ -629,6 +636,10 @@ export default function TemplateWorkspace() {
         timeout: REQUEST_TIMEOUT_MS,
       }
       const requestTs = Date.now()
+      const citiesUrl =
+        isAdmin || !vendorId
+          ? `${BASE_URL}/v1/cities?includeInactive=true`
+          : `${BASE_URL}/v1/cities?includeInactive=true&vendor_id=${encodeURIComponent(vendorId)}`
 
       const [
         catalogResponse,
@@ -643,10 +654,13 @@ export default function TemplateWorkspace() {
             : `${BASE_URL}/v1/templates/by-vendor?vendor_id=${vendorId}&_ts=${requestTs}`,
           requestConfig
         ),
-        axios.get(`${BASE_URL}/v1/cities?includeInactive=true`, requestConfig),
+        axios.get(citiesUrl, requestConfig),
         isAdmin
           ? Promise.resolve({ data: { products: [] } })
-          : axios.get(`${BASE_URL}/v1/products/vendor/${vendorId}`, requestConfig),
+          : axios.get(
+              `${BASE_URL}/v1/products/vendor/${vendorId}`,
+              requestConfig
+            ),
       ])
 
       const fetchedCatalog =
@@ -752,7 +766,11 @@ export default function TemplateWorkspace() {
 
     setConnectDomainListOpen(true)
     url.searchParams.delete('openConnectDomain')
-    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+    window.history.replaceState(
+      {},
+      '',
+      `${url.pathname}${url.search}${url.hash}`
+    )
   }, [isAdmin])
 
   useEffect(() => {
@@ -985,8 +1003,10 @@ export default function TemplateWorkspace() {
       setStoredEditingTemplateKey(vendorId, createdTemplateKey)
       setDialogOpen(false)
       const opensFoodDashboard =
-        normalizeTemplateAudience(selectedTemplate.audience, createdTemplateKey) ===
-        'food'
+        normalizeTemplateAudience(
+          selectedTemplate.audience,
+          createdTemplateKey
+        ) === 'food'
       toast.success(
         opensFoodDashboard
           ? 'Food website created. Opening Food Menu Manager...'
@@ -1232,7 +1252,6 @@ export default function TemplateWorkspace() {
       </TablePageHeader>
 
       <Main className='flex flex-1 flex-col gap-6'>
-
         <section className='space-y-4'>
           <div>
             <h2 className='text-foreground text-2xl font-semibold tracking-tight'>
@@ -1270,9 +1289,7 @@ export default function TemplateWorkspace() {
                 const websiteTemplate = templateByKey.get(templateKey)
                 const previewUrl = getVendorTemplatePreviewUrl(
                   String(
-                    website.vendor_id ||
-                      vendorPublicIdentifier ||
-                      vendorId
+                    website.vendor_id || vendorPublicIdentifier || vendorId
                   ).trim(),
                   templateKey,
                   selectedCitySlug ||
@@ -1288,7 +1305,7 @@ export default function TemplateWorkspace() {
                     className={cn(
                       cardClass,
                       isActiveWebsite &&
-                        'ring-2 ring-emerald-500 ring-offset-2 ring-offset-background'
+                        'ring-offset-background ring-2 ring-emerald-500 ring-offset-2'
                     )}
                   >
                     <div className='relative'>
@@ -1358,7 +1375,8 @@ export default function TemplateWorkspace() {
                           <span className='text-[10px] font-semibold tracking-wider text-slate-500 uppercase'>
                             Domain Status
                           </span>
-                          {website.custom_domain?.hostname && website.custom_domain?.status === 'active' ? (
+                          {website.custom_domain?.hostname &&
+                          website.custom_domain?.status === 'active' ? (
                             <span className='rounded bg-green-100 px-2 py-0.5 text-[10px] font-bold tracking-wide text-green-700'>
                               Connected
                             </span>
@@ -1368,7 +1386,8 @@ export default function TemplateWorkspace() {
                             </span>
                           )}
                         </div>
-                        {website.custom_domain?.hostname && website.custom_domain?.status === 'active' ? (
+                        {website.custom_domain?.hostname &&
+                        website.custom_domain?.status === 'active' ? (
                           <div className='mt-2'>
                             <a
                               href={`https://${website.custom_domain.hostname}`}
@@ -1376,7 +1395,8 @@ export default function TemplateWorkspace() {
                               rel='noreferrer'
                               className='inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition hover:text-blue-800 hover:underline'
                             >
-                              {website.custom_domain.hostname} <ExternalLink className='h-3 w-3' />
+                              {website.custom_domain.hostname}{' '}
+                              <ExternalLink className='h-3 w-3' />
                             </a>
                           </div>
                         ) : null}
@@ -1385,7 +1405,9 @@ export default function TemplateWorkspace() {
                       <div
                         className={cn(
                           'mt-auto grid gap-3',
-                          !isAdmin ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'
+                          !isAdmin
+                            ? 'grid-cols-1 sm:grid-cols-2'
+                            : 'grid-cols-1'
                         )}
                       >
                         {!isAdmin ? (
@@ -1411,7 +1433,9 @@ export default function TemplateWorkspace() {
                                 type='button'
                                 variant='outline'
                                 className='h-11 w-full rounded-2xl px-4 text-center'
-                                onClick={() => handleMakeDefaultWebsite(website)}
+                                onClick={() =>
+                                  handleMakeDefaultWebsite(website)
+                                }
                               >
                                 Set Default
                               </Button>
@@ -1481,7 +1505,10 @@ export default function TemplateWorkspace() {
         </section>
       </Main>
 
-      <Dialog open={!isAdmin && dialogOpen} onOpenChange={handleCreateDialogOpenChange}>
+      <Dialog
+        open={!isAdmin && dialogOpen}
+        onOpenChange={handleCreateDialogOpenChange}
+      >
         <DialogContent className='border-border bg-background w-[min(96vw,920px)] max-w-[min(96vw,920px)] gap-0 overflow-hidden rounded-none border p-0 sm:max-w-[min(96vw,920px)] [&>button]:rounded-none'>
           <div className='flex max-h-[90vh] flex-col'>
             <DialogHeader className='border-border border-b px-6 py-4 text-left sm:px-8'>
@@ -1803,7 +1830,7 @@ export default function TemplateWorkspace() {
         open={setupMethodModalOpen}
         onOpenChange={setSetupMethodModalOpen}
       >
-        <DialogContent className='w-[95vw] sm:max-w-[700px] overflow-hidden rounded-md p-6 sm:p-10'>
+        <DialogContent className='w-[95vw] overflow-hidden rounded-md p-6 sm:max-w-[700px] sm:p-10'>
           <DialogHeader className='text-left'>
             <DialogTitle className='text-3xl font-semibold'>
               Choose a way to set up your domain

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Edit3, Loader2, RefreshCcw, Save, Search } from 'lucide-react'
+import { Edit3, ImageIcon, Loader2, RefreshCcw, Save, Search } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import type { RootState } from '@/store'
@@ -43,6 +43,10 @@ type ProductRow = {
   slug?: string
   status?: string
   updatedAt?: string
+  defaultImages?: Array<{ url?: string }>
+  variants?: Array<{
+    variantsImageUrls?: Array<{ url?: string }>
+  }>
   metaTitle?: string
   metaDescription?: string
   metaKeywords?: string[]
@@ -110,6 +114,17 @@ const buildEditorForm = (product?: ProductRow | null): MetaEditorForm => ({
   metaKeywords: formatKeywords(product?.metaKeywords),
 })
 
+const getPrimaryProductImageUrl = (product?: ProductRow) => {
+  const defaultImage = normalizeText(product?.defaultImages?.[0]?.url)
+  if (defaultImage) return defaultImage
+
+  return Array.isArray(product?.variants)
+    ? product.variants
+        .map((variant) => normalizeText(variant?.variantsImageUrls?.[0]?.url))
+        .find(Boolean) || ''
+    : ''
+}
+
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (
     error &&
@@ -131,6 +146,29 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   }
 
   return fallback
+}
+
+function ProductImage({ product }: { product: ProductRow }) {
+  const [failed, setFailed] = useState(false)
+  const src = getPrimaryProductImageUrl(product)
+
+  if (!src || failed) {
+    return (
+      <div className='flex h-14 w-14 shrink-0 items-center justify-center rounded-md border bg-slate-100 text-slate-400'>
+        <ImageIcon className='h-6 w-6' />
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={product.productName || 'Product image'}
+      className='h-14 w-14 shrink-0 rounded-md border object-cover'
+      loading='lazy'
+      onError={() => setFailed(true)}
+    />
+  )
 }
 
 export default function SeoMetaTagsPage() {
@@ -405,7 +443,7 @@ export default function SeoMetaTagsPage() {
 
         <TableShell
           className='flex-1'
-          description='Products page ki meta title, description, aur keywords yahin se manage karein.'
+          description=''
           footer={
             <ServerPagination
               page={page}
@@ -419,16 +457,16 @@ export default function SeoMetaTagsPage() {
             />
           }
         >
-          <Table>
+          <Table className='min-w-[1220px] table-fixed'>
             <TableHeader>
               <TableRow>
-                <TableHead className='min-w-[220px]'>Product</TableHead>
-                <TableHead className='min-w-[180px]'>Meta Title</TableHead>
-                <TableHead className='min-w-[220px]'>Meta Description</TableHead>
-                <TableHead className='min-w-[180px]'>Keywords</TableHead>
-                <TableHead className='min-w-[120px]'>Status</TableHead>
-                <TableHead className='min-w-[140px]'>Updated</TableHead>
-                <TableHead className='text-right'>Action</TableHead>
+                <TableHead className='w-[380px]'>Product</TableHead>
+                <TableHead className='w-[190px]'>Meta Title</TableHead>
+                <TableHead className='w-[260px]'>Meta Description</TableHead>
+                <TableHead className='w-[160px]'>Keywords</TableHead>
+                <TableHead className='w-[110px]'>Status</TableHead>
+                <TableHead className='w-[150px]'>Updated</TableHead>
+                <TableHead className='w-[130px] text-right'>Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -450,36 +488,44 @@ export default function SeoMetaTagsPage() {
               ) : (
                 products.map((product) => (
                   <TableRow key={product._id}>
-                    <TableCell>
-                      <div className='space-y-1'>
-                        <div className='font-medium'>
-                          {product.productName || 'Unnamed Product'}
-                        </div>
-                        <div className='text-muted-foreground text-xs'>
-                          {product.brand || 'No brand'} {product.slug ? `• /${product.slug}` : ''}
+                    <TableCell className='w-[380px] max-w-[380px]'>
+                      <div className='flex min-w-0 items-center gap-3'>
+                        <ProductImage product={product} />
+                        <div className='min-w-0 flex-1 space-y-1'>
+                          <div className='truncate font-medium' title={product.productName}>
+                            {product.productName || 'Unnamed Product'}
+                          </div>
+                          <div
+                            className='text-muted-foreground truncate text-xs'
+                            title={`${product.brand || 'No brand'}${product.slug ? ` /${product.slug}` : ''}`}
+                          >
+                            {product.brand || 'No brand'}{product.slug ? ` /${product.slug}` : ''}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className='text-sm'>
-                      {normalizeText(product.metaTitle) || (
-                        <span className='text-muted-foreground'>Not added yet</span>
-                      )}
+                    <TableCell className='w-[190px] max-w-[190px] text-sm'>
+                      <div className='truncate' title={normalizeText(product.metaTitle)}>
+                        {normalizeText(product.metaTitle) || (
+                          <span className='text-muted-foreground'>Not added yet</span>
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell className='text-sm'>
-                      <div className='max-w-[320px] truncate'>
+                    <TableCell className='w-[260px] max-w-[260px] text-sm'>
+                      <div className='truncate' title={normalizeText(product.metaDescription)}>
                         {normalizeText(product.metaDescription) || (
                           <span className='text-muted-foreground'>Not added yet</span>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className='text-sm'>
-                      <div className='max-w-[220px] truncate'>
+                    <TableCell className='w-[160px] max-w-[160px] text-sm'>
+                      <div className='truncate' title={formatKeywords(product.metaKeywords)}>
                         {formatKeywords(product.metaKeywords) || (
                           <span className='text-muted-foreground'>No keywords</span>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className='w-[110px] max-w-[110px]'>
                       <Badge
                         variant='outline'
                         className={getStatusBadgeClassName(product.status)}
@@ -487,13 +533,18 @@ export default function SeoMetaTagsPage() {
                         {formatStatusLabel(product.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell className='text-sm text-muted-foreground'>
+                    <TableCell className='w-[150px] max-w-[150px] text-sm text-muted-foreground'>
                       {formatDate(product.updatedAt)}
                     </TableCell>
-                    <TableCell className='text-right'>
-                      <Button variant='outline' size='sm' onClick={() => openEditor(product)}>
+                    <TableCell className='w-[130px] max-w-[130px] text-right'>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='w-full'
+                        onClick={() => openEditor(product)}
+                      >
                         <Edit3 className='mr-2 h-4 w-4' />
-                        Edit Meta
+                        Edit
                       </Button>
                     </TableCell>
                   </TableRow>

@@ -11,6 +11,7 @@ import {
   ImageIcon,
   Layers3,
   Loader2,
+  MapPin,
   Pencil,
   Trash2,
 } from 'lucide-react'
@@ -93,6 +94,18 @@ type ProductWebsiteRef =
       template_key?: string
     }
 
+type ProductCityRef =
+  | string
+  | {
+      _id?: string
+      id?: string
+      name?: string
+      slug?: string
+      state?: string
+      country?: string
+      isActive?: boolean
+    }
+
 type NormalizedRef = {
   id: string
   name: string
@@ -133,6 +146,7 @@ type Product = {
   productCategories?: ProductCategoryRef[]
   productSubCategories?: ProductSubcategoryRef[]
   websiteIds?: ProductWebsiteRef[]
+  availableCities?: ProductCityRef[]
 }
 
 type CategoryCatalogItem = {
@@ -167,6 +181,12 @@ type WebsiteOption = {
   label: string
 }
 
+type LocationOption = {
+  value: string
+  label: string
+  helper?: string
+}
+
 const API_BASE = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(
   /\/$/,
   ''
@@ -184,6 +204,27 @@ const isLikelyObjectId = (value: string) => /^[a-f0-9]{24}$/i.test(value)
 
 const sanitizeStringList = (values: string[]) =>
   Array.from(new Set(values.map(normalizeText).filter(Boolean)))
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message
+
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) return message
+  }
+
+  return fallback
+}
+
+const isAbortError = (error: unknown) => {
+  if (error instanceof DOMException) return error.name === 'AbortError'
+
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    return (error as { name?: unknown }).name === 'AbortError'
+  }
+
+  return false
+}
 
 const formatFieldLabel = (value: string) =>
   value
@@ -295,7 +336,7 @@ const getWebsiteOptionId = (website: ProductWebsiteRef) => {
 
 const getProductWebsiteIds = (product?: Product | null) =>
   sanitizeStringList(
-    (Array.isArray(product?.websiteIds) ? product?.websiteIds : [])
+    (Array.isArray(product?.websiteIds) ? product.websiteIds : [])
       .map((website) => getWebsiteOptionId(website))
       .filter(Boolean)
   )
@@ -329,6 +370,65 @@ const getWebsiteVisibilitySummary = (
 
   return `${visibility.websiteIds.length} website${
     visibility.websiteIds.length === 1 ? '' : 's'
+  }`
+}
+
+const getLocationOptionLabel = (city: ProductCityRef) => {
+  if (typeof city === 'string') return normalizeText(city)
+
+  return normalizeText(city.name) || normalizeText(city.slug) || 'Untitled city'
+}
+
+const getLocationOptionHelper = (city: ProductCityRef) => {
+  if (typeof city === 'string') return ''
+
+  return sanitizeStringList([
+    normalizeText(city.state),
+    normalizeText(city.country),
+  ]).join(', ')
+}
+
+const getLocationOptionId = (city: ProductCityRef) => {
+  if (typeof city === 'string') return normalizeText(city)
+  return normalizeText(city._id || city.id)
+}
+
+const getProductLocationIds = (product?: Product | null) =>
+  sanitizeStringList(
+    (Array.isArray(product?.availableCities) ? product.availableCities : [])
+      .map((city) => getLocationOptionId(city))
+      .filter(Boolean)
+  )
+
+const resolveProductLocationVisibility = (
+  product: Product | null | undefined,
+  locationOptions: LocationOption[]
+) => {
+  const configuredLocationIds = getProductLocationIds(product)
+  const allLocationIds = sanitizeStringList(
+    locationOptions.map((location) => location.value)
+  )
+  const usesAllLocations = configuredLocationIds.length === 0
+  const locationIds = usesAllLocations ? allLocationIds : configuredLocationIds
+
+  return {
+    configuredLocationIds,
+    usesAllLocations,
+    locationIds,
+  }
+}
+
+const getLocationVisibilitySummary = (
+  product: Product,
+  locationOptions: LocationOption[]
+) => {
+  if (!locationOptions.length) return 'No locations'
+
+  const visibility = resolveProductLocationVisibility(product, locationOptions)
+  if (visibility.usesAllLocations) return 'All locations'
+
+  return `${visibility.locationIds.length} location${
+    visibility.locationIds.length === 1 ? '' : 's'
   }`
 }
 
@@ -610,6 +710,35 @@ async function fetchVendorWebsites(
       label: getWebsiteOptionLabel(website),
     }))
     .filter((website: WebsiteOption) => website.value && website.label)
+}
+
+async function fetchVendorLocations(
+  vendorId: string,
+  token: string,
+  signal?: AbortSignal
+) {
+  const response = await fetch(
+    `${API_BASE}/v1/cities?vendor_id=${encodeURIComponent(vendorId)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const data = await response.json()
+  const rows = Array.isArray(data?.data) ? data.data : []
+
+  return rows
+    .map((city: ProductCityRef) => ({
+      value: getLocationOptionId(city),
+      label: getLocationOptionLabel(city),
+      helper: getLocationOptionHelper(city),
+    }))
+    .filter((location: LocationOption) => location.value && location.label)
 }
 
 function ProductImage({
@@ -1168,6 +1297,108 @@ function ProductWebsiteVisibilitySheet({
   )
 }
 
+function ProductLocationVisibilitySheet({
+  product,
+  locations,
+  updating,
+  onToggleLocation,
+  open,
+  onOpenChange,
+}: {
+  product: Product | null
+  locations: LocationOption[]
+  updating: boolean
+  onToggleLocation: (locationId: string, nextValue: boolean) => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const visibility = useMemo(
+    () => resolveProductLocationVisibility(product, locations),
+    [product, locations]
+  )
+
+  if (!product) return null
+
+  const enabledCount = visibility.locationIds.length
+  const productVisible = product.isAvailable !== false
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side='right' className='w-full gap-0 p-0 sm:max-w-xl'>
+        <SheetHeader className='border-b px-5 py-5 pr-14 text-left'>
+          <SheetTitle>Manage locations</SheetTitle>
+          <SheetDescription>
+            Choose which vendor cities can show this product.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className='flex-1 space-y-4 overflow-y-auto px-5 py-5'>
+          <div className='rounded-md border bg-slate-50 px-4 py-3'>
+            <p className='text-sm font-semibold text-slate-900'>
+              {product.productName || 'Unnamed Product'}
+            </p>
+            <p className='text-muted-foreground mt-1 text-xs'>
+              {visibility.usesAllLocations
+                ? 'This product is currently enabled for all vendor locations.'
+                : `${enabledCount} location${enabledCount === 1 ? '' : 's'} enabled for this product.`}
+            </p>
+          </div>
+
+          {locations.length ? (
+            <div className='space-y-2'>
+              {locations.map((location) => {
+                const checked = visibility.locationIds.includes(location.value)
+
+                return (
+                  <div
+                    key={`${product._id}:${location.value}`}
+                    className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'
+                  >
+                    <div className='min-w-0'>
+                      <p className='truncate text-sm font-medium text-slate-900'>
+                        {location.label}
+                      </p>
+                      {location.helper ? (
+                        <p className='text-muted-foreground mt-0.5 truncate text-xs'>
+                          {location.helper}
+                        </p>
+                      ) : null}
+                      <p className='text-muted-foreground mt-1 text-xs'>
+                        {checked
+                          ? 'Product will show in this location.'
+                          : 'Product is removed from this location.'}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={checked}
+                      onCheckedChange={(nextValue) =>
+                        onToggleLocation(location.value, nextValue)
+                      }
+                      disabled={updating || !productVisible}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className='text-muted-foreground rounded-md border border-dashed px-4 py-6 text-sm'>
+              No locations found for this vendor yet. Create locations from
+              Manage Locations first.
+            </div>
+          )}
+
+          {!productVisible ? (
+            <div className='rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700'>
+              Location switches are disabled while the product is hidden
+              globally.
+            </div>
+          ) : null}
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 export default function VendorProductsTable() {
   const vendorId = useSelector(
     (state: RootState) =>
@@ -1179,6 +1410,7 @@ export default function VendorProductsTable() {
   const token = useSelector((state: RootState) => state.auth?.token || '')
   const [products, setProducts] = useState<Product[]>([])
   const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([])
+  const [locationOptions, setLocationOptions] = useState<LocationOption[]>([])
   const [categoryCatalog, setCategoryCatalog] = useState<CategoryCatalogItem[]>(
     []
   )
@@ -1193,6 +1425,7 @@ export default function VendorProductsTable() {
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
   const [websiteProduct, setWebsiteProduct] = useState<Product | null>(null)
+  const [locationProduct, setLocationProduct] = useState<Product | null>(null)
   const [visibilityUpdatingProductId, setVisibilityUpdatingProductId] =
     useState('')
 
@@ -1201,6 +1434,7 @@ export default function VendorProductsTable() {
       if (!vendorId || !token) {
         setProducts([])
         setWebsiteOptions([])
+        setLocationOptions([])
         setCategoryCatalog([])
         setLoading(false)
         return
@@ -1209,12 +1443,17 @@ export default function VendorProductsTable() {
       try {
         setLoading(true)
         setError('')
-        const [productsResult, categoriesResult, websitesResult] =
-          await Promise.allSettled([
-            fetchAllVendorProducts(vendorId, token, signal),
-            fetchCategoryCatalog(token, signal),
-            fetchVendorWebsites(vendorId, token, signal),
-          ])
+        const [
+          productsResult,
+          categoriesResult,
+          websitesResult,
+          locationsResult,
+        ] = await Promise.allSettled([
+          fetchAllVendorProducts(vendorId, token, signal),
+          fetchCategoryCatalog(token, signal),
+          fetchVendorWebsites(vendorId, token, signal),
+          fetchVendorLocations(vendorId, token, signal),
+        ])
 
         if (productsResult.status === 'rejected') {
           throw productsResult.reason
@@ -1227,10 +1466,14 @@ export default function VendorProductsTable() {
         setWebsiteOptions(
           websitesResult.status === 'fulfilled' ? websitesResult.value : []
         )
-      } catch (fetchError: any) {
-        if (fetchError?.name === 'AbortError') return
+        setLocationOptions(
+          locationsResult.status === 'fulfilled' ? locationsResult.value : []
+        )
+      } catch (fetchError: unknown) {
+        if (isAbortError(fetchError)) return
         setProducts([])
         setWebsiteOptions([])
+        setLocationOptions([])
         setCategoryCatalog([])
         setError('Failed to fetch products.')
       } finally {
@@ -1345,7 +1588,11 @@ export default function VendorProductsTable() {
   const updateProductCatalogVisibility = useCallback(
     async (
       productId: string,
-      payload: { isAvailable?: boolean; websiteIds?: string[] },
+      payload: {
+        isAvailable?: boolean
+        websiteIds?: string[]
+        availableCities?: string[]
+      },
       successMessage: string
     ) => {
       if (!token) return
@@ -1368,7 +1615,7 @@ export default function VendorProductsTable() {
         const body = await response.json().catch(() => ({}))
         if (!response.ok || body?.success === false) {
           throw new Error(
-            body?.message || 'Failed to update website visibility.'
+            body?.message || 'Failed to update product visibility.'
           )
         }
 
@@ -1382,6 +1629,9 @@ export default function VendorProductsTable() {
                 ...(payload.websiteIds !== undefined
                   ? { websiteIds: payload.websiteIds }
                   : {}),
+                ...(payload.availableCities !== undefined
+                  ? { availableCities: payload.availableCities }
+                  : {}),
               }
             : product
 
@@ -1392,10 +1642,15 @@ export default function VendorProductsTable() {
         setWebsiteProduct((current) =>
           current?._id === productId ? applyPatchToProduct(current) : current
         )
+        setLocationProduct((current) =>
+          current?._id === productId ? applyPatchToProduct(current) : current
+        )
 
         toast.success(successMessage)
-      } catch (error: any) {
-        toast.error(error?.message || 'Failed to update website visibility.')
+      } catch (error: unknown) {
+        toast.error(
+          getErrorMessage(error, 'Failed to update product visibility.')
+        )
       } finally {
         setVisibilityUpdatingProductId('')
       }
@@ -1466,6 +1721,54 @@ export default function VendorProductsTable() {
     [updateProductCatalogVisibility, websiteOptions, websiteProduct]
   )
 
+  const handleLocationVisibilityToggle = useCallback(
+    (locationId: string, nextValue: boolean) => {
+      if (!locationProduct) return
+
+      const allLocationIds = sanitizeStringList(
+        locationOptions.map((location) => location.value)
+      )
+      const currentVisibility = resolveProductLocationVisibility(
+        locationProduct,
+        locationOptions
+      )
+      const baseIds = currentVisibility.configuredLocationIds.length
+        ? currentVisibility.configuredLocationIds
+        : allLocationIds
+      const nextSet = new Set(baseIds)
+
+      if (nextValue) {
+        nextSet.add(locationId)
+      } else {
+        nextSet.delete(locationId)
+      }
+
+      if (nextSet.size === 0) {
+        toast.error(
+          'At least one location must stay enabled. Hide the product globally if you want it off everywhere.'
+        )
+        return
+      }
+
+      const nextLocationIds =
+        allLocationIds.length && nextSet.size === allLocationIds.length
+          ? []
+          : allLocationIds.filter((id) => nextSet.has(id))
+      const locationLabel =
+        locationOptions.find((location) => location.value === locationId)
+          ?.label || 'the selected location'
+
+      void updateProductCatalogVisibility(
+        locationProduct._id,
+        { availableCities: nextLocationIds },
+        nextValue
+          ? `Product will show in ${locationLabel}.`
+          : `Product removed from ${locationLabel}.`
+      )
+    },
+    [locationOptions, locationProduct, updateProductCatalogVisibility]
+  )
+
   const handleDeleteProduct = async () => {
     if (!productToDelete || !token) return
 
@@ -1494,12 +1797,15 @@ export default function VendorProductsTable() {
       setWebsiteProduct((current) =>
         current?._id === productToDelete._id ? null : current
       )
+      setLocationProduct((current) =>
+        current?._id === productToDelete._id ? null : current
+      )
 
       setProductToDelete(null)
 
       toast.success(result?.message || 'Product deleted successfully')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete product')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to delete product'))
     } finally {
       setDeletingProduct(false)
     }
@@ -1578,23 +1884,24 @@ export default function VendorProductsTable() {
             />
           }
         >
-          <Table>
+          <Table className='table-fixed'>
             <TableHeader>
               <TableRow>
-                <TableHead className='min-w-[260px]'>Product</TableHead>
-                <TableHead className='min-w-[180px]'>Main Category</TableHead>
-                <TableHead className='min-w-[160px]'>Brand</TableHead>
-                <TableHead className='min-w-[120px]'>Stock</TableHead>
-                <TableHead className='min-w-[140px]'>Price</TableHead>
-                <TableHead className='min-w-[150px]'>Status</TableHead>
-                <TableHead className='min-w-[150px]'>Websites</TableHead>
-                <TableHead className='text-right'>Action</TableHead>
+                <TableHead className='w-[330px]'>Product</TableHead>
+                <TableHead className='w-[210px]'>Main Category</TableHead>
+                <TableHead className='w-[150px]'>Brand</TableHead>
+                <TableHead className='w-[110px]'>Stock</TableHead>
+                <TableHead className='w-[120px]'>Price</TableHead>
+                <TableHead className='w-[120px]'>Status</TableHead>
+                <TableHead className='w-[120px]'>Websites</TableHead>
+                <TableHead className='w-[120px]'>Locations</TableHead>
+                <TableHead className='w-[480px] text-right'>Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className='h-24 text-center'>
+                  <TableCell colSpan={9} className='h-24 text-center'>
                     <div className='text-muted-foreground flex items-center justify-center gap-2 text-sm'>
                       <Loader2 className='h-4 w-4 animate-spin' />
                       Loading products...
@@ -1604,7 +1911,7 @@ export default function VendorProductsTable() {
               ) : paginatedProducts.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className='text-muted-foreground h-24 text-center'
                   >
                     {totalProducts === 0
@@ -1615,14 +1922,14 @@ export default function VendorProductsTable() {
               ) : (
                 paginatedProducts.map((product) => (
                   <TableRow key={product._id}>
-                    <TableCell>
+                    <TableCell className='w-[330px] max-w-[330px]'>
                       <div className='flex items-center gap-3'>
                         <ProductImage
                           src={getPrimaryProductImageUrl(product)}
                           alt={product.productName || 'Product'}
-                          className='h-14 w-14 rounded-md border object-cover'
+                          className='h-14 w-14 shrink-0 rounded-md border object-cover'
                         />
-                        <div className='min-w-0 space-y-1'>
+                        <div className='min-w-0 max-w-[240px] space-y-1'>
                           <div className='truncate text-sm font-medium'>
                             {product.productName || 'Unnamed Product'}
                           </div>
@@ -1633,20 +1940,21 @@ export default function VendorProductsTable() {
                               'No short description available.'
                             }
                             preserveWhitespace={false}
-                            className='text-muted-foreground max-w-[360px] truncate text-xs'
+                            className='text-muted-foreground truncate text-xs'
                           />
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className='w-[210px] max-w-[210px] overflow-hidden pr-4'>
                       <Badge
                         variant='outline'
-                        className='rounded-md border-slate-200 bg-slate-50 text-slate-700'
+                        title={getMainCategoryName(product, categoryLookup)}
+                        className='block w-full overflow-hidden truncate rounded-md border-slate-200 bg-slate-50 text-center text-slate-700'
                       >
                         {getMainCategoryName(product, categoryLookup)}
                       </Badge>
                     </TableCell>
-                    <TableCell className='text-sm'>
+                    <TableCell className='w-[150px] max-w-[150px] truncate text-sm'>
                       {product.brand || 'Unavailable'}
                     </TableCell>
                     <TableCell className='text-sm font-medium'>
@@ -1684,6 +1992,24 @@ export default function VendorProductsTable() {
                             )}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant='outline'
+                        className={cn(
+                          'rounded-md',
+                          product.isAvailable === false
+                            ? 'border-slate-200 bg-slate-100 text-slate-500'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        )}
+                      >
+                        {product.isAvailable === false
+                          ? 'Hidden'
+                          : getLocationVisibilitySummary(
+                              product,
+                              locationOptions
+                            )}
+                      </Badge>
+                    </TableCell>
                     <TableCell className='text-right'>
                       <div className='flex justify-end gap-2'>
                         <Button
@@ -1703,6 +2029,15 @@ export default function VendorProductsTable() {
                         >
                           <Globe2 className='mr-2 h-4 w-4' />
                           Websites
+                        </Button>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          className='rounded-md'
+                          onClick={() => setLocationProduct(product)}
+                        >
+                          <MapPin className='mr-2 h-4 w-4' />
+                          Locations
                         </Button>
                         <Button
                           variant='outline'
@@ -1752,6 +2087,15 @@ export default function VendorProductsTable() {
         onOpenChange={(open) => !open && setWebsiteProduct(null)}
         onToggleWebsite={handleWebsiteVisibilityToggle}
         onToggleProductVisibility={handleProductVisibilityToggle}
+      />
+
+      <ProductLocationVisibilitySheet
+        product={locationProduct}
+        locations={locationOptions}
+        updating={visibilityUpdatingProductId === locationProduct?._id}
+        open={Boolean(locationProduct)}
+        onOpenChange={(open) => !open && setLocationProduct(null)}
+        onToggleLocation={handleLocationVisibilityToggle}
       />
 
       <AlertDialog

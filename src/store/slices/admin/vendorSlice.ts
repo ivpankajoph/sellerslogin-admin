@@ -13,6 +13,8 @@ interface Vendor {
   gst_number?: string
   email: string
   phone?: string
+  password?: string
+  plain_password?: string
   address?: string
   city?: string
   state?: string

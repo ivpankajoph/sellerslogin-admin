@@ -128,7 +128,8 @@ export default function SitemapsPage() {
   const authUser = useSelector((state: RootState) => state.auth?.user)
   const token = useSelector((state: RootState) => state.auth?.token || '')
   const role = authUser?.role
-  const vendorId = authUser?._id || authUser?.id || ''
+  const vendorId =
+    authUser?.vendor_id || authUser?.vendorId || authUser?._id || authUser?.id || ''
   const isAdmin = role === 'admin' || role === 'superadmin'
 
   const [loading, setLoading] = useState(false)
