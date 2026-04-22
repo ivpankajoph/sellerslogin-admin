@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Eye,
   FileText,
+  Globe2,
   HelpCircle,
   ImageIcon,
   Layers3,
@@ -14,11 +15,9 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
 import { formatINR } from '@/lib/currency'
 import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +28,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -43,6 +45,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { Switch } from '@/components/ui/switch'
 import {
   Table,
   TableBody,
@@ -57,7 +60,6 @@ import { TablePageHeader } from '@/components/data-table/table-page-header'
 import { TableShell } from '@/components/data-table/table-shell'
 import { Main } from '@/components/layout/main'
 import { LinkedText } from './components/linked-text'
-import { toast } from 'sonner'
 
 type ProductCategoryRef =
   | string
@@ -75,6 +77,20 @@ type ProductSubcategoryRef =
       id?: string
       name?: string
       slug?: string
+    }
+
+type ProductWebsiteRef =
+  | string
+  | {
+      _id?: string
+      id?: string
+      name?: string
+      website_name?: string
+      displayName?: string
+      business_name?: string
+      website_slug?: string
+      template_name?: string
+      template_key?: string
     }
 
 type NormalizedRef = {
@@ -116,6 +132,7 @@ type Product = {
   productCategory?: ProductCategoryRef
   productCategories?: ProductCategoryRef[]
   productSubCategories?: ProductSubcategoryRef[]
+  websiteIds?: ProductWebsiteRef[]
 }
 
 type CategoryCatalogItem = {
@@ -145,6 +162,11 @@ type CategoryLookup = {
   mainCategoryNameById: Map<string, string>
 }
 
+type WebsiteOption = {
+  value: string
+  label: string
+}
+
 const API_BASE = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(
   /\/$/,
   ''
@@ -159,6 +181,9 @@ const normalizeSearchValue = (value: unknown) =>
   normalizeText(value).toLowerCase().replace(/\s+/g, ' ')
 
 const isLikelyObjectId = (value: string) => /^[a-f0-9]{24}$/i.test(value)
+
+const sanitizeStringList = (values: string[]) =>
+  Array.from(new Set(values.map(normalizeText).filter(Boolean)))
 
 const formatFieldLabel = (value: string) =>
   value
@@ -246,6 +271,65 @@ const uniqueRefs = <T extends ProductCategoryRef | ProductSubcategoryRef>(
     seen.add(key)
     return true
   })
+}
+
+const getWebsiteOptionLabel = (website: ProductWebsiteRef) => {
+  if (typeof website === 'string') return normalizeText(website)
+
+  return (
+    normalizeText(website.name) ||
+    normalizeText(website.website_name) ||
+    normalizeText(website.displayName) ||
+    normalizeText(website.business_name) ||
+    normalizeText(website.website_slug) ||
+    normalizeText(website.template_name) ||
+    normalizeText(website.template_key) ||
+    'Untitled website'
+  )
+}
+
+const getWebsiteOptionId = (website: ProductWebsiteRef) => {
+  if (typeof website === 'string') return normalizeText(website)
+  return normalizeText(website._id || website.id)
+}
+
+const getProductWebsiteIds = (product?: Product | null) =>
+  sanitizeStringList(
+    (Array.isArray(product?.websiteIds) ? product?.websiteIds : [])
+      .map((website) => getWebsiteOptionId(website))
+      .filter(Boolean)
+  )
+
+const resolveProductWebsiteVisibility = (
+  product: Product | null | undefined,
+  websiteOptions: WebsiteOption[]
+) => {
+  const configuredWebsiteIds = getProductWebsiteIds(product)
+  const allWebsiteIds = sanitizeStringList(
+    websiteOptions.map((website) => website.value)
+  )
+  const usesAllWebsites = configuredWebsiteIds.length === 0
+  const websiteIds = usesAllWebsites ? allWebsiteIds : configuredWebsiteIds
+
+  return {
+    configuredWebsiteIds,
+    usesAllWebsites,
+    websiteIds,
+  }
+}
+
+const getWebsiteVisibilitySummary = (
+  product: Product,
+  websiteOptions: WebsiteOption[]
+) => {
+  if (!websiteOptions.length) return 'No websites'
+
+  const visibility = resolveProductWebsiteVisibility(product, websiteOptions)
+  if (visibility.usesAllWebsites) return 'All websites'
+
+  return `${visibility.websiteIds.length} website${
+    visibility.websiteIds.length === 1 ? '' : 's'
+  }`
 }
 
 const buildCategoryLookup = (
@@ -500,6 +584,34 @@ async function fetchCategoryCatalog(token: string, signal?: AbortSignal) {
   return rows
 }
 
+async function fetchVendorWebsites(
+  vendorId: string,
+  token: string,
+  signal?: AbortSignal
+) {
+  const response = await fetch(
+    `${API_BASE}/v1/templates/by-vendor?vendor_id=${encodeURIComponent(vendorId)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const data = await response.json()
+  const rows = Array.isArray(data?.data) ? data.data : []
+
+  return rows
+    .map((website: ProductWebsiteRef) => ({
+      value: getWebsiteOptionId(website),
+      label: getWebsiteOptionLabel(website),
+    }))
+    .filter((website: WebsiteOption) => website.value && website.label)
+}
+
 function ProductImage({
   src,
   alt,
@@ -637,7 +749,7 @@ function ProductCategorizationSection({
 
   return (
     <div className={cn(DETAILS_CARD_CLASSNAME, 'col-span-full bg-slate-50/30')}>
-      <p className='text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wider'>
+      <p className='text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase'>
         Classification
       </p>
       <div className='grid gap-4 sm:grid-cols-2'>
@@ -646,7 +758,7 @@ function ProductCategorizationSection({
             <div className='flex flex-col gap-2'>
               {group.categoryName && (
                 <div className='flex items-center gap-2'>
-                  <div className='bg-primary/10 text-primary group flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-primary/20 transition hover:bg-primary/15'>
+                  <div className='bg-primary/10 text-primary group ring-primary/20 hover:bg-primary/15 flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ring-1 transition'>
                     <Layers3 className='h-3 w-3' />
                     {group.categoryName}
                   </div>
@@ -932,6 +1044,130 @@ function ProductDetailsDialog({
   )
 }
 
+function ProductWebsiteVisibilitySheet({
+  product,
+  websites,
+  updating,
+  onToggleWebsite,
+  onToggleProductVisibility,
+  open,
+  onOpenChange,
+}: {
+  product: Product | null
+  websites: WebsiteOption[]
+  updating: boolean
+  onToggleWebsite: (websiteId: string, nextValue: boolean) => void
+  onToggleProductVisibility: (nextValue: boolean) => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const visibility = useMemo(
+    () => resolveProductWebsiteVisibility(product, websites),
+    [product, websites]
+  )
+
+  if (!product) return null
+
+  const enabledCount = visibility.websiteIds.length
+  const productVisible = product.isAvailable !== false
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side='right' className='w-full gap-0 p-0 sm:max-w-xl'>
+        <SheetHeader className='border-b px-5 py-5 pr-14 text-left'>
+          <SheetTitle>Manage websites</SheetTitle>
+          <SheetDescription>
+            Choose where this product should appear.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className='flex-1 space-y-4 overflow-y-auto px-5 py-5'>
+          <div className='rounded-md border bg-slate-50 px-4 py-3'>
+            <p className='text-sm font-semibold text-slate-900'>
+              {product.productName || 'Unnamed Product'}
+            </p>
+            <p className='text-muted-foreground mt-1 text-xs'>
+              {visibility.usesAllWebsites
+                ? 'This product is currently enabled for all vendor websites.'
+                : `${enabledCount} website${enabledCount === 1 ? '' : 's'} enabled for this product.`}
+            </p>
+          </div>
+
+          <div className='flex items-start justify-between gap-4 rounded-md border px-4 py-3'>
+            <div>
+              <p className='text-sm font-semibold text-slate-900'>
+                Product visibility
+              </p>
+              <p className='text-muted-foreground mt-1 text-xs'>
+                Turn this off to hide the product everywhere.
+              </p>
+            </div>
+            <div className='flex items-center gap-3'>
+              <Switch
+                checked={productVisible}
+                onCheckedChange={onToggleProductVisibility}
+                disabled={updating}
+              />
+              <span
+                className={cn(
+                  'text-sm font-medium',
+                  productVisible ? 'text-emerald-700' : 'text-slate-500'
+                )}
+              >
+                {updating ? 'Saving...' : productVisible ? 'Visible' : 'Hidden'}
+              </span>
+            </div>
+          </div>
+
+          {websites.length ? (
+            <div className='space-y-2'>
+              {websites.map((website) => {
+                const checked = visibility.websiteIds.includes(website.value)
+
+                return (
+                  <div
+                    key={`${product._id}:${website.value}`}
+                    className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'
+                  >
+                    <div className='min-w-0'>
+                      <p className='truncate text-sm font-medium text-slate-900'>
+                        {website.label}
+                      </p>
+                      <p className='text-muted-foreground mt-1 text-xs'>
+                        {checked
+                          ? 'Product will show on this website.'
+                          : 'Product is removed from this website.'}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={checked}
+                      onCheckedChange={(nextValue) =>
+                        onToggleWebsite(website.value, nextValue)
+                      }
+                      disabled={updating || !productVisible}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className='text-muted-foreground rounded-md border border-dashed px-4 py-6 text-sm'>
+              No websites found for this vendor yet.
+            </div>
+          )}
+
+          {!productVisible ? (
+            <div className='rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700'>
+              Website switches are disabled while the product is hidden
+              globally.
+            </div>
+          ) : null}
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 export default function VendorProductsTable() {
   const vendorId = useSelector(
     (state: RootState) =>
@@ -942,6 +1178,7 @@ export default function VendorProductsTable() {
   )
   const token = useSelector((state: RootState) => state.auth?.token || '')
   const [products, setProducts] = useState<Product[]>([])
+  const [websiteOptions, setWebsiteOptions] = useState<WebsiteOption[]>([])
   const [categoryCatalog, setCategoryCatalog] = useState<CategoryCatalogItem[]>(
     []
   )
@@ -955,11 +1192,15 @@ export default function VendorProductsTable() {
   const [statsOpen, setStatsOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
+  const [websiteProduct, setWebsiteProduct] = useState<Product | null>(null)
+  const [visibilityUpdatingProductId, setVisibilityUpdatingProductId] =
+    useState('')
 
   const fetchData = useCallback(
     async (signal?: AbortSignal) => {
       if (!vendorId || !token) {
         setProducts([])
+        setWebsiteOptions([])
         setCategoryCatalog([])
         setLoading(false)
         return
@@ -968,10 +1209,12 @@ export default function VendorProductsTable() {
       try {
         setLoading(true)
         setError('')
-        const [productsResult, categoriesResult] = await Promise.allSettled([
-          fetchAllVendorProducts(vendorId, token, signal),
-          fetchCategoryCatalog(token, signal),
-        ])
+        const [productsResult, categoriesResult, websitesResult] =
+          await Promise.allSettled([
+            fetchAllVendorProducts(vendorId, token, signal),
+            fetchCategoryCatalog(token, signal),
+            fetchVendorWebsites(vendorId, token, signal),
+          ])
 
         if (productsResult.status === 'rejected') {
           throw productsResult.reason
@@ -981,9 +1224,13 @@ export default function VendorProductsTable() {
         setCategoryCatalog(
           categoriesResult.status === 'fulfilled' ? categoriesResult.value : []
         )
+        setWebsiteOptions(
+          websitesResult.status === 'fulfilled' ? websitesResult.value : []
+        )
       } catch (fetchError: any) {
         if (fetchError?.name === 'AbortError') return
         setProducts([])
+        setWebsiteOptions([])
         setCategoryCatalog([])
         setError('Failed to fetch products.')
       } finally {
@@ -1095,24 +1342,156 @@ export default function VendorProductsTable() {
     ]
   )
 
+  const updateProductCatalogVisibility = useCallback(
+    async (
+      productId: string,
+      payload: { isAvailable?: boolean; websiteIds?: string[] },
+      successMessage: string
+    ) => {
+      if (!token) return
+
+      try {
+        setVisibilityUpdatingProductId(productId)
+
+        const response = await fetch(
+          `${API_BASE}/v1/admin/products/${productId}/content`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          }
+        )
+
+        const body = await response.json().catch(() => ({}))
+        if (!response.ok || body?.success === false) {
+          throw new Error(
+            body?.message || 'Failed to update website visibility.'
+          )
+        }
+
+        const applyPatchToProduct = (product: Product): Product =>
+          product._id === productId
+            ? {
+                ...product,
+                ...(payload.isAvailable !== undefined
+                  ? { isAvailable: payload.isAvailable }
+                  : {}),
+                ...(payload.websiteIds !== undefined
+                  ? { websiteIds: payload.websiteIds }
+                  : {}),
+              }
+            : product
+
+        setProducts((prev) => prev.map(applyPatchToProduct))
+        setSelectedProduct((current) =>
+          current?._id === productId ? applyPatchToProduct(current) : current
+        )
+        setWebsiteProduct((current) =>
+          current?._id === productId ? applyPatchToProduct(current) : current
+        )
+
+        toast.success(successMessage)
+      } catch (error: any) {
+        toast.error(error?.message || 'Failed to update website visibility.')
+      } finally {
+        setVisibilityUpdatingProductId('')
+      }
+    },
+    [token]
+  )
+
+  const handleProductVisibilityToggle = useCallback(
+    (nextValue: boolean) => {
+      if (!websiteProduct) return
+
+      void updateProductCatalogVisibility(
+        websiteProduct._id,
+        { isAvailable: nextValue },
+        nextValue
+          ? 'Product is visible on its configured websites.'
+          : 'Product is hidden across all websites.'
+      )
+    },
+    [updateProductCatalogVisibility, websiteProduct]
+  )
+
+  const handleWebsiteVisibilityToggle = useCallback(
+    (websiteId: string, nextValue: boolean) => {
+      if (!websiteProduct) return
+
+      const allWebsiteIds = sanitizeStringList(
+        websiteOptions.map((website) => website.value)
+      )
+      const currentVisibility = resolveProductWebsiteVisibility(
+        websiteProduct,
+        websiteOptions
+      )
+      const baseIds = currentVisibility.configuredWebsiteIds.length
+        ? currentVisibility.configuredWebsiteIds
+        : allWebsiteIds
+      const nextSet = new Set(baseIds)
+
+      if (nextValue) {
+        nextSet.add(websiteId)
+      } else {
+        nextSet.delete(websiteId)
+      }
+
+      if (nextSet.size === 0) {
+        toast.error(
+          'At least one website must stay enabled. Hide the product globally if you want it off everywhere.'
+        )
+        return
+      }
+
+      const nextWebsiteIds =
+        allWebsiteIds.length && nextSet.size === allWebsiteIds.length
+          ? []
+          : allWebsiteIds.filter((id) => nextSet.has(id))
+      const websiteLabel =
+        websiteOptions.find((website) => website.value === websiteId)?.label ||
+        'the selected website'
+
+      void updateProductCatalogVisibility(
+        websiteProduct._id,
+        { websiteIds: nextWebsiteIds },
+        nextValue
+          ? `Product will show on ${websiteLabel}.`
+          : `Product removed from ${websiteLabel}.`
+      )
+    },
+    [updateProductCatalogVisibility, websiteOptions, websiteProduct]
+  )
+
   const handleDeleteProduct = async () => {
     if (!productToDelete || !token) return
 
     try {
       setDeletingProduct(true)
-      const response = await fetch(`${API_BASE}/v1/products/${productToDelete._id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await fetch(
+        `${API_BASE}/v1/products/${productToDelete._id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
       const result = await response.json().catch(() => ({}))
       if (!response.ok) {
         throw new Error(result?.message || 'Failed to delete product')
       }
 
-      setProducts((prev) => prev.filter((item) => item._id !== productToDelete._id))
+      setProducts((prev) =>
+        prev.filter((item) => item._id !== productToDelete._id)
+      )
       setSelectedProduct((current) =>
+        current?._id === productToDelete._id ? null : current
+      )
+      setWebsiteProduct((current) =>
         current?._id === productToDelete._id ? null : current
       )
 
@@ -1208,13 +1587,14 @@ export default function VendorProductsTable() {
                 <TableHead className='min-w-[120px]'>Stock</TableHead>
                 <TableHead className='min-w-[140px]'>Price</TableHead>
                 <TableHead className='min-w-[150px]'>Status</TableHead>
+                <TableHead className='min-w-[150px]'>Websites</TableHead>
                 <TableHead className='text-right'>Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className='h-24 text-center'>
+                  <TableCell colSpan={8} className='h-24 text-center'>
                     <div className='text-muted-foreground flex items-center justify-center gap-2 text-sm'>
                       <Loader2 className='h-4 w-4 animate-spin' />
                       Loading products...
@@ -1224,7 +1604,7 @@ export default function VendorProductsTable() {
               ) : paginatedProducts.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className='text-muted-foreground h-24 text-center'
                   >
                     {totalProducts === 0
@@ -1286,6 +1666,24 @@ export default function VendorProductsTable() {
                         {formatProductStatusLabel(product.status)}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant='outline'
+                        className={cn(
+                          'rounded-md',
+                          product.isAvailable === false
+                            ? 'border-slate-200 bg-slate-100 text-slate-500'
+                            : 'border-violet-200 bg-violet-50 text-violet-700'
+                        )}
+                      >
+                        {product.isAvailable === false
+                          ? 'Hidden'
+                          : getWebsiteVisibilitySummary(
+                              product,
+                              websiteOptions
+                            )}
+                      </Badge>
+                    </TableCell>
                     <TableCell className='text-right'>
                       <div className='flex justify-end gap-2'>
                         <Button
@@ -1301,9 +1699,20 @@ export default function VendorProductsTable() {
                           variant='outline'
                           size='sm'
                           className='rounded-md'
+                          onClick={() => setWebsiteProduct(product)}
+                        >
+                          <Globe2 className='mr-2 h-4 w-4' />
+                          Websites
+                        </Button>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          className='rounded-md'
                           onClick={() => {
                             if (typeof window === 'undefined') return
-                            window.location.assign(buildProductEditorUrl(product._id))
+                            window.location.assign(
+                              buildProductEditorUrl(product._id)
+                            )
                           }}
                         >
                           <Pencil className='mr-2 h-4 w-4' />
@@ -1335,6 +1744,16 @@ export default function VendorProductsTable() {
         onOpenChange={(open) => !open && setSelectedProduct(null)}
       />
 
+      <ProductWebsiteVisibilitySheet
+        product={websiteProduct}
+        websites={websiteOptions}
+        updating={visibilityUpdatingProductId === websiteProduct?._id}
+        open={Boolean(websiteProduct)}
+        onOpenChange={(open) => !open && setWebsiteProduct(null)}
+        onToggleWebsite={handleWebsiteVisibilityToggle}
+        onToggleProductVisibility={handleProductVisibilityToggle}
+      />
+
       <AlertDialog
         open={Boolean(productToDelete)}
         onOpenChange={(open) => !open && setProductToDelete(null)}
@@ -1345,8 +1764,9 @@ export default function VendorProductsTable() {
               Are you sure you want to permanently delete this product?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {productToDelete?.productName || 'This product'} - will be removed from the
-              vendor catalog and all assigned websites. This action cannot be undone.
+              {productToDelete?.productName || 'This product'} - will be removed
+              from the vendor catalog and all assigned websites. This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

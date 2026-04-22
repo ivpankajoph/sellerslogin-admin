@@ -43,6 +43,10 @@ import {
 
 type WebsiteOption = {
   _id: string
+  id?: string
+  website_name?: string
+  displayName?: string
+  website_slug?: string
   template_key?: string
   template_name?: string
   name?: string
@@ -59,6 +63,8 @@ interface Props {
   variants: Variant[]
   specifications: ProductSpecification[]
   recommendedAttributeKeys: string[]
+  recommendedSpecificationKeys: string[]
+  selectedSpecificationKeys: string[]
   variantKeySuggestions: string[]
   variantKeyContextLabel: string
   websiteOptions: WebsiteOption[]
@@ -108,6 +114,18 @@ type SelectOption = {
   value: string
   label: string
 }
+
+const getWebsiteOptionLabel = (website: WebsiteOption) =>
+  String(
+    website.name ||
+      website.website_name ||
+      website.displayName ||
+      website.business_name ||
+      website.website_slug ||
+      website.template_name ||
+      website.template_key ||
+      'Untitled website'
+  ).trim()
 
 type VariantRow = {
   id: string
@@ -940,6 +958,8 @@ const Step5Variants: React.FC<Props> = ({
   variants,
   specifications,
   recommendedAttributeKeys,
+  recommendedSpecificationKeys,
+  selectedSpecificationKeys,
   variantKeySuggestions,
   websiteOptions,
   selectedWebsiteIds,
@@ -972,14 +992,8 @@ const Step5Variants: React.FC<Props> = ({
     () =>
       websiteOptions
         .map((website) => ({
-          value: String(website._id || '').trim(),
-          label: String(
-            website.template_name ||
-              website.business_name ||
-              website.name ||
-              website.template_key ||
-              'Untitled website'
-          ).trim(),
+          value: String(website._id || website.id || '').trim(),
+          label: getWebsiteOptionLabel(website),
         }))
         .filter((option) => option.value && option.label),
     [websiteOptions]
@@ -1483,6 +1497,8 @@ const Step5Variants: React.FC<Props> = ({
 
       <Step3Specifications
         specifications={specifications}
+        suggestedKeys={recommendedSpecificationKeys}
+        selectedKeys={selectedSpecificationKeys}
         aiLoading={specificationAiLoading}
         onSpecChange={onSpecificationChange}
         onAddKey={onAddSpecificationKey}

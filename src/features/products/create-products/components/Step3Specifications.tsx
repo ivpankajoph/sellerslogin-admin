@@ -9,6 +9,8 @@ import {
 
 interface Props {
   specifications: Record<string, string>[]
+  suggestedKeys?: string[]
+  selectedKeys?: string[]
   aiLoading: boolean
   onSpecChange: (key: string, value: string) => void
   onAddKey: (key: string) => void
@@ -47,6 +49,9 @@ const normalizeKey = (value: string) =>
 
 const Step3Specifications: React.FC<Props> = ({
   specifications,
+  suggestedKeys = [],
+  selectedKeys = [],
+  aiLoading,
   onSpecChange,
   onAddKey,
 }) => {
@@ -74,12 +79,95 @@ const Step3Specifications: React.FC<Props> = ({
   }, [specifications])
 
   const activeSpecKeys = useMemo(() => Object.keys(activeSpecs), [activeSpecs])
-  const missingRequiredKeys = useMemo(() => {
-    const activeKeySet = new Set(activeSpecKeys.map(normalizeKey))
-    return REQUIRED_SPECIFICATION_KEYS.filter(
-      (key) => !activeKeySet.has(normalizeKey(key))
+  const selectedKeySet = useMemo(
+    () => new Set(selectedKeys.map(normalizeKey)),
+    [selectedKeys]
+  )
+  const displayActiveSpecKeys = useMemo(
+    () =>
+      activeSpecKeys.filter(
+        (key) =>
+          selectedKeySet.has(normalizeKey(key)) ||
+          Boolean(String(activeSpecs[key] || '').trim())
+      ),
+    [activeSpecKeys, activeSpecs, selectedKeySet]
+  )
+  const availableSuggestedKeys = useMemo(() => {
+    const activeKeySet = new Set(displayActiveSpecKeys.map(normalizeKey))
+    const sourceKeys = suggestedKeys.length
+      ? suggestedKeys
+      : REQUIRED_SPECIFICATION_KEYS
+
+    return Array.from(
+      new Set(sourceKeys.map((key) => key.trim()).filter(Boolean))
+    ).filter((key) => !activeKeySet.has(normalizeKey(key)))
+  }, [displayActiveSpecKeys, suggestedKeys])
+
+  const sortedActiveSpecKeys = useMemo(
+    () =>
+      [...displayActiveSpecKeys].sort(
+        (a, b) =>
+          suggestedKeys.findIndex(
+            (key) => normalizeKey(key) === normalizeKey(a)
+          ) -
+          suggestedKeys.findIndex(
+            (key) => normalizeKey(key) === normalizeKey(b)
+          )
+      ),
+    [displayActiveSpecKeys, suggestedKeys]
+  )
+
+  const visibleActiveSpecKeys = suggestedKeys.length
+    ? sortedActiveSpecKeys.filter((key) =>
+        suggestedKeys.some(
+          (suggestedKey) => normalizeKey(suggestedKey) === normalizeKey(key)
+        )
+      )
+    : sortedActiveSpecKeys
+
+  const customActiveSpecKeys = suggestedKeys.length
+    ? sortedActiveSpecKeys.filter(
+        (key) =>
+          !suggestedKeys.some(
+            (suggestedKey) => normalizeKey(suggestedKey) === normalizeKey(key)
+          )
+      )
+    : []
+
+  const renderSpecField = (key: string) => {
+    const value = activeSpecs[key] || ''
+    const isLongField =
+      value.length > 80 || key.toLowerCase().includes('instruction')
+
+    return (
+      <div key={key} className={studioCardClass}>
+        <label className='text-foreground text-sm font-medium'>
+          {toLabel(key)}
+        </label>
+        {isLongField ||
+        key.toLowerCase().includes('features') ||
+        key.toLowerCase().includes('package') ||
+        key.toLowerCase().includes('policy') ||
+        key.toLowerCase().includes('support') ? (
+          <textarea
+            rows={4}
+            value={value}
+            onChange={(event) => onSpecChange(key, event.target.value)}
+            className={studioTextareaClass}
+            placeholder={`Enter ${toLabel(key).toLowerCase()}`}
+          />
+        ) : (
+          <input
+            type='text'
+            value={value}
+            onChange={(event) => onSpecChange(key, event.target.value)}
+            className={studioInputClass}
+            placeholder={`Enter ${toLabel(key).toLowerCase()}`}
+          />
+        )}
+      </div>
     )
-  }, [activeSpecKeys])
+  }
 
   const handleAddKey = () => {
     const normalized = newKey.trim()
@@ -94,50 +182,25 @@ const Step3Specifications: React.FC<Props> = ({
       <div className='border-border/60 mb-4 border-b pb-3'>
         <h3 className='text-foreground text-lg font-bold'>Product Features</h3>
       </div>
-      {activeSpecKeys.length ? (
+      {visibleActiveSpecKeys.length || customActiveSpecKeys.length ? (
         <div className='grid gap-4 lg:grid-cols-2'>
-          {activeSpecKeys.map((key) => {
-            const value = activeSpecs[key] || ''
-            const isLongField =
-              value.length > 80 || key.toLowerCase().includes('instruction')
-
-            return (
-              <div key={key} className={studioCardClass}>
-                <label className='text-foreground text-sm font-medium'>
-                  {toLabel(key)}
-                </label>
-                {isLongField ||
-                key.toLowerCase().includes('features') ||
-                key.toLowerCase().includes('package') ||
-                key.toLowerCase().includes('policy') ||
-                key.toLowerCase().includes('support') ? (
-                  <textarea
-                    rows={4}
-                    value={value}
-                    onChange={(event) => onSpecChange(key, event.target.value)}
-                    className={studioTextareaClass}
-                    placeholder={`Enter ${toLabel(key).toLowerCase()}`}
-                  />
-                ) : (
-                  <input
-                    type='text'
-                    value={value}
-                    onChange={(event) => onSpecChange(key, event.target.value)}
-                    className={studioInputClass}
-                    placeholder={`Enter ${toLabel(key).toLowerCase()}`}
-                  />
-                )}
-              </div>
-            )
-          })}
+          {[...visibleActiveSpecKeys, ...customActiveSpecKeys].map(
+            renderSpecField
+          )}
         </div>
       ) : null}
 
       <div className='border-border/60 mt-6 border-t pt-4'>
-        {missingRequiredKeys.length ? (
+        {aiLoading ? (
+          <div className='text-muted-foreground mb-4 text-sm'>
+            Generating product feature keys...
+          </div>
+        ) : null}
+
+        {availableSuggestedKeys.length ? (
           <div className='mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4'>
             <div className='flex flex-wrap gap-2'>
-              {missingRequiredKeys.map((key) => (
+              {availableSuggestedKeys.map((key) => (
                 <Button
                   key={key}
                   type='button'
