@@ -49,6 +49,7 @@ import { NotificationBell } from '@/components/notifications/notification-bell'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { SkipToMain } from '@/components/skip-to-main'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { DeliveryWorkspaceShell } from '@/features/delivery-system'
 import { UpgradePlanDialog } from '@/features/dashboard/components/UpgradePlanDialog'
 import type { BillingSummary } from '@/features/plans/shared'
 import {
@@ -175,6 +176,8 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
       ),
   })
   const isAnalytics = pathname.startsWith('/analytics')
+  const isDeliverySystem = pathname.startsWith('/delivery-system')
+  const isCourierWorkspace = pathname.startsWith('/courier')
   const isThemeEditor = pathname.startsWith('/vendor-template')
   const isProductEditor = pathname.startsWith('/products/create-products')
   const content = children ?? <Outlet />
@@ -348,6 +351,62 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
                 {content}
                 <CreatePasswordModal />
               </div>
+              {showNavigationLoader ? (
+                <ContentNavigationLoader rect={loaderRect} />
+              ) : null}
+            </div>
+          </LayoutProvider>
+        </SearchProvider>
+      </VendorIntegrationsProvider>
+    )
+  }
+
+  if (isDeliverySystem) {
+    return (
+      <VendorIntegrationsProvider>
+        <SearchProvider>
+          <LayoutProvider>
+            <div className='vendor-flow dashboard-square relative min-h-svh w-full'>
+              <div
+                ref={contentViewportRef}
+                className='relative min-h-svh w-full'
+              >
+                {content}
+                <CreatePasswordModal />
+              </div>
+              {showNavigationLoader ? (
+                <ContentNavigationLoader rect={loaderRect} />
+              ) : null}
+            </div>
+          </LayoutProvider>
+        </SearchProvider>
+      </VendorIntegrationsProvider>
+    )
+  }
+
+  if (isCourierWorkspace) {
+    const deliveryActiveSection = pathname.startsWith('/courier/list')
+      ? 'courier-list'
+      : pathname.startsWith('/courier/warehouses')
+        ? 'warehouses'
+        : pathname.startsWith('/courier/tracking')
+          ? 'tracking'
+          : pathname.startsWith('/courier/delhivery')
+            ? 'delhivery'
+            : 'apps'
+
+    return (
+      <VendorIntegrationsProvider>
+        <SearchProvider>
+          <LayoutProvider>
+            <div
+              ref={contentViewportRef}
+              className='vendor-flow dashboard-square relative min-h-svh w-full'
+            >
+              <DeliveryWorkspaceShell activeSection={deliveryActiveSection}>
+                {content}
+              </DeliveryWorkspaceShell>
+              <CreatePasswordModal />
               {showNavigationLoader ? (
                 <ContentNavigationLoader rect={loaderRect} />
               ) : null}

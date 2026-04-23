@@ -13,6 +13,7 @@ import { Route as ProductPreviewRouteImport } from './routes/product-preview'
 import { Route as ClerkRouteRouteImport } from './routes/clerk/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedDeliverySystemRouteImport } from './routes/_authenticated/delivery-system'
 import { Route as AuthenticatedConnectBrevoRouteImport } from './routes/_authenticated/connect-brevo'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
@@ -119,6 +120,12 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDeliverySystemRoute =
+  AuthenticatedDeliverySystemRouteImport.update({
+    id: '/delivery-system',
+    path: '/delivery-system',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedConnectBrevoRoute =
   AuthenticatedConnectBrevoRouteImport.update({
     id: '/connect-brevo',
@@ -630,6 +637,7 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/connect-brevo': typeof AuthenticatedConnectBrevoRoute
+  '/delivery-system': typeof AuthenticatedDeliverySystemRoute
   '/': typeof AuthenticatedIndexRoute
   '/analytics/behavior': typeof AuthenticatedAnalyticsBehaviorRoute
   '/analytics/ecommerce': typeof AuthenticatedAnalyticsEcommerceRoute
@@ -717,6 +725,7 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/connect-brevo': typeof AuthenticatedConnectBrevoRoute
+  '/delivery-system': typeof AuthenticatedDeliverySystemRoute
   '/': typeof AuthenticatedIndexRoute
   '/analytics/behavior': typeof AuthenticatedAnalyticsBehaviorRoute
   '/analytics/ecommerce': typeof AuthenticatedAnalyticsEcommerceRoute
@@ -810,6 +819,7 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/connect-brevo': typeof AuthenticatedConnectBrevoRoute
+  '/_authenticated/delivery-system': typeof AuthenticatedDeliverySystemRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/analytics/behavior': typeof AuthenticatedAnalyticsBehaviorRoute
   '/_authenticated/analytics/ecommerce': typeof AuthenticatedAnalyticsEcommerceRoute
@@ -901,6 +911,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/connect-brevo'
+    | '/delivery-system'
     | '/'
     | '/analytics/behavior'
     | '/analytics/ecommerce'
@@ -988,6 +999,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/connect-brevo'
+    | '/delivery-system'
     | '/'
     | '/analytics/behavior'
     | '/analytics/ecommerce'
@@ -1080,6 +1092,7 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/connect-brevo'
+    | '/_authenticated/delivery-system'
     | '/_authenticated/'
     | '/_authenticated/analytics/behavior'
     | '/_authenticated/analytics/ecommerce'
@@ -1198,6 +1211,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/delivery-system': {
+      id: '/_authenticated/delivery-system'
+      path: '/delivery-system'
+      fullPath: '/delivery-system'
+      preLoaderRoute: typeof AuthenticatedDeliverySystemRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/connect-brevo': {
@@ -1851,6 +1871,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalyticsRouteRoute: typeof AuthenticatedAnalyticsRouteRouteWithChildren
   AuthenticatedMetaPixelRouteRoute: typeof AuthenticatedMetaPixelRouteRouteWithChildren
   AuthenticatedConnectBrevoRoute: typeof AuthenticatedConnectBrevoRoute
+  AuthenticatedDeliverySystemRoute: typeof AuthenticatedDeliverySystemRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedBorzoReportOrderIdRoute: typeof AuthenticatedBorzoReportOrderIdRoute
   AuthenticatedCourierPartnerRoute: typeof AuthenticatedCourierPartnerRoute
@@ -1919,6 +1940,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMetaPixelRouteRoute:
     AuthenticatedMetaPixelRouteRouteWithChildren,
   AuthenticatedConnectBrevoRoute: AuthenticatedConnectBrevoRoute,
+  AuthenticatedDeliverySystemRoute: AuthenticatedDeliverySystemRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedBorzoReportOrderIdRoute: AuthenticatedBorzoReportOrderIdRoute,
   AuthenticatedCourierPartnerRoute: AuthenticatedCourierPartnerRoute,

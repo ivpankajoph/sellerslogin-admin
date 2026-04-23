@@ -145,30 +145,11 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
         {
-          title: 'Courier List',
-          url: '/courier/list',
+          title: 'Sellerslogin Delivery System',
+          url: '/delivery-system',
           icon: Truck,
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           pageKey: 'orders',
-        },
-        {
-          title: 'Courier Apps',
-          icon: Truck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-          items: [
-            {
-              title: 'Delhivery',
-              url: '/courier/delhivery',
-              roles: [ROLES.ADMIN, ROLES.VENDOR],
-              pageKey: 'orders',
-            },
-            {
-              title: 'Warehouse Manage',
-              url: '/courier/warehouses',
-              roles: [ROLES.VENDOR],
-              pageKey: 'orders',
-            },
-          ],
         },
       ],
     },
