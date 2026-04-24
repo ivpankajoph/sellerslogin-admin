@@ -382,6 +382,7 @@ export function useTemplateForm() {
         if (!options?.silent) {
           toast.success('Template saved successfully')
         }
+        return true
       } else {
         throw new Error()
       }
@@ -390,6 +391,7 @@ export function useTemplateForm() {
       if (!options?.silent) {
         toast.error(error?.response?.data?.message || 'Save failed')
       }
+      return false
     } finally {
       setIsSubmitting(false)
     }

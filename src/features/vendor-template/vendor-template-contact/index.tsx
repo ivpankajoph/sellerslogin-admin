@@ -73,6 +73,7 @@ function VendorTemplateContact() {
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
+  const [activeEditorArea, setActiveEditorArea] = useState('hero')
   const [, setInlineEditVersion] = useState(0)
   const [isMapReady, setIsMapReady] = useState(false)
   const [domainOpen, setDomainOpen] = useState(false)
@@ -218,6 +219,7 @@ function VendorTemplateContact() {
     if (!pendingSelection) return
     if (pendingSelection.sectionId) {
       setSelectedSection(pendingSelection.sectionId)
+      setActiveEditorArea(pendingSelection.sectionId)
     }
     if (pendingSelection.componentId) {
       setSelectedComponent(pendingSelection.componentId)
@@ -421,6 +423,7 @@ function VendorTemplateContact() {
       return
     }
     setSelectedSection(sectionId)
+    setActiveEditorArea(sectionId)
     setSelectedComponent(componentId || null)
   }
 
@@ -597,26 +600,38 @@ function VendorTemplateContact() {
     () => [
       {
         id: 'hero',
-        title: 'Hero Block',
-        description: 'Background image and hero copy',
+        title: 'Top banner',
+        description: 'Background image, page title, and short intro',
       },
       {
         id: 'details',
-        title: 'Location Details',
-        description: 'Address and supporting copy',
+        title: 'Contact text',
+        description: 'Headings and supporting copy shown above contact details',
       },
       {
         id: 'map',
-        title: 'Map + Coordinates',
-        description: 'Search, coordinates, and pin placement',
+        title: 'Map location',
+        description: 'Search address, coordinates, and pin placement',
       },
       {
         id: 'vendor',
-        title: 'Vendor Profile',
-        description: 'Override vendor details shown in About and Contact pages',
+        title: 'Business details',
+        description: 'Fallback store, address, and contact details',
       },
     ],
     []
+  )
+
+  const editorAreas = useMemo(
+    () => [
+      ...sections.map((section) => ({
+        label: section.title,
+        value: section.id,
+      })),
+      { label: 'Theme colors & fonts', value: '__theme' },
+      { label: 'Section order', value: '__order' },
+    ],
+    [sections]
   )
 
   const sectionBlocks: Record<string, JSX.Element> = {
@@ -862,6 +877,8 @@ function VendorTemplateContact() {
     ),
   }
 
+  const activeSectionBlock = sectionBlocks[activeEditorArea]
+
   return (
     <>
       <Header fixed>
@@ -920,6 +937,33 @@ function VendorTemplateContact() {
           />
         }
       >
+        <div className='rounded-[24px] border border-slate-200 bg-white p-5'>
+          <p className='text-xs font-semibold uppercase tracking-[0.22em] text-slate-500'>
+            Contact page editor
+          </p>
+          <h3 className='mt-1 text-[18px] font-semibold text-slate-950'>
+            Select what you want to edit
+          </h3>
+          <p className='mt-1 text-sm text-slate-500'>
+            Choose contact text, map location, business details, or appearance settings.
+          </p>
+          <select
+            className='mt-4 h-12 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-900/10'
+            value={activeEditorArea}
+            onChange={(event) => {
+              setActiveEditorArea(event.target.value)
+              setSelectedSection(event.target.value.startsWith('__') ? null : event.target.value)
+              setSelectedComponent(null)
+            }}
+          >
+            {editorAreas.map((area) => (
+              <option key={area.value} value={area.value}>
+                {area.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <SelectedFieldEditor
           data={data}
           selectedComponent={selectedComponent}
@@ -927,28 +971,27 @@ function VendorTemplateContact() {
           handleImageChange={handleImageChange}
         />
 
-        <ThemeSettingsSection data={data} updateField={updateField} />
-
-        <TemplateSectionOrder
-          title='Contact Page Sections'
-          items={sections}
-          order={sectionOrder}
-          setOrder={setSectionOrder}
-        />
-
-        {sectionOrder.map((sectionId) => (
+        {activeEditorArea === '__theme' ? (
+          <ThemeSettingsSection data={data} updateField={updateField} />
+        ) : activeEditorArea === '__order' ? (
+          <TemplateSectionOrder
+            title='Contact Page Sections'
+            items={sections}
+            order={sectionOrder}
+            setOrder={setSectionOrder}
+          />
+        ) : activeSectionBlock ? (
           <div
-            key={sectionId}
-            data-editor-section={sectionId}
+            data-editor-section={activeEditorArea}
             className={
-              selectedSection === sectionId
+              selectedSection === activeEditorArea
                 ? 'rounded-3xl ring-2 ring-slate-900/15 ring-offset-2 ring-offset-slate-50'
                 : undefined
             }
           >
-            {sectionBlocks[sectionId]}
+            {activeSectionBlock}
           </div>
-        ))}
+        ) : null}
       </TemplatePageLayout>
       <DomainModal
         open={domainOpen}

@@ -72,6 +72,7 @@ function VendorTemplateAbout() {
   const [uploadingPaths, setUploadingPaths] = useState<Set<string>>(new Set())
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
+  const [activeEditorArea, setActiveEditorArea] = useState('overview')
   const [, setInlineEditVersion] = useState(0)
   const [domainOpen, setDomainOpen] = useState(false)
   const [sectionOrder, setSectionOrder] = useState([
@@ -285,6 +286,7 @@ function VendorTemplateAbout() {
     if (!pendingSelection) return
     if (pendingSelection.sectionId) {
       setSelectedSection(pendingSelection.sectionId)
+      setActiveEditorArea(pendingSelection.sectionId)
     }
     if (pendingSelection.componentId) {
       setSelectedComponent(pendingSelection.componentId)
@@ -313,6 +315,7 @@ function VendorTemplateAbout() {
       return
     }
     setSelectedSection(sectionId)
+    setActiveEditorArea(sectionId)
     setSelectedComponent(componentId || null)
   }
 
@@ -504,41 +507,54 @@ function VendorTemplateAbout() {
     () => [
       {
         id: 'hero',
-        title: 'Hero Block',
-        description: 'Hero background, title, and subtitle',
+        title: 'Top banner',
+        description: 'Background image, page title, and short intro',
       },
       {
         id: 'story',
-        title: 'Story + Media',
-        description: 'Narrative paragraphs and featured image',
+        title: 'Business story',
+        description: 'About text paragraphs and story image',
       },
       {
         id: 'values',
-        title: 'Core Values',
-        description: 'Iconic value statements',
+        title: 'Value cards',
+        description: 'Trust points shown on the About page',
       },
       {
         id: 'team',
-        title: 'Team Spotlight',
-        description: 'Team member cards',
+        title: 'Team cards',
+        description: 'People, roles, and photos',
       },
       {
         id: 'stats',
-        title: 'Highlight Stats',
-        description: 'Numbers that build trust',
+        title: 'Trust numbers',
+        description: 'Numbers like years, customers, products',
       },
       {
         id: 'vendorStories',
-        title: 'Vendor Stories',
-        description: 'Journey cards shown below About sections',
+        title: 'Journey cards',
+        description: 'Milestones and business highlights',
       },
       {
         id: 'vendor',
-        title: 'Vendor Profile',
-        description: 'Override vendor details shown in About and Contact pages',
+        title: 'Business details',
+        description: 'Fallback store, address, and contact details',
       },
     ],
     []
+  )
+
+  const editorAreas = useMemo(
+    () => [
+      { label: 'About basics', value: 'overview' },
+      ...sections.map((section) => ({
+        label: section.title,
+        value: section.id,
+      })),
+      { label: 'Theme colors & fonts', value: '__theme' },
+      { label: 'Section order', value: '__order' },
+    ],
+    [sections]
   )
 
   const sectionBlocks: Record<string, JSX.Element> = {
@@ -1003,6 +1019,8 @@ function VendorTemplateAbout() {
     ),
   }
 
+  const activeSectionBlock = sectionBlocks[activeEditorArea]
+
   return (
     <>
       <Header fixed>
@@ -1059,6 +1077,34 @@ function VendorTemplateAbout() {
           />
         }
       >
+        <div className='rounded-[24px] border border-slate-200 bg-white p-5'>
+          <p className='text-xs font-semibold uppercase tracking-[0.22em] text-slate-500'>
+            About page editor
+          </p>
+          <h3 className='mt-1 text-[18px] font-semibold text-slate-950'>
+            Select what you want to edit
+          </h3>
+          <p className='mt-1 text-sm text-slate-500'>
+            Pick one About page area at a time. This keeps the form short and easy to understand.
+          </p>
+          <select
+            className='mt-4 h-12 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-900/10'
+            value={activeEditorArea}
+            onChange={(event) => {
+              setActiveEditorArea(event.target.value)
+              setSelectedSection(event.target.value.startsWith('__') ? null : event.target.value)
+              setSelectedComponent(null)
+            }}
+          >
+            {editorAreas.map((area) => (
+              <option key={area.value} value={area.value}>
+                {area.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {activeEditorArea === 'overview' ? (
         <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
           <div className='flex flex-col gap-2'>
             <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>
@@ -1255,6 +1301,7 @@ function VendorTemplateAbout() {
             </div>
           </div>
         </div>
+        ) : null}
 
         <SelectedFieldEditor
           data={data}
@@ -1263,28 +1310,27 @@ function VendorTemplateAbout() {
           handleImageChange={handleImageChange}
         />
 
-        <ThemeSettingsSection data={data} updateField={updateField} />
-
-        <TemplateSectionOrder
-          title='About Page Sections'
-          items={sections}
-          order={sectionOrder}
-          setOrder={setSectionOrder}
-        />
-
-        {sectionOrder.map((sectionId) => (
+        {activeEditorArea === '__theme' ? (
+          <ThemeSettingsSection data={data} updateField={updateField} />
+        ) : activeEditorArea === '__order' ? (
+          <TemplateSectionOrder
+            title='About Page Sections'
+            items={sections}
+            order={sectionOrder}
+            setOrder={setSectionOrder}
+          />
+        ) : activeSectionBlock ? (
           <div
-            key={sectionId}
-            data-editor-section={sectionId}
+            data-editor-section={activeEditorArea}
             className={
-              selectedSection === sectionId
+              selectedSection === activeEditorArea
                 ? 'rounded-3xl ring-2 ring-slate-900/15 ring-offset-2 ring-offset-slate-50'
                 : undefined
             }
           >
-            {sectionBlocks[sectionId]}
+            {activeSectionBlock}
           </div>
-        ))}
+        ) : null}
       </TemplatePageLayout>
       <DomainModal
         open={domainOpen}

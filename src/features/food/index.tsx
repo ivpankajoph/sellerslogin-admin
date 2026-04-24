@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { useLocation } from '@tanstack/react-router'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import api from '@/lib/axios'
 import { Main } from '@/components/layout/main'
@@ -8,8 +8,13 @@ import { uploadImage } from '@/lib/upload-image'
 import {
   getVendorTemplatePreviewUrl,
   getVendorTemplateProductUrl,
+  setStoredTemplatePreviewCity,
 } from '@/lib/storefront-url'
-import { getStoredActiveWebsite } from '@/features/vendor-template/components/websiteStudioStorage'
+import { setStoredEditingTemplateKey } from '@/features/vendor-template/components/templateVariantParam'
+import {
+  getStoredActiveWebsite,
+  setStoredActiveWebsite,
+} from '@/features/vendor-template/components/websiteStudioStorage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +27,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import {
   Table,
@@ -119,6 +131,8 @@ type TemplateWebsiteLite = {
   id?: string
   template_key?: string
   templateKey?: string
+  name?: string
+  business_name?: string
   website_slug?: string
 }
 
@@ -257,6 +271,25 @@ const getRestaurantFoodTypeLabels = (value?: string) => {
     selections.includes(option.value)
   ).map((option) => option.label)
 }
+const DEFAULT_FOOD_CATEGORY_OPTIONS = [
+  'Breakfast',
+  'Lunch',
+  'Dinner',
+  'Main Course',
+  'Starters',
+  'Snacks',
+  'Beverages',
+  'Desserts',
+]
+const MAX_MENU_IMAGES = 3
+const DEFAULT_VARIANT_NAME_OPTIONS = [
+  'Regular',
+  'Medium',
+  'Large',
+  'Extra Large',
+  'Half Plate',
+  'Full Plate',
+]
 const getOrderAddress = (order: Order) =>
   [
     order.shipping_address?.line1,
@@ -278,6 +311,11 @@ const getOrderAddressLines = (order: Order) =>
   ].filter(Boolean)
 const truncateText = (value: string, maxLength: number) =>
   value.length > maxLength ? `${value.slice(0, maxLength).trim()}...` : value
+const capitalizeFirstLetter = (value: string) => {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) return ''
+  return `${trimmedValue.charAt(0).toUpperCase()}${trimmedValue.slice(1)}`
+}
 const formatOpeningHours = (hours: RestaurantProfile['opening_hours']) =>
   (hours || []).map((slot) =>
     slot.is_closed ? `${slot.day}: Closed` : `${slot.day}: ${slot.open} - ${slot.close}`
@@ -293,6 +331,53 @@ const getMenuItemPrice = (item?: MenuItem | null) => {
     variants[0]
   return Number(variant?.offer_price || item.offer_price || variant?.price || item.price || 0)
 }
+const convertImageFileToPng = (file: File) =>
+  new Promise<File>((resolve, reject) => {
+    if (file.type === 'image/png') {
+      resolve(file)
+      return
+    }
+
+    const image = new Image()
+    const objectUrl = URL.createObjectURL(file)
+
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = image.naturalWidth || image.width
+        canvas.height = image.naturalHeight || image.height
+        const context = canvas.getContext('2d')
+
+        if (!context || !canvas.width || !canvas.height) {
+          URL.revokeObjectURL(objectUrl)
+          reject(new Error('Unable to convert image'))
+          return
+        }
+
+        context.drawImage(image, 0, 0)
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(objectUrl)
+          if (!blob) {
+            reject(new Error('Unable to convert image'))
+            return
+          }
+
+          const fileName = file.name.replace(/\.[^.]+$/, '') || 'food-item'
+          resolve(new File([blob], `${fileName}.png`, { type: 'image/png' }))
+        }, 'image/png')
+      } catch (error) {
+        URL.revokeObjectURL(objectUrl)
+        reject(error)
+      }
+    }
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Unable to read image'))
+    }
+
+    image.src = objectUrl
+  })
 
 const createEmptyAddon = (): MenuAddon => ({ name: '', price: 0, is_free: false })
 const createEmptyVariant = (): MenuVariant => ({
@@ -350,6 +435,28 @@ function FieldLabel({
   )
 }
 
+function InfoHint({ text }: { text: string }) {
+  return (
+    <span
+      tabIndex={0}
+      title={text}
+      aria-label={text}
+      className='inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold leading-none text-slate-500 shadow-sm'
+    >
+      i
+    </span>
+  )
+}
+
+function MainFieldLabel({ label, helper }: { label: string; helper: string }) {
+  return (
+    <div className='flex items-center gap-1.5'>
+      <FieldLabel label={label} />
+      <InfoHint text={helper} />
+    </div>
+  )
+}
+
 function FoodTypeMark({ type }: { type?: string }) {
   const normalized = String(type || 'veg').toLowerCase().replace(/[\s-]+/g, '_')
   const isNonVeg = normalized === 'non_veg' || normalized === 'nonveg'
@@ -387,6 +494,7 @@ const getFoodHubSectionFromHash = (): FoodHubSectionId => {
 
 export default function FoodHubPage() {
   const routerHash = useLocation({ select: (location) => location.hash })
+  const navigate = useNavigate()
   const authUser = useSelector((state: any) => state.auth?.user || null)
   const authToken = useSelector((state: any) => state.auth?.token || '')
   const vendorProfile = useSelector(
@@ -401,18 +509,26 @@ export default function FoodHubPage() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [restaurant, setRestaurant] = useState<RestaurantProfile>(DEFAULT_RESTAURANT)
   const [restaurantDraft, setRestaurantDraft] = useState<RestaurantProfile>(DEFAULT_RESTAURANT)
+  const [websiteLogo, setWebsiteLogo] = useState('')
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [offers, setOffers] = useState<Offer[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [savingRestaurant, setSavingRestaurant] = useState(false)
   const [savingMenu, setSavingMenu] = useState(false)
+  const [updatingAvailabilityId, setUpdatingAvailabilityId] = useState('')
+  const [updatingOfferStatusId, setUpdatingOfferStatusId] = useState('')
   const [savingOffer, setSavingOffer] = useState(false)
   const [uploadingField, setUploadingField] = useState('')
   const [menuForm, setMenuForm] = useState<MenuFormState>(DEFAULT_MENU_FORM)
+  const [customCategoryMode, setCustomCategoryMode] = useState(false)
+  const [customVariantIndexes, setCustomVariantIndexes] = useState<Set<number>>(
+    () => new Set()
+  )
   const [offerForm, setOfferForm] = useState<OfferFormState>(DEFAULT_OFFER_FORM)
   const [expandedAddressOrderId, setExpandedAddressOrderId] = useState('')
   const [addressModalOrder, setAddressModalOrder] = useState<Order | null>(null)
   const [restaurantEditorOpen, setRestaurantEditorOpen] = useState(false)
+  const [menuEditorOpen, setMenuEditorOpen] = useState(false)
   const [activeSection, setActiveSection] = useState<FoodHubSectionId>(
     getFoodHubSectionFromHash
   )
@@ -443,6 +559,7 @@ export default function FoodHubPage() {
       setMenuItems(menuRes.data?.items || [])
       setOffers(offerRes.data?.offers || [])
       setOrders(orderRes.data?.orders || [])
+      setWebsiteLogo(await resolvePocoFoodTemplateLogo())
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to load food hub')
     } finally {
@@ -501,18 +618,23 @@ export default function FoodHubPage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  const resolvePocoFoodWebsiteId = async () => {
+  const resolvePocoFoodWebsite = async () => {
     const activeWebsite = getStoredActiveWebsite(vendorId)
     if (
       activeWebsite?.id &&
       String(activeWebsite.templateKey || '').trim().toLowerCase() === 'pocofood'
     ) {
-      return activeWebsite.id
+      return {
+        _id: activeWebsite.id,
+        name: activeWebsite.name,
+        template_key: 'pocofood',
+        website_slug: activeWebsite.websiteSlug,
+      }
     }
 
     try {
       const apiBase = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/+$/, '')
-      if (!apiBase || !vendorId) return ''
+      if (!apiBase || !vendorId) return null
       const response = await fetch(
         `${apiBase}/v1/templates/by-vendor?vendor_id=${encodeURIComponent(vendorId)}&_ts=${Date.now()}`,
         {
@@ -529,10 +651,93 @@ export default function FoodHubPage() {
           .toLowerCase()
         return key === 'pocofood' || key.includes('pocofood')
       })
-      return String(pocoFoodWebsite?._id || pocoFoodWebsite?.id || '').trim()
+      return pocoFoodWebsite || null
     } catch {
-      return ''
+      return null
     }
+  }
+
+  const resolvePocoFoodWebsiteId = async () => {
+    const website = await resolvePocoFoodWebsite()
+    return String(website?._id || website?.id || '').trim()
+  }
+
+  const editFoodWebsite = async () => {
+    if (!vendorId) {
+      toast.error('Vendor profile is not ready yet.')
+      return
+    }
+
+    const website = await resolvePocoFoodWebsite()
+    const websiteId = String(website?._id || website?.id || '').trim()
+
+    if (!websiteId) {
+      toast.error('Food website not found. Create a Poco Food website first.')
+      void navigate({ to: '/template-workspace' })
+      return
+    }
+
+    const previewCity =
+      String(vendorProfile?.default_city_slug || authUser?.default_city_slug || '').trim() ||
+      'all'
+
+    setStoredActiveWebsite(vendorId, {
+      id: websiteId,
+      name: website?.name || website?.business_name || 'Food website',
+      templateKey: 'pocofood',
+      websiteSlug: website?.website_slug || websiteId,
+    })
+    setStoredEditingTemplateKey(vendorId, 'pocofood')
+    setStoredTemplatePreviewCity(previewCity)
+
+    void navigate({
+      to: '/vendor-template/$templateKey',
+      params: { templateKey: 'pocofood' },
+      search: { website: websiteId },
+    })
+  }
+
+  const resolvePocoFoodTemplateLogo = async () => {
+    const apiBase = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/+$/, '')
+    const fallbackLogo = String(
+      vendorProfile?.logo ||
+        vendorProfile?.avatar ||
+        vendorProfile?.profile_image ||
+        authUser?.logo ||
+        authUser?.avatar ||
+        ''
+    ).trim()
+
+    if (!apiBase || !vendorId) return fallbackLogo
+
+    try {
+      const websiteId = await resolvePocoFoodWebsiteId()
+      const endpoints = [
+        `${apiBase}/v1/templates/home?vendor_id=${encodeURIComponent(vendorId)}${
+          websiteId ? `&website_id=${encodeURIComponent(websiteId)}` : ''
+        }`,
+        `${apiBase}/v1/templates/home/${encodeURIComponent(vendorId)}`,
+        `${apiBase}/v1/templates/${encodeURIComponent(vendorId)}`,
+      ]
+
+      for (const url of endpoints) {
+        try {
+          const response = await fetch(url, {
+            headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+          })
+          const root = await response.json().catch(() => null)
+          const payload = root?.data || root?.template || root
+          const logo = String(payload?.components?.logo || payload?.logo || '').trim()
+          if (logo) return logo
+        } catch {
+          continue
+        }
+      }
+    } catch {
+      return fallbackLogo
+    }
+
+    return fallbackLogo
   }
 
   const previewFoodTemplate = async () => {
@@ -591,11 +796,26 @@ export default function FoodHubPage() {
 
   const categoryOptions = Array.from(
     new Set(
-      menuItems
-        .map((item) => String(item.category || '').trim())
-        .filter(Boolean)
+      [
+        ...DEFAULT_FOOD_CATEGORY_OPTIONS,
+        ...menuItems.map((item) => String(item.category || '').trim()),
+      ].filter(Boolean)
     )
   )
+  const variantNameOptions = Array.from(
+    new Set(
+      [
+        ...DEFAULT_VARIANT_NAME_OPTIONS,
+        ...menuItems.flatMap((item) =>
+          (item.variants || []).map((variant) => String(variant.name || '').trim())
+        ),
+      ].filter(Boolean)
+    )
+  )
+  const selectedCategoryValue =
+    menuForm.category && categoryOptions.includes(menuForm.category)
+      ? menuForm.category
+      : ''
 
   const handleUpload = async (
     file: File | undefined,
@@ -620,17 +840,32 @@ export default function FoodHubPage() {
   const handleMenuGalleryUpload = async (files: FileList | null) => {
     const imageFiles = Array.from(files || []).filter(Boolean)
     if (!imageFiles.length) return
+    const remainingSlots = Math.max(0, MAX_MENU_IMAGES - menuForm.gallery_images.length)
+    if (!remainingSlots) {
+      toast.error(`You can add up to ${MAX_MENU_IMAGES} item images only`)
+      return
+    }
+    const filesToUpload = imageFiles.slice(0, remainingSlots)
+    if (imageFiles.length > remainingSlots) {
+      toast.error(`Only ${remainingSlots} more image${remainingSlots === 1 ? '' : 's'} allowed`)
+    }
     try {
       setUploadingField('menu_gallery')
-      const urls = await Promise.all(imageFiles.map((file) => uploadImage(file, 'food_hub')))
+      const pngFiles = await Promise.all(filesToUpload.map(convertImageFileToPng))
+      const urls = await Promise.all(pngFiles.map((file) => uploadImage(file, 'food_hub')))
       const validUrls = urls.filter(Boolean) as string[]
       if (!validUrls.length) return
       setMenuForm((current) => ({
         ...current,
         image_url: current.image_url || validUrls[0],
-        gallery_images: Array.from(new Set([...current.gallery_images, ...validUrls])),
+        gallery_images: Array.from(new Set([...current.gallery_images, ...validUrls])).slice(
+          0,
+          MAX_MENU_IMAGES
+        ),
       }))
-      toast.success('Gallery images uploaded')
+      toast.success('Gallery images uploaded as PNG')
+    } catch {
+      toast.error('Image conversion failed. Please try another image.')
     } finally {
       setUploadingField('')
     }
@@ -650,10 +885,69 @@ export default function FoodHubPage() {
     }
   }
 
-  const resetMenuForm = () => setMenuForm(DEFAULT_MENU_FORM())
+  const resetMenuForm = () => {
+    setMenuForm(DEFAULT_MENU_FORM())
+    setCustomCategoryMode(false)
+    setCustomVariantIndexes(new Set())
+    setMenuEditorOpen(false)
+  }
+
+  const getMenuItemFormState = (item: MenuItem): MenuFormState => ({
+    id: item._id,
+    item_name: item.item_name,
+    category: item.category,
+    price: String(item.price || 0),
+    offer_price: String(item.offer_price || 0),
+    description: item.description || '',
+    image_url: item.image_url || '',
+    gallery_images: (
+      item.gallery_images?.length ? item.gallery_images : item.image_url ? [item.image_url] : []
+    ).slice(0, MAX_MENU_IMAGES),
+    food_type: item.food_type || 'veg',
+    is_available: item.is_available !== false,
+    prep_time_minutes: String(item.prep_time_minutes || 20),
+    addons: item.addons?.length ? item.addons : [createEmptyAddon()],
+    variants: item.variants?.length ? item.variants : [createEmptyVariant()],
+  })
+
+  const startEditMenuItem = (item: MenuItem) => {
+    setCustomCategoryMode(false)
+    setCustomVariantIndexes(new Set())
+    setMenuForm(getMenuItemFormState(item))
+    setMenuEditorOpen(true)
+  }
+
+  const addMenuAddon = () => {
+    setMenuForm((current) => ({
+      ...current,
+      addons: [...current.addons, createEmptyAddon()],
+    }))
+  }
+
+  const addMenuVariant = () => {
+    setMenuForm((current) => ({
+      ...current,
+      variants: [...current.variants, createEmptyVariant()],
+    }))
+  }
+
+  const updateMenuBasePrice = (field: 'price' | 'offer_price', value: string) => {
+    setMenuForm((current) => ({
+      ...current,
+      [field]: value,
+      variants: current.variants.map((variant, index) =>
+        index === 0
+          ? {
+              ...variant,
+              [field === 'price' ? 'price' : 'offer_price']: parseFormNumber(value),
+            }
+          : variant
+      ),
+    }))
+  }
 
   const saveMenuItem = async () => {
-    const itemName = menuForm.item_name.trim()
+    const itemName = capitalizeFirstLetter(menuForm.item_name)
     const category = menuForm.category.trim()
     const price = parseFormNumber(menuForm.price)
     const offerPrice = parseFormNumber(menuForm.offer_price)
@@ -695,11 +989,12 @@ export default function FoodHubPage() {
 
     const variants = menuForm.variants
       .filter((variant) => String(variant.name || '').trim())
-      .map((variant) => ({
+      .map((variant, index) => ({
         ...variant,
         name: String(variant.name || '').trim(),
-        price: parseFormNumber(variant.price),
-        offer_price: parseFormNumber(variant.offer_price),
+        price: index === 0 ? price : parseFormNumber(variant.price),
+        offer_price: index === 0 ? offerPrice : parseFormNumber(variant.offer_price),
+        is_default: index === 0,
       }))
     const invalidVariant = variants.find(
       (variant) => !isValidAmount(variant.price) || !isValidAmount(variant.offer_price)
@@ -799,6 +1094,42 @@ export default function FoodHubPage() {
     }
   }
 
+  const updateMenuItemAvailability = async (item: MenuItem, isAvailable: boolean) => {
+    try {
+      setUpdatingAvailabilityId(item._id)
+      await api.put(`/food/menu/${item._id}`, {
+        item_name: item.item_name,
+        category: item.category,
+        price: item.price,
+        offer_price: item.offer_price,
+        description: item.description,
+        image_url: item.image_url,
+        gallery_images: item.gallery_images || [],
+        food_type: item.food_type || 'veg',
+        is_available: isAvailable,
+        prep_time_minutes: item.prep_time_minutes || 20,
+        addons: item.addons || [],
+        variants: (item.variants || []).map((variant, index) => ({
+          ...variant,
+          is_default: index === 0,
+        })),
+      })
+
+      setMenuItems((current) =>
+        current.map((menuItem) =>
+          menuItem._id === item._id
+            ? { ...menuItem, is_available: isAvailable }
+            : menuItem
+        )
+      )
+      toast.success(isAvailable ? 'Item marked in stock' : 'Item marked out of stock')
+    } catch (error: any) {
+      toast.error(getApiErrorMessage(error, 'Failed to update item status'))
+    } finally {
+      setUpdatingAvailabilityId('')
+    }
+  }
+
   const removeOffer = async (id: string) => {
     try {
       await api.delete(`/food/offers/${id}`)
@@ -806,6 +1137,42 @@ export default function FoodHubPage() {
       await loadAll()
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to delete offer')
+    }
+  }
+
+  const updateOfferStatus = async (offer: Offer, isActive: boolean) => {
+    try {
+      setUpdatingOfferStatusId(offer._id)
+      await api.put(`/food/offers/${offer._id}`, {
+        offer_title: offer.offer_title,
+        offer_type: offer.offer_type,
+        combo_price: offer.combo_price || 0,
+        discount_percent: offer.discount_percent || 0,
+        flat_discount: offer.flat_discount || 0,
+        free_item_name: offer.free_item_name || '',
+        coupon_code: offer.coupon_code || '',
+        min_cart_value: offer.min_cart_value || 0,
+        max_discount: offer.max_discount || 0,
+        start_date: offer.start_date || null,
+        end_date: offer.end_date || null,
+        is_active: isActive,
+        combo_items: (offer.combo_items || []).map((comboItem) => ({
+          menu_item_id: comboItem.menu_item_id || null,
+          item_name: comboItem.item_name || '',
+          quantity: Math.max(1, Number(comboItem.quantity || 1)),
+        })),
+      })
+
+      setOffers((current) =>
+        current.map((item) =>
+          item._id === offer._id ? { ...item, is_active: isActive } : item
+        )
+      )
+      toast.success(isActive ? 'Offer marked active' : 'Offer marked inactive')
+    } catch (error: any) {
+      toast.error(getApiErrorMessage(error, 'Failed to update offer status'))
+    } finally {
+      setUpdatingOfferStatusId('')
     }
   }
 
@@ -956,6 +1323,7 @@ export default function FoodHubPage() {
   const comboWorth = comboPreviewItems.reduce((sum, item) => sum + item.lineTotal, 0)
   const comboPrice = Number(offerForm.combo_price || 0)
   const comboSavings = comboWorth > comboPrice && comboPrice > 0 ? comboWorth - comboPrice : 0
+  const restaurantLogo = String(restaurant.logo_url || websiteLogo || '').trim()
   const restaurantFoodTypeSelections = getRestaurantFoodTypeSelections(
     restaurantDraft.veg_nonveg_type
   )
@@ -1040,8 +1408,17 @@ export default function FoodHubPage() {
                     Preview Template
                   </Button>
                   <Button
+                    variant='outline'
+                    onClick={() => void editFoodWebsite()}
+                  >
+                    Edit your website
+                  </Button>
+                  <Button
                     onClick={() => {
-                      setRestaurantDraft(restaurant)
+                      setRestaurantDraft({
+                        ...restaurant,
+                        logo_url: restaurant.logo_url || websiteLogo,
+                      })
                       setRestaurantEditorOpen(true)
                     }}
                   >
@@ -1054,8 +1431,8 @@ export default function FoodHubPage() {
                   <div className='rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-5'>
                     <div className='flex flex-col gap-4 sm:flex-row sm:items-start'>
                       <div className='h-20 w-20 overflow-hidden rounded-2xl border border-slate-200 bg-white'>
-                        {restaurant.logo_url ? (
-                          <img src={restaurant.logo_url} alt={restaurant.restaurant_name || 'Restaurant logo'} className='h-full w-full object-cover' />
+                        {restaurantLogo ? (
+                          <img src={restaurantLogo} alt={restaurant.restaurant_name || 'Restaurant logo'} className='h-full w-full object-cover' />
                         ) : (
                           <div className='flex h-full w-full items-center justify-center text-xl font-semibold text-slate-400'>
                             {(restaurant.restaurant_name || 'R').slice(0, 1).toUpperCase()}
@@ -1121,67 +1498,128 @@ export default function FoodHubPage() {
         {activeSection === 'food-items' || activeSection === 'all-items' ? (
         <section id={activeSection}>
           <div className='space-y-4'>
-            {activeSection === 'food-items' ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Food Item Form</CardTitle>
-                <p className='text-sm text-slate-600'>
-                  Create or update food items here. Saved items are listed below/alongside this form.
-                </p>
+            {activeSection === 'food-items' || menuEditorOpen ? (
+            <div className={menuEditorOpen ? 'fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/45 p-3 sm:p-6' : ''}>
+            <Card className={menuEditorOpen ? 'w-full max-w-6xl shadow-2xl' : ''}>
+              <CardHeader className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+                <div>
+                  <CardTitle>{menuEditorOpen ? 'Edit Food Item' : 'Food Item Form'}</CardTitle>
+                  <p className='text-sm text-slate-600'>
+                    {menuEditorOpen
+                      ? 'Update this item here without leaving the All Items page.'
+                      : 'Create or update food items here. Saved items are listed below/alongside this form.'}
+                  </p>
+                </div>
+                {menuEditorOpen ? (
+                  <Button type='button' variant='outline' onClick={resetMenuForm}>
+                    Close
+                  </Button>
+                ) : null}
               </CardHeader>
               <CardContent className='space-y-3'>
                 <div className='space-y-2'>
-                  <FieldLabel label='Food item name' helper='This name appears on the menu card.' />
+                  <MainFieldLabel label='Food item name' helper='This name appears on the menu card and storefront product pages.' />
                   <Input placeholder='Example: Crispy Veg Burger' value={menuForm.item_name} onChange={(e) => setMenuForm((c) => ({ ...c, item_name: e.target.value }))} />
                 </div>
                 <div className='space-y-2'>
-                  <FieldLabel label='Category' helper='Group the item, such as Burger, Drinks, or Wrap.' />
-                  <Input
-                    placeholder='Example: Burger'
-                    list='food-category-options'
-                    value={menuForm.category}
-                    onChange={(e) => setMenuForm((c) => ({ ...c, category: e.target.value }))}
-                  />
+                  <MainFieldLabel label='Category' helper='Group this item so customers can browse menu sections like Lunch, Dinner, or Snacks.' />
+                  <Select
+                    value={selectedCategoryValue}
+                    onValueChange={(value) => {
+                      setCustomCategoryMode(false)
+                      setMenuForm((current) => ({
+                        ...current,
+                        category: value,
+                      }))
+                    }}
+                  >
+                    <SelectTrigger className='h-10 w-full bg-background text-sm text-slate-900'>
+                      <SelectValue placeholder='Select category' />
+                    </SelectTrigger>
+                    <SelectContent
+                      className='max-h-64 overflow-y-auto'
+                      position='popper'
+                    >
+                      {categoryOptions.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <button
+                    type='button'
+                    className='w-fit text-xs font-semibold text-violet-700 underline underline-offset-4 hover:text-violet-900'
+                    onClick={() => {
+                      setCustomCategoryMode(true)
+                      setMenuForm((current) => ({
+                        ...current,
+                        category: '',
+                      }))
+                    }}
+                  >
+                    Create new category
+                  </button>
+                  {customCategoryMode ? (
+                    <Input
+                      autoFocus
+                      placeholder='Type new category, e.g. Tandoori'
+                      value={menuForm.category}
+                      onChange={(e) =>
+                        setMenuForm((current) => ({
+                          ...current,
+                          category: e.target.value,
+                        }))
+                      }
+                    />
+                  ) : null}
                 </div>
-                <datalist id='food-category-options'>
-                  {categoryOptions.map((item) => (
-                    <option key={item} value={item} />
-                  ))}
-                </datalist>
                 <div className='grid grid-cols-2 gap-3'>
                   <div className='space-y-2'>
-                    <FieldLabel label='Regular price' helper='Original item price.' />
+                    <MainFieldLabel label='Regular price' helper='Original item price before any discount or offer.' />
                     <Input
                       type='number'
                       placeholder='Example: 159'
                       value={emptyWhenZero(menuForm.price)}
-                      onChange={(e) => setMenuForm((c) => ({ ...c, price: e.target.value }))}
+                      onChange={(e) => updateMenuBasePrice('price', e.target.value)}
                     />
                   </div>
                   <div className='space-y-2'>
-                    <FieldLabel label='Offer / sale price' helper='Discounted price. Use 0 if there is no discount.' />
+                    <MainFieldLabel label='Offer / sale price' helper='Discounted item price. Use 0 if this item has no discount.' />
                     <Input
                       type='number'
                       placeholder='Example: 119'
                       value={emptyWhenZero(menuForm.offer_price)}
-                      onChange={(e) => setMenuForm((c) => ({ ...c, offer_price: e.target.value }))}
+                      onChange={(e) => updateMenuBasePrice('offer_price', e.target.value)}
                     />
                   </div>
                 </div>
                 <div className='space-y-2'>
                   <div className='space-y-1'>
-                    <p className='text-xs font-medium uppercase tracking-wide text-slate-500'>
-                      Item images
-                    </p>
-                    <Input
-                      type='file'
-                      accept='image/*'
-                      multiple
-                      onChange={(e) => void handleMenuGalleryUpload(e.target.files)}
+                    <MainFieldLabel
+                      label='Item images'
+                      helper='Upload up to 3 food item photos. The first image will be shown first to customers.'
                     />
-                    <p className='text-xs text-slate-500'>
-                      Select one or more images. The first image becomes the primary image automatically.
-                    </p>
+                    <div className='flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between'>
+                      <div>
+                        <p className='text-sm font-medium text-slate-800'>
+                          Add item photos
+                        </p>
+                        <p className='mt-1 text-xs text-slate-500'>
+                          Upload up to 3 images. First image will be used as primary.
+                        </p>
+                      </div>
+                      <label className='inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-violet-200 bg-white px-4 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50'>
+                        Upload Images
+                        <Input
+                          type='file'
+                          accept='image/*'
+                          multiple
+                          className='sr-only'
+                          onChange={(e) => void handleMenuGalleryUpload(e.target.files)}
+                        />
+                      </label>
+                    </div>
                   </div>
                   {uploadingField === 'menu_gallery' ? (
                     <p className='text-xs text-slate-500'>Uploading gallery images...</p>
@@ -1194,28 +1632,30 @@ export default function FoodHubPage() {
                           For the product detail page and gallery thumbnails.
                         </p>
                       </div>
-                      <Badge variant='secondary'>{menuForm.gallery_images.length} images</Badge>
+                      <Badge variant='secondary'>
+                        {menuForm.gallery_images.length}/{MAX_MENU_IMAGES} images
+                      </Badge>
                     </div>
                     {menuForm.gallery_images.length > 0 ? (
-                      <div className='mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3'>
+                      <div className='mt-3 flex flex-wrap gap-3'>
                         {menuForm.gallery_images.map((image, index) => (
                           <div
                             key={`${image}-${index}`}
-                            className='overflow-hidden rounded-lg border border-slate-200 bg-white'
+                            className='w-[132px] overflow-hidden rounded-lg border border-slate-200 bg-white'
                           >
-                            <div className='aspect-square overflow-hidden bg-slate-100'>
+                            <div className='h-24 w-full overflow-hidden bg-slate-100'>
                               <img
                                 src={image}
                                 alt={`Gallery ${index + 1}`}
                                 className='h-full w-full object-cover'
                               />
                             </div>
-                            <div className='space-y-2 p-2'>
+                            <div className='space-y-1.5 p-2'>
                               <Button
                                 type='button'
                                 variant='outline'
                                 size='sm'
-                                className='w-full'
+                                className='h-8 w-full text-xs'
                                 onClick={() =>
                                   setMenuForm((current) => ({
                                     ...current,
@@ -1229,7 +1669,7 @@ export default function FoodHubPage() {
                                 type='button'
                                 variant='outline'
                                 size='sm'
-                                className='w-full'
+                                className='h-8 w-full text-xs'
                                 onClick={() =>
                                   setMenuForm((current) => {
                                     const nextGallery = current.gallery_images.filter(
@@ -1257,7 +1697,7 @@ export default function FoodHubPage() {
                   </div>
                 </div>
                 <div className='space-y-2'>
-                  <FieldLabel label='Food type' helper='Select whether this item is veg or non-veg.' />
+                  <MainFieldLabel label='Food type' helper='Select whether this food item is vegetarian or non-vegetarian.' />
                   <select
                     className='h-10 w-full rounded-md border border-input bg-background px-3 text-sm'
                     value={menuForm.food_type}
@@ -1268,30 +1708,20 @@ export default function FoodHubPage() {
                   </select>
                 </div>
                 <div className='space-y-2'>
-                  <FieldLabel label='Item description' helper='Add taste, ingredients, serving size, or short details.' />
+                  <MainFieldLabel label='Item description' helper='Add taste, ingredients, serving size, spice level, or other useful details.' />
                   <Textarea className='min-h-[88px]' placeholder='Example: Crispy veg patty with cheese, lettuce, mayo, and fresh bun.' value={menuForm.description} onChange={(e) => setMenuForm((c) => ({ ...c, description: e.target.value }))} />
                 </div>
-                {offerForm.offer_type === 'combo_price' ? (
                 <div className='space-y-3 rounded-lg border border-slate-200 p-4'>
-                  <div className='flex items-center justify-between gap-3'>
+                  <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
                     <div>
-                      <p className='text-sm font-medium text-slate-700'>Addons</p>
+                      <div className='flex items-center gap-2'>
+                        <p className='text-sm font-medium text-slate-700'>Addons</p>
+                        <InfoHint text='Add optional extras customers can choose with this food item, such as Extra Cheese or Cold Drink.' />
+                      </div>
                       <p className='text-xs text-slate-500'>
                         Example: Extra Cheese, Fries, Cold Drink
                       </p>
                     </div>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      onClick={() =>
-                        setMenuForm((current) => ({
-                          ...current,
-                          addons: [...current.addons, createEmptyAddon()],
-                        }))
-                      }
-                    >
-                      Add Addon
-                    </Button>
                   </div>
                   {menuForm.addons.map((addon, index) => (
                     <div
@@ -1322,9 +1752,10 @@ export default function FoodHubPage() {
                       </div>
                       <div className='grid gap-3 md:grid-cols-2'>
                         <div className='space-y-1'>
-                          <p className='text-xs font-medium uppercase tracking-wide text-slate-500'>
-                            Addon name
-                          </p>
+                          <FieldLabel
+                            label='Addon name'
+                            helper='Extra item customers can add with this food item, such as Extra Cheese.'
+                          />
                           <Input
                             placeholder='Example: Extra Cheese'
                             value={addon.name}
@@ -1333,9 +1764,10 @@ export default function FoodHubPage() {
                           />
                         </div>
                         <div className='space-y-1'>
-                          <p className='text-xs font-medium uppercase tracking-wide text-slate-500'>
-                            Price
-                          </p>
+                          <FieldLabel
+                            label='Price'
+                            helper='Addon price. Use 0 when this addon should be free.'
+                          />
                           <Input
                             type='number'
                             placeholder='Addon price, e.g. 30'
@@ -1348,9 +1780,10 @@ export default function FoodHubPage() {
                         </div>
                       </div>
                       <div className='space-y-1 md:max-w-[220px]'>
-                        <p className='text-xs font-medium uppercase tracking-wide text-slate-500'>
-                          Free addon?
-                        </p>
+                        <FieldLabel
+                          label='Free addon?'
+                          helper='Turn this on if customers should get this addon without extra charge.'
+                        />
                         <div className='flex min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2'>
                           <Switch
                             checked={addon.is_free}
@@ -1363,28 +1796,27 @@ export default function FoodHubPage() {
                       </div>
                     </div>
                   ))}
+                  <div className='flex justify-end border-t border-slate-200 pt-3'>
+                    <Button
+                      type='button'
+                      onClick={addMenuAddon}
+                      className='bg-violet-700 text-white hover:bg-violet-800'
+                    >
+                      Add Addon
+                    </Button>
+                  </div>
                 </div>
-                ) : null}
                 <div className='space-y-3 rounded-lg border border-slate-200 p-4'>
                   <div className='flex items-center justify-between gap-3'>
                     <div>
-                      <p className='text-sm font-medium text-slate-700'>Variants</p>
+                      <div className='flex items-center gap-2'>
+                        <p className='text-sm font-medium text-slate-700'>Variants</p>
+                        <InfoHint text='Add size or portion options for this item. The first variant will be selected by default.' />
+                      </div>
                       <p className='text-xs text-slate-500'>
-                        Example: Regular, Medium, Large
+                        Example: Regular, Medium, Large. The first variant will be selected by default.
                       </p>
                     </div>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      onClick={() =>
-                        setMenuForm((current) => ({
-                          ...current,
-                          variants: [...current.variants, createEmptyVariant()],
-                        }))
-                      }
-                    >
-                      Add Variant
-                    </Button>
                   </div>
                   {menuForm.variants.map((variant, index) => (
                     <div
@@ -1404,7 +1836,8 @@ export default function FoodHubPage() {
                           type='button'
                           variant='outline'
                           className='shrink-0 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700'
-                          onClick={() =>
+                          onClick={() => {
+                            setCustomVariantIndexes(new Set())
                             setMenuForm((current) => ({
                               ...current,
                               variants:
@@ -1412,27 +1845,86 @@ export default function FoodHubPage() {
                                   ? [createEmptyVariant()]
                                   : current.variants.filter((_, itemIndex) => itemIndex !== index),
                             }))
-                          }
+                          }}
                         >
                           Remove
                         </Button>
                       </div>
                       <div className='grid gap-3 md:grid-cols-3'>
                         <div className='space-y-1'>
-                          <p className='text-xs font-medium text-slate-500'>
-                            Variant name
-                          </p>
-                          <Input
-                            placeholder='Example: Regular'
-                            value={variant.name}
-                            onChange={(e) => updateVariant(index, 'name', e.target.value)}
-                            className='min-w-0 bg-white'
+                          <FieldLabel
+                            label='Variant name'
+                            helper='Select a size or portion option, such as Regular, Half Plate, or Full Plate.'
                           />
+                          {(() => {
+                            const variantName = String(variant.name || '').trim()
+                            const isCustomVariant =
+                              customVariantIndexes.has(index) ||
+                              Boolean(variantName && !variantNameOptions.includes(variantName))
+
+                            return (
+                              <>
+                                <Select
+                                  value={
+                                    !isCustomVariant && variantNameOptions.includes(variantName)
+                                      ? variantName
+                                      : ''
+                                  }
+                                  onValueChange={(value) => {
+                                    setCustomVariantIndexes((current) => {
+                                      const next = new Set(current)
+                                      next.delete(index)
+                                      return next
+                                    })
+                                    updateVariant(index, 'name', value)
+                                  }}
+                                >
+                                  <SelectTrigger className='h-10 w-full bg-white text-sm text-slate-900'>
+                                    <SelectValue placeholder='Select variant' />
+                                  </SelectTrigger>
+                                  <SelectContent
+                                    className='max-h-56 overflow-y-auto'
+                                    position='popper'
+                                  >
+                                    {variantNameOptions.map((name) => (
+                                      <SelectItem key={name} value={name}>
+                                        {name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <button
+                                  type='button'
+                                  className='w-fit text-xs font-semibold text-violet-700 underline underline-offset-4 hover:text-violet-900'
+                                  onClick={() => {
+                                    setCustomVariantIndexes((current) => {
+                                      const next = new Set(current)
+                                      next.add(index)
+                                      return next
+                                    })
+                                    updateVariant(index, 'name', '')
+                                  }}
+                                >
+                                  Create new variant
+                                </button>
+                                {isCustomVariant ? (
+                                  <Input
+                                    autoFocus
+                                    placeholder='Type custom variant, e.g. Family Pack'
+                                    value={variant.name}
+                                    onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                                    className='min-w-0 bg-white'
+                                  />
+                                ) : null}
+                              </>
+                            )
+                          })()}
                         </div>
                         <div className='space-y-1'>
-                          <p className='text-xs font-medium text-slate-500'>
-                            Price
-                          </p>
+                          <FieldLabel
+                            label='Price'
+                            helper='Selling price for this variant option.'
+                          />
                           <Input
                             type='number'
                             placeholder='Variant price, e.g. 129'
@@ -1444,9 +1936,10 @@ export default function FoodHubPage() {
                           />
                         </div>
                         <div className='space-y-1'>
-                          <p className='text-xs font-medium text-slate-500'>
-                            Offer price
-                          </p>
+                          <FieldLabel
+                            label='Offer price'
+                            helper='Discounted price for this variant. Use 0 if there is no offer.'
+                          />
                           <Input
                             type='number'
                             placeholder='Offer price, e.g. 99'
@@ -1458,28 +1951,8 @@ export default function FoodHubPage() {
                           />
                         </div>
                       </div>
-                      <div className='grid gap-3 md:grid-cols-2'>
-                        <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
-                          <div className='flex items-center justify-between gap-3'>
-                            <div>
-                              <p className='text-sm font-medium text-slate-900'>Default variant</p>
-                              <p className='text-xs text-slate-500'>Selected by default for customers.</p>
-                            </div>
-                            <Switch
-                              checked={variant.is_default}
-                              onCheckedChange={(checked) =>
-                                setMenuForm((current) => ({
-                                  ...current,
-                                  variants: current.variants.map((item, itemIndex) => ({
-                                    ...item,
-                                    is_default: itemIndex === index ? checked : false,
-                                  })),
-                                }))
-                              }
-                            />
-                          </div>
-                        </div>
-                        <div className='rounded-xl border border-slate-200 bg-slate-50 p-3'>
+                      <div className='grid gap-3 sm:grid-cols-2'>
+                        <div className='rounded-xl border border-slate-200 bg-slate-50 p-3 sm:max-w-[420px]'>
                           <div className='flex items-center justify-between gap-3'>
                             <div>
                               <p className='text-sm font-medium text-slate-900'>Available</p>
@@ -1496,6 +1969,15 @@ export default function FoodHubPage() {
                       </div>
                     </div>
                   ))}
+                  <div className='flex justify-end border-t border-slate-200 pt-3'>
+                    <Button
+                      type='button'
+                      onClick={addMenuVariant}
+                      className='bg-violet-700 text-white hover:bg-violet-800'
+                    >
+                      Add Variant
+                    </Button>
+                  </div>
                 </div>
                 <div className='flex items-center gap-3'>
                   <Switch checked={menuForm.is_available} onCheckedChange={(checked) => setMenuForm((c) => ({ ...c, is_available: checked }))} />
@@ -1507,6 +1989,7 @@ export default function FoodHubPage() {
                 </div>
               </CardContent>
             </Card>
+            </div>
             ) : null}
             {activeSection === 'all-items' ? (
             <Card>
@@ -1527,11 +2010,39 @@ export default function FoodHubPage() {
                           </div>
                         </TableCell>
                         <TableCell>{money(item.offer_price || item.price)}</TableCell>
-                        <TableCell><Badge variant='outline'>{item.is_available ? 'available' : 'unavailable'}</Badge></TableCell>
+                        <TableCell>
+                          <div className='inline-flex rounded-md border border-slate-200 bg-slate-50 p-1'>
+                            {[
+                              { label: 'In stock', value: true },
+                              { label: 'Out stock', value: false },
+                            ].map((status) => {
+                              const active = (item.is_available !== false) === status.value
+                              const disabled = updatingAvailabilityId === item._id
+
+                              return (
+                                <button
+                                  key={status.label}
+                                  type='button'
+                                  disabled={disabled || active}
+                                  onClick={() => void updateMenuItemAvailability(item, status.value)}
+                                  className={`rounded px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed ${
+                                    active
+                                      ? status.value
+                                        ? 'bg-emerald-600 text-white'
+                                        : 'bg-rose-600 text-white'
+                                      : 'text-slate-600 hover:bg-white'
+                                  }`}
+                                >
+                                  {disabled && !active ? '...' : status.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </TableCell>
                         <TableCell className='text-right'>
                           <div className='flex justify-end gap-2'>
                             <Button variant='outline' onClick={() => previewMenuItem(item)}>Preview</Button>
-                            <Button variant='outline' onClick={() => setMenuForm({ id: item._id, item_name: item.item_name, category: item.category, price: String(item.price || 0), offer_price: String(item.offer_price || 0), description: item.description || '', image_url: item.image_url || '', gallery_images: item.gallery_images?.length ? item.gallery_images : item.image_url ? [item.image_url] : [], food_type: item.food_type || 'veg', is_available: item.is_available !== false, prep_time_minutes: String(item.prep_time_minutes || 20), addons: item.addons?.length ? item.addons : [createEmptyAddon()], variants: item.variants?.length ? item.variants : [createEmptyVariant()] })}>Edit</Button>
+                            <Button variant='outline' onClick={() => startEditMenuItem(item)}>Edit</Button>
                             <Button variant='outline' onClick={() => removeMenuItem(item._id)}>Delete</Button>
                           </div>
                         </TableCell>
@@ -1555,7 +2066,7 @@ export default function FoodHubPage() {
               <CardHeader><CardTitle>Combo / Offer Form</CardTitle></CardHeader>
               <CardContent className='space-y-3'>
                 <div className='space-y-2'>
-                  <FieldLabel label='Offer title' helper='This name appears in the deals/combo section.' />
+                  <MainFieldLabel label='Offer title' helper='This name appears in the deals/combo section and helps customers understand the combo quickly.' />
                   <Input placeholder='Example: Coke + Crispy Veg Burger' value={offerForm.offer_title} onChange={(e) => setOfferForm((c) => ({ ...c, offer_title: e.target.value }))} />
                   {offerForm.offer_type === 'combo_price' && comboAutoTitle ? (
                     <Button
@@ -1569,7 +2080,7 @@ export default function FoodHubPage() {
                   ) : null}
                 </div>
                 <div className='space-y-2'>
-                  <FieldLabel label='Offer type' helper='Select how the discount should be applied.' />
+                  <MainFieldLabel label='Offer type' helper='Choose whether this is a combo price, coupon, flat discount, percentage discount, or free item offer.' />
                   <select
                     className='h-10 w-full rounded-md border border-input bg-background px-3 text-sm'
                     value={offerForm.offer_type}
@@ -1583,31 +2094,6 @@ export default function FoodHubPage() {
                     <option value='coupon'>Coupon</option>
                   </select>
                 </div>
-                {offerForm.offer_type === 'combo_price' ? (
-                  <div className='space-y-2'>
-                    <FieldLabel label='Final combo price' helper='Combo me selected items ka final selling price.' />
-                    <Input
-                      type='number'
-                      placeholder='Example: 249'
-                      value={emptyWhenZero(offerForm.combo_price)}
-                      onChange={(e) => setOfferForm((c) => ({ ...c, combo_price: e.target.value }))}
-                    />
-                    <div className='grid grid-cols-3 gap-2'>
-                      <div className='rounded-lg border border-slate-200 bg-slate-50 px-3 py-2'>
-                        <p className='text-[11px] font-semibold uppercase text-slate-500'>Worth</p>
-                        <p className='text-sm font-bold text-slate-900'>{money(comboWorth)}</p>
-                      </div>
-                      <div className='rounded-lg border border-slate-200 bg-slate-50 px-3 py-2'>
-                        <p className='text-[11px] font-semibold uppercase text-slate-500'>Combo</p>
-                        <p className='text-sm font-bold text-slate-900'>{money(comboPrice)}</p>
-                      </div>
-                      <div className='rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2'>
-                        <p className='text-[11px] font-semibold uppercase text-emerald-700'>Save</p>
-                        <p className='text-sm font-bold text-emerald-700'>{money(comboSavings)}</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
                 {offerForm.offer_type === 'percentage_discount' ? (
                   <div className='space-y-2'>
                     <FieldLabel label='Discount percentage' helper='Percentage discount customers will receive.' />
@@ -1636,25 +2122,20 @@ export default function FoodHubPage() {
                     <Input placeholder='Example: Coke Can' value={offerForm.free_item_name} onChange={(e) => setOfferForm((c) => ({ ...c, free_item_name: e.target.value }))} />
                   </div>
                 ) : null}
-                <div className='grid grid-cols-2 gap-3'>
-                  <div className='space-y-2'>
-                    <FieldLabel label='Offer start date' helper='Is date se offer active maana jayega.' />
-                    <Input type='date' value={offerForm.start_date} onChange={(e) => setOfferForm((c) => ({ ...c, start_date: e.target.value }))} />
-                  </div>
-                  <div className='space-y-2'>
-                    <FieldLabel label='Offer end date' helper='Is date ke baad offer expire ho jayega.' />
-                    <Input type='date' value={offerForm.end_date} onChange={(e) => setOfferForm((c) => ({ ...c, end_date: e.target.value }))} />
-                  </div>
-                </div>
+                {offerForm.offer_type === 'combo_price' ? (
                 <div className='space-y-3 rounded-lg border border-slate-200 p-4'>
                   <div className='flex items-center justify-between gap-3'>
                     <div>
-                      <p className='text-sm font-medium text-slate-700'>Combo builder</p>
+                      <div className='flex items-center gap-2'>
+                        <p className='text-sm font-medium text-slate-700'>Combo builder</p>
+                        <InfoHint text='Select the food items included in this combo and set quantity for each item.' />
+                      </div>
                       <p className='text-xs text-slate-500'>Select items from the dropdown, add quantity, then set the final combo price.</p>
                     </div>
                     <Button
                       type='button'
                       variant='outline'
+                      className='w-full sm:w-auto'
                       onClick={() =>
                         setOfferForm((current) => ({
                           ...current,
@@ -1777,9 +2258,50 @@ export default function FoodHubPage() {
                     })}
                   </div>
                 </div>
+                ) : null}
+                {offerForm.offer_type === 'combo_price' ? (
+                  <>
+                    <div className='space-y-2'>
+                      <MainFieldLabel label='Final combo price' helper='Set the final selling price customers will pay for all selected combo items together.' />
+                      <Input
+                        type='number'
+                        placeholder='Example: 249'
+                        value={emptyWhenZero(offerForm.combo_price)}
+                        onChange={(e) => setOfferForm((c) => ({ ...c, combo_price: e.target.value }))}
+                      />
+                    </div>
+                    <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
+                      <div className='rounded-lg border border-slate-200 bg-slate-50 px-3 py-3'>
+                        <p className='text-[11px] font-semibold uppercase text-slate-500'>Worth</p>
+                        <p className='text-base font-bold text-slate-900'>{money(comboWorth)}</p>
+                      </div>
+                      <div className='rounded-lg border border-slate-200 bg-slate-50 px-3 py-3'>
+                        <p className='text-[11px] font-semibold uppercase text-slate-500'>Combo</p>
+                        <p className='text-base font-bold text-slate-900'>{money(comboPrice)}</p>
+                      </div>
+                      <div className='rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3'>
+                        <p className='text-[11px] font-semibold uppercase text-emerald-700'>Save</p>
+                        <p className='text-base font-bold text-emerald-700'>{money(comboSavings)}</p>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+                <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+                  <div className='space-y-2'>
+                    <MainFieldLabel label='Offer start date' helper='The offer can start showing to customers from this date.' />
+                    <Input type='date' value={offerForm.start_date} onChange={(e) => setOfferForm((c) => ({ ...c, start_date: e.target.value }))} />
+                  </div>
+                  <div className='space-y-2'>
+                    <MainFieldLabel label='Offer end date' helper='The offer will stop after this date. Leave clear dates so vendors can manage campaigns easily.' />
+                    <Input type='date' value={offerForm.end_date} onChange={(e) => setOfferForm((c) => ({ ...c, end_date: e.target.value }))} />
+                  </div>
+                </div>
                 <div className='flex items-center gap-3'>
                   <Switch checked={offerForm.is_active} onCheckedChange={(checked) => setOfferForm((c) => ({ ...c, is_active: checked }))} />
-                  <span className='text-sm text-slate-700'>Offer active</span>
+                  <span className='inline-flex items-center gap-2 text-sm text-slate-700'>
+                    Offer active
+                    <InfoHint text='Turn this on to show the offer on the storefront. Turn it off to save it without showing it to customers.' />
+                  </span>
                 </div>
                 <div className='flex gap-2'>
                   <Button onClick={saveOffer} disabled={savingOffer}>{savingOffer ? 'Saving...' : offerForm.id ? 'Update Offer' : 'Create Offer'}</Button>
@@ -1799,7 +2321,35 @@ export default function FoodHubPage() {
                       <TableRow key={offer._id}>
                         <TableCell><div><p className='font-medium'>{offer.offer_title}</p><p className='text-xs text-slate-500'>{offer.offer_type}</p></div></TableCell>
                         <TableCell>{offer.combo_price ? money(offer.combo_price) : offer.discount_percent ? `${offer.discount_percent}%` : offer.flat_discount ? money(offer.flat_discount) : offer.free_item_name || '-'}</TableCell>
-                        <TableCell><Badge variant='outline'>{offer.is_active ? 'active' : 'inactive'}</Badge></TableCell>
+                        <TableCell>
+                          <div className='inline-flex rounded-md border border-slate-200 bg-slate-50 p-1'>
+                            {[
+                              { label: 'Active', value: true },
+                              { label: 'Inactive', value: false },
+                            ].map((status) => {
+                              const active = (offer.is_active !== false) === status.value
+                              const disabled = updatingOfferStatusId === offer._id
+
+                              return (
+                                <button
+                                  key={status.label}
+                                  type='button'
+                                  disabled={disabled || active}
+                                  onClick={() => void updateOfferStatus(offer, status.value)}
+                                  className={`rounded px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed ${
+                                    active
+                                      ? status.value
+                                        ? 'bg-emerald-600 text-white'
+                                        : 'bg-rose-600 text-white'
+                                      : 'text-slate-600 hover:bg-white'
+                                  }`}
+                                >
+                                  {disabled && !active ? '...' : status.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </TableCell>
                         <TableCell className='text-right'>
                           <div className='flex justify-end gap-2'>
                             <Button variant='outline' onClick={() => void previewFoodOffers()}>Preview</Button>

@@ -84,6 +84,15 @@ import { Route as AuthenticatedSeoEntitiesRouteImport } from './routes/_authenti
 import { Route as AuthenticatedMetaPixelConnectRouteImport } from './routes/_authenticated/meta-pixel/connect'
 import { Route as AuthenticatedMetaPixelAnalyticsRouteImport } from './routes/_authenticated/meta-pixel/analytics'
 import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
+import { Route as AuthenticatedFoodTableReservationsRouteImport } from './routes/_authenticated/food/table-reservations'
+import { Route as AuthenticatedFoodStoreAdminRouteImport } from './routes/_authenticated/food/store-admin'
+import { Route as AuthenticatedFoodReportsRouteImport } from './routes/_authenticated/food/reports'
+import { Route as AuthenticatedFoodPosRouteImport } from './routes/_authenticated/food/pos'
+import { Route as AuthenticatedFoodPendingOrdersRouteImport } from './routes/_authenticated/food/pending-orders'
+import { Route as AuthenticatedFoodOnlineOrdersRouteImport } from './routes/_authenticated/food/online-orders'
+import { Route as AuthenticatedFoodInventoryRouteImport } from './routes/_authenticated/food/inventory'
+import { Route as AuthenticatedFoodDashboardRouteImport } from './routes/_authenticated/food/dashboard'
+import { Route as AuthenticatedFoodBillStatusRouteImport } from './routes/_authenticated/food/bill-status'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedCourierWarehousesRouteImport } from './routes/_authenticated/courier/warehouses'
 import { Route as AuthenticatedCourierTrackingRouteImport } from './routes/_authenticated/courier/tracking'
@@ -523,6 +532,59 @@ const AuthenticatedIntegrationsProviderRoute =
     path: '/integrations/$provider',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFoodTableReservationsRoute =
+  AuthenticatedFoodTableReservationsRouteImport.update({
+    id: '/food/table-reservations',
+    path: '/food/table-reservations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodStoreAdminRoute =
+  AuthenticatedFoodStoreAdminRouteImport.update({
+    id: '/food/store-admin',
+    path: '/food/store-admin',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodReportsRoute =
+  AuthenticatedFoodReportsRouteImport.update({
+    id: '/food/reports',
+    path: '/food/reports',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodPosRoute = AuthenticatedFoodPosRouteImport.update({
+  id: '/food/pos',
+  path: '/food/pos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedFoodPendingOrdersRoute =
+  AuthenticatedFoodPendingOrdersRouteImport.update({
+    id: '/food/pending-orders',
+    path: '/food/pending-orders',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodOnlineOrdersRoute =
+  AuthenticatedFoodOnlineOrdersRouteImport.update({
+    id: '/food/online-orders',
+    path: '/food/online-orders',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodInventoryRoute =
+  AuthenticatedFoodInventoryRouteImport.update({
+    id: '/food/inventory',
+    path: '/food/inventory',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodDashboardRoute =
+  AuthenticatedFoodDashboardRouteImport.update({
+    id: '/food/dashboard',
+    path: '/food/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodBillStatusRoute =
+  AuthenticatedFoodBillStatusRouteImport.update({
+    id: '/food/bill-status',
+    path: '/food/bill-status',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedErrorsErrorRoute =
   AuthenticatedErrorsErrorRouteImport.update({
     id: '/errors/$error',
@@ -643,6 +705,15 @@ export interface FileRoutesByFullPath {
   '/courier/tracking': typeof AuthenticatedCourierTrackingRoute
   '/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/food/bill-status': typeof AuthenticatedFoodBillStatusRoute
+  '/food/dashboard': typeof AuthenticatedFoodDashboardRoute
+  '/food/inventory': typeof AuthenticatedFoodInventoryRoute
+  '/food/online-orders': typeof AuthenticatedFoodOnlineOrdersRoute
+  '/food/pending-orders': typeof AuthenticatedFoodPendingOrdersRoute
+  '/food/pos': typeof AuthenticatedFoodPosRoute
+  '/food/reports': typeof AuthenticatedFoodReportsRoute
+  '/food/store-admin': typeof AuthenticatedFoodStoreAdminRoute
+  '/food/table-reservations': typeof AuthenticatedFoodTableReservationsRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
   '/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
@@ -730,6 +801,15 @@ export interface FileRoutesByTo {
   '/courier/tracking': typeof AuthenticatedCourierTrackingRoute
   '/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/food/bill-status': typeof AuthenticatedFoodBillStatusRoute
+  '/food/dashboard': typeof AuthenticatedFoodDashboardRoute
+  '/food/inventory': typeof AuthenticatedFoodInventoryRoute
+  '/food/online-orders': typeof AuthenticatedFoodOnlineOrdersRoute
+  '/food/pending-orders': typeof AuthenticatedFoodPendingOrdersRoute
+  '/food/pos': typeof AuthenticatedFoodPosRoute
+  '/food/reports': typeof AuthenticatedFoodReportsRoute
+  '/food/store-admin': typeof AuthenticatedFoodStoreAdminRoute
+  '/food/table-reservations': typeof AuthenticatedFoodTableReservationsRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
   '/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
@@ -823,6 +903,15 @@ export interface FileRoutesById {
   '/_authenticated/courier/tracking': typeof AuthenticatedCourierTrackingRoute
   '/_authenticated/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/_authenticated/food/bill-status': typeof AuthenticatedFoodBillStatusRoute
+  '/_authenticated/food/dashboard': typeof AuthenticatedFoodDashboardRoute
+  '/_authenticated/food/inventory': typeof AuthenticatedFoodInventoryRoute
+  '/_authenticated/food/online-orders': typeof AuthenticatedFoodOnlineOrdersRoute
+  '/_authenticated/food/pending-orders': typeof AuthenticatedFoodPendingOrdersRoute
+  '/_authenticated/food/pos': typeof AuthenticatedFoodPosRoute
+  '/_authenticated/food/reports': typeof AuthenticatedFoodReportsRoute
+  '/_authenticated/food/store-admin': typeof AuthenticatedFoodStoreAdminRoute
+  '/_authenticated/food/table-reservations': typeof AuthenticatedFoodTableReservationsRoute
   '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/_authenticated/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
   '/_authenticated/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
@@ -914,6 +1003,15 @@ export interface FileRouteTypes {
     | '/courier/tracking'
     | '/courier/warehouses'
     | '/errors/$error'
+    | '/food/bill-status'
+    | '/food/dashboard'
+    | '/food/inventory'
+    | '/food/online-orders'
+    | '/food/pending-orders'
+    | '/food/pos'
+    | '/food/reports'
+    | '/food/store-admin'
+    | '/food/table-reservations'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
     | '/meta-pixel/connect'
@@ -1001,6 +1099,15 @@ export interface FileRouteTypes {
     | '/courier/tracking'
     | '/courier/warehouses'
     | '/errors/$error'
+    | '/food/bill-status'
+    | '/food/dashboard'
+    | '/food/inventory'
+    | '/food/online-orders'
+    | '/food/pending-orders'
+    | '/food/pos'
+    | '/food/reports'
+    | '/food/store-admin'
+    | '/food/table-reservations'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
     | '/meta-pixel/connect'
@@ -1093,6 +1200,15 @@ export interface FileRouteTypes {
     | '/_authenticated/courier/tracking'
     | '/_authenticated/courier/warehouses'
     | '/_authenticated/errors/$error'
+    | '/_authenticated/food/bill-status'
+    | '/_authenticated/food/dashboard'
+    | '/_authenticated/food/inventory'
+    | '/_authenticated/food/online-orders'
+    | '/_authenticated/food/pending-orders'
+    | '/_authenticated/food/pos'
+    | '/_authenticated/food/reports'
+    | '/_authenticated/food/store-admin'
+    | '/_authenticated/food/table-reservations'
     | '/_authenticated/integrations/$provider'
     | '/_authenticated/meta-pixel/analytics'
     | '/_authenticated/meta-pixel/connect'
@@ -1697,6 +1813,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIntegrationsProviderRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/food/table-reservations': {
+      id: '/_authenticated/food/table-reservations'
+      path: '/food/table-reservations'
+      fullPath: '/food/table-reservations'
+      preLoaderRoute: typeof AuthenticatedFoodTableReservationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/store-admin': {
+      id: '/_authenticated/food/store-admin'
+      path: '/food/store-admin'
+      fullPath: '/food/store-admin'
+      preLoaderRoute: typeof AuthenticatedFoodStoreAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/reports': {
+      id: '/_authenticated/food/reports'
+      path: '/food/reports'
+      fullPath: '/food/reports'
+      preLoaderRoute: typeof AuthenticatedFoodReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/pos': {
+      id: '/_authenticated/food/pos'
+      path: '/food/pos'
+      fullPath: '/food/pos'
+      preLoaderRoute: typeof AuthenticatedFoodPosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/pending-orders': {
+      id: '/_authenticated/food/pending-orders'
+      path: '/food/pending-orders'
+      fullPath: '/food/pending-orders'
+      preLoaderRoute: typeof AuthenticatedFoodPendingOrdersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/online-orders': {
+      id: '/_authenticated/food/online-orders'
+      path: '/food/online-orders'
+      fullPath: '/food/online-orders'
+      preLoaderRoute: typeof AuthenticatedFoodOnlineOrdersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/inventory': {
+      id: '/_authenticated/food/inventory'
+      path: '/food/inventory'
+      fullPath: '/food/inventory'
+      preLoaderRoute: typeof AuthenticatedFoodInventoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/dashboard': {
+      id: '/_authenticated/food/dashboard'
+      path: '/food/dashboard'
+      fullPath: '/food/dashboard'
+      preLoaderRoute: typeof AuthenticatedFoodDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/bill-status': {
+      id: '/_authenticated/food/bill-status'
+      path: '/food/bill-status'
+      fullPath: '/food/bill-status'
+      preLoaderRoute: typeof AuthenticatedFoodBillStatusRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/errors/$error': {
       id: '/_authenticated/errors/$error'
       path: '/errors/$error'
@@ -1859,6 +2038,15 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCourierTrackingRoute: typeof AuthenticatedCourierTrackingRoute
   AuthenticatedCourierWarehousesRoute: typeof AuthenticatedCourierWarehousesRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedFoodBillStatusRoute: typeof AuthenticatedFoodBillStatusRoute
+  AuthenticatedFoodDashboardRoute: typeof AuthenticatedFoodDashboardRoute
+  AuthenticatedFoodInventoryRoute: typeof AuthenticatedFoodInventoryRoute
+  AuthenticatedFoodOnlineOrdersRoute: typeof AuthenticatedFoodOnlineOrdersRoute
+  AuthenticatedFoodPendingOrdersRoute: typeof AuthenticatedFoodPendingOrdersRoute
+  AuthenticatedFoodPosRoute: typeof AuthenticatedFoodPosRoute
+  AuthenticatedFoodReportsRoute: typeof AuthenticatedFoodReportsRoute
+  AuthenticatedFoodStoreAdminRoute: typeof AuthenticatedFoodStoreAdminRoute
+  AuthenticatedFoodTableReservationsRoute: typeof AuthenticatedFoodTableReservationsRoute
   AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
   AuthenticatedSeoEntitiesRoute: typeof AuthenticatedSeoEntitiesRoute
   AuthenticatedSeoMetaTagsRoute: typeof AuthenticatedSeoMetaTagsRoute
@@ -1927,6 +2115,16 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCourierTrackingRoute: AuthenticatedCourierTrackingRoute,
   AuthenticatedCourierWarehousesRoute: AuthenticatedCourierWarehousesRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedFoodBillStatusRoute: AuthenticatedFoodBillStatusRoute,
+  AuthenticatedFoodDashboardRoute: AuthenticatedFoodDashboardRoute,
+  AuthenticatedFoodInventoryRoute: AuthenticatedFoodInventoryRoute,
+  AuthenticatedFoodOnlineOrdersRoute: AuthenticatedFoodOnlineOrdersRoute,
+  AuthenticatedFoodPendingOrdersRoute: AuthenticatedFoodPendingOrdersRoute,
+  AuthenticatedFoodPosRoute: AuthenticatedFoodPosRoute,
+  AuthenticatedFoodReportsRoute: AuthenticatedFoodReportsRoute,
+  AuthenticatedFoodStoreAdminRoute: AuthenticatedFoodStoreAdminRoute,
+  AuthenticatedFoodTableReservationsRoute:
+    AuthenticatedFoodTableReservationsRoute,
   AuthenticatedIntegrationsProviderRoute:
     AuthenticatedIntegrationsProviderRoute,
   AuthenticatedSeoEntitiesRoute: AuthenticatedSeoEntitiesRoute,

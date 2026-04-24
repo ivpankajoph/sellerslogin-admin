@@ -78,7 +78,34 @@ const prefersTextarea = (path: string[], value: unknown) => {
     'paragraph',
     'text',
     'address',
-  ].some((token) => joined.includes(token))
+    ].some((token) => joined.includes(token))
+}
+
+const fieldHelp: Record<string, { label: string; help: string }> = {
+  'components.logo': {
+    label: 'Website logo',
+    help: 'Appears in the header and footer where the template supports a logo.',
+  },
+  'components.home_page.backgroundImage': {
+    label: 'Home page banner image',
+    help: 'The large image behind the first headline on the home page.',
+  },
+  'components.home_page.header.navMenuLabel': {
+    label: 'Products menu text',
+    help: 'Changes the menu link that opens all products.',
+  },
+  'components.home_page.header.navComboLabel': {
+    label: 'Combo menu text',
+    help: 'Changes the menu link that opens combo offers.',
+  },
+  'components.home_page.header_text': {
+    label: 'Main banner headline',
+    help: 'The largest text visitors see first on the home page.',
+  },
+  'components.home_page.header_text_small': {
+    label: 'Main banner subtitle',
+    help: 'Short supporting line below the main headline.',
+  },
 }
 
 export function SelectedFieldEditor({
@@ -108,6 +135,7 @@ export function SelectedFieldEditor({
   const isColorField = looksLikeColorPath(path)
   const isNumericStyleField = looksLikeNumericStylePath(path)
   const useTextarea = prefersTextarea(path, rawValue)
+  const friendly = fieldHelp[normalizedComponent]
 
   return (
     <div className='rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm'>
@@ -115,8 +143,12 @@ export function SelectedFieldEditor({
         <p className='text-xs font-semibold uppercase tracking-[0.25em] text-slate-500'>
           Quick Editor
         </p>
-        <h3 className='text-lg font-semibold text-slate-900'>{label || 'Selected field'}</h3>
-        <p className='mt-1 text-xs text-slate-600'>{normalizedComponent}</p>
+        <h3 className='text-lg font-semibold text-slate-900'>
+          {friendly?.label || label || 'Selected field'}
+        </h3>
+        <p className='mt-1 text-xs text-slate-600'>
+          {friendly?.help || 'This field was selected from the live preview.'}
+        </p>
       </div>
 
       <div data-editor-component={normalizedComponent}>
