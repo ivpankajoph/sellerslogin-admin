@@ -388,6 +388,7 @@ function VendorTemplatePolicy() {
   const [, setInlineEditVersion] = useState(0)
   const [domainOpen, setDomainOpen] = useState(false)
   const [activePreviewPath, setActivePreviewPath] = useState('/privacy')
+  const [activeEditorArea, setActiveEditorArea] = useState('privacy')
   const selectedTemplateKey = useMemo(
     () => getStoredEditingTemplateKey(vendor_id),
     [vendor_id]
@@ -871,6 +872,14 @@ function VendorTemplatePolicy() {
     </>
   )
 
+  const editorAreas = [
+    ...POLICY_SECTIONS.map((section) => ({
+      label: section.heading,
+      value: section.key,
+    })),
+    { label: 'Theme colors & fonts', value: 'theme' },
+  ]
+
   return (
     <>
       <Header fixed>
@@ -925,16 +934,46 @@ function VendorTemplatePolicy() {
           />
         }
       >
+        <div className='rounded-[24px] border border-slate-200 bg-white p-5'>
+          <p className='text-xs font-semibold uppercase tracking-[0.22em] text-slate-500'>
+            Policy page editor
+          </p>
+          <h3 className='mt-1 text-[18px] font-semibold text-slate-950'>
+            Select what you want to edit
+          </h3>
+          <p className='mt-1 text-sm text-slate-500'>
+            Choose Privacy, Terms, Shipping policy, or appearance settings.
+          </p>
+          <select
+            className='mt-4 h-12 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-900/10'
+            value={activeEditorArea}
+            onChange={(event) => {
+              const nextValue = event.target.value
+              setActiveEditorArea(nextValue)
+              const matched = POLICY_SECTIONS.find((section) => section.key === nextValue)
+              if (matched) setActivePreviewPath(matched.defaultHref)
+            }}
+          >
+            {editorAreas.map((area) => (
+              <option key={area.value} value={area.value}>
+                {area.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <SelectedFieldEditor
           data={data}
           selectedComponent={selectedComponent}
           updateField={updateField}
         />
 
-        <ThemeSettingsSection data={data} updateField={updateField} />
+        {activeEditorArea === 'theme' ? (
+          <ThemeSettingsSection data={data} updateField={updateField} />
+        ) : null}
 
         <div className='space-y-6'>
-          {POLICY_SECTIONS.map((section) => {
+          {POLICY_SECTIONS.filter((section) => section.key === activeEditorArea).map((section) => {
             const pageRecord = getPolicyPageRecord(data, section.key)
             const textSection = Array.isArray(pageRecord?.sections)
               ? pageRecord.sections.find((item: any) => item?.type === 'text')

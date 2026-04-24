@@ -17,6 +17,7 @@ export function ImageInput({
   onChange,
   isFileInput = false,
   dimensions,
+  helperText,
 }: {
   label: string
   name: string
@@ -24,6 +25,7 @@ export function ImageInput({
   onChange: (file: File | null) => void
   isFileInput?: boolean
   dimensions?: string
+  helperText?: string
 }) {
   const [open, setOpen] = useState(false)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +48,7 @@ export function ImageInput({
           </Button>
         ) : null}
       </div>
+      {helperText ? <p className='text-xs text-slate-500'>{helperText}</p> : null}
       {isFileInput ? (
         <>
           <Input
@@ -55,11 +58,21 @@ export function ImageInput({
             onChange={handleFileChange}
           />
           {value && (
-            <img
-              src={value}
-              alt={label}
-              className='mt-2 max-h-32 rounded border object-contain'
-            />
+            <div className='mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3'>
+              <img
+                src={value}
+                alt={label}
+                className='max-h-40 w-full rounded-lg object-contain'
+              />
+              <Button
+                type='button'
+                variant='outline'
+                className='mt-3 h-9 border-slate-300 bg-white text-xs'
+                onClick={() => onChange(null)}
+              >
+                Remove image
+              </Button>
+            </div>
           )}
         </>
       ) : (

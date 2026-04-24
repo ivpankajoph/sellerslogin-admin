@@ -251,6 +251,7 @@ function VendorTemplateBlog() {
   const [uploadingBlogId, setUploadingBlogId] = useState<string | null>(null)
   const [testingCoverBlogId, setTestingCoverBlogId] = useState<string | null>(null)
   const [coverInputById, setCoverInputById] = useState<Record<string, string>>({})
+  const [activeEditorArea, setActiveEditorArea] = useState('posts')
   const selectedTemplateKey = useMemo(
     () => getStoredEditingTemplateKey(vendor_id),
     [vendor_id]
@@ -702,6 +703,12 @@ function VendorTemplateBlog() {
     </>
   )
 
+  const editorAreas = [
+    { label: 'Blog posts', value: 'posts' },
+    { label: 'Footer blog link', value: 'footer' },
+    { label: 'Theme colors & fonts', value: 'theme' },
+  ]
+
   return (
     <>
       <Header fixed>
@@ -754,14 +761,40 @@ function VendorTemplateBlog() {
           />
         }
       >
+        <div className='rounded-[24px] border border-slate-200 bg-white p-5'>
+          <p className='text-xs font-semibold uppercase tracking-[0.22em] text-slate-500'>
+            Blog page editor
+          </p>
+          <h3 className='mt-1 text-[18px] font-semibold text-slate-950'>
+            Select what you want to edit
+          </h3>
+          <p className='mt-1 text-sm text-slate-500'>
+            Manage blog posts, the footer blog link, or page appearance from one dropdown.
+          </p>
+          <select
+            className='mt-4 h-12 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-900/10'
+            value={activeEditorArea}
+            onChange={(event) => setActiveEditorArea(event.target.value)}
+          >
+            {editorAreas.map((area) => (
+              <option key={area.value} value={area.value}>
+                {area.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <SelectedFieldEditor
           data={data}
           selectedComponent={selectedComponent}
           updateField={updateField}
         />
 
-        <ThemeSettingsSection data={data} updateField={updateField} />
+        {activeEditorArea === 'theme' ? (
+          <ThemeSettingsSection data={data} updateField={updateField} />
+        ) : null}
 
+        {activeEditorArea === 'footer' ? (
         <div className='rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
           <div className='flex flex-col gap-2'>
             <h3 className='text-lg font-semibold text-slate-900'>Footer Blog Link</h3>
@@ -799,7 +832,9 @@ function VendorTemplateBlog() {
             </div>
           </div>
         </div>
+        ) : null}
 
+        {activeEditorArea === 'posts' ? (
         <div className='space-y-6'>
           <div className='flex items-center justify-between rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm'>
             <div>
@@ -1023,6 +1058,7 @@ function VendorTemplateBlog() {
             )
           })}
         </div>
+        ) : null}
       </TemplatePageLayout>
 
       <DomainModal

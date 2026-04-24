@@ -257,6 +257,38 @@
   outline: none;
 }
 
+.template-editor-sidebar {
+  --editor-field-border: #d8dce7;
+}
+
+.template-editor-sidebar * {
+  min-width: 0;
+  word-break: normal;
+}
+
+.template-editor-sidebar .grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.template-editor-sidebar input:not([type='checkbox']):not([type='radio']),
+.template-editor-sidebar textarea,
+.template-editor-sidebar select {
+  width: 100%;
+  min-width: 0;
+  border-color: var(--editor-field-border);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.template-editor-sidebar textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.template-editor-sidebar label {
+  line-height: 1.35;
+}
+
 .vendor-note-card {
   border: 1px solid #ede9fe;
   border-radius: 0;

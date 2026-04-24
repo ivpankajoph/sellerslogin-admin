@@ -27,6 +27,7 @@ export type TemplateData = {
       footerBackground?: string
       footerBottomBackground?: string
       footerAccentColor?: string
+      logoSize?: number
       fontScale: number
       headingFont: string
       bodyFont: string
@@ -46,6 +47,10 @@ export type TemplateData = {
         navComboLabel?: string
         navBlogLabel?: string
         navContactLabel?: string
+        showMenuLink?: boolean
+        showComboLink?: boolean
+        showBlogLink?: boolean
+        showContactLink?: boolean
       }
       hero_kicker?: string
       hero_detail?: string
@@ -85,7 +90,12 @@ export type TemplateData = {
         badgeColor?: string
         badgeSize?: number
         primaryButtonColor?: string
+        primaryButtonTextColor?: string
         secondaryButtonColor?: string
+        secondaryButtonTextColor?: string
+        backgroundColor?: string
+        bannerZoom?: number
+        bannerPosition?: number
         overlayColor?: string
         overlayAccentColor?: string
         overlayOpacity?: number
@@ -99,8 +109,11 @@ export type TemplateData = {
         titleSize?: number
         kickerColor?: string
         kickerSize?: number
+        backgroundColor?: string
+        buttonColor?: string
       }
       benefits?: {
+        backgroundColor?: string
         kicker?: string
         heading?: string
         subtitle?: string
@@ -110,6 +123,7 @@ export type TemplateData = {
         }>
       }
       advantage?: {
+        backgroundColor?: string
         kicker?: string
         heading?: string
         subtitle?: string
@@ -127,6 +141,7 @@ export type TemplateData = {
         premiumImageTwo?: string
         accentColor?: string
         glowColor?: string
+        imageSize?: number
         cards?: Array<{
           title?: string
           description?: string
@@ -321,7 +336,12 @@ export const initialData: TemplateData = {
         badgeColor: '',
         badgeSize: 0,
         primaryButtonColor: '',
+        primaryButtonTextColor: '',
         secondaryButtonColor: '',
+        secondaryButtonTextColor: '',
+        backgroundColor: '',
+        bannerZoom: 100,
+        bannerPosition: 50,
         overlayColor: '',
         overlayAccentColor: '',
         overlayOpacity: 0,
@@ -335,8 +355,11 @@ export const initialData: TemplateData = {
         titleSize: 0,
         kickerColor: '',
         kickerSize: 0,
+        backgroundColor: '#ffffff',
+        buttonColor: '#ffc222',
       },
       benefits: {
+        backgroundColor: '#ffffff',
         kicker: '',
         heading: '',
         subtitle: '',
@@ -348,6 +371,7 @@ export const initialData: TemplateData = {
         ],
       },
       advantage: {
+        backgroundColor: '#ffffff',
         kicker: '',
         heading: '',
         subtitle: '',
@@ -365,6 +389,7 @@ export const initialData: TemplateData = {
         premiumImageTwo: '',
         accentColor: '#d94b2b',
         glowColor: '#7d9920',
+        imageSize: 240,
         cards: [
           { title: '', description: '' },
           { title: '', description: '' },

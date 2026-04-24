@@ -1,5 +1,7 @@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ColorPreviewChip } from './ColorPreviewChip'
+import { VisibleOnBadge } from './VisibleOnBadge'
 
 interface ThemeSettingsSectionProps {
   data: any
@@ -44,9 +46,18 @@ export function ThemeSettingsSection({
           </p>
         </div>
 
-        <div className='grid gap-4 md:grid-cols-3'>
+        <div className='grid gap-4 xl:grid-cols-3'>
           <div className='space-y-2'>
             <Label>Template Color</Label>
+            <VisibleOnBadge label='Multiple Sections' />
+            <p className='text-xs text-slate-500'>
+              This is the shared accent color used across the template.
+            </p>
+            <ColorPreviewChip
+              color={colorOr(theme.templateColor, '#0f172a')}
+              label='Accent preview'
+              variant='accent'
+            />
             <Input
               type='color'
               value={colorOr(theme.templateColor, '#0f172a')}
@@ -61,6 +72,15 @@ export function ThemeSettingsSection({
           </div>
           <div className='space-y-2'>
             <Label>Banner Color</Label>
+            <VisibleOnBadge label='Global Banner Surfaces' />
+            <p className='text-xs text-slate-500'>
+              This affects the shared color used on banner and highlight surfaces.
+            </p>
+            <ColorPreviewChip
+              color={colorOr(theme.bannerColor, '#0f172a')}
+              label='Section preview'
+              variant='surface'
+            />
             <Input
               type='color'
               value={colorOr(theme.bannerColor, '#0f172a')}
@@ -75,6 +95,10 @@ export function ThemeSettingsSection({
           </div>
           <div className='space-y-2'>
             <Label>Font Size</Label>
+            <VisibleOnBadge label='Entire Website' />
+            <p className='text-xs text-slate-500'>
+              This changes the overall text scale used across the website.
+            </p>
             <div className='flex items-center gap-3'>
               <Input
                 type='range'
@@ -96,9 +120,13 @@ export function ThemeSettingsSection({
           </div>
         </div>
 
-        <div className='grid gap-4 md:grid-cols-2'>
+        <div className='grid gap-4 xl:grid-cols-2'>
           <div className='space-y-2'>
             <Label>Heading Font</Label>
+            <VisibleOnBadge label='All Headings' />
+            <p className='text-xs text-slate-500'>
+              This font is used for the main headings and section titles.
+            </p>
             <select
               value={theme.headingFont || 'Poppins'}
               onChange={(e) =>
@@ -115,6 +143,10 @@ export function ThemeSettingsSection({
           </div>
           <div className='space-y-2'>
             <Label>Body Font</Label>
+            <VisibleOnBadge label='All Paragraphs' />
+            <p className='text-xs text-slate-500'>
+              This font is used for paragraphs, descriptions, and body text.
+            </p>
             <select
               value={theme.bodyFont || 'Poppins'}
               onChange={(e) =>
@@ -131,9 +163,18 @@ export function ThemeSettingsSection({
           </div>
         </div>
 
-        <div className='grid gap-4 md:grid-cols-4'>
+        <div className='grid gap-4 xl:grid-cols-2 2xl:grid-cols-4'>
           <div className='space-y-2'>
             <Label>Body Text Color</Label>
+            <VisibleOnBadge label='All Paragraphs' />
+            <p className='text-xs text-slate-500'>
+              This is the default color for paragraph and description text.
+            </p>
+            <ColorPreviewChip
+              color={colorOr(theme.textColor, '#1f2937')}
+              label='Text preview'
+              variant='text'
+            />
             <Input
               type='color'
               value={colorOr(theme.textColor, '#1f2937')}
@@ -145,6 +186,15 @@ export function ThemeSettingsSection({
           </div>
           <div className='space-y-2'>
             <Label>Heading Color</Label>
+            <VisibleOnBadge label='All Headings' />
+            <p className='text-xs text-slate-500'>
+              This is the default color used for headings and titles.
+            </p>
+            <ColorPreviewChip
+              color={colorOr(theme.headingColor, '#0f172a')}
+              label='Text preview'
+              variant='text'
+            />
             <Input
               type='color'
               value={colorOr(theme.headingColor, '#0f172a')}
@@ -156,6 +206,15 @@ export function ThemeSettingsSection({
           </div>
           <div className='space-y-2'>
             <Label>Surface Color</Label>
+            <VisibleOnBadge label='Cards and Content Boxes' />
+            <p className='text-xs text-slate-500'>
+              This is the default background color for cards and content boxes.
+            </p>
+            <ColorPreviewChip
+              color={colorOr(theme.surfaceColor, '#ffffff')}
+              label='Section preview'
+              variant='surface'
+            />
             <Input
               type='color'
               value={colorOr(theme.surfaceColor, '#ffffff')}
@@ -167,6 +226,15 @@ export function ThemeSettingsSection({
           </div>
           <div className='space-y-2'>
             <Label>Muted Surface Color</Label>
+            <VisibleOnBadge label='Soft Background Sections' />
+            <p className='text-xs text-slate-500'>
+              This is used for softer alternate section backgrounds and muted cards.
+            </p>
+            <ColorPreviewChip
+              color={colorOr(theme.surfaceMutedColor, '#f8fafc')}
+              label='Section preview'
+              variant='surface'
+            />
             <Input
               type='color'
               value={colorOr(theme.surfaceMutedColor, '#f8fafc')}
@@ -181,9 +249,18 @@ export function ThemeSettingsSection({
           </div>
         </div>
 
-        <div className='grid gap-4 md:grid-cols-2'>
+        <div className='grid gap-4 xl:grid-cols-2'>
           <div className='space-y-2'>
             <Label>Border Color</Label>
+            <VisibleOnBadge label='Cards and Inputs' />
+            <p className='text-xs text-slate-500'>
+              This controls the border color used for cards, inputs, and section outlines.
+            </p>
+            <ColorPreviewChip
+              color={colorOr(theme.borderColor, '#e2e8f0')}
+              label='Accent preview'
+              variant='accent'
+            />
             <Input
               type='color'
               value={colorOr(theme.borderColor, '#e2e8f0')}

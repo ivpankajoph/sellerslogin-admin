@@ -30,10 +30,10 @@ const navItems = [
   },
 ]
 
-const MIN_EDITOR_PANEL_WIDTH = 340
-const MIN_PREVIEW_PANEL_WIDTH = 520
+const MIN_EDITOR_PANEL_WIDTH = 580
+const MIN_PREVIEW_PANEL_WIDTH = 620
 const DIVIDER_TRACK_WIDTH = 12
-const DEFAULT_EDITOR_PANEL_WIDTH = 380
+const DEFAULT_EDITOR_PANEL_WIDTH = 660
 const PANEL_WIDTH_STORAGE_KEY = 'template_editor_panel_width_px'
 
 interface TemplatePageLayoutProps {
@@ -244,21 +244,21 @@ export function TemplatePageLayout({
 
   if (isSplitLayout) {
     return (
-      <div className='min-h-screen bg-[#f6f6f7] font-manrope text-slate-900'>
+      <div className='min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.92),_rgba(244,246,250,0.96)_38%,_rgba(236,240,245,1)_100%)] font-manrope text-slate-900'>
         <div className='flex min-h-screen flex-col'>
           {showNavigation || actions ? (
-            <div className='border-b border-slate-200 bg-white'>
-              <div className='relative flex min-h-[64px] items-center justify-center px-4 sm:px-6 lg:px-8'>
+            <div className='border-b border-slate-200/80 bg-white/90 backdrop-blur'>
+              <div className='relative flex min-h-[72px] items-center justify-center px-4 sm:px-6 lg:px-8'>
                 {showNavigation ? (
-                  <div className='flex flex-wrap items-center justify-center gap-2'>
+                  <div className='flex flex-wrap items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/95 px-2 py-2 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.45)]'>
                     {resolvedNavItems.map((item) => (
                       <Link
                         key={item.key}
                         to={item.to}
                         className={cn(
-                          'rounded-full px-3 py-1.5 text-sm font-medium transition',
+                          'rounded-full px-4 py-2 text-sm font-semibold transition',
                           item.key === activeKey
-                            ? 'bg-slate-900 text-white'
+                            ? 'bg-slate-900 text-white shadow-[0_14px_28px_-18px_rgba(15,23,42,0.8)]'
                             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                         )}
                       >
@@ -282,9 +282,9 @@ export function TemplatePageLayout({
             className='grid flex-1 lg:grid-cols-[var(--template-editor-panel-width)_12px_minmax(0,1fr)]'
           >
             {children ? (
-              <aside className='overflow-hidden border-r border-slate-200 bg-white'>
+              <aside className='template-editor-sidebar overflow-hidden border-r border-slate-200/80 bg-white/80 backdrop-blur'>
                 <div
-                  className='space-y-4 px-4 py-4 lg:h-[calc(100vh-65px)] lg:overflow-y-auto'
+                  className='space-y-5 px-5 py-5 lg:h-[calc(100vh-73px)] lg:overflow-y-auto'
                   data-editor-scroll-container='true'
                 >
                   {children}
@@ -302,14 +302,14 @@ export function TemplatePageLayout({
                   resizePointerIdRef.current = null
                   stopResizing()
                 }}
-                className='group h-full w-full cursor-col-resize select-none bg-[#f6f6f7]'
+                className='group h-full w-full cursor-col-resize select-none bg-transparent'
                 aria-label='Resize editor and preview panels'
                 title='Drag to resize panels'
               >
                 <span className='flex h-full w-full items-center justify-center'>
                   <span
                     className={cn(
-                      'h-32 w-[2px] rounded-full bg-slate-300 transition',
+                      'h-40 w-[3px] rounded-full bg-slate-300/80 transition',
                       isResizing ? 'bg-slate-500' : 'group-hover:bg-slate-500'
                     )}
                   />
@@ -317,7 +317,7 @@ export function TemplatePageLayout({
               </button>
             </div>
             {preview ? (
-              <section className='bg-[#efefef] lg:h-[calc(100vh-65px)] lg:overflow-y-auto'>
+              <section className='bg-transparent lg:h-[calc(100vh-73px)] lg:overflow-y-auto'>
                 {preview}
               </section>
             ) : null}
@@ -328,7 +328,7 @@ export function TemplatePageLayout({
   }
 
   return (
-    <div className='min-h-screen bg-[#f6f6f7] font-manrope text-slate-900'>
+    <div className='min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.92),_rgba(244,246,250,0.96)_38%,_rgba(236,240,245,1)_100%)] font-manrope text-slate-900'>
       <div className='mx-auto flex max-w-[1720px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8'>
         <header className='rounded-[24px] border border-slate-200 bg-white shadow-[0_12px_36px_-28px_rgba(15,23,42,0.4)]'>
           <div className='flex flex-col gap-5 px-5 py-5 lg:flex-row lg:items-center lg:justify-between'>

@@ -19,7 +19,7 @@ interface TemplatePreviewPanelProps {
   pageOptions?: Array<{ label: string; path: string }>
   showPageSelector?: boolean
   showPreviewActions?: boolean
-  onSync?: () => Promise<void> | void
+  onSync?: () => Promise<unknown> | void
   isSyncing?: boolean
   syncDisabled?: boolean
   vendorId?: string
@@ -169,17 +169,20 @@ export function TemplatePreviewPanel({
   }, [onSelectSection, onInlineEdit, vendorId, page, previewOrigin])
 
   return (
-    <div className='min-h-full border-l border-slate-200 bg-[#f1f1f1] p-4 lg:p-5'>
-      <div className='flex flex-col gap-4'>
-        <div className='flex flex-col gap-3 border border-slate-200 bg-white p-4'>
+    <div className='min-h-full border-l border-slate-200/80 bg-transparent p-4 lg:p-5'>
+      <div className='flex flex-col gap-5'>
+        <div className='flex flex-col gap-4 rounded-[28px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)] backdrop-blur'>
           <div className='flex items-start justify-between gap-3'>
             <div className='min-w-0'>
-              <h3 className='text-[15px] font-semibold text-slate-900'>{title}</h3>
+              <div className='mb-2 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500'>
+                Preview Panel
+              </div>
+              <h3 className='text-[17px] font-semibold text-slate-950'>{title}</h3>
               {subtitle ? (
-                <p className='mt-1 text-sm text-slate-500'>{subtitle}</p>
+                <p className='mt-1 max-w-xl text-sm leading-6 text-slate-500'>{subtitle}</p>
               ) : null}
             </div>
-            <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 p-1.5'>
               {showPageSelector && pageOptions && pageOptions.length > 0 ? (
                 <select
                   className='h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700'
@@ -231,7 +234,7 @@ export function TemplatePreviewPanel({
                 disabled={syncDisabled || isSyncing}
               >
                 <RefreshCcw className='h-4 w-4' />
-                {isSyncing ? 'Syncing...' : 'Sync + Refresh'}
+                {isSyncing ? 'Refreshing...' : 'Refresh Preview'}
               </Button>
               {computedFullPreviewUrl ? (
                 <a
@@ -251,16 +254,16 @@ export function TemplatePreviewPanel({
             </div>
           ) : null}
 
-          <div className='border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-xs text-slate-500'>
-            Click text directly inside the preview to edit it. Click any block to jump the sidebar to that section.
+          <div className='rounded-2xl border border-dashed border-slate-300 bg-[linear-gradient(135deg,rgba(248,250,252,0.95),rgba(241,245,249,0.82))] px-4 py-3 text-xs leading-6 text-slate-500'>
+            Click text inside the preview to edit it, or click any block to jump straight to that section in the editor.
           </div>
         </div>
 
-        <div className='border border-slate-200 bg-white p-3'>
+        <div className='rounded-[30px] border border-slate-200/80 bg-white/90 p-4 shadow-[0_28px_70px_-44px_rgba(15,23,42,0.4)] backdrop-blur'>
           {computedSrc ? (
             <div
               className={cn(
-                'overflow-hidden border border-slate-200 bg-white',
+                'overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
                 device === 'mobile'
                   ? 'mx-auto w-full max-w-[390px]'
                   : 'w-full'
@@ -292,15 +295,15 @@ export function TemplatePreviewPanel({
               />
             </div>
           ) : (
-            <div className='flex min-h-[320px] flex-col items-center justify-center gap-2 border border-dashed border-slate-300 bg-white text-center text-sm text-slate-500'>
+            <div className='flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-[24px] border border-dashed border-slate-300 bg-white text-center text-sm text-slate-500'>
               <p>Preview will appear once vendor data is available.</p>
               <p>Save the template to load the live preview.</p>
             </div>
           )}
         </div>
 
-        <p className='text-xs text-slate-500'>
-          The canvas uses live saved data. Sync after changing text, images, or section order.
+        <p className='px-1 text-xs leading-6 text-slate-500'>
+          Changes auto-save in the background. Use Refresh Preview only when you want a full page reload.
         </p>
       </div>
     </div>
