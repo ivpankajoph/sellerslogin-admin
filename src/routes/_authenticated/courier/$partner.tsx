@@ -41,6 +41,9 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Main } from '@/components/layout/main'
 import {
+  cancelShadowfaxOrder,
+  createShadowfaxEscalation,
+  createShadowfaxWarehouseShipment,
   createDelhiveryWarehouse,
   createDelhiveryShipment,
   createDelhiveryPickupRequest,
@@ -49,11 +52,16 @@ import {
   fetchDelhiveryB2cServiceability,
   fetchDelhiveryBulkWaybills,
   fetchDelhiveryHeavyServiceability,
+  fetchShadowfaxOrderDetails,
+  fetchShadowfaxPodDetails,
   fetchDelhiveryShippingEstimate,
+  generateShadowfaxAwbs,
+  fetchShadowfaxServiceability,
   fetchDelhiverySingleWaybill,
   generateDelhiveryLabel,
   loadCourierOrders,
   trackDelhiveryShipment,
+  updateShadowfaxOrderData,
   updateDelhiveryWarehouse,
 } from '@/features/courier/api'
 import { formatINR } from '@/lib/currency'
@@ -134,6 +142,62 @@ type DelhiveryWarehouseResult = {
   raw?: unknown
 }
 
+type ShadowfaxServiceabilityResult = {
+  title: string
+  summary: string
+  rows: string[]
+  raw?: unknown
+}
+
+type ShadowfaxAwbResult = {
+  title: string
+  summary: string
+  rows: string[]
+  raw?: unknown
+}
+
+type ShadowfaxOrderResult = {
+  title: string
+  summary: string
+  rows: string[]
+  raw?: unknown
+}
+
+type ShadowfaxTrackingResult = {
+  title: string
+  summary: string
+  rows: string[]
+  raw?: unknown
+}
+
+type ShadowfaxUpdateResult = {
+  title: string
+  summary: string
+  rows: string[]
+  raw?: unknown
+}
+
+type ShadowfaxCancelResult = {
+  title: string
+  summary: string
+  rows: string[]
+  raw?: unknown
+}
+
+type ShadowfaxEscalationResult = {
+  title: string
+  summary: string
+  rows: string[]
+  raw?: unknown
+}
+
+type ShadowfaxPodResult = {
+  title: string
+  summary: string
+  rows: string[]
+  raw?: unknown
+}
+
 type DelhiveryWarehouseForm = {
   name: string
   registered_name: string
@@ -155,6 +219,33 @@ type DelhiveryWarehouseUpdateForm = {
   address: string
   pin: string
   phone: string
+}
+
+type ShadowfaxUpdateForm = {
+  awbNumber: string
+  deliveryContact: string
+  deliveryAddress: string
+  deliveryPincode: string
+  pickupContact: string
+  pickupAddress: string
+  pickupPincode: string
+  actualWeight: string
+  volumetricWeight: string
+  status: string
+}
+
+type ShadowfaxCancelForm = {
+  requestId: string
+  cancelRemarks: string
+}
+
+type ShadowfaxEscalationForm = {
+  awbNumber: string
+  issueCategory: string
+}
+
+type ShadowfaxPodForm = {
+  awbNumbers: string
 }
 
 const defaultBookingForm: BookingFormState = {
@@ -197,10 +288,63 @@ const defaultDelhiveryWarehouseUpdateForm: DelhiveryWarehouseUpdateForm = {
   phone: '',
 }
 
+const defaultShadowfaxUpdateForm: ShadowfaxUpdateForm = {
+  awbNumber: '',
+  deliveryContact: '',
+  deliveryAddress: '',
+  deliveryPincode: '',
+  pickupContact: '',
+  pickupAddress: '',
+  pickupPincode: '',
+  actualWeight: '',
+  volumetricWeight: '',
+  status: '',
+}
+
+const defaultShadowfaxCancelForm: ShadowfaxCancelForm = {
+  requestId: '',
+  cancelRemarks: 'Request cancelled by customer',
+}
+
+const defaultShadowfaxEscalationForm: ShadowfaxEscalationForm = {
+  awbNumber: '',
+  issueCategory: '1',
+}
+
+const defaultShadowfaxPodForm: ShadowfaxPodForm = {
+  awbNumbers: '',
+}
+
 const readText = (value: unknown) => String(value ?? '').trim()
 
 const bookingRows = (items: Array<string | null | undefined>) =>
   items.map((item) => readText(item)).filter(Boolean)
+
+const buildShadowfaxUpdateSection = (entries: Record<string, unknown>) => {
+  const nextEntries = Object.entries(entries).reduce<Record<string, unknown>>(
+    (accumulator, [key, value]) => {
+      const normalized = typeof value === 'string' ? readText(value) : value
+      if (normalized === '' || normalized === null || normalized === undefined) {
+        return accumulator
+      }
+      accumulator[key] = normalized
+      return accumulator
+    },
+    {}
+  )
+
+  return Object.keys(nextEntries).length ? nextEntries : null
+}
+
+const parseShadowfaxAwbText = (value: string) =>
+  Array.from(
+    new Set(
+      readText(value)
+        .split(/[\s,]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    )
+  )
 
 const fillBookingFormFromOrder = (
   order: CourierOrderSummary,
@@ -237,6 +381,8 @@ function CourierPartnerPage() {
     : 'delhivery') as CourierPartnerId
   const partnerMeta = COURIER_PARTNER_MAP[partnerId]
   const isDelhivery = partnerId === 'delhivery'
+  const isShadowfax = partnerId === 'shadowfax'
+  const usesLiveOrders = partnerId === 'delhivery' || partnerId === 'shadowfax'
   const initialLane = useMemo(() => {
     if (typeof window === 'undefined') return { origin: '', destination: '' }
     const params = new URLSearchParams(window.location.search)
@@ -297,6 +443,51 @@ function CourierPartnerPage() {
     useState<DelhiveryWarehouseUpdateForm>(defaultDelhiveryWarehouseUpdateForm)
   const [delhiveryWarehouseResult, setDelhiveryWarehouseResult] =
     useState<DelhiveryWarehouseResult | null>(null)
+  const [shadowfaxServiceabilityBusy, setShadowfaxServiceabilityBusy] = useState(false)
+  const [shadowfaxServiceabilityForm, setShadowfaxServiceabilityForm] = useState({
+    service: 'customer_delivery',
+    pincodes: '',
+    page: '1',
+    count: '10',
+  })
+  const [shadowfaxServiceabilityResult, setShadowfaxServiceabilityResult] =
+    useState<ShadowfaxServiceabilityResult | null>(null)
+  const [shadowfaxAwbBusy, setShadowfaxAwbBusy] = useState(false)
+  const [shadowfaxAwbForm, setShadowfaxAwbForm] = useState({
+    count: '10',
+    requestType: 'FWD',
+  })
+  const [shadowfaxAwbResult, setShadowfaxAwbResult] = useState<ShadowfaxAwbResult | null>(null)
+  const [shadowfaxOrderBusy, setShadowfaxOrderBusy] = useState(false)
+  const [shadowfaxOrderResult, setShadowfaxOrderResult] = useState<ShadowfaxOrderResult | null>(
+    null
+  )
+  const [shadowfaxTrackingBusy, setShadowfaxTrackingBusy] = useState(false)
+  const [shadowfaxTrackingForm, setShadowfaxTrackingForm] = useState({
+    awbNumber: '',
+  })
+  const [shadowfaxTrackingResult, setShadowfaxTrackingResult] =
+    useState<ShadowfaxTrackingResult | null>(null)
+  const [shadowfaxUpdateBusy, setShadowfaxUpdateBusy] = useState(false)
+  const [shadowfaxUpdateForm, setShadowfaxUpdateForm] =
+    useState<ShadowfaxUpdateForm>(defaultShadowfaxUpdateForm)
+  const [shadowfaxUpdateResult, setShadowfaxUpdateResult] =
+    useState<ShadowfaxUpdateResult | null>(null)
+  const [shadowfaxCancelBusy, setShadowfaxCancelBusy] = useState(false)
+  const [shadowfaxCancelForm, setShadowfaxCancelForm] =
+    useState<ShadowfaxCancelForm>(defaultShadowfaxCancelForm)
+  const [shadowfaxCancelResult, setShadowfaxCancelResult] =
+    useState<ShadowfaxCancelResult | null>(null)
+  const [shadowfaxEscalationBusy, setShadowfaxEscalationBusy] = useState(false)
+  const [shadowfaxEscalationForm, setShadowfaxEscalationForm] =
+    useState<ShadowfaxEscalationForm>(defaultShadowfaxEscalationForm)
+  const [shadowfaxEscalationResult, setShadowfaxEscalationResult] =
+    useState<ShadowfaxEscalationResult | null>(null)
+  const [shadowfaxPodBusy, setShadowfaxPodBusy] = useState(false)
+  const [shadowfaxPodForm, setShadowfaxPodForm] =
+    useState<ShadowfaxPodForm>(defaultShadowfaxPodForm)
+  const [shadowfaxPodResult, setShadowfaxPodResult] =
+    useState<ShadowfaxPodResult | null>(null)
 
   const profileOriginPincode = useMemo(
     () => readText(user?.pincode || user?.pin || user?.postal_code || user?.zip),
@@ -333,8 +524,7 @@ function CourierPartnerPage() {
     let cancelled = false
 
     const loadData = async () => {
-      const needsLiveData =
-        partnerId === 'delhivery'
+      const needsLiveData = usesLiveOrders
       if (!needsLiveData) {
         setLiveOrders([])
         setNdrItems([])
@@ -368,10 +558,10 @@ function CourierPartnerPage() {
     return () => {
       cancelled = true
     }
-  }, [isVendor, partnerId, refreshKey])
+  }, [isVendor, refreshKey, usesLiveOrders])
 
   const assignments = useMemo(() => {
-    if (partnerId === 'delhivery') {
+    if (usesLiveOrders) {
       return liveOrders
         .map((order) => ({ assignment: getRemoteCourierAssignment(order), order }))
         .filter(
@@ -393,7 +583,7 @@ function CourierPartnerPage() {
         return b - a
       })
       .map((assignment) => ({ assignment, order: null as CourierOrderSummary | null }))
-  }, [liveOrders, partnerId])
+  }, [liveOrders, partnerId, usesLiveOrders])
 
   const eligibleOrders = useMemo(
     () => liveOrders.filter((order) => !hasAnyActiveCourierAssignment(order)),
@@ -440,6 +630,155 @@ function CourierPartnerPage() {
     initialLane.origin,
     profileOriginPincode,
     selectedBookingOrder,
+  ])
+
+  useEffect(() => {
+    if (!isShadowfax) return
+
+    const nextPincodes = readText(
+      shadowfaxServiceabilityForm.pincodes ||
+        bookingForm.destination ||
+        selectedBookingOrder?.pincode
+    )
+
+    if (!nextPincodes || nextPincodes === shadowfaxServiceabilityForm.pincodes) {
+      return
+    }
+
+    setShadowfaxServiceabilityForm((current) => ({
+      ...current,
+      pincodes: current.pincodes || nextPincodes,
+    }))
+  }, [
+    bookingForm.destination,
+    isShadowfax,
+    selectedBookingOrder?.pincode,
+    shadowfaxServiceabilityForm.pincodes,
+  ])
+
+  useEffect(() => {
+    if (!isShadowfax) return
+
+    const candidateAwb = readText(
+      shadowfaxTrackingForm.awbNumber ||
+        assignments[0]?.assignment?.trackingCode ||
+        liveOrders.find((order) => readText(order.shadowfax?.tracking_number || order.shadowfax?.order_id))
+          ?.shadowfax?.tracking_number ||
+        liveOrders.find((order) => readText(order.shadowfax?.tracking_number || order.shadowfax?.order_id))
+          ?.shadowfax?.order_id
+    )
+
+    if (!candidateAwb || candidateAwb === shadowfaxTrackingForm.awbNumber) {
+      return
+    }
+
+    setShadowfaxTrackingForm((current) => ({
+      ...current,
+      awbNumber: current.awbNumber || candidateAwb,
+    }))
+  }, [assignments, isShadowfax, liveOrders, shadowfaxTrackingForm.awbNumber])
+
+  useEffect(() => {
+    if (!isShadowfax) return
+
+    const candidateAwb = readText(
+      shadowfaxUpdateForm.awbNumber ||
+        shadowfaxTrackingForm.awbNumber ||
+        assignments[0]?.assignment?.trackingCode
+    )
+
+    if (!candidateAwb || candidateAwb === shadowfaxUpdateForm.awbNumber) {
+      return
+    }
+
+    setShadowfaxUpdateForm((current) => ({
+      ...current,
+      awbNumber: current.awbNumber || candidateAwb,
+    }))
+  }, [assignments, isShadowfax, shadowfaxTrackingForm.awbNumber, shadowfaxUpdateForm.awbNumber])
+
+  useEffect(() => {
+    if (!isShadowfax) return
+
+    const candidateRequestId = readText(
+      shadowfaxCancelForm.requestId ||
+        shadowfaxUpdateForm.awbNumber ||
+        shadowfaxTrackingForm.awbNumber ||
+        assignments[0]?.assignment?.trackingCode
+    )
+
+    if (!candidateRequestId || candidateRequestId === shadowfaxCancelForm.requestId) {
+      return
+    }
+
+    setShadowfaxCancelForm((current) => ({
+      ...current,
+      requestId: current.requestId || candidateRequestId,
+    }))
+  }, [
+    assignments,
+    isShadowfax,
+    shadowfaxCancelForm.requestId,
+    shadowfaxTrackingForm.awbNumber,
+    shadowfaxUpdateForm.awbNumber,
+  ])
+
+  useEffect(() => {
+    if (!isShadowfax) return
+
+    const candidateAwb = readText(
+      shadowfaxEscalationForm.awbNumber ||
+        shadowfaxTrackingForm.awbNumber ||
+        shadowfaxUpdateForm.awbNumber ||
+        shadowfaxCancelForm.requestId ||
+        assignments[0]?.assignment?.trackingCode
+    )
+
+    if (!candidateAwb || candidateAwb === shadowfaxEscalationForm.awbNumber) {
+      return
+    }
+
+    setShadowfaxEscalationForm((current) => ({
+      ...current,
+      awbNumber: current.awbNumber || candidateAwb,
+    }))
+  }, [
+    assignments,
+    isShadowfax,
+    shadowfaxCancelForm.requestId,
+    shadowfaxEscalationForm.awbNumber,
+    shadowfaxTrackingForm.awbNumber,
+    shadowfaxUpdateForm.awbNumber,
+  ])
+
+  useEffect(() => {
+    if (!isShadowfax) return
+
+    const candidateAwb = readText(
+      shadowfaxPodForm.awbNumbers ||
+        shadowfaxTrackingForm.awbNumber ||
+        shadowfaxEscalationForm.awbNumber ||
+        shadowfaxUpdateForm.awbNumber ||
+        shadowfaxCancelForm.requestId ||
+        assignments[0]?.assignment?.trackingCode
+    )
+
+    if (!candidateAwb || readText(shadowfaxPodForm.awbNumbers)) {
+      return
+    }
+
+    setShadowfaxPodForm((current) => ({
+      ...current,
+      awbNumbers: current.awbNumbers || candidateAwb,
+    }))
+  }, [
+    assignments,
+    isShadowfax,
+    shadowfaxCancelForm.requestId,
+    shadowfaxEscalationForm.awbNumber,
+    shadowfaxPodForm.awbNumbers,
+    shadowfaxTrackingForm.awbNumber,
+    shadowfaxUpdateForm.awbNumber,
   ])
 
   const applyOrderToBookingForm = (order: CourierOrderSummary | null) => {
@@ -882,6 +1221,505 @@ function CourierPartnerPage() {
     }
   }
 
+  const handleRunShadowfaxServiceability = async () => {
+    if (!isShadowfax) return
+
+    const pincodes = readText(
+      shadowfaxServiceabilityForm.pincodes ||
+        bookingForm.destination ||
+        selectedBookingOrder?.pincode
+    )
+
+    if (!pincodes) {
+      toast.error('Destination pincode is required')
+      return
+    }
+
+    try {
+      setShadowfaxServiceabilityBusy(true)
+      const response = await fetchShadowfaxServiceability({
+        pincodes,
+        service: readText(shadowfaxServiceabilityForm.service || 'customer_delivery'),
+        page: readText(shadowfaxServiceabilityForm.page || '1'),
+        count: readText(shadowfaxServiceabilityForm.count || '10'),
+      })
+      const summary = response?.serviceability || {}
+      const requestedPincodes = Array.isArray(summary?.pincodes)
+        ? summary.pincodes.map((entry: unknown) => readText(entry)).filter(Boolean)
+        : pincodes
+            .split(',')
+            .map((entry) => readText(entry))
+            .filter(Boolean)
+      const previewRows = Array.isArray(summary?.records)
+        ? summary.records.slice(0, 5).map((record: any, index: number) => {
+            const location = [readText(record?.pincode), readText(record?.city), readText(record?.state)]
+              .filter(Boolean)
+              .join(' | ')
+            const serviceableLabel =
+              record?.serviceable === true
+                ? 'serviceable'
+                : record?.serviceable === false
+                  ? 'not serviceable'
+                  : ''
+            const embargoedLabel = record?.embargoed === true ? 'embargoed' : ''
+            return `Record ${index + 1}: ${[location, serviceableLabel, embargoedLabel]
+              .filter(Boolean)
+              .join(' | ')}`
+          })
+        : []
+
+      setShadowfaxServiceabilityResult({
+        title: 'Pincode serviceability',
+        summary:
+          Number(summary?.serviceable_count ?? 0) > 0
+            ? 'Shadowfax returned serviceable records for this query.'
+            : Number(summary?.matched_count ?? 0) > 0
+              ? 'Shadowfax returned records but none were marked serviceable.'
+              : 'No Shadowfax serviceability records were returned.',
+        rows: bookingRows([
+          `Service: ${summary?.service || shadowfaxServiceabilityForm.service}`,
+          `Requested pincodes: ${requestedPincodes.join(', ') || pincodes}`,
+          `Matched records: ${summary?.matched_count ?? 0}`,
+          summary?.serviceable_count === null || summary?.serviceable_count === undefined
+            ? ''
+            : `Serviceable records: ${summary.serviceable_count}`,
+          summary?.embargoed_count === null || summary?.embargoed_count === undefined
+            ? ''
+            : `Embargoed records: ${summary.embargoed_count}`,
+          Array.isArray(summary?.returned_pincodes) && summary.returned_pincodes.length
+            ? `Returned pincodes: ${summary.returned_pincodes.join(', ')}`
+            : '',
+          ...previewRows,
+        ]),
+        raw: response,
+      })
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to check Shadowfax serviceability')
+      setShadowfaxServiceabilityResult({
+        title: 'Pincode serviceability',
+        summary: err?.response?.data?.message || err?.message || 'Request failed',
+        rows: ['Check pincodes and backend Shadowfax env settings, then retry.'],
+        raw: err?.response?.data || null,
+      })
+    } finally {
+      setShadowfaxServiceabilityBusy(false)
+    }
+  }
+
+  const handleGenerateShadowfaxAwb = async () => {
+    if (!isShadowfax) return
+
+    const count = readText(shadowfaxAwbForm.count || '10')
+    if (!count || Number(count) <= 0) {
+      toast.error('AWB count must be greater than 0')
+      return
+    }
+
+    try {
+      setShadowfaxAwbBusy(true)
+      const response = await generateShadowfaxAwbs({
+        count,
+        request_type: readText(shadowfaxAwbForm.requestType || 'FWD').toUpperCase(),
+      })
+      const summary = response?.awb || {}
+      const awbs = Array.isArray(summary?.awb_numbers)
+        ? summary.awb_numbers.map((entry: unknown) => readText(entry)).filter(Boolean)
+        : []
+
+      setShadowfaxAwbResult({
+        title: 'AWB generation',
+        summary: awbs.length
+          ? `Shadowfax returned ${awbs.length} AWB number${awbs.length === 1 ? '' : 's'}.`
+          : 'Shadowfax did not return any AWB numbers.',
+        rows: bookingRows([
+          `Request type: ${summary?.request_type || shadowfaxAwbForm.requestType}`,
+          `Requested count: ${summary?.count_requested ?? count}`,
+          `Received count: ${summary?.count_received ?? awbs.length}`,
+          ...awbs.slice(0, 20).map((awb: string, index: number) => `AWB ${index + 1}: ${awb}`),
+        ]),
+        raw: response,
+      })
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to generate Shadowfax AWB numbers')
+      setShadowfaxAwbResult({
+        title: 'AWB generation',
+        summary: err?.response?.data?.message || err?.message || 'Request failed',
+        rows: ['Check count, request type, and backend Shadowfax env settings.'],
+        raw: err?.response?.data || null,
+      })
+    } finally {
+      setShadowfaxAwbBusy(false)
+    }
+  }
+
+  const handleCreateShadowfaxWarehouseOrder = async () => {
+    if (!isShadowfax) return
+    if (!selectedBookingOrder) {
+      toast.error('Select an available order first')
+      return
+    }
+
+    try {
+      setShadowfaxOrderBusy(true)
+      const response = await createShadowfaxWarehouseShipment(selectedBookingOrder)
+      const shipment = response?.shipment || {}
+      const reference =
+        readText(shipment?.tracking_number) ||
+        readText(shipment?.order_id) ||
+        readText(shipment?.client_order_id)
+
+      setShadowfaxOrderResult({
+        title: 'Warehouse order creation',
+        summary: reference
+          ? `Shadowfax warehouse order created for ${selectedBookingOrder.orderNumber}.`
+          : `Shadowfax warehouse request completed for ${selectedBookingOrder.orderNumber}.`,
+        rows: bookingRows([
+          `Order: ${selectedBookingOrder.orderNumber}`,
+          `Customer: ${selectedBookingOrder.customerName}`,
+          `Pincode: ${selectedBookingOrder.pincode || '-'}`,
+          `Reference: ${reference || 'Not returned'}`,
+          `Status: ${readText(shipment?.status) || 'Not returned'}`,
+          `Payment mode: ${readText(shipment?.payment_mode || response?.payload?.order_details?.payment_mode) || 'Not returned'}`,
+        ]),
+        raw: response,
+      })
+      toast.success(
+        reference
+          ? `Shadowfax warehouse order created (${reference})`
+          : 'Shadowfax warehouse order created'
+      )
+      setRefreshKey((current) => current + 1)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create Shadowfax warehouse order')
+      setShadowfaxOrderResult({
+        title: 'Warehouse order creation',
+        summary: err?.response?.data?.message || err?.message || 'Request failed',
+        rows: [
+          'Run the serviceability check first and confirm the order shipping address and backend Shadowfax env settings.',
+        ],
+        raw: err?.response?.data || null,
+      })
+    } finally {
+      setShadowfaxOrderBusy(false)
+    }
+  }
+
+  const handleRunShadowfaxTracking = async () => {
+    if (!isShadowfax) return
+
+    const awbNumber = readText(shadowfaxTrackingForm.awbNumber)
+    if (!awbNumber) {
+      toast.error('AWB number is required')
+      return
+    }
+
+    try {
+      setShadowfaxTrackingBusy(true)
+      const response = await fetchShadowfaxOrderDetails(awbNumber)
+      const tracking = response?.tracking || {}
+      const events = Array.isArray(tracking?.events) ? tracking.events : []
+
+      setShadowfaxTrackingResult({
+        title: 'Single Order Details V4',
+        summary:
+          readText(tracking?.status) ||
+          readText(tracking?.status_id) ||
+          'Tracking response received.',
+        rows: bookingRows([
+          `AWB: ${readText(tracking?.awb_number) || awbNumber}`,
+          `Status ID: ${readText(tracking?.status_id) || 'Not returned'}`,
+          `Status: ${readText(tracking?.status) || 'Not returned'}`,
+          `Remark: ${readText(tracking?.remark) || 'Not returned'}`,
+          `Event timestamp: ${readText(tracking?.event_timestamp) || 'Not returned'}`,
+          ...events.slice(0, 12).map((event: any, index: number) => {
+            const parts = [
+              readText(event?.status_id),
+              readText(event?.status),
+              readText(event?.remark),
+              readText(event?.event_timestamp),
+            ].filter(Boolean)
+            return `Event ${index + 1}: ${parts.join(' | ')}`
+          }),
+        ]),
+        raw: response,
+      })
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to fetch Shadowfax tracking')
+      setShadowfaxTrackingResult({
+        title: 'Single Order Details V4',
+        summary: err?.response?.data?.message || err?.message || 'Request failed',
+        rows: ['Check the AWB number and backend Shadowfax env settings, then retry.'],
+        raw: err?.response?.data || null,
+      })
+    } finally {
+      setShadowfaxTrackingBusy(false)
+    }
+  }
+
+  const handleUpdateShadowfaxOrder = async () => {
+    if (!isShadowfax) return
+
+    const awbNumber = readText(shadowfaxUpdateForm.awbNumber)
+    if (!awbNumber) {
+      toast.error('AWB number is required')
+      return
+    }
+
+    const deliveryDetails = buildShadowfaxUpdateSection({
+      contact: shadowfaxUpdateForm.deliveryContact,
+      customer_address: shadowfaxUpdateForm.deliveryAddress,
+      pincode: shadowfaxUpdateForm.deliveryPincode,
+    })
+    const pickupDetails = buildShadowfaxUpdateSection({
+      contact: shadowfaxUpdateForm.pickupContact,
+      customer_address: shadowfaxUpdateForm.pickupAddress,
+      pincode: shadowfaxUpdateForm.pickupPincode,
+    })
+    const orderDetails = buildShadowfaxUpdateSection({
+      actual_weight: shadowfaxUpdateForm.actualWeight,
+      volumetric_weight: shadowfaxUpdateForm.volumetricWeight,
+    })
+    const statusValue = readText(shadowfaxUpdateForm.status)
+    const statusUpdate = statusValue ? { status: statusValue } : null
+
+    if (!deliveryDetails && !pickupDetails && !orderDetails && !statusUpdate) {
+      toast.error('Add at least one update field')
+      return
+    }
+
+    try {
+      setShadowfaxUpdateBusy(true)
+      const response = await updateShadowfaxOrderData({
+        awb_number: awbNumber,
+        delivery_details: deliveryDetails,
+        pickup_details: pickupDetails,
+        order_details: orderDetails,
+        status_update: statusUpdate,
+      })
+      const update = response?.update || {}
+      const request = response?.request || {}
+      const sentSections = Array.isArray(update?.sent_sections)
+        ? update.sent_sections.map((entry: unknown) => readText(entry)).filter(Boolean)
+        : []
+
+      setShadowfaxUpdateResult({
+        title: 'Update Order Data',
+        summary:
+          readText(update?.message) ||
+          readText(update?.status) ||
+          'Shadowfax order update response received.',
+        rows: bookingRows([
+          `AWB: ${readText(update?.awb_number) || awbNumber}`,
+          `Status: ${readText(update?.status) || 'Not returned'}`,
+          `Message: ${readText(update?.message) || 'Not returned'}`,
+          sentSections.length ? `Updated sections: ${sentSections.join(', ')}` : '',
+          request?.delivery_details ? 'Delivery details sent' : 'Delivery details: null',
+          request?.pickup_details ? 'Pickup details sent' : 'Pickup details: null',
+          request?.order_details ? 'Order details sent' : 'Order details: null',
+          request?.status_update ? 'Status update sent' : 'Status update: null',
+        ]),
+        raw: response,
+      })
+      toast.success(`Shadowfax order update sent for ${awbNumber}`)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update Shadowfax order')
+      setShadowfaxUpdateResult({
+        title: 'Update Order Data',
+        summary: err?.response?.data?.message || err?.message || 'Request failed',
+        rows: [
+          'Check the AWB number, update rules for the current shipment state, and backend Shadowfax env settings.',
+        ],
+        raw: err?.response?.data || null,
+      })
+    } finally {
+      setShadowfaxUpdateBusy(false)
+    }
+  }
+
+  const handleCancelShadowfaxOrder = async () => {
+    if (!isShadowfax) return
+
+    const requestId = readText(shadowfaxCancelForm.requestId)
+    const cancelRemarks = readText(shadowfaxCancelForm.cancelRemarks)
+
+    if (!requestId) {
+      toast.error('Request ID or AWB number is required')
+      return
+    }
+
+    if (!cancelRemarks) {
+      toast.error('Cancel remarks are required')
+      return
+    }
+
+    try {
+      setShadowfaxCancelBusy(true)
+      const response = await cancelShadowfaxOrder({
+        request_id: requestId,
+        cancel_remarks: cancelRemarks,
+      })
+      const cancellation = response?.cancellation || {}
+      const statusCode = Number(cancellation?.status_code || 0)
+      const queueState = readText(cancellation?.cancellation_state)
+
+      setShadowfaxCancelResult({
+        title: 'Order Cancellation',
+        summary:
+          readText(cancellation?.message) ||
+          (queueState === 'queued'
+            ? 'Shadowfax queued the cancellation request.'
+            : 'Shadowfax cancellation response received.'),
+        rows: bookingRows([
+          `Request ID: ${readText(cancellation?.request_id) || requestId}`,
+          `Remote status code: ${statusCode || 'Not returned'}`,
+          `Cancellation state: ${queueState || 'Not returned'}`,
+          `Remarks: ${readText(cancellation?.cancel_remarks) || cancelRemarks}`,
+          statusCode === 304
+            ? 'Queued cancellation: the order is already in transit and will be cancelled at the next hub.'
+            : '',
+        ]),
+        raw: response,
+      })
+      toast.success(
+        statusCode === 304
+          ? `Shadowfax queued cancellation for ${requestId}`
+          : `Shadowfax cancellation sent for ${requestId}`
+      )
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to cancel Shadowfax order')
+      setShadowfaxCancelResult({
+        title: 'Order Cancellation',
+        summary: err?.response?.data?.message || err?.message || 'Request failed',
+        rows: [
+          'Check the AWB/request ID, ensure the shipment state still allows cancellation, and retry.',
+        ],
+        raw: err?.response?.data || null,
+      })
+    } finally {
+      setShadowfaxCancelBusy(false)
+    }
+  }
+
+  const handleCreateShadowfaxEscalation = async () => {
+    if (!isShadowfax) return
+
+    const awbNumber = readText(shadowfaxEscalationForm.awbNumber)
+    const issueCategory = readText(shadowfaxEscalationForm.issueCategory)
+
+    if (!awbNumber) {
+      toast.error('AWB number is required')
+      return
+    }
+
+    if (!issueCategory) {
+      toast.error('Issue category is required')
+      return
+    }
+
+    try {
+      setShadowfaxEscalationBusy(true)
+      const response = await createShadowfaxEscalation({
+        awb_number: awbNumber,
+        issue_category: issueCategory,
+      })
+      const escalation = response?.escalation || {}
+
+      setShadowfaxEscalationResult({
+        title: 'Escalation API',
+        summary:
+          readText(escalation?.message) ||
+          readText(escalation?.status) ||
+          'Shadowfax escalation response received.',
+        rows: bookingRows([
+          `AWB: ${readText(escalation?.awb_number) || awbNumber}`,
+          `Issue category: ${readText(escalation?.issue_category) || issueCategory}`,
+          `Status: ${readText(escalation?.status) || 'Not returned'}`,
+          `Message: ${readText(escalation?.message) || 'Not returned'}`,
+        ]),
+        raw: response,
+      })
+      toast.success(`Shadowfax escalation submitted for ${awbNumber}`)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create Shadowfax escalation')
+      setShadowfaxEscalationResult({
+        title: 'Escalation API',
+        summary: err?.response?.data?.message || err?.message || 'Request failed',
+        rows: [
+          'Check the AWB number, use a valid issue category, and confirm the shipment matches Shadowfax escalation rules.',
+        ],
+        raw: err?.response?.data || null,
+      })
+    } finally {
+      setShadowfaxEscalationBusy(false)
+    }
+  }
+
+  const handleFetchShadowfaxPodDetails = async () => {
+    if (!isShadowfax) return
+
+    const awbNumbers = parseShadowfaxAwbText(shadowfaxPodForm.awbNumbers)
+
+    if (!awbNumbers.length) {
+      toast.error('At least one AWB number is required')
+      return
+    }
+
+    if (awbNumbers.length > 100) {
+      toast.error('POD details supports up to 100 AWB numbers at once')
+      return
+    }
+
+    try {
+      setShadowfaxPodBusy(true)
+      const response = await fetchShadowfaxPodDetails({
+        awb_numbers: awbNumbers,
+      })
+      const pod = response?.pod || {}
+      const records = Array.isArray(pod?.records) ? pod.records : []
+
+      setShadowfaxPodResult({
+        title: 'POD Details',
+        summary:
+          records.length > 0
+            ? `Shadowfax returned POD data for ${records.length} shipment${records.length === 1 ? '' : 's'}.`
+            : readText(pod?.message) || 'No POD records were returned.',
+        rows: bookingRows([
+          `Requested AWBs: ${Array.isArray(pod?.awb_numbers) ? pod.awb_numbers.length : awbNumbers.length}`,
+          `Returned records: ${pod?.returned_count ?? records.length}`,
+          readText(pod?.message) ? `Message: ${readText(pod.message)}` : '',
+          ...records.slice(0, 20).map((record: any, index: number) => {
+            const parts = [
+              `AWB ${index + 1}: ${readText(record?.awb_number) || 'Not returned'}`,
+              readText(record?.status) ? `Status ${readText(record.status)}` : '',
+              readText(record?.recipient_name) ? `Recipient ${readText(record.recipient_name)}` : '',
+              readText(record?.recipient_contact) ? `Contact ${readText(record.recipient_contact)}` : '',
+              readText(record?.recipient_signature)
+                ? `Signature ${readText(record.recipient_signature)}`
+                : readText(record?.pod_url)
+                  ? `POD ${readText(record.pod_url)}`
+                  : '',
+            ].filter(Boolean)
+            return parts.join(' | ')
+          }),
+        ]),
+        raw: response,
+      })
+      toast.success(`Shadowfax POD lookup completed for ${awbNumbers.length} AWB${awbNumbers.length === 1 ? '' : 's'}`)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to fetch Shadowfax POD details')
+      setShadowfaxPodResult({
+        title: 'POD Details',
+        summary: err?.response?.data?.message || err?.message || 'Request failed',
+        rows: [
+          'Check the AWB numbers, confirm the shipments are delivered or RTS delivered, and retry.',
+        ],
+        raw: err?.response?.data || null,
+      })
+    } finally {
+      setShadowfaxPodBusy(false)
+    }
+  }
+
   const handleFetchDelhiveryBulkWaybill = async () => {
     if (partnerId !== 'delhivery') return
     const count = Number(delhiveryWaybillCount)
@@ -1133,11 +1971,15 @@ function CourierPartnerPage() {
             <CardTitle className='text-lg'>
               {partnerId === 'delhivery'
                 ? 'Create shipment API'
+                : partnerId === 'shadowfax'
+                  ? 'Shadowfax desk'
                 : `${partnerMeta.title} booking flow`}
             </CardTitle>
             <CardDescription>
               {partnerId === 'delhivery'
                 ? 'Use Delhivery manifest create API for an order that is not already assigned.'
+                : partnerId === 'shadowfax'
+                  ? 'Shadowfax marketplace orders are created from the delivery dashboard, and this page also supports warehouse-model creation, serviceability checks, AWB generation, and routed-order status.'
                 : 'Use this app page for partner-specific monitoring. Booking is not enabled here yet.'}
             </CardDescription>
           </CardHeader>
@@ -1926,78 +2768,811 @@ function CourierPartnerPage() {
           </div>
         ) : null}
 
-        {!isDelhivery ? <div className='grid gap-4 lg:grid-cols-2'>
-          <Card className='border-border bg-card shadow-sm'>
-            <CardHeader>
-              <CardTitle className='text-base'>Tracking snapshot</CardTitle>
-              <CardDescription>
-                Recent assignments and tracking references.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className='space-y-3'>
-              {assignments.slice(0, 4).map(({ assignment, order }) => (
-                <div
-                  key={assignment.orderId}
-                  className='rounded-2xl border border-border bg-muted/40 p-4'
-                >
-                  <div className='flex items-start justify-between gap-3'>
-                    <div>
-                      <p className='font-medium text-foreground'>{assignment.orderNumber}</p>
-                      <p className='text-xs text-muted-foreground'>{assignment.customerName}</p>
+        {!isDelhivery ? (
+          <div className='space-y-4'>
+            {isShadowfax ? (
+              <div className='grid gap-4 xl:grid-cols-2 2xl:grid-cols-8'>
+                <Card className='border-border bg-card shadow-sm'>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Warehouse Order API</CardTitle>
+                    <CardDescription>
+                      Create a Shadowfax warehouse-model order from an unassigned dashboard order. Run serviceability first for the destination pincode.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    {eligibleOrders.length === 0 ? (
+                      <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                        No unassigned orders are available for Shadowfax warehouse creation.
+                      </div>
+                    ) : (
+                      <>
+                        <div className='space-y-2'>
+                          <label className='text-sm font-medium text-foreground'>Order</label>
+                          <select
+                            value={selectedBookingOrderId}
+                            onChange={(e) => {
+                              const nextOrder =
+                                eligibleOrders.find((order) => order.id === e.target.value) || null
+                              setSelectedBookingOrderId(e.target.value)
+                              if (nextOrder) applyOrderToBookingForm(nextOrder)
+                            }}
+                            className='vendor-field flex h-11 w-full rounded-none border bg-transparent px-4 py-2 text-sm shadow-sm outline-none'
+                          >
+                            <option value=''>Select order</option>
+                            {eligibleOrders.map((order) => (
+                              <option key={order.id} value={order.id}>
+                                {order.orderNumber} | {order.customerName} | {order.pincode || 'No pincode'}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {selectedBookingOrder ? (
+                          <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                            <p className='font-medium text-foreground'>
+                              {selectedBookingOrder.orderNumber} | {selectedBookingOrder.customerName}
+                            </p>
+                            <div className='mt-2 space-y-1'>
+                              <p>Destination: {selectedBookingOrder.pincode || 'Not available'}</p>
+                              <p>Value: {formatINR(selectedBookingOrder.total)}</p>
+                              <p>Items: {selectedBookingOrder.itemsCount} item(s)</p>
+                              <p>
+                                Model: Warehouse order API using order and vendor address data from
+                                SellersLogin.
+                              </p>
+                            </div>
+                          </div>
+                        ) : null}
+                        <div className='flex flex-wrap gap-2'>
+                          <Button
+                            variant='outline'
+                            className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                            disabled={shadowfaxOrderBusy || !selectedBookingOrder}
+                            onClick={() => {
+                              void handleCreateShadowfaxWarehouseOrder()
+                            }}
+                          >
+                            {shadowfaxOrderBusy ? (
+                              <LoaderCircle className='h-4 w-4 animate-spin' />
+                            ) : null}
+                            Create warehouse order
+                          </Button>
+                        </div>
+                        {shadowfaxOrderResult ? (
+                          <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                            <p className='font-medium text-foreground'>{shadowfaxOrderResult.title}</p>
+                            <p className='mt-2'>{shadowfaxOrderResult.summary}</p>
+                            <div className='mt-3 space-y-1'>
+                              {shadowfaxOrderResult.rows.map((row) => (
+                                <p key={row}>{row}</p>
+                              ))}
+                            </div>
+                            {shadowfaxOrderResult.raw ? (
+                              <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
+                                {JSON.stringify(shadowfaxOrderResult.raw, null, 2)}
+                              </pre>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className='border-border bg-card shadow-sm'>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Serviceability API</CardTitle>
+                    <CardDescription>
+                      Check Shadowfax pincode deliverability through the backend proxy using env-based credentials.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
+                      <div className='space-y-2 xl:col-span-2'>
+                        <label className='text-sm font-medium text-foreground'>Pincodes</label>
+                        <Input
+                          value={shadowfaxServiceabilityForm.pincodes}
+                          onChange={(e) =>
+                            setShadowfaxServiceabilityForm((current) => ({
+                              ...current,
+                              pincodes: e.target.value,
+                            }))
+                          }
+                          placeholder='560017 or 560017,110001'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>Service</label>
+                        <Input
+                          value={shadowfaxServiceabilityForm.service}
+                          onChange={(e) =>
+                            setShadowfaxServiceabilityForm((current) => ({
+                              ...current,
+                              service: e.target.value,
+                            }))
+                          }
+                          placeholder='customer_delivery'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>Page</label>
+                        <Input
+                          value={shadowfaxServiceabilityForm.page}
+                          onChange={(e) =>
+                            setShadowfaxServiceabilityForm((current) => ({
+                              ...current,
+                              page: e.target.value,
+                            }))
+                          }
+                          placeholder='1'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>Count</label>
+                        <Input
+                          value={shadowfaxServiceabilityForm.count}
+                          onChange={(e) =>
+                            setShadowfaxServiceabilityForm((current) => ({
+                              ...current,
+                              count: e.target.value,
+                            }))
+                          }
+                          placeholder='10'
+                        />
+                      </div>
                     </div>
-                    <Badge className='border-indigo-200 bg-indigo-50 text-indigo-700'>
-                      {assignment.trackingStatus}
-                    </Badge>
-                  </div>
-                  <div className='mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground'>
-                    <span className='inline-flex items-center gap-2'>
-                      <Truck className='h-4 w-4 text-muted-foreground' />
-                      {assignment.trackingCode}
-                    </span>
-                    {order?.delhivery?.scans?.[0]?.location ? (
-                      <span className='inline-flex items-center gap-2'>
-                        <ArrowUpRight className='h-4 w-4 text-muted-foreground' />
-                        {order.delhivery.scans[0].location}
-                      </span>
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        variant='outline'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                        disabled={shadowfaxServiceabilityBusy}
+                        onClick={() => {
+                          void handleRunShadowfaxServiceability()
+                        }}
+                      >
+                        {shadowfaxServiceabilityBusy ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : null}
+                        Check pincode
+                      </Button>
+                    </div>
+                    {shadowfaxServiceabilityResult ? (
+                      <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                        <p className='font-medium text-foreground'>
+                          {shadowfaxServiceabilityResult.title}
+                        </p>
+                        <p className='mt-2'>{shadowfaxServiceabilityResult.summary}</p>
+                        <div className='mt-3 space-y-1'>
+                          {shadowfaxServiceabilityResult.rows.map((row) => (
+                            <p key={row}>{row}</p>
+                          ))}
+                        </div>
+                        {shadowfaxServiceabilityResult.raw ? (
+                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
+                            {JSON.stringify(shadowfaxServiceabilityResult.raw, null, 2)}
+                          </pre>
+                        ) : null}
+                      </div>
                     ) : null}
-                    <span className='inline-flex items-center gap-2'>
-                      <Package2 className='h-4 w-4 text-slate-400' />
-                      {formatINR(assignment.total)}
-                    </span>
+                  </CardContent>
+                </Card>
 
-                  </div>
-                </div>
-              ))}
-              {!assignments.length && (
-                <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-6 text-sm text-muted-foreground'>
-                  No tracking snapshot yet.
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                <Card className='border-border bg-card shadow-sm'>
+                  <CardHeader>
+                    <CardTitle className='text-base'>AWB API</CardTitle>
+                    <CardDescription>
+                      Generate Shadowfax AWB numbers from the same backend-proxied integration used by the delivery dashboard.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    <div className='grid gap-4 md:grid-cols-2'>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>Count</label>
+                        <Input
+                          value={shadowfaxAwbForm.count}
+                          onChange={(e) =>
+                            setShadowfaxAwbForm((current) => ({
+                              ...current,
+                              count: e.target.value,
+                            }))
+                          }
+                          placeholder='10'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>Request type</label>
+                        <Input
+                          value={shadowfaxAwbForm.requestType}
+                          onChange={(e) =>
+                            setShadowfaxAwbForm((current) => ({
+                              ...current,
+                              requestType: e.target.value,
+                            }))
+                          }
+                          placeholder='FWD'
+                        />
+                      </div>
+                    </div>
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        variant='outline'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                        disabled={shadowfaxAwbBusy}
+                        onClick={() => {
+                          void handleGenerateShadowfaxAwb()
+                        }}
+                      >
+                        {shadowfaxAwbBusy ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : null}
+                        Generate AWB
+                      </Button>
+                    </div>
+                    {shadowfaxAwbResult ? (
+                      <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                        <p className='font-medium text-foreground'>{shadowfaxAwbResult.title}</p>
+                        <p className='mt-2'>{shadowfaxAwbResult.summary}</p>
+                        <div className='mt-3 space-y-1'>
+                          {shadowfaxAwbResult.rows.map((row) => (
+                            <p key={row}>{row}</p>
+                          ))}
+                        </div>
+                        {shadowfaxAwbResult.raw ? (
+                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
+                            {JSON.stringify(shadowfaxAwbResult.raw, null, 2)}
+                          </pre>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
 
-          <Card className='border-border bg-card shadow-sm'>
-            <CardHeader>
-              <CardTitle className='text-base'>
-                Partner routing notes
-              </CardTitle>
-              <CardDescription>
-                Notes for this partner view.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className='space-y-3 text-sm leading-6 text-muted-foreground'>
-                <>
+                <Card className='border-border bg-card shadow-sm'>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Tracking API V4</CardTitle>
+                    <CardDescription>
+                      Fetch single-order Shadowfax tracking with intermediate bag and hub events using an AWB number.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-sm font-medium text-foreground'>AWB number</label>
+                      <Input
+                        value={shadowfaxTrackingForm.awbNumber}
+                        onChange={(e) =>
+                          setShadowfaxTrackingForm((current) => ({
+                            ...current,
+                            awbNumber: e.target.value,
+                          }))
+                        }
+                        placeholder='SF12345678'
+                      />
+                    </div>
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        variant='outline'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                        disabled={shadowfaxTrackingBusy}
+                        onClick={() => {
+                          void handleRunShadowfaxTracking()
+                        }}
+                      >
+                        {shadowfaxTrackingBusy ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : null}
+                        Track AWB
+                      </Button>
+                    </div>
+                    {shadowfaxTrackingResult ? (
+                      <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                        <p className='font-medium text-foreground'>{shadowfaxTrackingResult.title}</p>
+                        <p className='mt-2'>{shadowfaxTrackingResult.summary}</p>
+                        <div className='mt-3 space-y-1'>
+                          {shadowfaxTrackingResult.rows.map((row) => (
+                            <p key={row}>{row}</p>
+                          ))}
+                        </div>
+                        {shadowfaxTrackingResult.raw ? (
+                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
+                            {JSON.stringify(shadowfaxTrackingResult.raw, null, 2)}
+                          </pre>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
+                <Card className='border-border bg-card shadow-sm'>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Update Order Data</CardTitle>
+                    <CardDescription>
+                      Update delivery, pickup, weight, or status fields for an existing Shadowfax AWB. Blank sections are sent as null.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-sm font-medium text-foreground'>AWB number</label>
+                      <Input
+                        value={shadowfaxUpdateForm.awbNumber}
+                        onChange={(e) =>
+                          setShadowfaxUpdateForm((current) => ({
+                            ...current,
+                            awbNumber: e.target.value,
+                          }))
+                        }
+                        placeholder='SF12345678'
+                      />
+                    </div>
+                    <div className='grid gap-4 md:grid-cols-2'>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>
+                          Delivery contact
+                        </label>
+                        <Input
+                          value={shadowfaxUpdateForm.deliveryContact}
+                          onChange={(e) =>
+                            setShadowfaxUpdateForm((current) => ({
+                              ...current,
+                              deliveryContact: e.target.value,
+                            }))
+                          }
+                          placeholder='9999999999'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>
+                          Delivery pincode
+                        </label>
+                        <Input
+                          value={shadowfaxUpdateForm.deliveryPincode}
+                          onChange={(e) =>
+                            setShadowfaxUpdateForm((current) => ({
+                              ...current,
+                              deliveryPincode: e.target.value,
+                            }))
+                          }
+                          placeholder='560008'
+                        />
+                      </div>
+                      <div className='space-y-2 md:col-span-2'>
+                        <label className='text-sm font-medium text-foreground'>
+                          Delivery address
+                        </label>
+                        <Textarea
+                          value={shadowfaxUpdateForm.deliveryAddress}
+                          onChange={(e) =>
+                            setShadowfaxUpdateForm((current) => ({
+                              ...current,
+                              deliveryAddress: e.target.value,
+                            }))
+                          }
+                          placeholder='Updated delivery address'
+                          className='min-h-[88px]'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>
+                          Pickup contact
+                        </label>
+                        <Input
+                          value={shadowfaxUpdateForm.pickupContact}
+                          onChange={(e) =>
+                            setShadowfaxUpdateForm((current) => ({
+                              ...current,
+                              pickupContact: e.target.value,
+                            }))
+                          }
+                          placeholder='9123456781'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>
+                          Pickup pincode
+                        </label>
+                        <Input
+                          value={shadowfaxUpdateForm.pickupPincode}
+                          onChange={(e) =>
+                            setShadowfaxUpdateForm((current) => ({
+                              ...current,
+                              pickupPincode: e.target.value,
+                            }))
+                          }
+                          placeholder='560007'
+                        />
+                      </div>
+                      <div className='space-y-2 md:col-span-2'>
+                        <label className='text-sm font-medium text-foreground'>
+                          Pickup address
+                        </label>
+                        <Textarea
+                          value={shadowfaxUpdateForm.pickupAddress}
+                          onChange={(e) =>
+                            setShadowfaxUpdateForm((current) => ({
+                              ...current,
+                              pickupAddress: e.target.value,
+                            }))
+                          }
+                          placeholder='Updated pickup address'
+                          className='min-h-[88px]'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>
+                          Actual weight
+                        </label>
+                        <Input
+                          value={shadowfaxUpdateForm.actualWeight}
+                          onChange={(e) =>
+                            setShadowfaxUpdateForm((current) => ({
+                              ...current,
+                              actualWeight: e.target.value,
+                            }))
+                          }
+                          placeholder='539.127'
+                        />
+                      </div>
+                      <div className='space-y-2'>
+                        <label className='text-sm font-medium text-foreground'>
+                          Volumetric weight
+                        </label>
+                        <Input
+                          value={shadowfaxUpdateForm.volumetricWeight}
+                          onChange={(e) =>
+                            setShadowfaxUpdateForm((current) => ({
+                              ...current,
+                              volumetricWeight: e.target.value,
+                            }))
+                          }
+                          placeholder='1498.314'
+                        />
+                      </div>
+                      <div className='space-y-2 md:col-span-2'>
+                        <label className='text-sm font-medium text-foreground'>
+                          Status update
+                        </label>
+                        <Input
+                          value={shadowfaxUpdateForm.status}
+                          onChange={(e) =>
+                            setShadowfaxUpdateForm((current) => ({
+                              ...current,
+                              status: e.target.value,
+                            }))
+                          }
+                          placeholder='rts, rto, reopen_ndr'
+                        />
+                      </div>
+                    </div>
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        variant='outline'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                        disabled={shadowfaxUpdateBusy}
+                        onClick={() => {
+                          void handleUpdateShadowfaxOrder()
+                        }}
+                      >
+                        {shadowfaxUpdateBusy ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : null}
+                        Send update
+                      </Button>
+                    </div>
+                    {shadowfaxUpdateResult ? (
+                      <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                        <p className='font-medium text-foreground'>{shadowfaxUpdateResult.title}</p>
+                        <p className='mt-2'>{shadowfaxUpdateResult.summary}</p>
+                        <div className='mt-3 space-y-1'>
+                          {shadowfaxUpdateResult.rows.map((row) => (
+                            <p key={row}>{row}</p>
+                          ))}
+                        </div>
+                        {shadowfaxUpdateResult.raw ? (
+                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
+                            {JSON.stringify(shadowfaxUpdateResult.raw, null, 2)}
+                          </pre>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
+                <Card className='border-border bg-card shadow-sm'>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Order Cancellation</CardTitle>
+                    <CardDescription>
+                      Cancel a Shadowfax marketplace or warehouse order using an AWB number or client order ID.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-sm font-medium text-foreground'>
+                        Request ID / AWB
+                      </label>
+                      <Input
+                        value={shadowfaxCancelForm.requestId}
+                        onChange={(e) =>
+                          setShadowfaxCancelForm((current) => ({
+                            ...current,
+                            requestId: e.target.value,
+                          }))
+                        }
+                        placeholder='SF10000002NRN'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-sm font-medium text-foreground'>
+                        Cancel remarks
+                      </label>
+                      <Textarea
+                        value={shadowfaxCancelForm.cancelRemarks}
+                        onChange={(e) =>
+                          setShadowfaxCancelForm((current) => ({
+                            ...current,
+                            cancelRemarks: e.target.value,
+                          }))
+                        }
+                        placeholder='Request cancelled by customer'
+                        className='min-h-[88px]'
+                      />
+                    </div>
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        variant='outline'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                        disabled={shadowfaxCancelBusy}
+                        onClick={() => {
+                          void handleCancelShadowfaxOrder()
+                        }}
+                      >
+                        {shadowfaxCancelBusy ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : null}
+                        Cancel request
+                      </Button>
+                    </div>
+                    {shadowfaxCancelResult ? (
+                      <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                        <p className='font-medium text-foreground'>{shadowfaxCancelResult.title}</p>
+                        <p className='mt-2'>{shadowfaxCancelResult.summary}</p>
+                        <div className='mt-3 space-y-1'>
+                          {shadowfaxCancelResult.rows.map((row) => (
+                            <p key={row}>{row}</p>
+                          ))}
+                        </div>
+                        {shadowfaxCancelResult.raw ? (
+                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
+                            {JSON.stringify(shadowfaxCancelResult.raw, null, 2)}
+                          </pre>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
+                <Card className='border-border bg-card shadow-sm'>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Escalation API</CardTitle>
+                    <CardDescription>
+                      Raise a Shadowfax support issue for a shipment that needs manual intervention.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-sm font-medium text-foreground'>AWB number</label>
+                      <Input
+                        value={shadowfaxEscalationForm.awbNumber}
+                        onChange={(e) =>
+                          setShadowfaxEscalationForm((current) => ({
+                            ...current,
+                            awbNumber: e.target.value,
+                          }))
+                        }
+                        placeholder='SF00000000TC'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-sm font-medium text-foreground'>
+                        Issue category
+                      </label>
+                      <select
+                        value={shadowfaxEscalationForm.issueCategory}
+                        onChange={(e) =>
+                          setShadowfaxEscalationForm((current) => ({
+                            ...current,
+                            issueCategory: e.target.value,
+                          }))
+                        }
+                        className='vendor-field flex h-11 w-full rounded-none border bg-transparent px-4 py-2 text-sm shadow-sm outline-none'
+                      >
+                        <option value='1'>1 | Delayed Delivery</option>
+                        <option value='2'>2 | Expedite Pickup (Customer)</option>
+                        <option value='3'>3 | Expedite Pickup (Seller)</option>
+                        <option value='4'>4 | Status Mismatch</option>
+                        <option value='5'>5 | Delivery Dispute</option>
+                      </select>
+                    </div>
+                    <div className='rounded-2xl border border-border bg-muted/40 p-4 text-xs text-muted-foreground'>
+                      <p>1: Delayed delivery after expected date.</p>
+                      <p>2: Expedite reverse pickup for customer.</p>
+                      <p>3: Expedite seller pickup for forward shipment.</p>
+                      <p>4: Physical shipment state does not match API state.</p>
+                      <p>5: Delivery dispute after marked delivered.</p>
+                    </div>
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        variant='outline'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                        disabled={shadowfaxEscalationBusy}
+                        onClick={() => {
+                          void handleCreateShadowfaxEscalation()
+                        }}
+                      >
+                        {shadowfaxEscalationBusy ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : null}
+                        Raise issue
+                      </Button>
+                    </div>
+                    {shadowfaxEscalationResult ? (
+                      <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                        <p className='font-medium text-foreground'>
+                          {shadowfaxEscalationResult.title}
+                        </p>
+                        <p className='mt-2'>{shadowfaxEscalationResult.summary}</p>
+                        <div className='mt-3 space-y-1'>
+                          {shadowfaxEscalationResult.rows.map((row) => (
+                            <p key={row}>{row}</p>
+                          ))}
+                        </div>
+                        {shadowfaxEscalationResult.raw ? (
+                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
+                            {JSON.stringify(shadowfaxEscalationResult.raw, null, 2)}
+                          </pre>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
+                <Card className='border-border bg-card shadow-sm'>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Get POD Details</CardTitle>
+                    <CardDescription>
+                      Fetch proof-of-delivery recipient details and signature references for up to 100 AWBs in one request.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    <div className='space-y-2'>
+                      <label className='text-sm font-medium text-foreground'>
+                        AWB numbers
+                      </label>
+                      <Textarea
+                        value={shadowfaxPodForm.awbNumbers}
+                        onChange={(e) =>
+                          setShadowfaxPodForm((current) => ({
+                            ...current,
+                            awbNumbers: e.target.value,
+                          }))
+                        }
+                        placeholder='SF17102220TE, SF17102219TE, SF16330181TE'
+                        className='min-h-[112px]'
+                      />
+                    </div>
+                    <div className='rounded-2xl border border-border bg-muted/40 p-4 text-xs text-muted-foreground'>
+                      <p>POD is available only after `delivered` or `rts_d` status.</p>
+                      <p>Separate AWBs with commas, spaces, or new lines.</p>
+                      <p>Maximum batch size: 100 AWBs.</p>
+                    </div>
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        variant='outline'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                        disabled={shadowfaxPodBusy}
+                        onClick={() => {
+                          void handleFetchShadowfaxPodDetails()
+                        }}
+                      >
+                        {shadowfaxPodBusy ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : null}
+                        Fetch POD
+                      </Button>
+                    </div>
+                    {shadowfaxPodResult ? (
+                      <div className='rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground'>
+                        <p className='font-medium text-foreground'>{shadowfaxPodResult.title}</p>
+                        <p className='mt-2'>{shadowfaxPodResult.summary}</p>
+                        <div className='mt-3 space-y-1'>
+                          {shadowfaxPodResult.rows.map((row) => (
+                            <p key={row}>{row}</p>
+                          ))}
+                        </div>
+                        {shadowfaxPodResult.raw ? (
+                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
+                            {JSON.stringify(shadowfaxPodResult.raw, null, 2)}
+                          </pre>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              </div>
+            ) : null}
+
+            <div className='grid gap-4 lg:grid-cols-2'>
+              <Card className='border-border bg-card shadow-sm'>
+                <CardHeader>
+                  <CardTitle className='text-base'>Tracking snapshot</CardTitle>
+                  <CardDescription>
+                    Recent assignments and tracking references.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-3'>
+                  {assignments.slice(0, 4).map(({ assignment, order }) => (
+                    <div
+                      key={assignment.orderId}
+                      className='rounded-2xl border border-border bg-muted/40 p-4'
+                    >
+                      <div className='flex items-start justify-between gap-3'>
+                        <div>
+                          <p className='font-medium text-foreground'>{assignment.orderNumber}</p>
+                          <p className='text-xs text-muted-foreground'>{assignment.customerName}</p>
+                        </div>
+                        <Badge className='border-indigo-200 bg-indigo-50 text-indigo-700'>
+                          {assignment.trackingStatus}
+                        </Badge>
+                      </div>
+                      <div className='mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground'>
+                        <span className='inline-flex items-center gap-2'>
+                          <Truck className='h-4 w-4 text-muted-foreground' />
+                          {assignment.trackingCode}
+                        </span>
+                        {order?.delhivery?.scans?.[0]?.location ? (
+                          <span className='inline-flex items-center gap-2'>
+                            <ArrowUpRight className='h-4 w-4 text-muted-foreground' />
+                            {order.delhivery.scans[0].location}
+                          </span>
+                        ) : null}
+                        <span className='inline-flex items-center gap-2'>
+                          <Package2 className='h-4 w-4 text-slate-400' />
+                          {formatINR(assignment.total)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {!assignments.length && (
+                    <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-6 text-sm text-muted-foreground'>
+                      No tracking snapshot yet.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className='border-border bg-card shadow-sm'>
+                <CardHeader>
+                  <CardTitle className='text-base'>Partner routing notes</CardTitle>
+                  <CardDescription>
+                    Notes for this partner view.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-3 text-sm leading-6 text-muted-foreground'>
                   <p>
                     Use the courier desk to assign new orders to {partnerMeta.title}. Each
                     assignment is shown here with a quote and tracking reference.
                   </p>
+                  {isShadowfax ? (
+                    <p>
+                      Serviceability checks use the backend Shadowfax env values, so the API token
+                      is not exposed in the browser.
+                    </p>
+                  ) : null}
                   <p className='font-medium text-slate-900'>
                     Current ETA benchmark: {partnerMeta.etaLabel}
                   </p>
-                </>
-            </CardContent>
-          </Card>
-        </div> : null}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        ) : null}
       </div>
       <Dialog
         open={editDialogOpen}

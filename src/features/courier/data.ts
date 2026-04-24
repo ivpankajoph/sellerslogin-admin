@@ -1,9 +1,10 @@
 import borzoLogo from '@/assets/toolkit-apps/borzo.svg'
 import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
+import shadowfaxLogo from '@/assets/toolkit-apps/shadowfax.svg'
 
 import porterLogo from '@/assets/toolkit-apps/porter.svg'
 
-export type CourierPartnerId = 'borzo' | 'delhivery' | 'porter'
+export type CourierPartnerId = 'borzo' | 'delhivery' | 'shadowfax' | 'porter'
 
 export type CourierPartner = {
   id: CourierPartnerId
@@ -78,6 +79,16 @@ export type CourierOrderSummary = {
     }>
     updated_at?: string
   }
+  shadowfax?: {
+    order_model?: string
+    order_id?: string
+    tracking_number?: string
+    client_order_id?: string
+    payment_mode?: string
+    status?: string
+    status_description?: string
+    updated_at?: string
+  }
 
 }
 
@@ -131,6 +142,17 @@ export const COURIER_PARTNERS: CourierPartner[] = [
     reportPath: '/courier/delhivery',
   },
 
+  {
+    id: 'shadowfax',
+    title: 'Shadowfax',
+    shortLabel: 'Shadowfax',
+    description: 'Marketplace and warehouse shipping partner for routed courier orders.',
+    imageSrc: shadowfaxLogo,
+    themeClass: 'border-orange-500/20 bg-orange-500/10',
+    etaLabel: '1-3 days',
+    live: true,
+    reportPath: '/courier/shadowfax',
+  },
   {
     id: 'porter',
     title: 'Porter',
@@ -240,6 +262,7 @@ const safeWindow = () =>
 const trackingStatusByPartner: Record<CourierPartnerId, string> = {
   borzo: 'Request queued',
   delhivery: 'Pickup requested',
+  shadowfax: 'Order created',
 
   porter: 'Dispatcher review',
 }
@@ -247,6 +270,7 @@ const trackingStatusByPartner: Record<CourierPartnerId, string> = {
 const trackingPrefixByPartner: Record<CourierPartnerId, string> = {
   borzo: 'BRZ',
   delhivery: 'DLV',
+  shadowfax: 'SFX',
 
   porter: 'PTR',
 }
@@ -345,7 +369,9 @@ export const normalizeCourierOrder = (
     trackingUrl: toText(order?.borzo?.tracking_url),
     externalDeliveryId: toText(
       order?.borzo?.order_id ||
-        order?.delhivery?.waybill
+        order?.delhivery?.waybill ||
+        order?.shadowfax?.tracking_number ||
+        order?.shadowfax?.order_id
     ),
     websiteLabel,
     items: items.map((item: any) => ({
@@ -404,6 +430,18 @@ export const normalizeCourierOrder = (
           updated_at: toText(order?.delhivery?.updated_at),
         }
       : undefined,
+    shadowfax: order?.shadowfax
+      ? {
+          order_model: toText(order?.shadowfax?.order_model),
+          order_id: toText(order?.shadowfax?.order_id),
+          tracking_number: toText(order?.shadowfax?.tracking_number),
+          client_order_id: toText(order?.shadowfax?.client_order_id),
+          payment_mode: toText(order?.shadowfax?.payment_mode),
+          status: toText(order?.shadowfax?.status),
+          status_description: toText(order?.shadowfax?.status_description),
+          updated_at: toText(order?.shadowfax?.updated_at),
+        }
+      : undefined,
 
   }
 }
@@ -415,18 +453,21 @@ export const estimateCourierQuote = (
   const baseRateMap: Record<CourierPartnerId, number> = {
     borzo: 54,
     delhivery: 68,
+    shadowfax: 72,
 
     porter: 76,
   }
   const variableRateMap: Record<CourierPartnerId, number> = {
     borzo: 0.013,
     delhivery: 0.01,
+    shadowfax: 0.011,
 
     porter: 0.012,
   }
   const itemRateMap: Record<CourierPartnerId, number> = {
     borzo: 9,
     delhivery: 11,
+    shadowfax: 12,
 
     porter: 13,
   }
@@ -524,6 +565,13 @@ export const getActiveCourierPartnerIds = (
     next.add('delhivery')
   }
 
+  if (
+    (toText(order.shadowfax?.order_id) || toText(order.shadowfax?.tracking_number)) &&
+    !isClosedCourierState(order.shadowfax?.status)
+  ) {
+    next.add('shadowfax')
+  }
+
 
 
   const localAssignment = getCourierAssignmentForOrder(order.id)
@@ -566,6 +614,32 @@ export const getRemoteCourierAssignment = (
       trackingStatus: order.delhivery?.status || trackingStatusByPartner.delhivery,
       trackingCode: realWaybill,
       trackingUrl: order.delhivery?.label_url || '',
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      total: order.total,
+      websiteLabel: order.websiteLabel,
+    }
+  }
+
+  if (
+    (toText(order.shadowfax?.order_id) || toText(order.shadowfax?.tracking_number)) &&
+    !isClosedCourierState(order.shadowfax?.status)
+  ) {
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      source: order.source,
+      partnerId: 'shadowfax',
+      partnerName: COURIER_PARTNER_MAP.shadowfax.title,
+      amount: 0,
+      etaLabel: COURIER_PARTNER_MAP.shadowfax.etaLabel,
+      assignedAt: order.shadowfax?.updated_at || order.createdAt,
+      trackingStatus: order.shadowfax?.status || trackingStatusByPartner.shadowfax,
+      trackingCode:
+        toText(order.shadowfax?.tracking_number) ||
+        toText(order.shadowfax?.order_id) ||
+        `${trackingPrefixByPartner.shadowfax}-${order.id.slice(-6).toUpperCase()}`,
+      trackingUrl: '',
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       total: order.total,

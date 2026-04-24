@@ -389,11 +389,13 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
       ? 'courier-list'
       : pathname.startsWith('/courier/warehouses')
         ? 'warehouses'
-        : pathname.startsWith('/courier/tracking')
-          ? 'tracking'
-          : pathname.startsWith('/courier/delhivery')
-            ? 'delhivery'
-            : 'apps'
+          : pathname.startsWith('/courier/tracking')
+            ? 'tracking'
+            : pathname.startsWith('/courier/delhivery')
+              ? 'delhivery'
+              : pathname.startsWith('/courier/shadowfax')
+                ? 'shadowfax'
+                : 'apps'
 
     return (
       <VendorIntegrationsProvider>

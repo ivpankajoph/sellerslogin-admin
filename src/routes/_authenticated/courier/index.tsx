@@ -20,14 +20,18 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
   fetchDelhiveryB2cServiceability,
+  fetchDelhiveryShippingEstimate,
+  fetchShadowfaxServiceability,
   loadCourierOrders,
 } from '@/features/courier/api'
 import {
   COURIER_PARTNER_MAP,
+  estimateCourierQuote,
   hasAnyActiveCourierAssignment,
   type CourierOrderSummary,
   type CourierPartnerId,
 } from '@/features/courier/data'
+import { formatINR } from '@/lib/currency'
 import type { RootState } from '@/store'
 
 export const Route = createFileRoute('/_authenticated/courier/')({
@@ -39,6 +43,7 @@ type CheckResult = {
   title: string
   state: 'ok' | 'bad' | 'warn' | 'error'
   summary: string
+  priceLabel: string
   rows: string[]
 }
 
@@ -163,8 +168,8 @@ function CourierDeskPage() {
       },
       {
         label: 'Checked apps',
-        value: 1,
-        helper: 'Currently lane check is performed for Delhivery.',
+        value: 2,
+        helper: 'Checks Delhivery price and Shadowfax serviceability.',
       },
     ],
     [availableOrders.length, orders.length, routedOrders.length]
@@ -192,18 +197,41 @@ function CourierDeskPage() {
 
     setChecking(true)
     try {
-      const [delhivery] = await Promise.allSettled([
+      const [delhivery, delhiveryEstimate, shadowfax] = await Promise.allSettled([
         fetchDelhiveryB2cServiceability(resolvedDestination),
+        fetchDelhiveryShippingEstimate({
+          md: 'S',
+          cgm: '500',
+          o_pin: resolvedOrigin,
+          d_pin: resolvedDestination,
+          ss: 'Delivered',
+          pt: 'Pre-paid',
+          l: '10',
+          b: '10',
+          h: '10',
+          ipkg_type: 'box',
+        }),
+        fetchShadowfaxServiceability({
+          pincodes: resolvedDestination,
+          service: 'customer_delivery',
+          page: 1,
+          count: 10,
+        }),
       ])
 
       const next: CheckResult[] = []
 
       if (delhivery.status === 'fulfilled') {
         const serviceability = delhivery.value?.serviceability || {}
+        const estimate = delhiveryEstimate.status === 'fulfilled'
+          ? delhiveryEstimate.value?.estimate || {}
+          : {}
+        const delhiveryPrice = Number(estimate?.estimated_charge || 0)
         next.push({
           id: 'delhivery',
           title: 'Delhivery',
           state: serviceability?.serviceable ? 'ok' : 'bad',
+          priceLabel: delhiveryPrice ? formatINR(delhiveryPrice) : 'Price not returned',
           summary: serviceability?.serviceable
             ? 'Destination pincode is serviceable on Delhivery.'
             : 'Delhivery did not return a serviceable record for this pincode.',
@@ -212,6 +240,7 @@ function CourierDeskPage() {
             `Destination: ${serviceability?.requested_pincode || resolvedDestination}`,
             `Matched records: ${serviceability?.code_count ?? 0}`,
             `Serviceable records: ${serviceability?.serviceable_count ?? 0}`,
+            `Chargeable weight: ${estimate?.chargeable_weight ?? '500'} gm`,
           ],
         })
       } else {
@@ -219,11 +248,49 @@ function CourierDeskPage() {
           id: 'delhivery',
           title: 'Delhivery',
           state: 'error',
+          priceLabel: 'Price unavailable',
           summary:
             delhivery.reason?.response?.data?.message ||
             delhivery.reason?.message ||
             'Delhivery serviceability check failed.',
           rows: ['Check Delhivery connection and try again.'],
+        })
+      }
+
+      if (shadowfax.status === 'fulfilled') {
+        const serviceability = shadowfax.value?.serviceability || {}
+        const shadowfaxQuote = selectedOrder
+          ? estimateCourierQuote(selectedOrder, 'shadowfax')
+          : null
+        next.push({
+          id: 'shadowfax',
+          title: 'Shadowfax',
+          state: serviceability?.serviceable ? 'ok' : 'bad',
+          priceLabel: shadowfaxQuote
+            ? `${formatINR(shadowfaxQuote.amount)} est.`
+            : 'Estimate after order selection',
+          summary: serviceability?.serviceable
+            ? 'Destination pincode is serviceable on Shadowfax.'
+            : 'Shadowfax did not return a serviceable record for this pincode.',
+          rows: [
+            `Origin: ${resolvedOrigin}`,
+            `Destination: ${serviceability?.requested_pincode || resolvedDestination}`,
+            `Matched records: ${serviceability?.code_count ?? 0}`,
+            `Serviceable records: ${serviceability?.serviceable_count ?? 0}`,
+            shadowfaxQuote ? `ETA: ${shadowfaxQuote.etaLabel}` : 'Select an order for local price estimate.',
+          ],
+        })
+      } else {
+        next.push({
+          id: 'shadowfax',
+          title: 'Shadowfax',
+          state: 'error',
+          priceLabel: 'Price unavailable',
+          summary:
+            shadowfax.reason?.response?.data?.message ||
+            shadowfax.reason?.message ||
+            'Shadowfax serviceability check failed.',
+          rows: ['Check Shadowfax connection and try again.'],
         })
       }
 
@@ -238,7 +305,7 @@ function CourierDeskPage() {
     if (selectedOrderId) params.set('orderId', selectedOrderId)
     if (origin.trim()) params.set('origin', origin.trim())
     if (destination.trim()) params.set('destination', destination.trim())
-    window.location.assign(`/courier/${partnerId}${params.toString() ? `?${params.toString()}` : ''}`)
+    void navigate({ to: `/courier/${partnerId}${params.toString() ? `?${params.toString()}` : ''}` })
   }
 
   useEffect(() => {
@@ -256,10 +323,10 @@ function CourierDeskPage() {
         <div className='overflow-hidden rounded-none border border-border bg-card p-4 md:p-5'>
           <div className='flex flex-wrap items-start justify-between gap-4'>
             <div className='space-y-2'>
-              <h1 className='text-3xl font-semibold tracking-tight text-foreground'>Courier Desk</h1>
+              <h1 className='text-3xl font-semibold tracking-tight text-foreground'>Check Price</h1>
               <p className='max-w-3xl text-sm leading-6 text-muted-foreground'>
-                Check lane availability by origin and destination pincode only. Shipment creation
-                now happens on the courier app page.
+                Check delivery app availability and price by origin and destination pincode.
+                Shipment creation happens on the selected courier app page.
               </p>
             </div>
             <div className='flex flex-wrap gap-2'>
@@ -278,7 +345,7 @@ function CourierDeskPage() {
               <Button
                 variant='outline'
                 className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
-                onClick={() => window.location.assign('/courier/list')}
+                onClick={() => void navigate({ to: '/courier/list' })}
               >
                 Courier List
                 <ArrowUpRight className='h-4 w-4' />
@@ -334,7 +401,7 @@ function CourierDeskPage() {
                 onClick={() => void runCheck()}
               >
                 {checking ? <LoaderCircle className='h-4 w-4 animate-spin' /> : <Search className='h-4 w-4' />}
-                {checking ? 'Checking availability' : 'Check availability'}
+                {checking ? 'Checking price' : 'Check price'}
               </Button>
               <p className='text-sm text-muted-foreground'>
                 Routed orders are no longer handled here. Open `Courier List` to manage active shipments.
@@ -360,7 +427,7 @@ function CourierDeskPage() {
           <CardContent>
             {!results.length ? (
               <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-8 text-sm text-muted-foreground'>
-                Enter origin and destination pincodes to check courier availability.
+                Enter origin and destination pincodes to check courier app prices.
               </div>
             ) : (
               <div className='grid gap-4 xl:grid-cols-2'>
@@ -378,6 +445,7 @@ function CourierDeskPage() {
                           </div>
                           <div>
                             <p className='text-xl font-semibold text-foreground'>{item.title}</p>
+                            <p className='mt-1 text-2xl font-bold text-foreground'>{item.priceLabel}</p>
                           </div>
                         </div>
                         <Badge className={tone.className}>

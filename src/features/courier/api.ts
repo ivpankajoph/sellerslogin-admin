@@ -82,6 +82,25 @@ export const createDelhiveryShipment = async (
   return res?.data
 }
 
+export const createShadowfaxShipment = async (
+  order: CourierOrderSummary,
+  payload: Record<string, unknown> = {}
+) => {
+  const res = await api.post(`${getOrderBasePath(order)}/shadowfax/create`, payload)
+  return res?.data
+}
+
+export const createShadowfaxWarehouseShipment = async (
+  order: CourierOrderSummary,
+  payload: Record<string, unknown> = {}
+) => {
+  const res = await api.post(`${getOrderBasePath(order)}/shadowfax/create`, {
+    ...payload,
+    order_model: 'warehouse',
+  })
+  return res?.data
+}
+
 export const editDelhiveryShipment = async (
   order: CourierOrderSummary,
   payload: Record<string, unknown> = {}
@@ -136,6 +155,63 @@ export const fetchDelhiveryB2cServiceability = async (filterCodes: string) => {
   const res = await api.get('/delhivery/serviceability', {
     params: { filter_codes: filterCodes },
   })
+  return res?.data
+}
+
+export const fetchShadowfaxServiceability = async (params: {
+  pincodes: string
+  service?: string
+  page?: string | number
+  count?: string | number
+}) => {
+  const res = await api.get('/shadowfax/serviceability', { params })
+  return res?.data
+}
+
+export const generateShadowfaxAwbs = async (payload: {
+  count?: string | number
+  request_type?: string
+}) => {
+  const res = await api.post('/shadowfax/awb', payload)
+  return res?.data
+}
+
+export const fetchShadowfaxOrderDetails = async (awbNumber: string) => {
+  const res = await api.get(`/shadowfax/order/${encodeURIComponent(awbNumber)}`)
+  return res?.data
+}
+
+export const updateShadowfaxOrderData = async (payload: {
+  awb_number: string
+  delivery_details?: Record<string, unknown> | null
+  pickup_details?: Record<string, unknown> | null
+  order_details?: Record<string, unknown> | null
+  status_update?: Record<string, unknown> | null
+}) => {
+  const res = await api.post('/shadowfax/order-update', payload)
+  return res?.data
+}
+
+export const cancelShadowfaxOrder = async (payload: {
+  request_id: string
+  cancel_remarks: string
+}) => {
+  const res = await api.post('/shadowfax/orders/cancel', payload)
+  return res?.data
+}
+
+export const createShadowfaxEscalation = async (payload: {
+  awb_number: string
+  issue_category: string | number
+}) => {
+  const res = await api.post('/shadowfax/support/issue', payload)
+  return res?.data
+}
+
+export const fetchShadowfaxPodDetails = async (payload: {
+  awb_numbers: string[]
+}) => {
+  const res = await api.post('/shadowfax/pod-details', payload)
   return res?.data
 }
 

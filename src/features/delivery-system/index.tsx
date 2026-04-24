@@ -1,11 +1,9 @@
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
-  BarChart3,
   Boxes,
   CheckCircle2,
-  ChevronDown,
-  CircleDollarSign,
   ClipboardList,
   Home,
   LayoutDashboard,
@@ -13,20 +11,25 @@ import {
   Menu,
   PackageCheck,
   PackageOpen,
-  Plus,
   RefreshCcw,
   Search,
   Settings,
   ShoppingCart,
-  Star,
   Truck,
-  UserRound,
   Warehouse,
 } from 'lucide-react'
 import { type ReactNode } from 'react'
 import { useSelector } from 'react-redux'
 import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
+import shadowfaxLogo from '@/assets/toolkit-apps/shadowfax.svg'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   fetchExternalDelhiveryShipments,
   loadCourierOrders,
@@ -58,6 +61,10 @@ const getOrderSearchText = (order: CourierOrderSummary) =>
     order.pincode,
     order.status,
     order.websiteLabel,
+    order.delhivery?.waybill,
+    order.delhivery?.waybills?.[0],
+    order.shadowfax?.tracking_number,
+    order.shadowfax?.order_id,
   ]
     .map((value) => readText(value).toLowerCase())
     .filter(Boolean)
@@ -68,10 +75,57 @@ const getDelhiveryCode = (order: CourierOrderSummary) =>
   readText(order.delhivery?.waybills?.[0]) ||
   readText(order.externalDeliveryId)
 
+const getShadowfaxCode = (order: CourierOrderSummary) =>
+  readText(order.shadowfax?.tracking_number) || readText(order.shadowfax?.order_id)
+
+const getShadowfaxLabel = (order: CourierOrderSummary) => {
+  const model = readText(order.shadowfax?.order_model).toLowerCase()
+  if (model === 'warehouse') return 'Shadowfax Warehouse'
+  if (model === 'marketplace') return 'Shadowfax Marketplace'
+  return 'Shadowfax'
+}
+
+const getTrackingCode = (order: CourierOrderSummary) =>
+  getShadowfaxCode(order) || getDelhiveryCode(order)
+
+const getShipmentStatus = (order: CourierOrderSummary) =>
+  readText(order.shadowfax?.status) ||
+  readText(order.delhivery?.status) ||
+  readText(order.status) ||
+  'pending'
+
+const FALLBACK_IMAGE =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+      <rect width="96" height="96" fill="#f1f5f9"/>
+      <rect x="14" y="14" width="68" height="68" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="2"/>
+      <path d="M26 62l14-17 10 11 8-10 12 12" fill="none" stroke="#94a3b8" stroke-width="3"/>
+      <circle cx="35" cy="35" r="5" fill="#94a3b8"/>
+    </svg>`
+  )
+
+const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value)
+
+const resolveItemImage = (value?: string) => {
+  const text = readText(value)
+  if (!text) return FALLBACK_IMAGE
+  if (text.startsWith('data:') || text.startsWith('blob:')) return text
+  if (text.startsWith('//')) return `https:${text}`
+  if (isAbsoluteUrl(text)) return text
+  if (text.startsWith('/')) return text
+  return `/${text}`
+}
+
+const getCourierStatusText = (order: CourierOrderSummary) =>
+  `${readText(order.status)} ${readText(order.delhivery?.status)} ${readText(
+    order.delhivery?.status_description
+  )} ${readText(order.shadowfax?.status)} ${readText(order.shadowfax?.status_description)}`.toLowerCase()
+
 const isPendingPickup = (order: CourierOrderSummary) => {
   const status = readText(order.status).toLowerCase()
-  const courierStatus = readText(order.delhivery?.status).toLowerCase()
-  if (getDelhiveryCode(order)) return false
+  const courierStatus = getCourierStatusText(order)
+  if (getTrackingCode(order)) return false
   return (
     !status ||
     ['pending', 'placed', 'confirmed', 'processing', 'new'].some((entry) =>
@@ -82,23 +136,21 @@ const isPendingPickup = (order: CourierOrderSummary) => {
 }
 
 const isInTransit = (order: CourierOrderSummary) => {
-  const status = `${readText(order.status)} ${readText(order.delhivery?.status)}`.toLowerCase()
+  const status = getCourierStatusText(order)
   return ['ship', 'transit', 'dispatch', 'out for delivery', 'picked'].some((entry) =>
     status.includes(entry)
   )
 }
 
 const isAtDestinationHub = (order: CourierOrderSummary) => {
-  const status = `${readText(order.status)} ${readText(order.delhivery?.status)} ${readText(
-    order.delhivery?.status_description
-  )}`.toLowerCase()
+  const status = getCourierStatusText(order)
   return ['destination', 'hub', 'reached facility'].some((entry) =>
     status.includes(entry)
   )
 }
 
 const isDelivered = (order: CourierOrderSummary) => {
-  const status = `${readText(order.status)} ${readText(order.delhivery?.status)}`.toLowerCase()
+  const status = getCourierStatusText(order)
   return status.includes('delivered') || status.includes('completed')
 }
 
@@ -261,12 +313,12 @@ export function DeliveryWorkspaceShell({
   onSearchFocus,
 }: {
   children: ReactNode
-  activeSection?: 'dashboard' | 'orders' | 'courier-list' | 'apps' | 'delhivery' | 'warehouses' | 'tracking'
+  activeSection?: 'dashboard' | 'orders' | 'courier-list' | 'apps' | 'delhivery' | 'shadowfax' | 'warehouses' | 'tracking'
   searchValue?: string
   onSearchChange?: (value: string) => void
   onSearchFocus?: () => void
 }) {
-  const user = useSelector((state: RootState) => state.auth?.user)
+  const navigate = useNavigate()
   const [internalSearch, setInternalSearch] = useState(searchValue)
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
@@ -281,7 +333,7 @@ export function DeliveryWorkspaceShell({
   }
 
   const openPath = (path: string) => {
-    window.location.assign(path)
+    void navigate({ to: path })
   }
 
   const handleSearchChange = (value: string) => {
@@ -299,7 +351,7 @@ export function DeliveryWorkspaceShell({
     if (value.trim()) {
       params.set('q', value.trim())
     }
-    window.location.assign(`/delivery-system?${params.toString()}`)
+    void navigate({ to: `/delivery-system?${params.toString()}` })
   }
 
   return (
@@ -331,18 +383,6 @@ export function DeliveryWorkspaceShell({
               </span>
             </span>
           </button>
-          <button
-            type='button'
-            onClick={() => openPath('/profile')}
-            className='hidden h-12 min-w-[260px] items-center gap-3 rounded-[8px] border border-slate-200 bg-slate-50 px-4 md:flex'
-          >
-            <span className='flex h-8 w-8 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white'>
-              {readText(user?.name || user?.email || 'S').slice(0, 1).toUpperCase()}
-            </span>
-            <span className='truncate text-base font-semibold text-slate-800'>
-              {readText(user?.name) || readText(user?.email) || 'Sellerslogin.com'}
-            </span>
-          </button>
           <div className='relative hidden flex-1 lg:block'>
             <Search className='pointer-events-none absolute top-1/2 left-5 h-5 w-5 -translate-y-1/2 text-slate-400' />
             <input
@@ -358,27 +398,6 @@ export function DeliveryWorkspaceShell({
               className='h-14 w-full rounded-[6px] border border-slate-200 bg-slate-100 px-14 text-base outline-none focus:border-teal-500 focus:bg-white'
             />
           </div>
-          <Button
-            variant='outline'
-            className='hidden h-14 rounded-[6px] border-slate-200 bg-white px-5 text-base font-semibold lg:inline-flex'
-            onClick={() => openPath('/delivery-system')}
-          >
-            <Star className='h-5 w-5 fill-blue-600 text-blue-600' />
-            Quick Actions
-          </Button>
-          <button
-            type='button'
-            onClick={() => openPath('/template-wallet')}
-            className='hidden h-14 items-center overflow-hidden rounded-[12px] border border-teal-700 bg-white lg:flex'
-          >
-            <span className='flex h-full items-center gap-2 px-5 text-xl font-bold'>
-              <CircleDollarSign className='h-6 w-6 text-teal-700' />
-              {formatINR(0)}
-            </span>
-            <span className='flex h-full w-16 items-center justify-center bg-teal-700 text-white'>
-              <Plus className='h-7 w-7' />
-            </span>
-          </button>
           <div className='ml-auto flex items-center gap-2'>
             <button
               type='button'
@@ -387,14 +406,6 @@ export function DeliveryWorkspaceShell({
               aria-label='Refresh'
             >
               <RefreshCcw className='h-5 w-5' />
-            </button>
-            <button
-              type='button'
-              onClick={() => openPath('/profile')}
-              className='flex h-12 items-center gap-2 rounded-full bg-slate-100 px-3 text-slate-800'
-            >
-              <UserRound className='h-7 w-7' />
-              <ChevronDown className='h-4 w-4' />
             </button>
           </div>
         </div>
@@ -423,16 +434,9 @@ export function DeliveryWorkspaceShell({
             />
             <RailButton
               collapsed={collapsed}
-              active={activeSection === 'courier-list'}
-              icon={BarChart3}
-              label='Courier List'
-              onClick={() => openPath('/courier/list')}
-            />
-            <RailButton
-              collapsed={collapsed}
               active={activeSection === 'apps'}
               icon={Truck}
-              label='Courier Apps'
+              label='Check Price'
               onClick={() => openPath('/courier')}
             />
             <RailImageButton
@@ -442,9 +446,10 @@ export function DeliveryWorkspaceShell({
               label='Delhivery'
               onClick={() => openPath('/courier/delhivery')}
             />
-            <RailButton
+            <RailImageButton
               collapsed={collapsed}
-              icon={Truck}
+              active={activeSection === 'shadowfax'}
+              imageSrc={shadowfaxLogo}
               label='Shadowfax'
               onClick={() => openPath('/courier/shadowfax')}
             />
@@ -480,6 +485,8 @@ export function DeliveryWorkspaceShell({
 }
 
 export function DeliverySystemDashboard() {
+  const navigate = useNavigate()
+  const searchStr = useLocation({ select: (location) => location.searchStr })
   const role = String(
     useSelector((state: RootState) => state.auth?.user?.role || '')
   ).toLowerCase()
@@ -494,6 +501,7 @@ export function DeliverySystemDashboard() {
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [selectedOrder, setSelectedOrder] = useState<CourierOrderSummary | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -549,13 +557,12 @@ export function DeliverySystemDashboard() {
   }, [isVendor, refreshKey, token, user])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
+    const params = new URLSearchParams(searchStr)
     const view = params.get('view')
     const search = params.get('q')
-    if (view === 'orders') setActiveView('orders')
-    if (search) setQuery(search)
-  }, [])
+    setActiveView(view === 'orders' ? 'orders' : 'dashboard')
+    setQuery(search || '')
+  }, [searchStr])
 
   const filteredOrders = useMemo(() => {
     const term = query.trim().toLowerCase()
@@ -583,14 +590,16 @@ export function DeliverySystemDashboard() {
   )
 
   const openPath = (path: string) => {
-    window.location.assign(path)
+    void navigate({ to: path })
   }
 
-  const startShippingForOrder = (order: CourierOrderSummary) => {
+  const openPriceCheckForOrder = (order: CourierOrderSummary) => {
     const params = new URLSearchParams()
+    const origin = readText(user?.pincode || user?.pin || user?.postal_code || user?.zip)
     params.set('orderId', order.id)
+    if (origin) params.set('origin', origin)
     if (order.pincode) params.set('destination', order.pincode)
-    openPath(`/courier/delhivery?${params.toString()}`)
+    openPath(`/courier?${params.toString()}`)
   }
 
   return (
@@ -620,10 +629,10 @@ export function DeliverySystemDashboard() {
                     <div className='mt-8 flex flex-wrap items-center gap-6'>
                       <button
                         type='button'
-                        onClick={() => openPath('/courier/delhivery')}
+                        onClick={() => openPath('/courier')}
                         className='flex h-16 items-center gap-5 rounded-[8px] bg-white px-9 text-lg font-bold text-slate-900 shadow-sm hover:bg-slate-50'
                       >
-                        Start Shipping
+                        Check price for delivery
                         <ArrowRight className='h-7 w-7' />
                       </button>
                     </div>
@@ -656,7 +665,7 @@ export function DeliverySystemDashboard() {
                     <QuickAction
                       icon={Truck}
                       title='Create orders'
-                      subtitle='Create Delhivery shipment from dashboard orders'
+                      subtitle='Create Delhivery or Shadowfax shipment from dashboard orders'
                       onClick={() => openPath('/courier/delhivery')}
                     />
                     <QuickAction
@@ -739,11 +748,15 @@ export function DeliverySystemDashboard() {
                     </thead>
                     <tbody>
                       {filteredOrders.map((order) => {
-                        const awb = getDelhiveryCode(order)
+                        const awb = getTrackingCode(order)
+                        const hasShadowfax = Boolean(getShadowfaxCode(order))
+                        const hasDelhivery = Boolean(getDelhiveryCode(order))
+                        const hasActiveShipment = hasAnyActiveCourierAssignment(order)
                         return (
                           <tr
                             key={`${order.source}-${order.id}`}
-                            className='border-b border-slate-100 align-top hover:bg-slate-50'
+                            className='cursor-pointer border-b border-slate-100 align-top hover:bg-slate-50'
+                            onClick={() => setSelectedOrder(order)}
                           >
                             <td className='px-4 py-4'>
                               <p className='font-bold text-slate-950'>{order.orderNumber}</p>
@@ -780,17 +793,28 @@ export function DeliverySystemDashboard() {
                             </td>
                             <td className='px-4 py-4'>
                               <span className='inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold capitalize text-slate-700'>
-                                {order.delhivery?.status || order.status || 'pending'}
+                                {getShipmentStatus(order)}
                               </span>
                             </td>
                             <td className='px-4 py-4'>
-                              <span className='text-sm font-semibold text-slate-700'>
-                                {awb || 'Not created'}
-                              </span>
+                              <div className='space-y-1'>
+                                <span className='text-sm font-semibold text-slate-700'>
+                                  {awb || 'Not created'}
+                                </span>
+                                {hasShadowfax ? (
+                                  <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-orange-600'>
+                                    {getShadowfaxLabel(order)}
+                                  </p>
+                                ) : hasDelhivery ? (
+                                  <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-600'>
+                                    Delhivery
+                                  </p>
+                                ) : null}
+                              </div>
                             </td>
                             <td className='px-4 py-4 text-right'>
-                              <div className='flex justify-end gap-2'>
-                                {awb ? (
+                              <div className='flex justify-end gap-2' onClick={(event) => event.stopPropagation()}>
+                                {hasDelhivery ? (
                                   <Button
                                     variant='outline'
                                     className='rounded-[6px]'
@@ -805,13 +829,31 @@ export function DeliverySystemDashboard() {
                                     Track
                                   </Button>
                                 ) : null}
-                                <Button
-                                  className='rounded-[6px] bg-teal-700 text-white hover:bg-teal-800'
-                                  onClick={() => startShippingForOrder(order)}
-                                >
-                                  {awb ? 'Manage' : 'Ship'}
-                                  <PackageCheck className='h-4 w-4' />
-                                </Button>
+                                {!hasActiveShipment ? (
+                                  <Button
+                                    className='rounded-[6px] bg-teal-700 text-white hover:bg-teal-800'
+                                    onClick={() => openPriceCheckForOrder(order)}
+                                  >
+                                    Check price for delivery
+                                    <PackageCheck className='h-4 w-4' />
+                                  </Button>
+                                ) : hasDelhivery ? (
+                                  <Button
+                                    className='rounded-[6px] bg-teal-700 text-white hover:bg-teal-800'
+                                    onClick={() => openPriceCheckForOrder(order)}
+                                  >
+                                    Check price
+                                    <PackageCheck className='h-4 w-4' />
+                                  </Button>
+                                ) : hasShadowfax ? (
+                                  <Button
+                                    variant='outline'
+                                    className='rounded-[6px] border-orange-200 text-orange-700 hover:bg-orange-50'
+                                    onClick={() => openPath('/courier/shadowfax')}
+                                  >
+                                    View
+                                  </Button>
+                                ) : null}
                               </div>
                             </td>
                           </tr>
@@ -823,6 +865,88 @@ export function DeliverySystemDashboard() {
               )}
             </section>
           )}
+          <Dialog
+            open={Boolean(selectedOrder)}
+            onOpenChange={(open) => {
+              if (!open) setSelectedOrder(null)
+            }}
+          >
+            <DialogContent className='max-h-[88vh] max-w-5xl overflow-y-auto rounded-none'>
+              {selectedOrder ? (
+                <div className='space-y-5'>
+                  <DialogHeader>
+                    <DialogTitle className='text-2xl'>{selectedOrder.orderNumber}</DialogTitle>
+                    <DialogDescription>
+                      {selectedOrder.customerName || 'Customer'} | {selectedOrder.pincode || 'No pincode'} | {formatINR(selectedOrder.total)}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className='grid gap-4 md:grid-cols-2'>
+                    <div className='rounded-none border p-4'>
+                      <p className='font-semibold text-slate-950'>Customer</p>
+                      <div className='mt-3 space-y-2 text-sm text-slate-600'>
+                        <p>Name: {selectedOrder.customerName || 'Not available'}</p>
+                        <p>Phone: {selectedOrder.customerPhone || 'Not available'}</p>
+                        <p>Email: {selectedOrder.customerEmail || 'Not available'}</p>
+                        <p>Status: {selectedOrder.status || 'Not available'}</p>
+                      </div>
+                    </div>
+                    <div className='rounded-none border p-4'>
+                      <p className='font-semibold text-slate-950'>Delivery</p>
+                      <div className='mt-3 space-y-2 text-sm text-slate-600'>
+                        <p>Address: {selectedOrder.address || 'Not available'}</p>
+                        <p>City: {selectedOrder.city || 'Not available'}</p>
+                        <p>State: {selectedOrder.state || 'Not available'}</p>
+                        <p>Pincode: {selectedOrder.pincode || 'Not available'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className='rounded-none border p-4'>
+                    <p className='font-semibold text-slate-950'>Order Data</p>
+                    <div className='mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2'>
+                      <p>Source: {selectedOrder.source}</p>
+                      <p>Website: {selectedOrder.websiteLabel || 'Not available'}</p>
+                      <p>Created: {formatDateTime(selectedOrder.createdAt)}</p>
+                      <p>Amount: {formatINR(selectedOrder.total)}</p>
+                      <p>AWB: {getTrackingCode(selectedOrder) || 'Not created'}</p>
+                      <p>Courier status: {getShipmentStatus(selectedOrder)}</p>
+                    </div>
+                  </div>
+
+                  <div className='rounded-none border p-4'>
+                    <p className='font-semibold text-slate-950'>Products</p>
+                    <div className='mt-3 space-y-3'>
+                      {selectedOrder.items.map((item, index) => (
+                        <div
+                          key={`${selectedOrder.id}-${item.productName}-${index}`}
+                          className='flex items-start gap-3 rounded-none border bg-slate-50 p-3 text-sm text-slate-600'
+                        >
+                          <img
+                            src={resolveItemImage(item.imageUrl)}
+                            alt={item.productName || 'Product'}
+                            className='h-16 w-16 rounded-none border bg-white object-cover'
+                            onError={(event) => {
+                              const target = event.currentTarget
+                              if (target.dataset.fallbackApplied) return
+                              target.dataset.fallbackApplied = 'true'
+                              target.src = FALLBACK_IMAGE
+                            }}
+                          />
+                          <div className='min-w-0 flex-1'>
+                            <p className='font-semibold text-slate-950'>{item.productName || 'Product'}</p>
+                            <p>Qty {item.quantity} | {formatINR(item.totalPrice || item.unitPrice * item.quantity)}</p>
+                            <p>Unit price: {formatINR(item.unitPrice || 0)}</p>
+                            {item.variantSummary ? <p>{item.variantSummary}</p> : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </DialogContent>
+          </Dialog>
     </DeliveryWorkspaceShell>
   )
 }
