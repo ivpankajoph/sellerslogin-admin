@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LayoutTemplate,
   MapPinned,
+  Mail,
   PlugZap,
   SearchCheck,
   ShieldCheck,
@@ -19,6 +20,9 @@ export const ROLES = {
   ADMIN: 'admin',
   VENDOR: 'vendor',
 } as const
+
+const emailMarketingUrl =
+  import.meta.env.VITE_EMAIL_MARKETING_URL || 'http://localhost:5174/login'
 
 export const sidebarData: Pick<SidebarData, 'navGroups'> = {
   navGroups: [
@@ -356,6 +360,12 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
       title: 'Marketing & SEO',
       roles: [ROLES.ADMIN, ROLES.VENDOR],
       items: [
+        {
+          title: 'Email Marketing',
+          url: emailMarketingUrl,
+          icon: Mail,
+          roles: [ROLES.VENDOR],
+        },
         {
           title: 'SEO Manager',
           icon: SearchCheck,
