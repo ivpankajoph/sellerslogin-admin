@@ -138,15 +138,49 @@ function BillingPlanPage() {
   const loadBilling = async () => {
     setIsLoading(true)
     try {
-      const [creditsResponse, invoicesResponse] = await Promise.all([
+      const [creditsResult, invoicesResult, packsResult] = await Promise.allSettled([
         api.get('/billing/me/credits'),
         api.get('/billing/me/invoices'),
+        api.get('/billing/credit-packs'),
       ])
 
-      setSnapshot(creditsResponse.data)
-      setInvoices(invoicesResponse.data.invoices || [])
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Unable to load credit wallet')
+      const fallbackPacks = packsResult.status === 'fulfilled' ? packsResult.value.data.packs || [] : []
+
+      if (creditsResult.status === 'fulfilled') {
+        const nextSnapshot = creditsResult.value.data || {}
+        setSnapshot({
+          ...nextSnapshot,
+          packs: nextSnapshot.packs?.length ? nextSnapshot.packs : fallbackPacks.filter((pack) => pack.isActive !== false),
+        })
+      } else {
+        setSnapshot({
+          wallet: {},
+          controls: {},
+          usage: {},
+          recentTransactions: [],
+          packs: fallbackPacks.filter((pack) => pack.isActive !== false),
+          lastPurchasedPack: null,
+        })
+      }
+
+      if (invoicesResult.status === 'fulfilled') {
+        setInvoices(invoicesResult.value.data.invoices || [])
+      } else {
+        setInvoices([])
+      }
+
+      const primaryError =
+        creditsResult.status === 'rejected'
+          ? creditsResult.reason
+          : invoicesResult.status === 'rejected'
+            ? invoicesResult.reason
+            : packsResult.status === 'rejected'
+              ? packsResult.reason
+              : null
+
+      if (primaryError) {
+        toast.error(primaryError.response?.data?.message || 'Unable to load complete billing details')
+      }
     } finally {
       setIsLoading(false)
     }

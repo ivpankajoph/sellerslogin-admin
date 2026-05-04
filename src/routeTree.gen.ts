@@ -762,7 +762,6 @@ export interface FileRoutesByFullPath {
   '/product-preview': typeof ProductPreviewRoute
   '/analytics': typeof AuthenticatedAnalyticsRouteRouteWithChildren
   '/meta-pixel': typeof AuthenticatedMetaPixelRouteRouteWithChildren
-  '/clerk/': typeof ClerkauthRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
@@ -869,8 +868,8 @@ export interface FileRoutesByFullPath {
   '/products/create-products': typeof AuthenticatedProductsCreateProductsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/product-preview': typeof ProductPreviewRoute
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
+  '/product-preview': typeof ProductPreviewRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
@@ -1097,7 +1096,6 @@ export interface FileRouteTypes {
     | '/product-preview'
     | '/analytics'
     | '/meta-pixel'
-    | '/clerk/'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
@@ -1204,8 +1202,8 @@ export interface FileRouteTypes {
     | '/products/create-products'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/product-preview'
     | '/clerk'
+    | '/product-preview'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
@@ -1580,8 +1578,8 @@ declare module '@tanstack/react-router' {
     }
     '/clerk/(auth)': {
       id: '/clerk/(auth)'
-      path: '/'
-      fullPath: '/clerk/'
+      path: ''
+      fullPath: '/clerk'
       preLoaderRoute: typeof ClerkauthRouteRouteImport
       parentRoute: typeof ClerkRouteRoute
     }

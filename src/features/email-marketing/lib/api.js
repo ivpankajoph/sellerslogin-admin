@@ -46,8 +46,11 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = getStoredToken()
+  const hasAuthorizationHeader = Boolean(
+    config.headers?.Authorization || config.headers?.authorization,
+  )
 
-  if (token) {
+  if (token && !hasAuthorizationHeader) {
     config.headers = config.headers || {}
     config.headers.Authorization = `Bearer ${token}`
   }

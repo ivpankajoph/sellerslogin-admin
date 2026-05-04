@@ -39,6 +39,16 @@ function RoleLanding() {
   return <Navigate to={admin?.role === "super_admin" ? "/admin" : "/overview"} replace />;
 }
 
+function VendorExperienceRoute({ children }) {
+  const { admin } = useContext(AuthContext);
+
+  if (admin?.role === "super_admin") {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return children;
+}
+
 function SuperAdminRoute({ children }) {
   const { admin } = useContext(AuthContext);
 
@@ -53,7 +63,14 @@ function App() {
   return (
     <BrowserRouter basename="/email-marketing">
       <Routes>
-        <Route path="/login" element={<Navigate to="/overview" replace />} />
+        <Route
+          path="/login"
+          element={
+            <ProtectedRoute>
+              <RoleLanding />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin"
           element={
@@ -68,7 +85,9 @@ function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <DashboardLayout />
+              <VendorExperienceRoute>
+                <DashboardLayout />
+              </VendorExperienceRoute>
             </ProtectedRoute>
           }
         >
@@ -313,7 +332,9 @@ function App() {
           path="/email-builder"
           element={
             <ProtectedRoute>
-              <Navigate to="/email-builder/new" replace />
+              <VendorExperienceRoute>
+                <Navigate to="/email-builder/new" replace />
+              </VendorExperienceRoute>
             </ProtectedRoute>
           }
         />
@@ -321,9 +342,11 @@ function App() {
           path="/email-builder/new"
           element={
             <ProtectedRoute>
-              <PermissionGate permission="edit_content">
-                <EmailBuilderPage />
-              </PermissionGate>
+              <VendorExperienceRoute>
+                <PermissionGate permission="edit_content">
+                  <EmailBuilderPage />
+                </PermissionGate>
+              </VendorExperienceRoute>
             </ProtectedRoute>
           }
         />
@@ -331,9 +354,11 @@ function App() {
           path="/email-builder/:id"
           element={
             <ProtectedRoute>
-              <PermissionGate permission="edit_content">
-                <EmailBuilderPage />
-              </PermissionGate>
+              <VendorExperienceRoute>
+                <PermissionGate permission="edit_content">
+                  <EmailBuilderPage />
+                </PermissionGate>
+              </VendorExperienceRoute>
             </ProtectedRoute>
           }
         />
@@ -341,9 +366,11 @@ function App() {
           path="/simple-editor/new"
           element={
             <ProtectedRoute>
-              <PermissionGate permission="edit_content">
-                <SimpleEmailEditorPage />
-              </PermissionGate>
+              <VendorExperienceRoute>
+                <PermissionGate permission="edit_content">
+                  <SimpleEmailEditorPage />
+                </PermissionGate>
+              </VendorExperienceRoute>
             </ProtectedRoute>
           }
         />
@@ -351,9 +378,11 @@ function App() {
           path="/simple-editor/:id"
           element={
             <ProtectedRoute>
-              <PermissionGate permission="edit_content">
-                <SimpleEmailEditorPage />
-              </PermissionGate>
+              <VendorExperienceRoute>
+                <PermissionGate permission="edit_content">
+                  <SimpleEmailEditorPage />
+                </PermissionGate>
+              </VendorExperienceRoute>
             </ProtectedRoute>
           }
         />
@@ -361,9 +390,11 @@ function App() {
           path="/html-editor/new"
           element={
             <ProtectedRoute>
-              <PermissionGate permission="edit_content">
-                <HtmlCustomCodeEditorPage />
-              </PermissionGate>
+              <VendorExperienceRoute>
+                <PermissionGate permission="edit_content">
+                  <HtmlCustomCodeEditorPage />
+                </PermissionGate>
+              </VendorExperienceRoute>
             </ProtectedRoute>
           }
         />
@@ -371,9 +402,11 @@ function App() {
           path="/html-editor/:id"
           element={
             <ProtectedRoute>
-              <PermissionGate permission="edit_content">
-                <HtmlCustomCodeEditorPage />
-              </PermissionGate>
+              <VendorExperienceRoute>
+                <PermissionGate permission="edit_content">
+                  <HtmlCustomCodeEditorPage />
+                </PermissionGate>
+              </VendorExperienceRoute>
             </ProtectedRoute>
           }
         />
