@@ -1,4 +1,6 @@
 
+import { STOREFRONT_URL } from "@/lib/storefront-url";
+
 
 const apiBase =
   import.meta.env.VITE_PUBLIC_API_URL && import.meta.env.VITE_PUBLIC_API_URL.endsWith("/v1")
@@ -8,11 +10,7 @@ const apiBase =
 const normalizeBase = (value: string) => value.replace(/\/+$/, "");
 
 const storefrontBaseUrl = normalizeBase(
-  String(
-    import.meta.env.VITE_PUBLIC_STOREFRONT_URL ||
-      import.meta.env.VITE_PUBLIC_API_URL_TEMPLATE_FRONTEND ||
-      ""
-  ).trim()
+  String(STOREFRONT_URL || "").trim()
 );
 
 const normalizeTemplatePreviewPath = (pathname: string) => {

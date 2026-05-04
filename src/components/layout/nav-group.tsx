@@ -47,6 +47,8 @@ const ICON_ACCENTS = [
 
 const NAV_ITEM_TEXT_CLASS = 'flex-1 min-w-0 whitespace-nowrap leading-none text-start'
 
+const isExternalUrl = (url?: string) => /^https?:\/\//i.test(String(url || ''))
+
 const iconAccentByKey = (key: string) => {
   const code = Array.from(String(key || '')).reduce((acc, char) => acc + char.charCodeAt(0), 0)
   return ICON_ACCENTS[code % ICON_ACCENTS.length]
@@ -106,6 +108,7 @@ function SidebarItemIcon({
 function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
   const { setOpenMobile } = useSidebar()
   const isActive = item.disabled ? false : checkIsActive(href, item)
+  const external = isExternalUrl(item.url)
   return (
     <SidebarMenuItem>
       {item.disabled ? (
@@ -125,11 +128,19 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
             tooltip={item.title}
             className='text-sidebar-foreground/90 data-[active=true]:text-sidebar-accent-foreground'
           >
-            <Link to={item.url} onClick={() => setOpenMobile(false)}>
-              <SidebarItemIcon icon={item.icon} seed={item.title} />
-              <span className={NAV_ITEM_TEXT_CLASS}>{item.title}</span>
-              {item.badge && <NavBadge>{item.badge}</NavBadge>}
-            </Link>
+            {external ? (
+              <a href={item.url} onClick={() => setOpenMobile(false)}>
+                <SidebarItemIcon icon={item.icon} seed={item.title} />
+                <span className={NAV_ITEM_TEXT_CLASS}>{item.title}</span>
+                {item.badge && <NavBadge>{item.badge}</NavBadge>}
+              </a>
+            ) : (
+              <Link to={item.url} onClick={() => setOpenMobile(false)}>
+                <SidebarItemIcon icon={item.icon} seed={item.title} />
+                <span className={NAV_ITEM_TEXT_CLASS}>{item.title}</span>
+                {item.badge && <NavBadge>{item.badge}</NavBadge>}
+              </Link>
+            )}
           </SidebarMenuButton>
       )}
     </SidebarMenuItem>
@@ -183,11 +194,19 @@ function SidebarMenuCollapsible({
                     isActive={checkIsActive(href, subItem)}
                     className='text-sidebar-foreground/85 data-[active=true]:text-sidebar-accent-foreground'
                   >
-                    <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
-                      <SidebarItemIcon icon={subItem.icon} seed={subItem.title} />
-                      <span className={NAV_ITEM_TEXT_CLASS}>{subItem.title}</span>
-                      {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
-                    </Link>
+                    {isExternalUrl(subItem.url) ? (
+                      <a href={subItem.url} onClick={() => setOpenMobile(false)}>
+                        <SidebarItemIcon icon={subItem.icon} seed={subItem.title} />
+                        <span className={NAV_ITEM_TEXT_CLASS}>{subItem.title}</span>
+                        {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
+                      </a>
+                    ) : (
+                      <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
+                        <SidebarItemIcon icon={subItem.icon} seed={subItem.title} />
+                        <span className={NAV_ITEM_TEXT_CLASS}>{subItem.title}</span>
+                        {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
+                      </Link>
+                    )}
                   </SidebarMenuSubButton>
                 )}
               </SidebarMenuSubItem>
@@ -242,16 +261,29 @@ function SidebarMenuCollapsedDropdown({
                   )}
                 </>
               ) : (
-                <Link
-                  to={sub.url}
-                  className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
-                >
-                  {sub.icon && <sub.icon />}
-                  <span className='max-w-52 text-wrap'>{sub.title}</span>
-                  {sub.badge && (
-                    <span className='ms-auto text-xs'>{sub.badge}</span>
-                  )}
-                </Link>
+                isExternalUrl(sub.url) ? (
+                  <a
+                    href={sub.url}
+                    className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
+                  >
+                    {sub.icon && <sub.icon />}
+                    <span className='max-w-52 text-wrap'>{sub.title}</span>
+                    {sub.badge && (
+                      <span className='ms-auto text-xs'>{sub.badge}</span>
+                    )}
+                  </a>
+                ) : (
+                  <Link
+                    to={sub.url}
+                    className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
+                  >
+                    {sub.icon && <sub.icon />}
+                    <span className='max-w-52 text-wrap'>{sub.title}</span>
+                    {sub.badge && (
+                      <span className='ms-auto text-xs'>{sub.badge}</span>
+                    )}
+                  </Link>
+                )
               )}
             </DropdownMenuItem>
           ))}
