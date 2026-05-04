@@ -539,18 +539,11 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           items: [
             {
               title: 'Store Management Analytics',
-               icon: AlignVerticalJustifyStart,
+              icon: AlignVerticalJustifyStart,
               url: '/analytics',
               roles: [ROLES.VENDOR],
               pageKey: 'storefront_analytics',
             },
-        {
-          
-          title: 'SEO Manager',
-          icon: SearchCheck,
-          roles: [ROLES.ADMIN, ROLES.VENDOR],
-          items: [
-          
             {
               title: 'Sitemap',
               url: '/seo/sitemaps',
