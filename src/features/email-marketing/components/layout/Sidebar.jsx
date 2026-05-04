@@ -1,8 +1,7 @@
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { AuthContext } from '../../context/AuthContext.jsx'
 import { navigationItems } from '../../data/navigation.js'
-import { roleLabels } from '../../data/permissions.js'
 
 function UserIcon() {
   return (
@@ -39,6 +38,15 @@ function HomeIcon() {
       <path d="M4 11.2 12 4l8 7.2" />
       <path d="M6.5 10.8V20h11V10.8" />
       <path d="M10 20v-6h4v6" />
+    </svg>
+  )
+}
+
+function ArrowLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+      <path d="M19 12H5" />
+      <path d="m12 5-7 7 7 7" />
     </svg>
   )
 }
@@ -174,26 +182,7 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
   const { admin, can } = useContext(AuthContext)
   const location = useLocation()
   const visibleItems = navigationItems.filter((item) => can(item.permission))
-  const [openMenu, setOpenMenu] = useState(false)
   const [marketingOpen, setMarketingOpen] = useState(true)
-  const menuRef = useRef(null)
-
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setOpenMenu(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleOutsideClick)
-    return () => document.removeEventListener('mousedown', handleOutsideClick)
-  }, [])
-
-  useEffect(() => {
-    if (!expanded) {
-      setOpenMenu(false)
-    }
-  }, [expanded])
 
   useEffect(() => {
     const isMarketingRoute = ['/campaigns', '/templates'].some(
@@ -208,8 +197,6 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
   const homeItems = visibleItems.filter((item) => item.path === '/overview')
   const marketingItems = visibleItems.filter((item) => ['/campaigns', '/templates'].includes(item.path))
   const otherItems = visibleItems.filter((item) => !['/overview', '/campaigns', '/templates'].includes(item.path))
-  const displayName = admin?.businessName || admin?.name || 'Vendor'
-  const displayRole = roleLabels[admin?.role] || 'Vendor'
   const isItemActive = (item) =>
     location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
 
@@ -222,70 +209,23 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
       onMouseLeave={() => onHoverChange(false)}
     >
       <div
-        ref={menuRef}
-        className={`relative border-b border-[#d8ccef] transition-all duration-200 ${
+        className={`border-b border-[#d8ccef] transition-all duration-200 ${
           expanded ? 'p-4' : 'p-2 lg:p-3'
         }`}
       >
         <button
           type="button"
-          onClick={() => setOpenMenu((current) => !current)}
-          className={`w-full border border-[#ded7ef] bg-white text-left transition hover:bg-[#fbf9ff] ${
-            expanded ? 'p-3' : 'p-2 lg:p-2'
+          onClick={() => {
+            window.location.assign('/')
+          }}
+          className={`flex w-full items-center border border-[#bfdbfe] bg-[#eff6ff] text-left text-[13px] font-medium text-[#1d4ed8] transition hover:border-[#2563eb] hover:bg-[#2563eb] hover:text-white ${
+            expanded ? 'gap-3 px-4 py-3' : 'justify-center px-2 py-3'
           }`}
-          title={expanded ? undefined : displayName}
+          title="Back Dashboard"
         >
-          <div
-            className={`flex items-center border border-[#eee9f8] bg-white transition-all duration-200 ${
-              expanded ? 'gap-3 px-3 py-3' : 'justify-center gap-0 px-0 py-3'
-            }`}
-          >
-            <div className="flex h-10 w-10 items-center justify-center bg-[#f0e8fb] text-[13px] font-semibold text-[#4c1d95]">
-              {displayName.slice(0, 2).toUpperCase()}
-            </div>
-            {expanded ? (
-              <>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[14px] font-semibold text-[#21192d]">
-                    {displayName}
-                  </p>
-                  <p className="truncate text-[12px] text-[#6e5a93]">
-                    {admin?.email || 'admin@emarketing.local'}
-                  </p>
-                </div>
-                <div className="text-[#5a4380]">
-                  <ChevronIcon open={openMenu} />
-                </div>
-              </>
-            ) : null}
-          </div>
+          <ArrowLeftIcon />
+          {expanded ? <span>Back Dashboard</span> : null}
         </button>
-
-        {openMenu ? (
-          <div className="absolute left-4 right-4 top-[calc(100%-4px)] z-50 overflow-hidden border border-[#ded7ef] bg-white shadow-[0_18px_42px_rgba(42,31,72,0.14)]">
-            <div className="border-b border-[#eee9f8] px-4 py-3">
-              <p className="text-[14px] font-semibold text-[#21192d]">{displayName}</p>
-              <p className="mt-1 text-[13px] text-[#7f6f96]">{admin?.email}</p>
-              <div className="mt-3 inline-flex bg-[#f0e6ff] px-3 py-1 text-xs font-semibold text-[#5a189a]">
-                {displayRole}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                window.location.assign('/')
-              }}
-              className="flex w-full items-center justify-between px-4 py-3 text-left text-[13px] text-[#21192d] transition hover:bg-[#f5efff]"
-            >
-              <span className="flex items-center gap-3">
-                <HomeIcon />
-                <span>Main Dashboard</span>
-              </span>
-              <span className="text-[#8d7fa3]">Open</span>
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <nav

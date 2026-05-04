@@ -48,6 +48,7 @@ export function AuthProvider({ children }) {
         const activeSellersLoginUser = sellersLoginUser || persistedSession.user
 
         if (activeSellersLoginToken) {
+          setAuthToken(null)
           const { data } = await api.post(
             '/auth/sellerslogin-sso',
             {

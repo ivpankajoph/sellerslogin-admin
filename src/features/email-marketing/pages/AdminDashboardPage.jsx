@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Activity,
+  ArrowLeft,
   BadgeIndianRupee,
   Ban,
   Bell,
@@ -89,6 +90,10 @@ const formatPlanPrice = (value = 0, currency = "INR") =>
     maximumFractionDigits: 0,
     style: "currency",
   }).format(value || 0);
+
+const goToMainDashboard = () => {
+  window.location.assign("/");
+};
 
 const formatDate = (value) => {
   if (!value) {
@@ -3057,27 +3062,37 @@ function AdminDashboardPage() {
         onMouseEnter={() => setIsSidebarHovered(true)}
         onMouseLeave={() => setIsSidebarHovered(false)}
       >
-        <div className="border-b border-[#d8ccef] p-3">
+        <div className="border-b border-[#d8ccef] p-4">
           <div
-            className={`flex items-center border border-[#d2c3ee] bg-[#eee5fb] py-3 transition-all ${
-              isSidebarExpanded ? "gap-3 px-3" : "justify-center px-2"
+            className={`mb-4 flex items-center transition-all ${
+              isSidebarExpanded ? "gap-3" : "justify-center"
             }`}
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[#f8f4ff] text-[13px] font-semibold text-[#4c1d95]">
-              SA
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[#7c3aed] text-white">
+              <Mail className="h-5 w-5" />
             </div>
             {isSidebarExpanded ? (
-              <>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[14px] font-semibold text-[#2b2140]">{admin?.name || "Super Admin"}</p>
-                  <p className="truncate text-[12px] text-[#6e5a93]">{admin?.email}</p>
-                </div>
-                <button className="text-[#5a4380]">
-                  <RefreshCcw className="h-4 w-4" />
-                </button>
-              </>
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-semibold leading-tight text-[#21192d]">
+                  Marketing Hub
+                </p>
+                <p className="mt-1 truncate text-[12px] text-[#7f6f96]">
+                  Email Marketing Admin
+                </p>
+              </div>
             ) : null}
           </div>
+          <button
+            type="button"
+            onClick={goToMainDashboard}
+            className={`flex w-full items-center border border-[#bfdbfe] bg-[#eff6ff] py-3 text-left text-[14px] font-medium text-[#1d4ed8] transition hover:border-[#2563eb] hover:bg-[#2563eb] hover:text-white ${
+              isSidebarExpanded ? "gap-2 px-3" : "justify-center px-2"
+            }`}
+            title="Back to Dashboard"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            {isSidebarExpanded ? <span>Back to Dashboard</span> : null}
+          </button>
         </div>
 
         <nav className={`min-h-0 flex-1 overflow-y-auto py-4 ${isSidebarExpanded ? "px-3" : "px-2"}`}>
@@ -3184,21 +3199,7 @@ function AdminDashboardPage() {
           ))}
         </nav>
 
-        <div className="border-t border-[#d8ccef] p-4">
-          <div className={`flex items-center ${isSidebarExpanded ? "gap-3" : "justify-center"}`}>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[13px] font-semibold text-[#4c1d95]">
-              {(admin?.name || "SA").slice(0, 2).toUpperCase()}
-            </div>
-            {isSidebarExpanded ? (
-              <>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-semibold text-[#2b2140]">{admin?.name || "Super Admin"}</p>
-                  <p className="truncate text-[12px] text-[#6e5a93]">{admin?.email}</p>
-                </div>
-                </>
-              ) : null}
-          </div>
-        </div>
+        <div className="border-t border-[#d8ccef] p-4" />
       </aside>
 
       <main className="min-h-0 overflow-y-auto">
