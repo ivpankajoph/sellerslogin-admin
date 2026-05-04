@@ -23,6 +23,18 @@ export type FoodOpsCashier = {
   status: 'Active' | 'Inactive'
 }
 
+export type FoodOpsCustomer = {
+  _id: string
+  name: string
+  phone?: string
+  email?: string
+  city?: string
+  birthday?: string
+  anniversary?: string
+  status: 'Active' | 'Inactive'
+  createdAt?: string
+}
+
 export type FoodOpsInventoryItem = {
   _id: string
   name: string
@@ -31,11 +43,30 @@ export type FoodOpsInventoryItem = {
   minimum_stock: number
 }
 
+export type FoodOpsInventoryAlertContact = {
+  name?: string
+  whatsapp: string
+}
+
+export type FoodOpsInventoryAlertSettings = {
+  contacts: FoodOpsInventoryAlertContact[]
+  whatsapp_enabled: boolean
+  dashboard_enabled: boolean
+}
+
 export type FoodOpsRecipe = {
   _id: string
   menu_item_id?: { _id?: string; item_name?: string; category?: string } | string
   materials?: Array<{
-    inventory_item_id?: { _id?: string; name?: string; unit?: string } | string
+    inventory_item_id?:
+      | {
+          _id?: string
+          name?: string
+          unit?: string
+          stock?: number
+          minimum_stock?: number
+        }
+      | string
     quantity_used?: number
   }>
 }
@@ -117,10 +148,37 @@ export const foodOpsApi = {
   updateCashier: (id: string, payload: Partial<FoodOpsCashier>) => api.put(`/food/cashiers/${id}`, payload),
   deleteCashier: (id: string) => api.delete(`/food/cashiers/${id}`),
 
+  getCustomers: () => getRows<FoodOpsCustomer>('/food/customers'),
+  createCustomer: (payload: Partial<FoodOpsCustomer>) => api.post('/food/customers', payload),
+  updateCustomer: (id: string, payload: Partial<FoodOpsCustomer>) => api.put(`/food/customers/${id}`, payload),
+  deleteCustomer: (id: string) => api.delete(`/food/customers/${id}`),
+
   getInventory: () => getRows<FoodOpsInventoryItem>('/food/inventory'),
   createInventoryItem: (payload: Partial<FoodOpsInventoryItem>) => api.post('/food/inventory', payload),
   updateInventoryItem: (id: string, payload: Partial<FoodOpsInventoryItem>) => api.put(`/food/inventory/${id}`, payload),
   deleteInventoryItem: (id: string) => api.delete(`/food/inventory/${id}`),
+  getInventoryAlertSettings: async () => {
+    const response = await api.get('/food/inventory-alert-settings')
+    return (response?.data?.settings || {
+      contacts: [],
+      whatsapp_enabled: true,
+      dashboard_enabled: true,
+    }) as FoodOpsInventoryAlertSettings
+  },
+  updateInventoryAlertSettings: async (
+    payload: Partial<FoodOpsInventoryAlertSettings>
+  ) => {
+    const response = await api.put('/food/inventory-alert-settings', payload)
+    return response?.data as {
+      settings?: FoodOpsInventoryAlertSettings
+      low_stock_alerts_sent?: number
+      whatsapp_results?: Array<{
+        whatsapp?: string
+        success?: boolean
+        message?: string
+      }>
+    }
+  },
 
   getRecipes: () => getRows<FoodOpsRecipe>('/food/recipes'),
   saveRecipe: (payload: unknown) => api.post('/food/recipes', payload),

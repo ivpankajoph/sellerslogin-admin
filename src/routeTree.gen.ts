@@ -85,15 +85,22 @@ import { Route as AuthenticatedSeoEntitiesRouteImport } from './routes/_authenti
 import { Route as AuthenticatedMetaPixelConnectRouteImport } from './routes/_authenticated/meta-pixel/connect'
 import { Route as AuthenticatedMetaPixelAnalyticsRouteImport } from './routes/_authenticated/meta-pixel/analytics'
 import { Route as AuthenticatedIntegrationsProviderRouteImport } from './routes/_authenticated/integrations/$provider'
+import { Route as AuthenticatedFoodWaitersRouteImport } from './routes/_authenticated/food/waiters'
+import { Route as AuthenticatedFoodTablesRouteImport } from './routes/_authenticated/food/tables'
 import { Route as AuthenticatedFoodTableReservationsRouteImport } from './routes/_authenticated/food/table-reservations'
 import { Route as AuthenticatedFoodStoreAdminRouteImport } from './routes/_authenticated/food/store-admin'
 import { Route as AuthenticatedFoodReportsRouteImport } from './routes/_authenticated/food/reports'
 import { Route as AuthenticatedFoodPosRouteImport } from './routes/_authenticated/food/pos'
 import { Route as AuthenticatedFoodPendingOrdersRouteImport } from './routes/_authenticated/food/pending-orders'
 import { Route as AuthenticatedFoodOnlineOrdersRouteImport } from './routes/_authenticated/food/online-orders'
+import { Route as AuthenticatedFoodMenuSharesRouteImport } from './routes/_authenticated/food/menu-shares'
+import { Route as AuthenticatedFoodMenuItemsRouteImport } from './routes/_authenticated/food/menu-items'
 import { Route as AuthenticatedFoodInventoryRouteImport } from './routes/_authenticated/food/inventory'
 import { Route as AuthenticatedFoodDashboardRouteImport } from './routes/_authenticated/food/dashboard'
+import { Route as AuthenticatedFoodCustomersRouteImport } from './routes/_authenticated/food/customers'
+import { Route as AuthenticatedFoodCashiersRouteImport } from './routes/_authenticated/food/cashiers'
 import { Route as AuthenticatedFoodBillStatusRouteImport } from './routes/_authenticated/food/bill-status'
+import { Route as AuthenticatedFoodAdvanceOrderRouteImport } from './routes/_authenticated/food/advance-order'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedCourierWarehousesRouteImport } from './routes/_authenticated/courier/warehouses'
 import { Route as AuthenticatedCourierTrackingRouteImport } from './routes/_authenticated/courier/tracking'
@@ -539,6 +546,17 @@ const AuthenticatedIntegrationsProviderRoute =
     path: '/integrations/$provider',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFoodWaitersRoute =
+  AuthenticatedFoodWaitersRouteImport.update({
+    id: '/food/waiters',
+    path: '/food/waiters',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodTablesRoute = AuthenticatedFoodTablesRouteImport.update({
+  id: '/food/tables',
+  path: '/food/tables',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedFoodTableReservationsRoute =
   AuthenticatedFoodTableReservationsRouteImport.update({
     id: '/food/table-reservations',
@@ -574,6 +592,18 @@ const AuthenticatedFoodOnlineOrdersRoute =
     path: '/food/online-orders',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFoodMenuSharesRoute =
+  AuthenticatedFoodMenuSharesRouteImport.update({
+    id: '/food/menu-shares',
+    path: '/food/menu-shares',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodMenuItemsRoute =
+  AuthenticatedFoodMenuItemsRouteImport.update({
+    id: '/food/menu-items',
+    path: '/food/menu-items',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFoodInventoryRoute =
   AuthenticatedFoodInventoryRouteImport.update({
     id: '/food/inventory',
@@ -586,10 +616,28 @@ const AuthenticatedFoodDashboardRoute =
     path: '/food/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFoodCustomersRoute =
+  AuthenticatedFoodCustomersRouteImport.update({
+    id: '/food/customers',
+    path: '/food/customers',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodCashiersRoute =
+  AuthenticatedFoodCashiersRouteImport.update({
+    id: '/food/cashiers',
+    path: '/food/cashiers',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFoodBillStatusRoute =
   AuthenticatedFoodBillStatusRouteImport.update({
     id: '/food/bill-status',
     path: '/food/bill-status',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFoodAdvanceOrderRoute =
+  AuthenticatedFoodAdvanceOrderRouteImport.update({
+    id: '/food/advance-order',
+    path: '/food/advance-order',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedErrorsErrorRoute =
@@ -713,15 +761,22 @@ export interface FileRoutesByFullPath {
   '/courier/tracking': typeof AuthenticatedCourierTrackingRoute
   '/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/food/advance-order': typeof AuthenticatedFoodAdvanceOrderRoute
   '/food/bill-status': typeof AuthenticatedFoodBillStatusRoute
+  '/food/cashiers': typeof AuthenticatedFoodCashiersRoute
+  '/food/customers': typeof AuthenticatedFoodCustomersRoute
   '/food/dashboard': typeof AuthenticatedFoodDashboardRoute
   '/food/inventory': typeof AuthenticatedFoodInventoryRoute
+  '/food/menu-items': typeof AuthenticatedFoodMenuItemsRoute
+  '/food/menu-shares': typeof AuthenticatedFoodMenuSharesRoute
   '/food/online-orders': typeof AuthenticatedFoodOnlineOrdersRoute
   '/food/pending-orders': typeof AuthenticatedFoodPendingOrdersRoute
   '/food/pos': typeof AuthenticatedFoodPosRoute
   '/food/reports': typeof AuthenticatedFoodReportsRoute
   '/food/store-admin': typeof AuthenticatedFoodStoreAdminRoute
   '/food/table-reservations': typeof AuthenticatedFoodTableReservationsRoute
+  '/food/tables': typeof AuthenticatedFoodTablesRoute
+  '/food/waiters': typeof AuthenticatedFoodWaitersRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
   '/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
@@ -810,15 +865,22 @@ export interface FileRoutesByTo {
   '/courier/tracking': typeof AuthenticatedCourierTrackingRoute
   '/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/food/advance-order': typeof AuthenticatedFoodAdvanceOrderRoute
   '/food/bill-status': typeof AuthenticatedFoodBillStatusRoute
+  '/food/cashiers': typeof AuthenticatedFoodCashiersRoute
+  '/food/customers': typeof AuthenticatedFoodCustomersRoute
   '/food/dashboard': typeof AuthenticatedFoodDashboardRoute
   '/food/inventory': typeof AuthenticatedFoodInventoryRoute
+  '/food/menu-items': typeof AuthenticatedFoodMenuItemsRoute
+  '/food/menu-shares': typeof AuthenticatedFoodMenuSharesRoute
   '/food/online-orders': typeof AuthenticatedFoodOnlineOrdersRoute
   '/food/pending-orders': typeof AuthenticatedFoodPendingOrdersRoute
   '/food/pos': typeof AuthenticatedFoodPosRoute
   '/food/reports': typeof AuthenticatedFoodReportsRoute
   '/food/store-admin': typeof AuthenticatedFoodStoreAdminRoute
   '/food/table-reservations': typeof AuthenticatedFoodTableReservationsRoute
+  '/food/tables': typeof AuthenticatedFoodTablesRoute
+  '/food/waiters': typeof AuthenticatedFoodWaitersRoute
   '/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
   '/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
@@ -913,15 +975,22 @@ export interface FileRoutesById {
   '/_authenticated/courier/tracking': typeof AuthenticatedCourierTrackingRoute
   '/_authenticated/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/_authenticated/food/advance-order': typeof AuthenticatedFoodAdvanceOrderRoute
   '/_authenticated/food/bill-status': typeof AuthenticatedFoodBillStatusRoute
+  '/_authenticated/food/cashiers': typeof AuthenticatedFoodCashiersRoute
+  '/_authenticated/food/customers': typeof AuthenticatedFoodCustomersRoute
   '/_authenticated/food/dashboard': typeof AuthenticatedFoodDashboardRoute
   '/_authenticated/food/inventory': typeof AuthenticatedFoodInventoryRoute
+  '/_authenticated/food/menu-items': typeof AuthenticatedFoodMenuItemsRoute
+  '/_authenticated/food/menu-shares': typeof AuthenticatedFoodMenuSharesRoute
   '/_authenticated/food/online-orders': typeof AuthenticatedFoodOnlineOrdersRoute
   '/_authenticated/food/pending-orders': typeof AuthenticatedFoodPendingOrdersRoute
   '/_authenticated/food/pos': typeof AuthenticatedFoodPosRoute
   '/_authenticated/food/reports': typeof AuthenticatedFoodReportsRoute
   '/_authenticated/food/store-admin': typeof AuthenticatedFoodStoreAdminRoute
   '/_authenticated/food/table-reservations': typeof AuthenticatedFoodTableReservationsRoute
+  '/_authenticated/food/tables': typeof AuthenticatedFoodTablesRoute
+  '/_authenticated/food/waiters': typeof AuthenticatedFoodWaitersRoute
   '/_authenticated/integrations/$provider': typeof AuthenticatedIntegrationsProviderRoute
   '/_authenticated/meta-pixel/analytics': typeof AuthenticatedMetaPixelAnalyticsRoute
   '/_authenticated/meta-pixel/connect': typeof AuthenticatedMetaPixelConnectRoute
@@ -1014,15 +1083,22 @@ export interface FileRouteTypes {
     | '/courier/tracking'
     | '/courier/warehouses'
     | '/errors/$error'
+    | '/food/advance-order'
     | '/food/bill-status'
+    | '/food/cashiers'
+    | '/food/customers'
     | '/food/dashboard'
     | '/food/inventory'
+    | '/food/menu-items'
+    | '/food/menu-shares'
     | '/food/online-orders'
     | '/food/pending-orders'
     | '/food/pos'
     | '/food/reports'
     | '/food/store-admin'
     | '/food/table-reservations'
+    | '/food/tables'
+    | '/food/waiters'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
     | '/meta-pixel/connect'
@@ -1111,15 +1187,22 @@ export interface FileRouteTypes {
     | '/courier/tracking'
     | '/courier/warehouses'
     | '/errors/$error'
+    | '/food/advance-order'
     | '/food/bill-status'
+    | '/food/cashiers'
+    | '/food/customers'
     | '/food/dashboard'
     | '/food/inventory'
+    | '/food/menu-items'
+    | '/food/menu-shares'
     | '/food/online-orders'
     | '/food/pending-orders'
     | '/food/pos'
     | '/food/reports'
     | '/food/store-admin'
     | '/food/table-reservations'
+    | '/food/tables'
+    | '/food/waiters'
     | '/integrations/$provider'
     | '/meta-pixel/analytics'
     | '/meta-pixel/connect'
@@ -1213,15 +1296,22 @@ export interface FileRouteTypes {
     | '/_authenticated/courier/tracking'
     | '/_authenticated/courier/warehouses'
     | '/_authenticated/errors/$error'
+    | '/_authenticated/food/advance-order'
     | '/_authenticated/food/bill-status'
+    | '/_authenticated/food/cashiers'
+    | '/_authenticated/food/customers'
     | '/_authenticated/food/dashboard'
     | '/_authenticated/food/inventory'
+    | '/_authenticated/food/menu-items'
+    | '/_authenticated/food/menu-shares'
     | '/_authenticated/food/online-orders'
     | '/_authenticated/food/pending-orders'
     | '/_authenticated/food/pos'
     | '/_authenticated/food/reports'
     | '/_authenticated/food/store-admin'
     | '/_authenticated/food/table-reservations'
+    | '/_authenticated/food/tables'
+    | '/_authenticated/food/waiters'
     | '/_authenticated/integrations/$provider'
     | '/_authenticated/meta-pixel/analytics'
     | '/_authenticated/meta-pixel/connect'
@@ -1833,6 +1923,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIntegrationsProviderRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/food/waiters': {
+      id: '/_authenticated/food/waiters'
+      path: '/food/waiters'
+      fullPath: '/food/waiters'
+      preLoaderRoute: typeof AuthenticatedFoodWaitersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/tables': {
+      id: '/_authenticated/food/tables'
+      path: '/food/tables'
+      fullPath: '/food/tables'
+      preLoaderRoute: typeof AuthenticatedFoodTablesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/food/table-reservations': {
       id: '/_authenticated/food/table-reservations'
       path: '/food/table-reservations'
@@ -1875,6 +1979,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFoodOnlineOrdersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/food/menu-shares': {
+      id: '/_authenticated/food/menu-shares'
+      path: '/food/menu-shares'
+      fullPath: '/food/menu-shares'
+      preLoaderRoute: typeof AuthenticatedFoodMenuSharesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/menu-items': {
+      id: '/_authenticated/food/menu-items'
+      path: '/food/menu-items'
+      fullPath: '/food/menu-items'
+      preLoaderRoute: typeof AuthenticatedFoodMenuItemsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/food/inventory': {
       id: '/_authenticated/food/inventory'
       path: '/food/inventory'
@@ -1889,11 +2007,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFoodDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/food/customers': {
+      id: '/_authenticated/food/customers'
+      path: '/food/customers'
+      fullPath: '/food/customers'
+      preLoaderRoute: typeof AuthenticatedFoodCustomersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/cashiers': {
+      id: '/_authenticated/food/cashiers'
+      path: '/food/cashiers'
+      fullPath: '/food/cashiers'
+      preLoaderRoute: typeof AuthenticatedFoodCashiersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/food/bill-status': {
       id: '/_authenticated/food/bill-status'
       path: '/food/bill-status'
       fullPath: '/food/bill-status'
       preLoaderRoute: typeof AuthenticatedFoodBillStatusRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/food/advance-order': {
+      id: '/_authenticated/food/advance-order'
+      path: '/food/advance-order'
+      fullPath: '/food/advance-order'
+      preLoaderRoute: typeof AuthenticatedFoodAdvanceOrderRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/errors/$error': {
@@ -2059,15 +2198,22 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCourierTrackingRoute: typeof AuthenticatedCourierTrackingRoute
   AuthenticatedCourierWarehousesRoute: typeof AuthenticatedCourierWarehousesRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedFoodAdvanceOrderRoute: typeof AuthenticatedFoodAdvanceOrderRoute
   AuthenticatedFoodBillStatusRoute: typeof AuthenticatedFoodBillStatusRoute
+  AuthenticatedFoodCashiersRoute: typeof AuthenticatedFoodCashiersRoute
+  AuthenticatedFoodCustomersRoute: typeof AuthenticatedFoodCustomersRoute
   AuthenticatedFoodDashboardRoute: typeof AuthenticatedFoodDashboardRoute
   AuthenticatedFoodInventoryRoute: typeof AuthenticatedFoodInventoryRoute
+  AuthenticatedFoodMenuItemsRoute: typeof AuthenticatedFoodMenuItemsRoute
+  AuthenticatedFoodMenuSharesRoute: typeof AuthenticatedFoodMenuSharesRoute
   AuthenticatedFoodOnlineOrdersRoute: typeof AuthenticatedFoodOnlineOrdersRoute
   AuthenticatedFoodPendingOrdersRoute: typeof AuthenticatedFoodPendingOrdersRoute
   AuthenticatedFoodPosRoute: typeof AuthenticatedFoodPosRoute
   AuthenticatedFoodReportsRoute: typeof AuthenticatedFoodReportsRoute
   AuthenticatedFoodStoreAdminRoute: typeof AuthenticatedFoodStoreAdminRoute
   AuthenticatedFoodTableReservationsRoute: typeof AuthenticatedFoodTableReservationsRoute
+  AuthenticatedFoodTablesRoute: typeof AuthenticatedFoodTablesRoute
+  AuthenticatedFoodWaitersRoute: typeof AuthenticatedFoodWaitersRoute
   AuthenticatedIntegrationsProviderRoute: typeof AuthenticatedIntegrationsProviderRoute
   AuthenticatedSeoEntitiesRoute: typeof AuthenticatedSeoEntitiesRoute
   AuthenticatedSeoMetaTagsRoute: typeof AuthenticatedSeoMetaTagsRoute
@@ -2137,9 +2283,14 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCourierTrackingRoute: AuthenticatedCourierTrackingRoute,
   AuthenticatedCourierWarehousesRoute: AuthenticatedCourierWarehousesRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedFoodAdvanceOrderRoute: AuthenticatedFoodAdvanceOrderRoute,
   AuthenticatedFoodBillStatusRoute: AuthenticatedFoodBillStatusRoute,
+  AuthenticatedFoodCashiersRoute: AuthenticatedFoodCashiersRoute,
+  AuthenticatedFoodCustomersRoute: AuthenticatedFoodCustomersRoute,
   AuthenticatedFoodDashboardRoute: AuthenticatedFoodDashboardRoute,
   AuthenticatedFoodInventoryRoute: AuthenticatedFoodInventoryRoute,
+  AuthenticatedFoodMenuItemsRoute: AuthenticatedFoodMenuItemsRoute,
+  AuthenticatedFoodMenuSharesRoute: AuthenticatedFoodMenuSharesRoute,
   AuthenticatedFoodOnlineOrdersRoute: AuthenticatedFoodOnlineOrdersRoute,
   AuthenticatedFoodPendingOrdersRoute: AuthenticatedFoodPendingOrdersRoute,
   AuthenticatedFoodPosRoute: AuthenticatedFoodPosRoute,
@@ -2147,6 +2298,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFoodStoreAdminRoute: AuthenticatedFoodStoreAdminRoute,
   AuthenticatedFoodTableReservationsRoute:
     AuthenticatedFoodTableReservationsRoute,
+  AuthenticatedFoodTablesRoute: AuthenticatedFoodTablesRoute,
+  AuthenticatedFoodWaitersRoute: AuthenticatedFoodWaitersRoute,
   AuthenticatedIntegrationsProviderRoute:
     AuthenticatedIntegrationsProviderRoute,
   AuthenticatedSeoEntitiesRoute: AuthenticatedSeoEntitiesRoute,
