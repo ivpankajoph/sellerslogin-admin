@@ -2,32 +2,29 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   AlertTriangle,
   ArrowUpRight,
-  BarChart3,
   CheckCircle2,
   LoaderCircle,
-  RefreshCcw,
+  PackageOpen,
   Search,
   XCircle,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
-import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
-import { Main } from '@/components/layout/main'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   fetchDelhiveryB2cServiceability,
+  fetchDelhiveryWarehouses,
   fetchDelhiveryShippingEstimate,
   fetchShadowfaxServiceability,
   loadCourierOrders,
+  type DelhiveryWarehouse,
 } from '@/features/courier/api'
 import {
   COURIER_PARTNER_MAP,
   estimateCourierQuote,
-  hasAnyActiveCourierAssignment,
   type CourierOrderSummary,
   type CourierPartnerId,
 } from '@/features/courier/data'
@@ -86,19 +83,39 @@ function CourierDeskPage() {
   }, [isVendor, navigate, user])
 
   const [orders, setOrders] = useState<CourierOrderSummary[]>([])
+  const [warehouses, setWarehouses] = useState<DelhiveryWarehouse[]>([])
+  const [warehousesLoading, setWarehousesLoading] = useState(true)
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [refreshKey, setRefreshKey] = useState(0)
-  const [statsOpen, setStatsOpen] = useState(false)
   const [checking, setChecking] = useState(false)
   const [selectedOrderId, setSelectedOrderId] = useState(initialQuery.orderId)
-  const [origin, setOrigin] = useState(
-    initialQuery.origin ||
-      readText(user?.pincode || user?.pin || user?.postal_code || user?.zip)
-  )
   const [destination, setDestination] = useState(initialQuery.destination)
   const [results, setResults] = useState<CheckResult[]>([])
   const [autoCheckDone, setAutoCheckDone] = useState(false)
+
+  const orderedWarehouses = useMemo(
+    () =>
+      [...warehouses].sort((a, b) => {
+        const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime()
+        const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime()
+        return bTime - aTime
+      }),
+    [warehouses]
+  )
+
+  const selectedWarehouse = useMemo(
+    () =>
+      orderedWarehouses.find((warehouse) => warehouse.id === selectedWarehouseId) ||
+      orderedWarehouses.find((warehouse) => readText(warehouse.pin)) ||
+      null,
+    [orderedWarehouses, selectedWarehouseId]
+  )
+
+  const warehousePincode = useMemo(
+    () => readText(selectedWarehouse?.pin),
+    [selectedWarehouse?.pin]
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -125,22 +142,43 @@ function CourierDeskPage() {
     return () => {
       cancelled = true
     }
-  }, [isVendor, refreshKey])
+  }, [isVendor])
 
-  const availableOrders = useMemo(
-    () =>
-      orders.filter(
-        (order) => isOpenOrderStatus(order.status) && !hasAnyActiveCourierAssignment(order)
-      ),
-    [orders]
-  )
-  const routedOrders = useMemo(
-    () =>
-      orders.filter(
-        (order) => isOpenOrderStatus(order.status) && hasAnyActiveCourierAssignment(order)
-      ),
-    [orders]
-  )
+  useEffect(() => {
+    let cancelled = false
+
+    const loadWarehouses = async () => {
+      try {
+        setWarehousesLoading(true)
+        const response = await fetchDelhiveryWarehouses()
+        if (cancelled) return
+        const rows = Array.isArray(response?.warehouses) ? response.warehouses : []
+        setWarehouses(rows)
+      } catch (err: any) {
+        if (cancelled) return
+        toast.error(err?.response?.data?.message || 'Failed to load warehouses')
+        setWarehouses([])
+      } finally {
+        if (!cancelled) setWarehousesLoading(false)
+      }
+    }
+
+    void loadWarehouses()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    setSelectedWarehouseId((current) => {
+      if (current && orderedWarehouses.some((warehouse) => warehouse.id === current)) {
+        return current
+      }
+      return orderedWarehouses.find((warehouse) => readText(warehouse.pin))?.id || ''
+    })
+  }, [orderedWarehouses])
+
   const selectableOrders = useMemo(
     () => orders.filter((order) => isOpenOrderStatus(order.status)),
     [orders]
@@ -149,32 +187,6 @@ function CourierDeskPage() {
     () => selectableOrders.find((order) => order.id === selectedOrderId) || null,
     [selectableOrders, selectedOrderId]
   )
-  const statsItems = useMemo(
-    () => [
-      {
-        label: 'Open orders',
-        value: availableOrders.length,
-        helper: 'Orders that are still open and not routed.',
-      },
-      {
-        label: 'Routed shipments',
-        value: routedOrders.length,
-        helper: 'Open orders with an active courier assignment.',
-      },
-      {
-        label: 'Total orders',
-        value: orders.length,
-        helper: 'All loaded orders from vendor/admin scope.',
-      },
-      {
-        label: 'Checked apps',
-        value: 2,
-        helper: 'Checks Delhivery price and Shadowfax serviceability.',
-      },
-    ],
-    [availableOrders.length, orders.length, routedOrders.length]
-  )
-
   useEffect(() => {
     setSelectedOrderId((current) =>
       current && selectableOrders.some((order) => order.id === current)
@@ -184,16 +196,19 @@ function CourierDeskPage() {
   }, [selectableOrders])
 
   useEffect(() => {
-    if (!selectedOrder?.pincode) return
-    setDestination((current) => current || selectedOrder.pincode)
+    if (!selectedOrder) return
+    setDestination(selectedOrder.pincode || '')
+    setResults([])
   }, [selectedOrder])
 
   const runCheck = async () => {
-    const resolvedOrigin = origin.trim()
-    const resolvedDestination = destination.trim()
+    const resolvedOrigin = warehousePincode
+    const resolvedDestination = readText(selectedOrder?.pincode || destination)
 
-    if (!resolvedOrigin) return toast.error('Origin pincode is required')
-    if (!resolvedDestination) return toast.error('Destination pincode is required')
+    if (!selectedOrder) return toast.error('Select an order first')
+    if (!resolvedDestination) return toast.error('Customer pincode is required')
+    if (!selectedWarehouse) return toast.error('Create a warehouse first')
+    if (!resolvedOrigin) return toast.error('Warehouse pin is required')
 
     setChecking(true)
     try {
@@ -226,18 +241,35 @@ function CourierDeskPage() {
         const estimate = delhiveryEstimate.status === 'fulfilled'
           ? delhiveryEstimate.value?.estimate || {}
           : {}
+        const estimateError =
+          delhiveryEstimate.status === 'rejected'
+            ? delhiveryEstimate.reason?.response?.data?.message ||
+              delhiveryEstimate.reason?.message ||
+              'Delhivery price check failed.'
+            : ''
         const delhiveryPrice = Number(estimate?.estimated_charge || 0)
         next.push({
           id: 'delhivery',
           title: 'Delhivery',
-          state: serviceability?.serviceable ? 'ok' : 'bad',
-          priceLabel: delhiveryPrice ? formatINR(delhiveryPrice) : 'Price not returned',
-          summary: serviceability?.serviceable
-            ? 'Destination pincode is serviceable on Delhivery.'
-            : 'Delhivery did not return a serviceable record for this pincode.',
+          state: serviceability?.serviceable
+            ? estimateError
+              ? 'error'
+              : 'ok'
+            : 'bad',
+          priceLabel: delhiveryPrice
+            ? formatINR(delhiveryPrice)
+            : estimateError
+              ? 'Price unavailable'
+              : 'Price not returned',
+          summary: estimateError
+            ? estimateError
+            : serviceability?.serviceable
+              ? 'Customer pincode is serviceable on Delhivery.'
+              : 'Delhivery did not return a serviceable record for this pincode.',
           rows: [
-            `Origin: ${resolvedOrigin}`,
-            `Destination: ${serviceability?.requested_pincode || resolvedDestination}`,
+            `Warehouse: ${selectedWarehouse?.name || 'Selected warehouse'}`,
+            `Origin pincode: ${resolvedOrigin}`,
+            `Customer pincode: ${serviceability?.requested_pincode || resolvedDestination}`,
             `Matched records: ${serviceability?.code_count ?? 0}`,
             `Serviceable records: ${serviceability?.serviceable_count ?? 0}`,
             `Chargeable weight: ${estimate?.chargeable_weight ?? '500'} gm`,
@@ -270,11 +302,12 @@ function CourierDeskPage() {
             ? `${formatINR(shadowfaxQuote.amount)} est.`
             : 'Estimate after order selection',
           summary: serviceability?.serviceable
-            ? 'Destination pincode is serviceable on Shadowfax.'
+            ? 'Customer pincode is serviceable on Shadowfax.'
             : 'Shadowfax did not return a serviceable record for this pincode.',
           rows: [
-            `Origin: ${resolvedOrigin}`,
-            `Destination: ${serviceability?.requested_pincode || resolvedDestination}`,
+            `Warehouse: ${selectedWarehouse?.name || 'Selected warehouse'}`,
+            `Origin pincode: ${resolvedOrigin}`,
+            `Customer pincode: ${serviceability?.requested_pincode || resolvedDestination}`,
             `Matched records: ${serviceability?.code_count ?? 0}`,
             `Serviceable records: ${serviceability?.serviceable_count ?? 0}`,
             shadowfaxQuote ? `ETA: ${shadowfaxQuote.etaLabel}` : 'Select an order for local price estimate.',
@@ -303,67 +336,46 @@ function CourierDeskPage() {
   const openPartnerPage = (partnerId: CourierPartnerId) => {
     const params = new URLSearchParams()
     if (selectedOrderId) params.set('orderId', selectedOrderId)
-    if (origin.trim()) params.set('origin', origin.trim())
-    if (destination.trim()) params.set('destination', destination.trim())
+    if (warehousePincode) params.set('origin', warehousePincode)
+    const customerPincode = readText(selectedOrder?.pincode || destination)
+    if (customerPincode) params.set('destination', customerPincode)
     void navigate({ to: `/courier/${partnerId}${params.toString() ? `?${params.toString()}` : ''}` })
   }
 
   useEffect(() => {
-    if (!initialQuery.destination) return
+    if (!initialQuery.orderId && !initialQuery.destination) return
+    if (!selectedOrder) return
     if (loading || checking || autoCheckDone) return
-    if (!origin.trim() || !destination.trim()) return
+    if (!warehousePincode || !readText(selectedOrder.pincode || destination)) return
     setAutoCheckDone(true)
     void runCheck()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialQuery.destination, loading, checking, autoCheckDone, origin, destination])
+  }, [selectedOrder, loading, checking, autoCheckDone, warehousePincode, destination])
 
   return (
-    <Main>
-      <div className='space-y-6 p-4 md:p-6'>
+    <>
+      <div className='space-y-5'>
         <div className='overflow-hidden rounded-none border border-border bg-card p-4 md:p-5'>
           <div className='flex flex-wrap items-start justify-between gap-4'>
             <div className='space-y-2'>
               <h1 className='text-3xl font-semibold tracking-tight text-foreground'>Check Price</h1>
               <p className='max-w-3xl text-sm leading-6 text-muted-foreground'>
-                Check delivery app availability and price by origin and destination pincode.
+                Select an order to check courier app availability by customer pincode.
                 Shipment creation happens on the selected courier app page.
               </p>
             </div>
-            <div className='flex flex-wrap gap-2'>
-              <Button variant='outline' onClick={() => setStatsOpen(true)}>
-                <BarChart3 className='h-4 w-4' />
-                Statistics
-              </Button>
-              <Button
-                variant='outline'
-                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
-                onClick={() => setRefreshKey((current) => current + 1)}
-              >
-                <RefreshCcw className='h-4 w-4' />
-                Refresh
-              </Button>
-              <Button
-                variant='outline'
-                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
-                onClick={() => void navigate({ to: '/courier/manual' })}
-              >
-                Create Manual Order
-                <ArrowUpRight className='h-4 w-4' />
-              </Button>
-              <Button
-                variant='outline'
-                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
-                onClick={() => void navigate({ to: '/courier/list' })}
-              >
-                Courier List
-                <ArrowUpRight className='h-4 w-4' />
-              </Button>
-            </div>
+            <Button
+              className='rounded-none bg-primary text-primary-foreground hover:bg-primary/90'
+              onClick={() => void navigate({ to: '/courier/manual' })}
+            >
+              <PackageOpen className='h-4 w-4' />
+              Create Manual Order
+              <ArrowUpRight className='h-4 w-4' />
+            </Button>
           </div>
         </div>
 
         <Card className='border-border bg-card shadow-sm'>
-          <CardHeader />
           <CardContent className='space-y-6'>
             <div className='space-y-2'>
               <label className='text-sm font-medium text-foreground'>Order</label>
@@ -377,7 +389,7 @@ function CourierDeskPage() {
                 </option>
                 {selectableOrders.map((order) => (
                   <option key={order.id} value={order.id}>
-                    {order.orderNumber} | {order.customerName} | {order.pincode || 'No pincode'} | {order.status}
+                    {order.manualCourier ? 'Manual | ' : ''}{order.orderNumber} | {order.customerName} | {order.pincode || 'No pincode'} | {order.status}
                   </option>
                 ))}
               </select>
@@ -391,29 +403,96 @@ function CourierDeskPage() {
                 </p>
               )}
             </div>
-            <div className='grid gap-4 md:grid-cols-2'>
-              <div className='space-y-2'>
-                <label className='text-sm font-medium text-foreground'>Origin pincode</label>
-                <Input value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder='110001' />
-              </div>
-              <div className='space-y-2'>
-                <label className='text-sm font-medium text-foreground'>Destination pincode</label>
-                <Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder='201306' />
-              </div>
+            <div className='space-y-2'>
+              <label className='text-sm font-medium text-foreground'>Pricing warehouse</label>
+              <select
+                value={selectedWarehouse?.id || ''}
+                onChange={(e) => {
+                  setSelectedWarehouseId(e.target.value)
+                  setResults([])
+                }}
+                className='vendor-field flex h-11 w-full rounded-none border bg-transparent px-4 py-2 text-sm shadow-sm outline-none'
+                disabled={warehousesLoading || !orderedWarehouses.length}
+              >
+                <option value=''>
+                  {warehousesLoading
+                    ? 'Loading warehouses'
+                    : orderedWarehouses.length
+                      ? 'Select warehouse'
+                      : 'No warehouse created'}
+                </option>
+                {orderedWarehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name || 'Warehouse'} | {warehouse.pin || 'No pin'}
+                  </option>
+                ))}
+              </select>
+              {selectedWarehouse ? (
+                <p className='text-sm text-muted-foreground'>
+                  Calculating from {selectedWarehouse.name || 'selected warehouse'}
+                  {selectedWarehouse.pin ? `, ${selectedWarehouse.pin}` : ''}
+                  {selectedWarehouse.address ? ` | ${selectedWarehouse.address}` : ''}
+                </p>
+              ) : (
+                <p className='text-sm text-muted-foreground'>
+                  Create a warehouse before checking price.
+                </p>
+              )}
             </div>
+            {selectedOrder ? (
+              <div className='grid gap-4 md:grid-cols-4'>
+                <div className='rounded-none border border-border bg-muted/30 p-4'>
+                  <p className='text-xs font-semibold uppercase text-muted-foreground'>Origin warehouse</p>
+                  <p className='mt-2 text-lg font-semibold text-foreground'>
+                    {selectedWarehouse?.name || 'Not selected'}
+                  </p>
+                  <p className='mt-1 text-sm text-muted-foreground'>
+                    {selectedWarehouse?.pin || 'No pin'}
+                  </p>
+                </div>
+                <div className='rounded-none border border-border bg-muted/30 p-4'>
+                  <p className='text-xs font-semibold uppercase text-muted-foreground'>Customer pincode</p>
+                  <p className='mt-2 text-lg font-semibold text-foreground'>
+                    {selectedOrder.pincode || 'Not available'}
+                  </p>
+                </div>
+                <div className='rounded-none border border-border bg-muted/30 p-4'>
+                  <p className='text-xs font-semibold uppercase text-muted-foreground'>Customer</p>
+                  <p className='mt-2 text-lg font-semibold text-foreground'>
+                    {selectedOrder.customerName}
+                  </p>
+                </div>
+                <div className='rounded-none border border-border bg-muted/30 p-4'>
+                  <p className='text-xs font-semibold uppercase text-muted-foreground'>Order value</p>
+                  <p className='mt-2 text-lg font-semibold text-foreground'>
+                    {formatINR(selectedOrder.total)}
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             <div className='flex flex-wrap items-center gap-3'>
               <Button
                 className='rounded-none bg-primary text-primary-foreground hover:bg-primary/90'
-                disabled={checking}
+                disabled={checking || warehousesLoading || !selectedOrder || !selectedWarehouse}
                 onClick={() => void runCheck()}
               >
                 {checking ? <LoaderCircle className='h-4 w-4 animate-spin' /> : <Search className='h-4 w-4' />}
                 {checking ? 'Checking price' : 'Check price'}
               </Button>
               <p className='text-sm text-muted-foreground'>
-                Routed orders are no longer handled here. Open `Courier List` to manage active shipments.
+                Pricing uses the selected warehouse pin as origin.
               </p>
+              {!selectedWarehouse && !warehousesLoading ? (
+                <Button
+                  variant='outline'
+                  className='rounded-none'
+                  onClick={() => void navigate({ to: '/courier/warehouses' })}
+                >
+                  Create Warehouse
+                  <ArrowUpRight className='h-4 w-4' />
+                </Button>
+              ) : null}
             </div>
 
             {error ? (
@@ -431,11 +510,10 @@ function CourierDeskPage() {
         </Card>
 
         <Card className='border-border bg-card shadow-sm'>
-          <CardHeader />
           <CardContent>
             {!results.length ? (
               <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-8 text-sm text-muted-foreground'>
-                Enter origin and destination pincodes to check courier app prices.
+                Select an order to check courier app availability and price.
               </div>
             ) : (
               <div className='grid gap-4 xl:grid-cols-2'>
@@ -498,14 +576,6 @@ function CourierDeskPage() {
           </CardContent>
         </Card>
       </div>
-
-      <StatisticsDialog
-        open={statsOpen}
-        onOpenChange={setStatsOpen}
-        title='Courier Desk Statistics'
-        description='Current desk summary moved to popup view.'
-        items={statsItems}
-      />
-    </Main>
+    </>
   )
 }

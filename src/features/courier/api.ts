@@ -7,6 +7,11 @@ import {
   type CourierOrderSummary,
 } from './data'
 
+export type CourierCategoryOption = {
+  id: string
+  name: string
+}
+
 const getOrderBasePath = (order: CourierOrderSummary) =>
   order.source === 'template-orders'
     ? `/template-orders/${order.id}`
@@ -22,6 +27,7 @@ export const loadCourierOrders = async (isVendor: boolean) => {
     ? [
         { endpoint: '/orders', source: 'orders' as const },
         { endpoint: '/template-orders', source: 'template-orders' as const },
+        { endpoint: '/orders/manual', source: 'orders' as const },
       ]
     : [
         { endpoint: '/orders', source: 'orders' as const },
@@ -79,6 +85,20 @@ export const createManualCourierOrder = async (payload: Record<string, unknown>)
     ...res?.data,
     order,
   }
+}
+
+export const fetchCourierCategoryOptions = async () => {
+  const baseUrl = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/$/, '')
+  const res = await fetch(`${baseUrl}/v1/categories/getall?page=1&limit=500`)
+  if (!res.ok) throw new Error('Failed to load categories')
+  const data = await res.json()
+  const rows = Array.isArray(data?.data) ? data.data : []
+  return rows
+    .map((entry: any) => ({
+      id: String(entry?._id || entry?.id || entry?.slug || entry?.name || '').trim(),
+      name: String(entry?.name || entry?.title || entry?.category_name || '').trim(),
+    }))
+    .filter((entry: CourierCategoryOption) => entry.id && entry.name)
 }
 
 export const getAssignedCourierForOrder = (order: CourierOrderSummary | null) => {

@@ -3,7 +3,6 @@ import { LoaderCircle, MapPin, Package2, RefreshCcw, Truck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
-import { Main } from '@/components/layout/main'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -238,8 +237,8 @@ function CourierTrackingPage() {
   }
 
   return (
-    <Main>
-      <div className='space-y-5 p-4 md:p-6'>
+    <>
+      <div className='space-y-5'>
         <div className='flex flex-wrap items-center justify-between gap-3 rounded-none border bg-card p-4'>
           <div>
             <h1 className='text-xl font-semibold'>Delhivery Tracking</h1>
@@ -412,6 +411,6 @@ function CourierTrackingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Main>
+    </>
   )
 }

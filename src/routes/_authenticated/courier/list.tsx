@@ -2,7 +2,6 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ExternalLink, Truck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { Main } from '@/components/layout/main'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -394,8 +393,8 @@ function CourierListPage() {
   }
 
   return (
-    <Main>
-      <div className='space-y-6 p-4 md:p-6'>
+    <>
+      <div className='space-y-5'>
 
 
         {error ? (
@@ -774,6 +773,6 @@ function CourierListPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </Main>
+    </>
   )
 }

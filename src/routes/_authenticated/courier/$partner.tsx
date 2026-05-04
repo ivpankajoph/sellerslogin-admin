@@ -10,7 +10,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -39,7 +39,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { Main } from '@/components/layout/main'
 import {
   cancelShadowfaxOrder,
   createShadowfaxEscalation,
@@ -76,7 +75,13 @@ import {
   type CourierPartnerId,
 } from '@/features/courier/data'
 import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
+import {
+  resolveVendorProfile,
+  resolveVendorProfilePincode,
+} from '@/features/courier/vendor-profile'
 import type { RootState } from '@/store'
+import type { AppDispatch } from '@/store'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 
 const supportedPartners = COURIER_PARTNERS.map((partner) => partner.id)
 
@@ -372,7 +377,13 @@ const getLocalTimeValue = (value = new Date()) => {
 
 function CourierPartnerPage() {
   const { partner } = Route.useParams()
+  const dispatch = useDispatch<AppDispatch>()
   const user = useSelector((state: RootState) => state.auth?.user)
+  const vendorProfileState = useSelector((state: RootState) => state.vendorprofile)
+  const vendorProfile = useMemo(
+    () => resolveVendorProfile(vendorProfileState),
+    [vendorProfileState]
+  )
   const role = String(user?.role || '').toLowerCase()
   const isVendor = role === 'vendor'
   const { data: integrationsData } = useVendorIntegrations()
@@ -490,14 +501,18 @@ function CourierPartnerPage() {
     useState<ShadowfaxPodResult | null>(null)
 
   const profileOriginPincode = useMemo(
-    () => readText(user?.pincode || user?.pin || user?.postal_code || user?.zip),
-    [user]
+    () => resolveVendorProfilePincode(user, vendorProfile),
+    [user, vendorProfile]
   )
   const defaultPickupLocation = useMemo(
     () => readText(integrationsData?.providers?.delhivery?.config?.pickup_location),
     [integrationsData?.providers?.delhivery?.config?.pickup_location]
   )
 
+  useEffect(() => {
+    if (!isVendor || vendorProfile || vendorProfileState?.loading) return
+    void dispatch(fetchVendorProfile())
+  }, [dispatch, isVendor, vendorProfile, vendorProfileState?.loading])
 
   useEffect(() => {
     if (partnerId !== 'delhivery') return
@@ -1869,8 +1884,8 @@ function CourierPartnerPage() {
   }
 
   return (
-    <Main>
-      <div className='space-y-6 p-4 md:p-6'>
+    <>
+      <div className='space-y-5'>
         <div className='overflow-hidden rounded-3xl border border-border bg-card shadow-sm'>
           <div className='bg-[linear-gradient(135deg,color-mix(in_srgb,var(--card)_94%,#cbd5e1_6%)_0%,color-mix(in_srgb,var(--background)_92%,#67e8f9_8%)_45%,color-mix(in_srgb,var(--card)_92%,#fdba74_8%)_100%)] p-6 md:p-8'>
             <div className='flex flex-wrap items-start justify-between gap-4'>
@@ -3663,6 +3678,6 @@ function CourierPartnerPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Main>
+    </>
   )
 }

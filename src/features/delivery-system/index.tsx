@@ -355,8 +355,8 @@ export function DeliveryWorkspaceShell({
   }
 
   return (
-    <div className='min-h-svh bg-[#f4f8fb] text-slate-950'>
-      <header className='sticky top-0 z-30 border-b border-slate-200 bg-white shadow-sm'>
+    <div className='delivery-theme flex h-svh flex-col overflow-hidden bg-[#f4f8fb] text-slate-950'>
+      <header className='z-30 shrink-0 border-b border-slate-200 bg-white shadow-sm'>
         <div className='flex min-h-[88px] items-center gap-5 px-5 lg:px-7'>
           <button
             type='button'
@@ -411,9 +411,9 @@ export function DeliveryWorkspaceShell({
         </div>
       </header>
 
-      <div className='flex'>
+      <div className='flex min-h-0 flex-1'>
         <aside
-          className={`sticky top-[89px] hidden h-[calc(100svh-89px)] shrink-0 border-r border-slate-200 bg-white transition-[width] duration-200 md:block ${
+          className={`hidden h-full shrink-0 border-r border-slate-200 bg-white transition-[width] duration-200 md:block ${
             collapsed ? 'w-[88px]' : 'w-[264px]'
           }`}
         >
@@ -485,7 +485,9 @@ export function DeliveryWorkspaceShell({
           </div>
         </aside>
 
-        <main className='min-w-0 flex-1 px-4 py-4 md:px-5 lg:px-7'>{children}</main>
+        <main className='min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-5 lg:px-7'>
+          {children}
+        </main>
       </div>
     </div>
   )

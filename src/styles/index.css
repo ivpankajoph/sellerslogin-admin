@@ -257,6 +257,32 @@
   outline: none;
 }
 
+.delivery-theme {
+  --primary: #0f766e;
+  --primary-foreground: #ffffff;
+  --secondary: #dcfce7;
+  --secondary-foreground: #14532d;
+  --muted: #f0fdf4;
+  --muted-foreground: #64748b;
+  --accent: #dcfce7;
+  --accent-foreground: #14532d;
+  --border: #d8e6df;
+  --input: #bdd8cd;
+  --ring: #10b981;
+  --chart-1: #0f766e;
+  --chart-2: #059669;
+  --chart-3: #16a34a;
+  --chart-4: #22c55e;
+  --chart-5: #84cc16;
+}
+
+.delivery-theme .vendor-field:focus,
+.delivery-theme .vendor-field:focus-visible {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.16) !important;
+  outline: none;
+}
+
 .template-editor-sidebar {
   --editor-field-border: #d8dce7;
 }

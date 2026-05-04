@@ -106,6 +106,7 @@ import { Route as AuthenticatedFoodAdvanceOrderRouteImport } from './routes/_aut
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedCourierWarehousesRouteImport } from './routes/_authenticated/courier/warehouses'
 import { Route as AuthenticatedCourierTrackingRouteImport } from './routes/_authenticated/courier/tracking'
+import { Route as AuthenticatedCourierManualListRouteImport } from './routes/_authenticated/courier/manual-list'
 import { Route as AuthenticatedCourierManualRouteImport } from './routes/_authenticated/courier/manual'
 import { Route as AuthenticatedCourierListRouteImport } from './routes/_authenticated/courier/list'
 import { Route as AuthenticatedCourierDelhiveryRouteImport } from './routes/_authenticated/courier/delhivery'
@@ -671,6 +672,12 @@ const AuthenticatedCourierTrackingRoute =
     path: '/courier/tracking',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCourierManualListRoute =
+  AuthenticatedCourierManualListRouteImport.update({
+    id: '/courier/manual-list',
+    path: '/courier/manual-list',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCourierManualRoute =
   AuthenticatedCourierManualRouteImport.update({
     id: '/courier/manual',
@@ -781,6 +788,7 @@ export interface FileRoutesByFullPath {
   '/courier/delhivery': typeof AuthenticatedCourierDelhiveryRoute
   '/courier/list': typeof AuthenticatedCourierListRoute
   '/courier/manual': typeof AuthenticatedCourierManualRoute
+  '/courier/manual-list': typeof AuthenticatedCourierManualListRoute
   '/courier/tracking': typeof AuthenticatedCourierTrackingRoute
   '/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
@@ -888,6 +896,7 @@ export interface FileRoutesByTo {
   '/courier/delhivery': typeof AuthenticatedCourierDelhiveryRoute
   '/courier/list': typeof AuthenticatedCourierListRoute
   '/courier/manual': typeof AuthenticatedCourierManualRoute
+  '/courier/manual-list': typeof AuthenticatedCourierManualListRoute
   '/courier/tracking': typeof AuthenticatedCourierTrackingRoute
   '/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
@@ -1001,6 +1010,7 @@ export interface FileRoutesById {
   '/_authenticated/courier/delhivery': typeof AuthenticatedCourierDelhiveryRoute
   '/_authenticated/courier/list': typeof AuthenticatedCourierListRoute
   '/_authenticated/courier/manual': typeof AuthenticatedCourierManualRoute
+  '/_authenticated/courier/manual-list': typeof AuthenticatedCourierManualListRoute
   '/_authenticated/courier/tracking': typeof AuthenticatedCourierTrackingRoute
   '/_authenticated/courier/warehouses': typeof AuthenticatedCourierWarehousesRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
@@ -1113,6 +1123,7 @@ export interface FileRouteTypes {
     | '/courier/delhivery'
     | '/courier/list'
     | '/courier/manual'
+    | '/courier/manual-list'
     | '/courier/tracking'
     | '/courier/warehouses'
     | '/errors/$error'
@@ -1220,6 +1231,7 @@ export interface FileRouteTypes {
     | '/courier/delhivery'
     | '/courier/list'
     | '/courier/manual'
+    | '/courier/manual-list'
     | '/courier/tracking'
     | '/courier/warehouses'
     | '/errors/$error'
@@ -1332,6 +1344,7 @@ export interface FileRouteTypes {
     | '/_authenticated/courier/delhivery'
     | '/_authenticated/courier/list'
     | '/_authenticated/courier/manual'
+    | '/_authenticated/courier/manual-list'
     | '/_authenticated/courier/tracking'
     | '/_authenticated/courier/warehouses'
     | '/_authenticated/errors/$error'
@@ -2111,6 +2124,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCourierTrackingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/courier/manual-list': {
+      id: '/_authenticated/courier/manual-list'
+      path: '/courier/manual-list'
+      fullPath: '/courier/manual-list'
+      preLoaderRoute: typeof AuthenticatedCourierManualListRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/courier/manual': {
       id: '/_authenticated/courier/manual'
       path: '/courier/manual'
@@ -2258,6 +2278,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCourierDelhiveryRoute: typeof AuthenticatedCourierDelhiveryRoute
   AuthenticatedCourierListRoute: typeof AuthenticatedCourierListRoute
   AuthenticatedCourierManualRoute: typeof AuthenticatedCourierManualRoute
+  AuthenticatedCourierManualListRoute: typeof AuthenticatedCourierManualListRoute
   AuthenticatedCourierTrackingRoute: typeof AuthenticatedCourierTrackingRoute
   AuthenticatedCourierWarehousesRoute: typeof AuthenticatedCourierWarehousesRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
@@ -2344,6 +2365,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCourierDelhiveryRoute: AuthenticatedCourierDelhiveryRoute,
   AuthenticatedCourierListRoute: AuthenticatedCourierListRoute,
   AuthenticatedCourierManualRoute: AuthenticatedCourierManualRoute,
+  AuthenticatedCourierManualListRoute: AuthenticatedCourierManualListRoute,
   AuthenticatedCourierTrackingRoute: AuthenticatedCourierTrackingRoute,
   AuthenticatedCourierWarehousesRoute: AuthenticatedCourierWarehousesRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,

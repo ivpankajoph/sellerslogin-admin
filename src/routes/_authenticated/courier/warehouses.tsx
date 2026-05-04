@@ -3,7 +3,6 @@ import { LoaderCircle, Plus, RefreshCcw, Warehouse } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
-import { Main } from '@/components/layout/main'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -185,8 +184,8 @@ function CourierWarehouseManagePage() {
   }
 
   return (
-    <Main>
-      <div className='space-y-6 p-4 md:p-6'>
+    <>
+      <div className='space-y-5'>
         <div className='rounded-none border border-border bg-card p-4 md:p-5'>
           <div className='flex flex-wrap items-center justify-between gap-3'>
             <div>
@@ -397,6 +396,6 @@ function CourierWarehouseManagePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Main>
+    </>
   )
 }

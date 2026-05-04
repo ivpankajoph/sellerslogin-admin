@@ -348,26 +348,43 @@ export const normalizeCourierOrder = (
     (sum: number, item: any) => sum + Number(item?.quantity || 0),
     0
   )
-  const address = formatCourierAddress(order?.shipping_address)
+  const manualCustomer = order?.manual_courier?.customer || {}
+  const shippingAddress = order?.shipping_address || {}
+  const address =
+    formatCourierAddress(shippingAddress) ||
+    formatCourierAddress({
+      line1: toText(manualCustomer?.address_line_1 || manualCustomer?.address),
+      line2: toText(manualCustomer?.address_line_2),
+      city: toText(manualCustomer?.city),
+      state: toText(manualCustomer?.state),
+      pincode: toText(manualCustomer?.pincode),
+      country: toText(manualCustomer?.country || 'India'),
+    })
 
   return {
     id: orderId,
     orderNumber: toText(order?.order_number) || `#${orderId.slice(-6).toUpperCase()}`,
     source,
     customerName:
-      toText(order?.shipping_address?.full_name) ||
+      toText(shippingAddress?.full_name) ||
+      toText(manualCustomer?.name) ||
       toText(order?.user_id?.name) ||
       'Customer',
     customerPhone:
-      toText(order?.shipping_address?.phone) || toText(order?.user_id?.phone),
-    customerEmail: toText(order?.user_id?.email),
+      toText(shippingAddress?.phone) ||
+      toText(manualCustomer?.phone) ||
+      toText(order?.user_id?.phone),
+    customerEmail:
+      toText(shippingAddress?.email) ||
+      toText(manualCustomer?.email) ||
+      toText(order?.user_id?.email),
     total: Number(order?.total || order?.subtotal || 0),
     itemsCount: itemsCount || items.length || 1,
     createdAt: toText(order?.createdAt),
     address,
-    city: toText(order?.shipping_address?.city),
-    state: toText(order?.shipping_address?.state),
-    pincode: toText(order?.shipping_address?.pincode),
+    city: toText(shippingAddress?.city) || toText(manualCustomer?.city),
+    state: toText(shippingAddress?.state) || toText(manualCustomer?.state),
+    pincode: toText(shippingAddress?.pincode) || toText(manualCustomer?.pincode),
     status: toText(order?.status) || 'pending',
     deliveryProvider: toText(order?.delivery_provider),
     trackingUrl: toText(order?.borzo?.tracking_url),

@@ -1,10 +1,9 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { BarChart3, CircleHelp, LoaderCircle, RefreshCcw, Search, Warehouse } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { StatisticsDialog } from '@/components/data-table/statistics-dialog'
-import { Main } from '@/components/layout/main'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,9 +27,14 @@ import {
   type DelhiveryWarehouse,
 } from '@/features/courier/api'
 import { type CourierOrderSummary } from '@/features/courier/data'
+import {
+  resolveVendorProfile,
+  resolveVendorProfilePincode,
+} from '@/features/courier/vendor-profile'
 import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
 import { formatINR } from '@/lib/currency'
-import type { RootState } from '@/store'
+import type { AppDispatch, RootState } from '@/store'
+import { fetchVendorProfile } from '@/store/slices/vendor/profileSlice'
 
 export const Route = createFileRoute('/_authenticated/courier/delhivery')({
   component: DelhiveryCourierPage,
@@ -172,7 +176,13 @@ const uniqueTextList = (values: Array<unknown>) =>
 
 function DelhiveryCourierPage() {
   const navigate = useNavigate()
+  const dispatch = useDispatch<AppDispatch>()
   const user = useSelector((state: RootState) => state.auth?.user)
+  const vendorProfileState = useSelector((state: RootState) => state.vendorprofile)
+  const vendorProfile = useMemo(
+    () => resolveVendorProfile(vendorProfileState),
+    [vendorProfileState]
+  )
   const role = String(user?.role || '').toLowerCase()
   const isVendor = role === 'vendor'
   const { data: integrationsData } = useVendorIntegrations()
@@ -194,6 +204,11 @@ function DelhiveryCourierPage() {
       void navigate({ to: '/' })
     }
   }, [isVendor, navigate, user])
+
+  useEffect(() => {
+    if (!isVendor || vendorProfile || vendorProfileState?.loading) return
+    void dispatch(fetchVendorProfile())
+  }, [dispatch, isVendor, vendorProfile, vendorProfileState?.loading])
 
   const [orders, setOrders] = useState<CourierOrderSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -359,9 +374,7 @@ function DelhiveryCourierPage() {
     const fallbackOrigin =
       readText(selectedWarehouse?.pin) ||
       readText(initialQuery.origin) ||
-      readText(
-        user?.pincode || user?.pin || user?.postal_code || user?.zip
-      )
+      resolveVendorProfilePincode(user, vendorProfile)
     const fallbackDestination =
       readText(initialQuery.destination) || readText(selectedOrder?.pincode)
 
@@ -372,10 +385,8 @@ function DelhiveryCourierPage() {
     initialQuery.origin,
     selectedOrder,
     selectedWarehouse?.pin,
-    user?.pin,
-    user?.pincode,
-    user?.postal_code,
-    user?.zip,
+    user,
+    vendorProfile,
   ])
 
   const buildCreatePayload = useCallback((order: CourierOrderSummary) => {
@@ -608,8 +619,8 @@ function DelhiveryCourierPage() {
   )
 
   return (
-    <Main>
-      <div className='space-y-6 p-4 md:p-6'>
+    <>
+      <div className='space-y-5'>
         {error ? (
           <div className='rounded-none border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700'>
             {error}
@@ -1170,6 +1181,6 @@ function DelhiveryCourierPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Main>
+    </>
   )
 }
