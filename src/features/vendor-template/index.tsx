@@ -1107,7 +1107,10 @@ export default function TemplateForm() {
                 ['Blog menu', 'showBlogLink'],
                 ['Contact menu', 'showContactLink'],
               ].map(([label, key]) => {
-                const checked = headerConfig?.[key] !== false
+                const checked =
+                  key === 'showBlogLink' || key === 'showContactLink'
+                    ? headerConfig?.[key] === true
+                    : headerConfig?.[key] !== false
                 return (
                   <label
                     key={key}

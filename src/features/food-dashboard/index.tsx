@@ -10,7 +10,9 @@ import {
   Clock3,
   Copy,
   DollarSign,
+  Loader2,
   MessageCircle,
+  Send,
   ShoppingCart,
   Sparkles,
   Store,
@@ -41,10 +43,21 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   getVendorTemplatePreviewUrl,
   resolvePreviewCityFromVendorProfile,
 } from '@/lib/storefront-url'
-import { useActiveWebsiteSelection } from '@/features/vendor-template/components/websiteStudioStorage'
+import { getStoredActiveWebsite } from '@/features/vendor-template/components/websiteStudioStorage'
+import {
+  getFoodResponseArray,
+  getFoodResponseObject,
+} from '@/features/food-ops/shared'
 
 type Summary = {
   restaurant_name?: string
@@ -68,6 +81,14 @@ type Offer = {
   is_active?: boolean
 }
 
+type InventoryItem = {
+  _id: string
+  name?: string
+  unit?: string
+  stock?: number
+  minimum_stock?: number
+}
+
 type Order = {
   _id: string
   order_number?: string
@@ -87,6 +108,19 @@ type ShareForm = {
   name: string
   whatsapp: string
   email: string
+  linkType: 'menu' | 'offers' | 'items' | 'custom'
+  customLink: string
+}
+
+type TemplateWebsiteLite = {
+  _id?: string
+  id?: string
+  name?: string
+  business_name?: string
+  website_slug?: string
+  template_key?: string
+  templateKey?: string
+  is_default?: boolean
 }
 
 const money = (value?: number) => `Rs. ${Number(value || 0).toFixed(2)}`
@@ -124,6 +158,29 @@ const buildChartData = (orders: Order[]) => {
     label: format(parseISO(`${key}T00:00:00`), 'EEE'),
     total: Number(totals.get(key) || 0),
   }))
+}
+
+const normalizeWhatsAppNumber = (value: string) => {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return ''
+  return digits.length === 10 ? `91${digits}` : digits
+}
+
+const isValidEmail = (value: string) =>
+  !value.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+
+const shareLinkLabels: Record<ShareForm['linkType'], string> = {
+  menu: 'Full menu',
+  offers: 'Offers and combos',
+  items: 'Menu items',
+  custom: 'Custom link',
+}
+
+const isPocoFoodWebsite = (website?: TemplateWebsiteLite | null) => {
+  const key = String(website?.template_key || website?.templateKey || '')
+    .trim()
+    .toLowerCase()
+  return key === 'pocofood' || key.includes('pocofood')
 }
 
 const StatCard = ({
@@ -169,6 +226,7 @@ const StatCard = ({
 
 export default function FoodOperationsDashboardPage() {
   const authUser = useSelector((state: any) => state.auth?.user || null)
+  const authToken = useSelector((state: any) => state.auth?.token || '')
   const vendorProfile = useSelector(
     (state: any) =>
       state.vendorprofile?.profile?.vendor ||
@@ -177,19 +235,23 @@ export default function FoodOperationsDashboardPage() {
       null
   )
   const vendorId = String(authUser?.id || authUser?._id || '')
-  const { activeWebsite, activeWebsiteId } = useActiveWebsiteSelection(vendorId)
 
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState<Summary | null>(null)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [offers, setOffers] = useState<Offer[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [shareOpen, setShareOpen] = useState(false)
   const [shareForm, setShareForm] = useState<ShareForm>({
     name: '',
     whatsapp: '',
     email: '',
+    linkType: 'menu',
+    customLink: '',
   })
+  const [sendingShare, setSendingShare] = useState(false)
+  const [foodWebsite, setFoodWebsite] = useState<TemplateWebsiteLite | null>(null)
 
   useEffect(() => {
     let active = true
@@ -197,18 +259,23 @@ export default function FoodOperationsDashboardPage() {
     const loadDashboard = async () => {
       setLoading(true)
       try {
-        const [summaryRes, menuRes, offersRes, ordersRes] = await Promise.all([
+        const [summaryRes, menuRes, offersRes, ordersRes, inventoryRes] =
+          await Promise.all([
           api.get('/food/summary'),
           api.get('/food/menu'),
           api.get('/food/offers'),
           api.get('/food/orders'),
+          api.get('/food/inventory'),
         ])
 
         if (!active) return
-        setSummary(summaryRes?.data?.data || summaryRes?.data || null)
-        setMenuItems(menuRes?.data?.data || menuRes?.data || [])
-        setOffers(offersRes?.data?.data || offersRes?.data || [])
-        setOrders(ordersRes?.data?.data || ordersRes?.data || [])
+        setSummary(getFoodResponseObject<Summary>(summaryRes?.data, 'summary'))
+        setMenuItems(getFoodResponseArray<MenuItem>(menuRes?.data, 'items'))
+        setOffers(getFoodResponseArray<Offer>(offersRes?.data, 'offers'))
+        setOrders(getFoodResponseArray<Order>(ordersRes?.data, 'orders'))
+        setInventoryItems(
+          getFoodResponseArray<InventoryItem>(inventoryRes?.data, 'rows')
+        )
       } catch (error: any) {
         if (!active) return
         toast.error(
@@ -226,23 +293,113 @@ export default function FoodOperationsDashboardPage() {
     }
   }, [])
 
+  useEffect(() => {
+    let active = true
+
+    const loadFoodWebsite = async () => {
+      const storedWebsite = getStoredActiveWebsite(vendorId)
+      if (isPocoFoodWebsite(storedWebsite)) {
+        setFoodWebsite({
+          _id: storedWebsite?.id,
+          id: storedWebsite?.id,
+          name: storedWebsite?.name,
+          template_key: 'pocofood',
+          website_slug: storedWebsite?.websiteSlug,
+        })
+        return
+      }
+
+      try {
+        const apiBase = String(import.meta.env.VITE_PUBLIC_API_URL || '').replace(/\/+$/, '')
+        if (!apiBase || !vendorId) return
+        const response = await fetch(
+          `${apiBase}/v1/templates/by-vendor?vendor_id=${encodeURIComponent(vendorId)}&_ts=${Date.now()}`,
+          {
+            headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+          }
+        )
+        const payload = await response.json().catch(() => null)
+        const websites = Array.isArray(payload?.data)
+          ? (payload.data as TemplateWebsiteLite[])
+          : []
+        const defaultPocoFoodWebsite = websites.find(
+          (website) => isPocoFoodWebsite(website) && website.is_default
+        )
+        const pocoFoodWebsite =
+          defaultPocoFoodWebsite || websites.find((website) => isPocoFoodWebsite(website))
+        if (active) setFoodWebsite(pocoFoodWebsite || null)
+      } catch {
+        if (active) setFoodWebsite(null)
+      }
+    }
+
+    void loadFoodWebsite()
+
+    return () => {
+      active = false
+    }
+  }, [authToken, vendorId])
+
   const previewCity = useMemo(
     () => resolvePreviewCityFromVendorProfile(vendorProfile),
     [vendorProfile]
   )
 
   const menuShareUrl = useMemo(() => {
-    const templateKey =
-      String(activeWebsite?.templateKey || '').trim() || 'pocofood'
+    const websiteId = String(
+      foodWebsite?._id ||
+        foodWebsite?.id ||
+        vendorProfile?.default_website_id ||
+        vendorProfile?.defaultWebsiteId ||
+        authUser?.default_website_id ||
+        ''
+    ).trim()
     return (
       getVendorTemplatePreviewUrl(
         vendorId,
-        templateKey,
+        'pocofood',
         previewCity.slug,
-        activeWebsiteId || activeWebsite?.id
+        websiteId || undefined
       ) || ''
     )
-  }, [activeWebsite?.id, activeWebsite?.templateKey, activeWebsiteId, previewCity.slug, vendorId])
+  }, [
+    authUser?.default_website_id,
+    foodWebsite?._id,
+    foodWebsite?.id,
+    previewCity.slug,
+    vendorId,
+    vendorProfile?.defaultWebsiteId,
+    vendorProfile?.default_website_id,
+  ])
+
+  const selectedShareUrl = useMemo(() => {
+    const baseUrl = menuShareUrl
+    if (shareForm.linkType === 'custom') return shareForm.customLink.trim()
+    if (!baseUrl) return ''
+    if (shareForm.linkType === 'offers') return `${baseUrl}/combo`
+    return `${baseUrl}/all-products`
+  }, [menuShareUrl, shareForm.customLink, shareForm.linkType])
+
+  const shareMessage = useMemo(() => {
+    const customerName = shareForm.name.trim()
+    const restaurantName = summary?.restaurant_name || 'our restaurant'
+    return [
+      customerName ? `Hi ${customerName},` : 'Hi,',
+      `Here is the ${shareLinkLabels[shareForm.linkType].toLowerCase()} link for ${restaurantName}.`,
+      'Tap the link below to open the menu and place your order:',
+      '',
+      selectedShareUrl || 'Menu link is not ready yet.',
+    ].join('\n')
+  }, [selectedShareUrl, shareForm.linkType, shareForm.name, summary?.restaurant_name])
+
+  const sharePreviewMessage = useMemo(
+    () =>
+      shareMessage.replace(
+        selectedShareUrl || 'Menu link is not ready yet.',
+        selectedShareUrl ? `[${shareLinkLabels[shareForm.linkType]} link will be attached]` : 'Menu link is not ready yet.'
+      ),
+    [selectedShareUrl, shareForm.linkType, shareMessage]
+  )
 
   const totalRevenue = useMemo(
     () => orders.reduce((sum, order) => sum + Number(order.total || 0), 0),
@@ -259,36 +416,130 @@ export default function FoodOperationsDashboardPage() {
     [menuItems]
   )
 
+  const lowStockItems = useMemo(
+    () =>
+      inventoryItems.filter(
+        (item) =>
+          Number(item.minimum_stock || 0) > 0 &&
+          Number(item.stock || 0) <= Number(item.minimum_stock || 0)
+      ),
+    [inventoryItems]
+  )
+
   const recentOrders = useMemo(() => orders.slice(0, 5), [orders])
   const chartData = useMemo(() => buildChartData(orders), [orders])
 
   const copyMenuLink = async () => {
-    if (!menuShareUrl) {
+    if (!selectedShareUrl) {
       toast.error('Food website preview link is not ready yet.')
       return
     }
 
     try {
-      await navigator.clipboard.writeText(menuShareUrl)
+      await navigator.clipboard.writeText(selectedShareUrl)
       toast.success('Menu link copied')
     } catch {
       toast.error('Could not copy the menu link')
     }
   }
 
-  const shareMenuByMessage = async () => {
-    if (!menuShareUrl) {
+  const copyShareMessage = async () => {
+    if (!selectedShareUrl) {
       toast.error('Preview link is not ready yet. Please save/select your website first.')
       return
     }
 
     try {
-      await navigator.clipboard.writeText(menuShareUrl)
-      toast.success(`Menu link copied for ${shareForm.name || 'customer'}`)
-      setShareOpen(false)
-      setShareForm({ name: '', whatsapp: '', email: '' })
+      await navigator.clipboard.writeText(shareMessage)
+      toast.success(`Menu message copied for ${shareForm.name || 'customer'}`)
     } catch {
-      toast.error('Could not copy the menu link')
+      toast.error('Could not copy the menu message')
+    }
+  }
+
+  const sendMenuLink = async () => {
+    if (!selectedShareUrl) {
+      toast.error('Preview link is not ready yet. Please save/select your website first.')
+      return
+    }
+    const whatsappNumber = normalizeWhatsAppNumber(shareForm.whatsapp)
+    const email = shareForm.email.trim()
+    if (!whatsappNumber && !email) {
+      toast.error('Enter customer WhatsApp number or email')
+      return
+    }
+    if (!isValidEmail(email)) {
+      toast.error('Enter a valid email address')
+      return
+    }
+
+    setSendingShare(true)
+    try {
+      const response = await api.post('/food/share-menu-link', {
+        name: shareForm.name.trim(),
+        whatsapp: whatsappNumber,
+        email,
+        link: selectedShareUrl,
+        link_type: shareLinkLabels[shareForm.linkType],
+        restaurant_name: summary?.restaurant_name || '',
+        message: shareMessage,
+      })
+      const results = Array.isArray(response?.data?.results) ? response.data.results : []
+      const deliveredChannels = results
+        .filter(
+          (result: any) =>
+            result?.success &&
+            (result.channel !== 'whatsapp' || result.delivery_confirmed === true)
+        )
+        .map((result: any) => String(result?.channel || '').trim())
+        .filter(Boolean)
+      const submittedChannels = results
+        .filter(
+          (result: any) =>
+            result?.success &&
+            result.channel === 'whatsapp' &&
+            result.delivery_confirmed !== true
+        )
+        .map((result: any) => String(result?.channel || '').trim())
+        .filter(Boolean)
+      const failedChannels = results
+        .filter((result: any) => result && result.success === false)
+        .map((result: any) => `${result.channel}: ${result.message}`)
+
+      if (failedChannels.length || submittedChannels.length) {
+        const parts = [
+          deliveredChannels.length ? `Sent by ${deliveredChannels.join(' and ')}` : '',
+          submittedChannels.length
+            ? `WhatsApp submitted, delivery not confirmed`
+            : '',
+          failedChannels.length ? `Failed: ${failedChannels.join(' | ')}` : '',
+        ].filter(Boolean)
+        toast.warning(
+          parts.join('. ')
+        )
+      } else {
+        toast.success(
+          deliveredChannels.length
+            ? `Menu link sent by ${deliveredChannels.join(' and ')}`
+            : response?.data?.message || 'Menu link sent'
+        )
+        setShareOpen(false)
+      }
+    } catch (error: any) {
+      const results = Array.isArray(error?.response?.data?.results)
+        ? error.response.data.results
+        : []
+      const detail = results
+        .filter((result: any) => result && result.success === false)
+        .map((result: any) => `${result.channel}: ${result.message}`)
+        .join(' | ')
+      toast.error(
+        detail ||
+          error?.response?.data?.message ||
+          'Could not send the menu link. Check WhatsApp and email setup.'
+      )
+    } finally {
+      setSendingShare(false)
     }
   }
 
@@ -362,6 +613,42 @@ export default function FoodOperationsDashboardPage() {
           icon={<AlertCircle className={`h-5 w-5 ${attentionItemsCount > 0 ? 'text-rose-600' : 'text-slate-400'}`} />}
         />
       </div>
+
+      {lowStockItems.length ? (
+        <Card className='rounded-[28px] border border-rose-200 bg-rose-50 py-0 shadow-sm'>
+          <CardContent className='flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between'>
+            <div className='min-w-0'>
+              <div className='flex items-center gap-3'>
+                <span className='inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-100 text-rose-700'>
+                  <AlertCircle className='h-5 w-5' />
+                </span>
+                <div>
+                  <p className='text-lg font-black text-slate-950'>
+                    Low material stock
+                  </p>
+                  <p className='text-sm font-semibold text-slate-600'>
+                    {lowStockItems.length} material needs manager attention.
+                  </p>
+                </div>
+              </div>
+              <div className='mt-3 flex flex-wrap gap-2'>
+                {lowStockItems.slice(0, 5).map((item) => (
+                  <span
+                    key={item._id}
+                    className='rounded-full bg-white px-3 py-1 text-xs font-black text-rose-700 shadow-sm'
+                  >
+                    {item.name || 'Material'}: {Number(item.stock || 0)}{' '}
+                    {String(item.unit || '').toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <Button asChild className='h-11 rounded-2xl bg-slate-950 px-5 text-white hover:bg-black'>
+              <Link to='/food/inventory'>Open Inventory Alerts</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className='grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.9fr)]'>
         <Card className='rounded-[30px] border border-slate-200 bg-white py-0 shadow-sm'>
@@ -574,71 +861,155 @@ export default function FoodOperationsDashboardPage() {
       </div>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
-        <DialogContent className='max-w-[560px] rounded-[28px] border-0 p-0 shadow-2xl'>
-          <div className='border-b border-slate-100 bg-white px-6 py-5'>
+        <DialogContent className='max-h-[92vh] max-w-xl overflow-hidden rounded-[24px] border-0 p-0 shadow-2xl'>
+          <div className='border-b border-slate-100 bg-white px-5 py-4 sm:px-6'>
             <DialogHeader className='text-left'>
-              <DialogTitle className='text-2xl font-black tracking-tight text-slate-900'>
-                Share Digital Menu
+              <DialogTitle className='text-xl font-black tracking-tight text-slate-900 sm:text-2xl'>
+                Send Menu Link
               </DialogTitle>
-              <DialogDescription className='mt-2 text-sm text-slate-500'>
-                Copy the current PocoFood menu link and share it with your customer.
+              <DialogDescription className='mt-1 text-sm leading-6 text-slate-500'>
+                Enter customer details and send the menu link by WhatsApp or email.
               </DialogDescription>
             </DialogHeader>
           </div>
-          <div className='space-y-5 px-6 py-6'>
-            <div className='space-y-2'>
-              <label className='text-xs font-black uppercase tracking-[0.18em] text-slate-400'>
-                Customer Name
-              </label>
-              <Input
-                placeholder='Example: Rahul Sharma'
-                value={shareForm.name}
-                onChange={(event) =>
-                  setShareForm((current) => ({ ...current, name: event.target.value }))
-                }
-              />
-            </div>
-            <div className='space-y-2'>
-              <label className='text-xs font-black uppercase tracking-[0.18em] text-slate-400'>
-                WhatsApp Number
-              </label>
-              <Input
-                placeholder='Example: 9876543210'
-                value={shareForm.whatsapp}
-                onChange={(event) =>
-                  setShareForm((current) => ({ ...current, whatsapp: event.target.value }))
-                }
-              />
-            </div>
-            <div className='space-y-2'>
-              <label className='text-xs font-black uppercase tracking-[0.18em] text-slate-400'>
-                Email (Optional)
-              </label>
-              <Input
-                placeholder='customer@example.com'
-                value={shareForm.email}
-                onChange={(event) =>
-                  setShareForm((current) => ({ ...current, email: event.target.value }))
-                }
-              />
-            </div>
-            <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-              <p className='text-xs font-black uppercase tracking-[0.16em] text-slate-400'>
-                Current Menu Link
-              </p>
-              <p className='mt-2 break-all text-sm font-medium text-slate-700'>
-                {menuShareUrl || 'Select/save your active food website to generate the preview link.'}
-              </p>
-            </div>
-            <div className='flex flex-col gap-3 sm:flex-row sm:justify-end'>
-              <Button variant='outline' className='rounded-2xl' onClick={copyMenuLink}>
-                <Copy className='mr-2 h-4 w-4' />
-                Copy Link
-              </Button>
-              <Button className='rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600' onClick={shareMenuByMessage}>
-                <MessageCircle className='mr-2 h-4 w-4' />
-                Ready to Share
-              </Button>
+          <div className='max-h-[calc(92vh-92px)] overflow-y-auto bg-slate-50 px-5 py-5 sm:px-6'>
+            <div className='space-y-4'>
+              <div className='rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'>
+                <p className='text-xs font-black uppercase tracking-[0.18em] text-slate-400'>
+                  Customer Details
+                </p>
+                <div className='mt-4 grid gap-4'>
+                  <div className='space-y-2'>
+                    <label className='text-xs font-black uppercase tracking-[0.14em] text-slate-500'>
+                      Customer Name
+                    </label>
+                    <Input
+                      className='h-11 rounded-xl bg-slate-50 font-semibold'
+                      placeholder='Example: Rahul Sharma'
+                      value={shareForm.name}
+                      onChange={(event) =>
+                        setShareForm((current) => ({ ...current, name: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className='grid gap-4 sm:grid-cols-2'>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-black uppercase tracking-[0.14em] text-slate-500'>
+                        WhatsApp Number
+                      </label>
+                      <Input
+                        className='h-11 rounded-xl bg-slate-50 font-semibold'
+                        placeholder='9876543210'
+                        value={shareForm.whatsapp}
+                        onChange={(event) =>
+                          setShareForm((current) => ({
+                            ...current,
+                            whatsapp: event.target.value.replace(/[^\d+]/g, ''),
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className='text-xs font-black uppercase tracking-[0.14em] text-slate-500'>
+                        Email
+                      </label>
+                      <Input
+                        className='h-11 rounded-xl bg-slate-50 font-semibold'
+                        placeholder='customer@example.com'
+                        value={shareForm.email}
+                        onChange={(event) =>
+                          setShareForm((current) => ({ ...current, email: event.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className='space-y-2'>
+                    <label className='text-xs font-black uppercase tracking-[0.14em] text-slate-500'>
+                      Link to Send
+                    </label>
+                    <Select
+                      value={shareForm.linkType}
+                      onValueChange={(value) =>
+                        setShareForm((current) => ({
+                          ...current,
+                          linkType: value as ShareForm['linkType'],
+                        }))
+                      }
+                    >
+                      <SelectTrigger className='h-11 rounded-xl bg-slate-50 font-semibold'>
+                        <SelectValue placeholder='Choose link' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='menu'>Full menu</SelectItem>
+                        <SelectItem value='offers'>Offers and combos</SelectItem>
+                        <SelectItem value='items'>Menu items</SelectItem>
+                        <SelectItem value='custom'>Custom link</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {shareForm.linkType === 'custom' ? (
+                    <div className='space-y-2'>
+                      <label className='text-xs font-black uppercase tracking-[0.14em] text-slate-500'>
+                        Custom Link
+                      </label>
+                      <Input
+                        className='h-11 rounded-xl bg-slate-50 font-semibold'
+                        placeholder='https://...'
+                        value={shareForm.customLink}
+                        onChange={(event) =>
+                          setShareForm((current) => ({
+                            ...current,
+                            customLink: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className='rounded-2xl border border-emerald-200 bg-emerald-50 p-4'>
+                <div className='flex items-center justify-between gap-3'>
+                  <p className='text-xs font-black uppercase tracking-[0.18em] text-emerald-700'>
+                    Message Preview
+                  </p>
+                  <Badge className='rounded-full bg-white px-3 py-1 text-[10px] font-black text-emerald-700 shadow-none'>
+                    {shareLinkLabels[shareForm.linkType]}
+                  </Badge>
+                </div>
+                <div className='mt-3 whitespace-pre-line rounded-2xl bg-white p-4 text-sm font-semibold leading-6 text-slate-700 shadow-sm'>
+                  {sharePreviewMessage}
+                </div>
+                <p className='mt-3 text-xs font-semibold leading-5 text-emerald-700'>
+                  The real clickable menu link is only included inside the WhatsApp or email message sent to the customer.
+                </p>
+              </div>
+
+              <div className='sticky bottom-0 -mx-5 border-t border-slate-200 bg-slate-50/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:px-6'>
+                <div className='grid gap-3 sm:grid-cols-[1fr_auto]'>
+                  <Button
+                    className='h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700'
+                    onClick={sendMenuLink}
+                    disabled={sendingShare}
+                  >
+                    {sendingShare ? (
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    ) : (
+                      <Send className='mr-2 h-4 w-4' />
+                    )}
+                    Send Link
+                  </Button>
+                  <Button
+                    variant='outline'
+                    className='h-11 rounded-xl bg-white'
+                    onClick={copyShareMessage}
+                    disabled={sendingShare}
+                  >
+                    <Copy className='mr-2 h-4 w-4' />
+                    Copy Message
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </DialogContent>

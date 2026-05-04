@@ -70,6 +70,7 @@ type RestaurantProfile = {
   minimum_order_amount: number
   default_preparation_time_minutes: number
   opening_hours: Array<{ day: string; open: string; close: string; is_closed: boolean }>
+  service_areas: string[]
   is_active: boolean
 }
 
@@ -87,6 +88,12 @@ type MenuItem = {
   prep_time_minutes: number
   addons: Array<{ name: string; price: number; is_free: boolean }>
   variants: Array<{ name: string; price: number; offer_price: number; is_default: boolean; is_available: boolean }>
+  slug?: string
+  seo_title?: string
+  seo_description?: string
+  seo_keywords?: string[]
+  service_areas?: string[]
+  canonical_url?: string
 }
 
 type Offer = {
@@ -156,6 +163,12 @@ type MenuFormState = {
   prep_time_minutes: string
   addons: MenuAddon[]
   variants: MenuVariant[]
+  slug: string
+  seo_title: string
+  seo_description: string
+  seo_keywords: string
+  service_areas: string
+  canonical_url: string
 }
 
 type OfferFormState = {
@@ -191,6 +204,7 @@ const DEFAULT_RESTAURANT: RestaurantProfile = {
   delivery_radius_km: 5,
   minimum_order_amount: 0,
   default_preparation_time_minutes: 20,
+  service_areas: [],
   opening_hours: [
     { day: 'Monday', open: '09:00', close: '22:00', is_closed: false },
     { day: 'Tuesday', open: '09:00', close: '22:00', is_closed: false },
@@ -215,6 +229,18 @@ const emptyWhenZero = (value: unknown) => {
   if (value === '' || value === null || value === undefined) return ''
   return Number(value) === 0 ? '' : String(value)
 }
+const listToCsv = (value?: string[]) => (Array.isArray(value) ? value.join(', ') : '')
+const csvToList = (value: string) =>
+  String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+const toSlug = (value: string) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 const getApiErrorMessage = (error: any, fallback: string) =>
   error?.response?.data?.message ||
   error?.response?.data?.error ||
@@ -403,6 +429,12 @@ const DEFAULT_MENU_FORM = (): MenuFormState => ({
   prep_time_minutes: '20',
   addons: [createEmptyAddon()],
   variants: [createEmptyVariant()],
+  slug: '',
+  seo_title: '',
+  seo_description: '',
+  seo_keywords: '',
+  service_areas: '',
+  canonical_url: '',
 })
 
 const DEFAULT_OFFER_FORM = (): OfferFormState => ({
@@ -908,7 +940,57 @@ export default function FoodHubPage() {
     prep_time_minutes: String(item.prep_time_minutes || 20),
     addons: item.addons?.length ? item.addons : [createEmptyAddon()],
     variants: item.variants?.length ? item.variants : [createEmptyVariant()],
+    slug: item.slug || '',
+    seo_title: item.seo_title || '',
+    seo_description: item.seo_description || '',
+    seo_keywords: listToCsv(item.seo_keywords),
+    service_areas: listToCsv(item.service_areas),
+    canonical_url: item.canonical_url || '',
   })
+
+  const autoGenerateMenuSeo = () => {
+    const itemName = capitalizeFirstLetter(menuForm.item_name)
+    if (!itemName) {
+      toast.error('Add food item name first')
+      return
+    }
+    const restaurantName = restaurant.restaurant_name || 'Restaurant'
+    const areas = csvToList(menuForm.service_areas).length
+      ? csvToList(menuForm.service_areas)
+      : restaurant.service_areas?.length
+        ? restaurant.service_areas
+        : [restaurant.city].filter(Boolean)
+    const primaryArea = areas[0] || restaurant.city
+    const category = menuForm.category.trim() || 'Food'
+    const description =
+      menuForm.description.trim() ||
+      `${category} available for dine-in, takeaway and delivery.`
+
+    setMenuForm((current) => ({
+      ...current,
+      slug: current.slug || toSlug([itemName, primaryArea].filter(Boolean).join(' ')),
+      seo_title:
+        current.seo_title ||
+        [itemName, primaryArea ? `in ${primaryArea}` : '', restaurantName]
+          .filter(Boolean)
+          .join(' | '),
+      seo_description:
+        current.seo_description ||
+        [
+          `Order ${itemName} from ${restaurantName}.`,
+          description,
+          areas.length ? `Available in ${areas.join(', ')}.` : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      seo_keywords:
+        current.seo_keywords ||
+        [itemName, category, ...areas.map((area) => `${itemName} ${area}`)]
+          .filter(Boolean)
+          .join(', '),
+      service_areas: current.service_areas || areas.join(', '),
+    }))
+  }
 
   const startEditMenuItem = (item: MenuItem) => {
     setCustomCategoryMode(false)
@@ -1017,6 +1099,12 @@ export default function FoodHubPage() {
       prep_time_minutes: parseFormNumber(menuForm.prep_time_minutes) || 20,
       addons,
       variants,
+      slug: menuForm.slug,
+      seo_title: menuForm.seo_title,
+      seo_description: menuForm.seo_description,
+      seo_keywords: csvToList(menuForm.seo_keywords),
+      service_areas: csvToList(menuForm.service_areas),
+      canonical_url: menuForm.canonical_url,
     }
     try {
       setSavingMenu(true)
@@ -1113,6 +1201,12 @@ export default function FoodHubPage() {
           ...variant,
           is_default: index === 0,
         })),
+        slug: item.slug || '',
+        seo_title: item.seo_title || '',
+        seo_description: item.seo_description || '',
+        seo_keywords: item.seo_keywords || [],
+        service_areas: item.service_areas || [],
+        canonical_url: item.canonical_url || '',
       })
 
       setMenuItems((current) =>
@@ -1710,6 +1804,73 @@ export default function FoodHubPage() {
                 <div className='space-y-2'>
                   <MainFieldLabel label='Item description' helper='Add taste, ingredients, serving size, spice level, or other useful details.' />
                   <Textarea className='min-h-[88px]' placeholder='Example: Crispy veg patty with cheese, lettuce, mayo, and fresh bun.' value={menuForm.description} onChange={(e) => setMenuForm((c) => ({ ...c, description: e.target.value }))} />
+                </div>
+                <div className='space-y-3 rounded-lg border border-violet-100 bg-violet-50/40 p-4'>
+                  <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+                    <div>
+                      <p className='text-sm font-semibold text-slate-900'>SEO Settings</p>
+                      <p className='text-xs text-slate-500'>
+                        Used for Google title, description, sitemap, and local food searches.
+                      </p>
+                    </div>
+                    <Button type='button' variant='outline' onClick={autoGenerateMenuSeo}>
+                      Auto Generate SEO
+                    </Button>
+                  </div>
+                  <div className='grid gap-3 md:grid-cols-2'>
+                    <div className='space-y-1'>
+                      <FieldLabel label='URL slug' helper='Readable item URL keyword. Current links keep item ID for compatibility.' />
+                      <Input
+                        placeholder='crispy-veg-burger-noida'
+                        value={menuForm.slug}
+                        onChange={(e) => setMenuForm((c) => ({ ...c, slug: e.target.value }))}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <FieldLabel label='SEO keywords' helper='Comma separated keywords.' />
+                      <Input
+                        placeholder='burger in noida, veg burger sector 62'
+                        value={menuForm.seo_keywords}
+                        onChange={(e) => setMenuForm((c) => ({ ...c, seo_keywords: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className='space-y-1'>
+                    <FieldLabel label='SEO title' helper='Shown as Google result title.' />
+                    <Input
+                      placeholder='Crispy Veg Burger in Noida | Punjabi Dhaba'
+                      value={menuForm.seo_title}
+                      onChange={(e) => setMenuForm((c) => ({ ...c, seo_title: e.target.value }))}
+                    />
+                  </div>
+                  <div className='space-y-1'>
+                    <FieldLabel label='SEO description' helper='Shown as Google result summary.' />
+                    <Textarea
+                      className='min-h-[76px]'
+                      placeholder='Order Crispy Veg Burger from Punjabi Dhaba. Available in Noida Sector 62, Sector 135, Gaur City and Ghaziabad.'
+                      value={menuForm.seo_description}
+                      onChange={(e) => setMenuForm((c) => ({ ...c, seo_description: e.target.value }))}
+                    />
+                  </div>
+                  <div className='grid gap-3 md:grid-cols-2'>
+                    <div className='space-y-1'>
+                      <FieldLabel label='Item service areas' helper='Override restaurant areas for this item.' />
+                      <Textarea
+                        className='min-h-[68px]'
+                        placeholder='Noida Sector 62, Gaur City'
+                        value={menuForm.service_areas}
+                        onChange={(e) => setMenuForm((c) => ({ ...c, service_areas: e.target.value }))}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <FieldLabel label='Canonical URL' helper='Optional advanced SEO field.' />
+                      <Input
+                        placeholder='https://yourdomain.com/product/...'
+                        value={menuForm.canonical_url}
+                        onChange={(e) => setMenuForm((c) => ({ ...c, canonical_url: e.target.value }))}
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className='space-y-3 rounded-lg border border-slate-200 p-4'>
                   <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
@@ -2680,6 +2841,20 @@ export default function FoodHubPage() {
             <div className='space-y-2 md:col-span-2'>
               <FieldLabel label='Full restaurant address' helper='Complete address shown in the storefront contact section.' />
               <Textarea className='min-h-[88px]' placeholder='Example: Shop No. 12, Food Street Plaza, Sector 62, Noida, Uttar Pradesh, 201309' value={restaurantDraft.address} onChange={(e) => setRestaurantDraft((c) => ({ ...c, address: e.target.value }))} />
+            </div>
+            <div className='space-y-2 md:col-span-2'>
+              <FieldLabel label='Service / delivery areas' helper='Comma separated local areas used for food item SEO and local delivery signals.' />
+              <Textarea
+                className='min-h-[76px]'
+                placeholder='Example: Noida Sector 62, Sector 135, Gaur City, Ghaziabad'
+                value={listToCsv(restaurantDraft.service_areas)}
+                onChange={(e) =>
+                  setRestaurantDraft((c) => ({
+                    ...c,
+                    service_areas: csvToList(e.target.value),
+                  }))
+                }
+              />
             </div>
             <div className='space-y-3 md:col-span-2'>
               <p className='text-sm font-medium text-slate-700'>Opening hours</p>
