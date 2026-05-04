@@ -8,6 +8,38 @@ import { ToastContext } from '../../context/ToastContext.jsx'
 import { stepTypeLabels, triggerLabels } from '../../data/automations.js'
 import { api } from '../../lib/api.js'
 
+const normalizeWebsiteScope = (scope = {}) => ({
+  websiteId: String(scope.websiteId || scope.website_id || '').trim(),
+  websiteSlug: String(scope.websiteSlug || scope.website_slug || '').trim(),
+  websiteName: String(scope.websiteName || scope.website_name || '').trim(),
+  label: String(
+    scope.label ||
+      scope.websiteName ||
+      scope.website_name ||
+      scope.websiteSlug ||
+      scope.website_slug ||
+      scope.websiteId ||
+      scope.website_id ||
+      '',
+  ).trim(),
+})
+
+const hasWebsiteScope = (scope = {}) => Boolean(scope.websiteId || scope.websiteSlug || scope.websiteName)
+
+const getWebsiteAudienceLabel = (workflow = {}) => {
+  const scopes = (Array.isArray(workflow.websiteScopes) && workflow.websiteScopes.length
+    ? workflow.websiteScopes
+    : [workflow.websiteScope || workflow.entrySegmentId?.websiteScope || {}])
+    .map(normalizeWebsiteScope)
+    .filter(hasWebsiteScope)
+
+  if (scopes.length) {
+    return scopes.map((scope) => scope.label || scope.websiteName || scope.websiteSlug || scope.websiteId).join(', ')
+  }
+
+  return workflow.entrySegmentId?.name || 'All eligible subscribers'
+}
+
 function AutomationDetailsPage() {
   const { id } = useParams()
   const toast = useContext(ToastContext)
@@ -142,8 +174,8 @@ function AutomationDetailsPage() {
 
           <div className="mt-5 grid gap-4">
             <div className="rounded-[24px] border border-slate-100 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Entry segment</p>
-              <p className="mt-2 text-sm text-slate-900">{workflow.entrySegmentId?.name || 'All eligible subscribers'}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Audience</p>
+              <p className="mt-2 text-sm text-slate-900">{getWebsiteAudienceLabel(workflow)}</p>
             </div>
             <div className="rounded-[24px] border border-slate-100 bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Trigger notes</p>

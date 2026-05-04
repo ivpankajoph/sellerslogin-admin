@@ -20,8 +20,8 @@ import {
 } from 'lucide-react'
 import { type ReactNode } from 'react'
 import { useSelector } from 'react-redux'
-import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
-import shadowfaxLogo from '@/assets/toolkit-apps/shadowfax.svg'
+// import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
+// import shadowfaxLogo from '@/assets/toolkit-apps/shadowfax.svg'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -214,40 +214,40 @@ function RailButton({
   )
 }
 
-function RailImageButton({
-  active,
-  collapsed = true,
-  imageSrc,
-  label,
-  onClick,
-}: {
-  active?: boolean
-  collapsed?: boolean
-  imageSrc: string
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type='button'
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className={`flex h-14 items-center rounded-lg transition ${
-        collapsed ? 'w-14 justify-center' : 'w-full justify-start gap-3 px-4'
-      } ${
-        active
-          ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20'
-          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
-      }`}
-    >
-      <span className='flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded bg-white p-0.5'>
-        <img src={imageSrc} alt='' className='h-full w-full object-contain' />
-      </span>
-      {!collapsed ? <span className='truncate text-sm font-semibold'>{label}</span> : null}
-    </button>
-  )
-}
+// function RailImageButton({
+//   active,
+//   collapsed = true,
+//   imageSrc,
+//   label,
+//   onClick,
+// }: {
+//   active?: boolean
+//   collapsed?: boolean
+//   imageSrc: string
+//   label: string
+//   onClick: () => void
+// }) {
+//   return (
+//     <button
+//       type='button'
+//       aria-label={label}
+//       title={label}
+//       onClick={onClick}
+//       className={`flex h-14 items-center rounded-lg transition ${
+//         collapsed ? 'w-14 justify-center' : 'w-full justify-start gap-3 px-4'
+//       } ${
+//         active
+//           ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20'
+//           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+//       }`}
+//     >
+//       <span className='flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded bg-white p-0.5'>
+//         <img src={imageSrc} alt='' className='h-full w-full object-contain' />
+//       </span>
+//       {!collapsed ? <span className='truncate text-sm font-semibold'>{label}</span> : null}
+//     </button>
+//   )
+// }
 
 function StatTile({
   label,
@@ -313,7 +313,7 @@ export function DeliveryWorkspaceShell({
   onSearchFocus,
 }: {
   children: ReactNode
-  activeSection?: 'dashboard' | 'orders' | 'courier-list' | 'apps' | 'delhivery' | 'shadowfax' | 'warehouses' | 'tracking'
+  activeSection?: 'dashboard' | 'orders' | 'courier-list' | 'apps' | 'manual' | 'delhivery' | 'shadowfax' | 'warehouses' | 'tracking'
   searchValue?: string
   onSearchChange?: (value: string) => void
   onSearchFocus?: () => void
@@ -439,7 +439,14 @@ export function DeliveryWorkspaceShell({
               label='Check Price'
               onClick={() => openPath('/courier')}
             />
-            <RailImageButton
+            <RailButton
+              collapsed={collapsed}
+              active={activeSection === 'manual'}
+              icon={PackageOpen}
+              label='Manual Orders'
+              onClick={() => openPath('/courier/manual')}
+            />
+            {/* <RailImageButton
               collapsed={collapsed}
               active={activeSection === 'delhivery'}
               imageSrc={delhiveryLogo}
@@ -452,7 +459,7 @@ export function DeliveryWorkspaceShell({
               imageSrc={shadowfaxLogo}
               label='Shadowfax'
               onClick={() => openPath('/courier/shadowfax')}
-            />
+            /> */}
             <RailButton
               collapsed={collapsed}
               active={activeSection === 'warehouses'}

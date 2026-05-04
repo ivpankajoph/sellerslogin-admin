@@ -1,5 +1,6 @@
 import { useContext, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import PasswordField from "../components/auth/PasswordField.jsx";
 import { AuthContext } from "../context/AuthContext.jsx";
 
 const initialForm = {
@@ -14,9 +15,10 @@ function LoginPage() {
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   if (admin) {
-    return <Navigate to="/overview" replace />;
+    return <Navigate to={admin.role === "super_admin" ? "/admin" : "/overview"} replace />;
   }
 
   const handleSubmit = async (event) => {
@@ -25,8 +27,14 @@ function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login(form);
-      navigate(location.state?.from?.pathname || "/overview", {
+      const signedInUser = await login(form);
+      const fallbackPath = signedInUser?.role === "super_admin" ? "/admin" : "/overview";
+      const nextPath =
+        signedInUser?.role === "super_admin"
+          ? fallbackPath
+          : location.state?.from?.pathname || fallbackPath;
+
+      navigate(nextPath, {
         replace: true,
       });
     } catch (requestError) {
@@ -52,7 +60,7 @@ function LoginPage() {
               Sign in
             </h2>
             <p className="mt-3 max-w-md text-[15px] leading-6 text-ui-body">
-              Use your workspace email and password to access campaigns, automations, templates, and team controls.
+              Use your SellersLogin vendor email and password to access campaigns, automations, templates, and reports.
             </p>
           </div>
 
@@ -76,9 +84,7 @@ function LoginPage() {
 
               <label className="block space-y-2">
                 <span className="text-sm font-medium text-ui-strong">Password</span>
-                <input
-                  className="field"
-                  type="password"
+                <PasswordField
                   value={form.password}
                   onChange={(event) =>
                     setForm((current) => ({
@@ -86,7 +92,8 @@ function LoginPage() {
                       password: event.target.value,
                     }))
                   }
-                  placeholder="Enter password"
+                  showPassword={showPassword}
+                  onTogglePassword={() => setShowPassword((current) => !current)}
                 />
               </label>
 
@@ -103,6 +110,7 @@ function LoginPage() {
               >
                 {isSubmitting ? "Signing in..." : "Login"}
               </button>
+
             </form>
           </div>
         </div>

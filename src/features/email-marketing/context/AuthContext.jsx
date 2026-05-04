@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { canAccess } from '../data/permissions.js'
@@ -60,12 +61,12 @@ export function AuthProvider({ children }) {
             },
           )
           setAuthToken(data.token)
-          setAdmin(data.admin)
+          setAdmin(data.user || data.admin)
           return
         }
 
         const { data } = await api.get('/auth/me')
-        setAdmin(data.admin)
+        setAdmin(data.user || data.admin)
       } catch (error) {
         setAuthToken(null)
         setAdmin(null)
@@ -89,8 +90,8 @@ export function AuthProvider({ children }) {
   const login = async (credentials) => {
     const { data } = await api.post('/auth/login', credentials)
     setAuthToken(data.token)
-    setAdmin(data.admin)
-    return data.admin
+    setAdmin(data.user || data.admin)
+    return data.user || data.admin
   }
 
   const logout = async () => {
@@ -103,7 +104,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ admin, isLoading, authError, login, logout, can: (permission) => canAccess(admin, permission) }}>
+    <AuthContext.Provider value={{ admin, user: admin, isLoading, authError, login, logout, can: (permission) => canAccess(admin, permission) }}>
       {children}
     </AuthContext.Provider>
   )

@@ -31,7 +31,7 @@ function StatusBadge({ status }) {
 
   return (
     <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize ${
+      className={`inline-flex px-2.5 py-1 text-[12px] font-semibold capitalize ${
         palette[status] || 'bg-slate-100 text-slate-700'
       }`}
     >

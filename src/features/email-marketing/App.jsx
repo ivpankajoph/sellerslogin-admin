@@ -1,11 +1,14 @@
 ﻿import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import PermissionGate from "./components/auth/PermissionGate.jsx";
+import { useContext } from "react";
 import ProtectedRoute from "./components/auth/ProtectedRoute.jsx";
 import DashboardLayout from "./components/layout/DashboardLayout.jsx";
+import { AuthContext } from "./context/AuthContext.jsx";
 import CampaignDetailsPage from "./pages/dashboard/CampaignDetailsPage.jsx";
 import CampaignFormPage from "./pages/dashboard/CampaignFormPage.jsx";
 import CampaignsListPage from "./pages/dashboard/CampaignsListPage.jsx";
 import { navigationItems } from "./data/navigation.js";
+import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 import AnalyticsPage from "./pages/dashboard/AnalyticsPage.jsx";
 import AutomationDetailsPage from "./pages/dashboard/AutomationDetailsPage.jsx";
@@ -13,6 +16,7 @@ import AutomationExecutionsPage from "./pages/dashboard/AutomationExecutionsPage
 import AutomationFormPage from "./pages/dashboard/AutomationFormPage.jsx";
 import AutomationListPage from "./pages/dashboard/AutomationListPage.jsx";
 import AudienceListPage from "./pages/dashboard/AudienceListPage.jsx";
+import BillingPlanPage from "./pages/dashboard/BillingPlanPage.jsx";
 import DeliverabilityPage from "./pages/dashboard/DeliverabilityPage.jsx";
 import EmailBuilderPage from "./pages/dashboard/EmailBuilderPage.jsx";
 import OverviewPage from "./pages/dashboard/OverviewPage.jsx";
@@ -29,11 +33,37 @@ import SuppressionListPage from "./pages/dashboard/SuppressionListPage.jsx";
 import TemplateFormPage from "./pages/dashboard/TemplateFormPage.jsx";
 import TemplatesListPage from "./pages/dashboard/TemplatesListPage.jsx";
 
+function RoleLanding() {
+  const { admin } = useContext(AuthContext);
+
+  return <Navigate to={admin?.role === "super_admin" ? "/admin" : "/overview"} replace />;
+}
+
+function SuperAdminRoute({ children }) {
+  const { admin } = useContext(AuthContext);
+
+  if (admin?.role !== "super_admin") {
+    return <Navigate to="/overview" replace />;
+  }
+
+  return children;
+}
+
 function App() {
   return (
     <BrowserRouter basename="/email-marketing">
       <Routes>
         <Route path="/login" element={<Navigate to="/overview" replace />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <SuperAdminRoute>
+                <AdminDashboardPage />
+              </SuperAdminRoute>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/"
           element={
@@ -105,6 +135,14 @@ function App() {
             element={
               <PermissionGate permission="view_reports">
                 <ReportsPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="billing"
+            element={
+              <PermissionGate permission="view_billing">
+                <BillingPlanPage />
               </PermissionGate>
             }
           />
@@ -250,6 +288,7 @@ function App() {
                 ].includes(item.path) &&
                 ![
                   "/analytics",
+                  "/billing",
                   "/deliverability",
                   "/suppressions",
                   "/reports",

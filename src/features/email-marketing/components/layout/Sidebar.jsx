@@ -4,6 +4,23 @@ import { AuthContext } from '../../context/AuthContext.jsx'
 import { navigationItems } from '../../data/navigation.js'
 import { roleLabels } from '../../data/permissions.js'
 
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+      <path d="M12 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+      <path d="M5 19a7 7 0 0 1 14 0" />
+    </svg>
+  )
+}
+
+function KeyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+      <path d="M14 10a4 4 0 1 1-1.2-2.8L21 15v2h-2v2h-2v2h-2l-3.2-3.2A4 4 0 0 1 14 10Z" />
+    </svg>
+  )
+}
+
 function ChevronIcon({ open = false }) {
   return (
     <svg
@@ -22,16 +39,6 @@ function HomeIcon() {
       <path d="M4 11.2 12 4l8 7.2" />
       <path d="M6.5 10.8V20h11V10.8" />
       <path d="M10 20v-6h4v6" />
-    </svg>
-  )
-}
-
-function DashboardIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-      <path d="M4 5h7v6H4V5Z" />
-      <path d="M13 5h7v14h-7V5Z" />
-      <path d="M4 13h7v6H4v-6Z" />
     </svg>
   )
 }
@@ -155,6 +162,7 @@ function iconForItem(item) {
     deliverability: ChartIcon,
     automation: FlowIcon,
     reports: ChartIcon,
+    billing: ReceiptIcon,
     team: TeamUsersIcon,
     settings: SettingsIcon,
   }
@@ -200,10 +208,14 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
   const homeItems = visibleItems.filter((item) => item.path === '/overview')
   const marketingItems = visibleItems.filter((item) => ['/campaigns', '/templates'].includes(item.path))
   const otherItems = visibleItems.filter((item) => !['/overview', '/campaigns', '/templates'].includes(item.path))
+  const displayName = admin?.businessName || admin?.name || 'Vendor'
+  const displayRole = roleLabels[admin?.role] || 'Vendor'
+  const isItemActive = (item) =>
+    location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
 
   return (
     <aside
-      className={`sidebar-panel flex h-full min-h-0 flex-col overflow-hidden text-[var(--text-strong)] transition-[width] duration-200 ease-out ${
+      className={`sidebar-panel flex h-full min-h-0 flex-col overflow-hidden text-[#21192d] transition-[width] duration-200 ease-out ${
         expanded ? 'lg:w-[296px]' : 'lg:w-[72px]'
       } w-full`}
       onMouseEnter={() => onHoverChange(true)}
@@ -211,37 +223,37 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
     >
       <div
         ref={menuRef}
-        className={`relative border-b border-[var(--border-soft)] transition-all duration-200 ${
+        className={`relative border-b border-[#d8ccef] transition-all duration-200 ${
           expanded ? 'p-4' : 'p-2 lg:p-3'
         }`}
       >
         <button
           type="button"
           onClick={() => setOpenMenu((current) => !current)}
-          className={`w-full rounded-[24px] border border-[var(--border-soft)] bg-white/70 text-left backdrop-blur-sm transition hover:bg-white ${
+          className={`w-full border border-[#ded7ef] bg-white text-left transition hover:bg-[#fbf9ff] ${
             expanded ? 'p-3' : 'p-2 lg:p-2'
           }`}
-          title={expanded ? undefined : roleLabels[admin?.role] || 'Super Admin'}
+          title={expanded ? undefined : displayName}
         >
           <div
-            className={`flex items-center rounded-[20px] border border-[var(--border-soft)] bg-white/80 transition-all duration-200 ${
+            className={`flex items-center border border-[#eee9f8] bg-white transition-all duration-200 ${
               expanded ? 'gap-3 px-3 py-3' : 'justify-center gap-0 px-0 py-3'
             }`}
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgba(21,128,61,0.12)] text-sm font-semibold text-[#0f172a]">
-              {admin?.name?.slice(0, 2).toUpperCase() || 'SA'}
+            <div className="flex h-10 w-10 items-center justify-center bg-[#f0e8fb] text-[13px] font-semibold text-[#4c1d95]">
+              {displayName.slice(0, 2).toUpperCase()}
             </div>
             {expanded ? (
               <>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-semibold text-[#101828]">
-                    {roleLabels[admin?.role] || 'Super Admin'}
+                  <p className="truncate text-[14px] font-semibold text-[#21192d]">
+                    {displayName}
                   </p>
-                  <p className="truncate text-xs text-[#667085]">
+                  <p className="truncate text-[12px] text-[#6e5a93]">
                     {admin?.email || 'admin@emarketing.local'}
                   </p>
                 </div>
-                <div className="text-[#667085]">
+                <div className="text-[#5a4380]">
                   <ChevronIcon open={openMenu} />
                 </div>
               </>
@@ -250,12 +262,12 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
         </button>
 
         {openMenu ? (
-          <div className="absolute left-4 right-4 top-[calc(100%-4px)] z-50 overflow-hidden rounded-[18px] border border-[var(--border-soft)] bg-white shadow-[0_18px_42px_rgba(16,24,40,0.14)]">
-            <div className="border-b border-[var(--border-soft)] px-4 py-3">
-              <p className="text-[15px] font-semibold text-[#101828]">{admin?.name || 'Super Admin'}</p>
-              <p className="mt-1 text-sm text-[#667085]">{admin?.email}</p>
-              <div className="mt-3 inline-flex rounded-full bg-[rgba(21,128,61,0.1)] px-3 py-1 text-xs font-semibold text-[#0f7a33]">
-                {roleLabels[admin?.role] || 'Super Admin'}
+          <div className="absolute left-4 right-4 top-[calc(100%-4px)] z-50 overflow-hidden border border-[#ded7ef] bg-white shadow-[0_18px_42px_rgba(42,31,72,0.14)]">
+            <div className="border-b border-[#eee9f8] px-4 py-3">
+              <p className="text-[14px] font-semibold text-[#21192d]">{displayName}</p>
+              <p className="mt-1 text-[13px] text-[#7f6f96]">{admin?.email}</p>
+              <div className="mt-3 inline-flex bg-[#f0e6ff] px-3 py-1 text-xs font-semibold text-[#5a189a]">
+                {displayRole}
               </div>
             </div>
 
@@ -264,13 +276,13 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
               onClick={() => {
                 window.location.assign('/')
               }}
-              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-[#101828] transition hover:bg-[#f4f6ee]"
+              className="flex w-full items-center justify-between px-4 py-3 text-left text-[13px] text-[#21192d] transition hover:bg-[#f5efff]"
             >
               <span className="flex items-center gap-3">
-                <DashboardIcon />
+                <HomeIcon />
                 <span>Main Dashboard</span>
               </span>
-              <span className="text-[#667085]">Open</span>
+              <span className="text-[#8d7fa3]">Open</span>
             </button>
           </div>
         ) : null}
@@ -287,13 +299,11 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
               <NavLink
                 key={item.path}
                 to={item.path}
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`
-                }
+                className={`nav-link ${isItemActive(item) ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
                 title={expanded ? undefined : item.label}
               >
                 <span className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-white/70 text-[#0f172a] shadow-[0_8px_18px_rgba(16,24,40,0.04)]">
+                    <span className={`flex h-6 w-6 items-center justify-center ${isItemActive(item) ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
                     <Icon />
                   </span>
                   {expanded ? <span>{item.label}</span> : null}
@@ -310,7 +320,7 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
               title={expanded ? undefined : 'Marketing'}
             >
               <span className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-white/70 text-[#0f172a] shadow-[0_8px_18px_rgba(16,24,40,0.04)]">
+                <span className={`flex h-6 w-6 items-center justify-center ${marketingOpen ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
                   <MarketingIcon />
                 </span>
                 {expanded ? <span>Marketing</span> : null}
@@ -328,13 +338,11 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
                   <NavLink
                     key={item.path}
                     to={item.path}
-                    className={({ isActive }) =>
-                      `nav-link ${isActive ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`
-                    }
+                    className={`nav-link ${isItemActive(item) ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
                     title={expanded ? undefined : item.label}
                   >
                     <span className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-white/70 text-[#0f172a] shadow-[0_8px_18px_rgba(16,24,40,0.04)]">
+                      <span className={`flex h-6 w-6 items-center justify-center ${isItemActive(item) ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
                         <Icon />
                       </span>
                       {expanded ? <span>{item.label}</span> : null}
@@ -352,13 +360,11 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
               <NavLink
                 key={item.path}
                 to={item.path}
-                className={({ isActive }) =>
-                  `nav-link ${isActive ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`
-                }
+                className={`nav-link ${isItemActive(item) ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
                 title={expanded ? undefined : item.label}
               >
                 <span className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-white/70 text-[#0f172a] shadow-[0_8px_18px_rgba(16,24,40,0.04)]">
+                  <span className={`flex h-6 w-6 items-center justify-center ${isItemActive(item) ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
                     <Icon />
                   </span>
                   {expanded ? <span>{item.label}</span> : null}

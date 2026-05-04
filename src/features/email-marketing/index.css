@@ -1,32 +1,32 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter", "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
 }
 
-.email-marketing-app {
-  --bg-page: #f7f8f2;
-  --bg-page-soft: #fcfcf7;
-  --bg-card: rgba(255, 255, 255, 0.94);
+:root {
+  --bg-page: #f6f3fb;
+  --bg-page-soft: #fbf9ff;
+  --bg-card: rgba(255, 255, 255, 0.96);
   --bg-card-strong: #ffffff;
-  --bg-subtle: #f3f5ec;
-  --bg-sidebar: linear-gradient(180deg, #f6f8ee 0%, #eef5df 100%);
-  --border-soft: rgba(29, 78, 49, 0.12);
-  --border-strong: rgba(29, 78, 49, 0.18);
-  --text-strong: #121826;
-  --text-body: #425466;
-  --text-muted: #667085;
-  --accent: #6d28d9;
-  --accent-strong: #5b21b6;
-  --accent-soft: rgba(109, 40, 217, 0.14);
-  --success: #15803d;
-  --warning: #b45309;
-  --danger: #b42318;
-  --shadow-soft: 0 14px 34px rgba(16, 24, 40, 0.06);
-  --shadow-strong: 0 24px 56px rgba(16, 24, 40, 0.1);
+  --bg-subtle: #f5efff;
+  --bg-sidebar: #efe7fb;
+  --border-soft: #ded7ef;
+  --border-strong: #d8ccef;
+  --text-strong: #21192d;
+  --text-body: #5f5375;
+  --text-muted: #8d7fa3;
+  --accent: #8338ec;
+  --accent-strong: #5a189a;
+  --accent-soft: #f0e6ff;
+  --success: #009b5a;
+  --warning: #f97316;
+  --danger: #e11d48;
+  --shadow-soft: 0 10px 28px rgba(42, 31, 72, 0.04);
+  --shadow-strong: 0 20px 48px rgba(42, 31, 72, 0.1);
 }
 
-:root[data-theme='dark'] .email-marketing-app {
+:root[data-theme='dark'] {
   --bg-page: #0d1220;
   --bg-page-soft: #151c2f;
   --bg-card: rgba(18, 25, 43, 0.9);
@@ -38,9 +38,9 @@
   --text-strong: #f8fafc;
   --text-body: #cbd5e1;
   --text-muted: #94a3b8;
-  --accent: #a78bfa;
-  --accent-strong: #8b5cf6;
-  --accent-soft: rgba(167, 139, 250, 0.16);
+  --accent: #7bd389;
+  --accent-strong: #58c06b;
+  --accent-soft: rgba(123, 211, 137, 0.16);
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #f87171;
@@ -48,60 +48,59 @@
   --shadow-strong: 0 26px 64px rgba(2, 6, 23, 0.44);
 }
 
-.email-marketing-app {
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(99, 91, 255, 0.12), transparent 28%),
-    radial-gradient(circle at right top, rgba(14, 165, 233, 0.08), transparent 30%),
-    linear-gradient(180deg, var(--bg-page) 0%, var(--bg-page-soft) 100%);
+html {
+  height: 100%;
+  background: var(--bg-page-soft);
 }
 
-.email-marketing-app {
+body {
   margin: 0;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
+  background: transparent;
   color: var(--text-strong);
   font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.48;
 }
 
-.email-marketing-app * {
+* {
   box-sizing: border-box;
 }
 
-.email-marketing-app button,
-.email-marketing-app input,
-.email-marketing-app textarea,
-.email-marketing-app select {
+button,
+input,
+textarea,
+select {
   font: inherit;
 }
 
-.email-marketing-app a {
+a {
   color: inherit;
   text-decoration: none;
 }
 
-.email-marketing-app {
+#root {
   height: 100%;
 }
 
 .shell-card {
-  @apply rounded-[26px] border backdrop-blur;
+  @apply border backdrop-blur;
   border-color: var(--border-soft);
   background: var(--bg-card);
   box-shadow: var(--shadow-soft);
 }
 
 .shell-card-strong {
-  @apply rounded-[28px] border;
+  @apply border;
   border-color: var(--border-strong);
   background: var(--bg-card-strong);
   box-shadow: var(--shadow-strong);
 }
 
 .widget-shell {
-  @apply overflow-hidden rounded-[28px] border;
+  @apply overflow-hidden border;
   border-color: var(--border-strong);
   background: var(--bg-card-strong);
   box-shadow: var(--shadow-strong);
@@ -118,23 +117,23 @@
 }
 
 .nav-link {
-  @apply flex items-center justify-between rounded-none px-4 py-3 text-[15px] font-medium transition;
-  color: #354052;
+  @apply flex items-center justify-between px-3 py-2.5 text-[14px] font-medium transition;
+  color: #5a4380;
 }
 
 .nav-link:hover {
-  background: rgba(109, 40, 217, 0.1);
-  color: #4c1d95;
+  background: #eadcfb;
+  color: #3b176d;
 }
 
 .nav-link-active {
-  color: #4c1d95;
-  background: rgba(237, 233, 254, 0.95);
-  box-shadow: 0 14px 28px rgba(109, 40, 217, 0.12);
+  color: #ffffff;
+  background: #8338ec;
+  box-shadow: 0 12px 24px rgba(131, 56, 236, 0.18);
 }
 
 .field {
-  @apply w-full rounded-[20px] border px-4 py-3 text-[15px] outline-none transition;
+  @apply w-full border px-3.5 py-2.5 text-[14px] outline-none transition;
   border-color: var(--border-strong);
   background: color-mix(in srgb, var(--bg-card-strong) 94%, transparent);
   color: var(--text-strong);
@@ -146,14 +145,14 @@
 
 .field:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .primary-button {
-  @apply inline-flex items-center justify-center rounded-full px-5 py-3 text-[15px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
-  background: linear-gradient(135deg, #161616, #2b2b2b);
+  @apply inline-flex items-center justify-center px-4 py-2.5 text-[14px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
+  background: #21192d;
   color: #ffffff;
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 10px 22px rgba(33, 25, 45, 0.16);
 }
 
 .primary-button:hover {
@@ -161,29 +160,29 @@
 }
 
 .secondary-button {
-  @apply inline-flex items-center justify-center rounded-full border px-5 py-3 text-[15px] font-semibold transition;
+  @apply inline-flex items-center justify-center border px-4 py-2.5 text-[14px] font-semibold transition;
   border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--bg-card-strong) 92%, transparent);
-  color: var(--text-body);
+  background: #ffffff;
+  color: #5a4380;
 }
 
 .secondary-button:hover {
-  background: #f4f6ee;
+  background: #f5efff;
 }
 
 .ghost-button {
-  @apply inline-flex items-center justify-center rounded-full px-4 py-3 text-[15px] font-semibold transition;
+  @apply inline-flex items-center justify-center px-3.5 py-2.5 text-[14px] font-semibold transition;
   color: var(--text-body);
 }
 
 .ghost-button:hover {
-  background: #eef3e3;
+  background: #f5efff;
 }
 
 .metric-card {
-  @apply relative overflow-hidden rounded-[28px] border;
+  @apply relative overflow-hidden border;
   border-color: var(--border-soft);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card-strong) 100%, transparent), color-mix(in srgb, var(--bg-subtle) 75%, transparent));
+  background: #ffffff;
   box-shadow: var(--shadow-soft);
 }
 
@@ -191,7 +190,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at top right, rgba(99, 91, 255, 0.08), transparent 24%);
+  background: linear-gradient(180deg, rgba(131, 56, 236, 0.035), transparent);
 }
 
 .metric-card > * {
@@ -199,10 +198,10 @@
 }
 
 .soft-pill {
-  @apply inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold;
+  @apply inline-flex items-center border px-2.5 py-1 text-[11px] font-semibold;
   border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--bg-card-strong) 90%, transparent);
-  color: var(--text-muted);
+  background: #fbf9ff;
+  color: #715d9a;
 }
 
 .table-toolbar {
@@ -214,29 +213,29 @@
 }
 
 .empty-state {
-  @apply rounded-[28px] border border-dashed p-8 text-center;
+  @apply border border-dashed p-8 text-center;
   border-color: var(--border-strong);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-subtle) 100%, transparent), color-mix(in srgb, var(--bg-card-strong) 100%, transparent));
+  background: #fbf9ff;
 }
 
 .brevo-card {
-  @apply rounded-[28px] border;
+  @apply border;
   border-color: var(--border-soft);
   background: color-mix(in srgb, var(--bg-card-strong) 97%, transparent);
   box-shadow: var(--shadow-soft);
 }
 
 .brevo-tab {
-  @apply rounded-full border px-4 py-2 text-[14px] font-semibold transition;
+  @apply border px-3.5 py-2 text-[13px] font-semibold transition;
   border-color: var(--border-strong);
   color: var(--text-body);
   background: color-mix(in srgb, var(--bg-card-strong) 92%, transparent);
 }
 
 .brevo-tab-active {
-  border-color: rgba(21, 128, 61, 0.18);
-  background: rgba(213, 246, 200, 0.9);
-  color: #12351f;
+  border-color: #cbb6ee;
+  background: #f0e6ff;
+  color: #4c1d95;
 }
 
 .loading-skeleton {
@@ -272,4 +271,12 @@
 .scrollbar-none::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+.vendor-dashboard-shell :is(.rounded-xl, .rounded-2xl, .rounded-3xl, .rounded-\[18px\], .rounded-\[20px\], .rounded-\[24px\], .rounded-\[26px\], .rounded-\[28px\], .rounded-\[32px\]) {
+  border-radius: 0 !important;
+}
+
+.vendor-dashboard-shell :is(button.rounded-full, a.rounded-full, span.rounded-full) {
+  border-radius: 0 !important;
 }

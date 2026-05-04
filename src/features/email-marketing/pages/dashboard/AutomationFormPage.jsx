@@ -19,6 +19,13 @@ const createInitialForm = () => ({
   trigger: 'welcome_signup',
   status: 'draft',
   entrySegmentId: '',
+  websiteScope: {
+    websiteId: '',
+    websiteSlug: '',
+    websiteName: '',
+    label: '',
+  },
+  websiteScopes: [],
   triggerConfig: {
     delayWindow: '',
     notes: '',
@@ -155,6 +162,65 @@ function FieldLabel({ label, help }) {
       {help ? <HelpIcon text={help} /> : null}
     </div>
   )
+}
+
+const emptyWebsiteScope = {
+  websiteId: '',
+  websiteSlug: '',
+  websiteName: '',
+  label: '',
+}
+
+const normalizeWebsiteScope = (scope = {}) => ({
+  websiteId: String(scope.websiteId || scope.website_id || '').trim(),
+  websiteSlug: String(scope.websiteSlug || scope.website_slug || '').trim(),
+  websiteName: String(scope.websiteName || scope.website_name || '').trim(),
+  label: String(
+    scope.label ||
+      scope.websiteName ||
+      scope.website_name ||
+      scope.websiteSlug ||
+      scope.website_slug ||
+      scope.websiteId ||
+      scope.website_id ||
+      '',
+  ).trim(),
+})
+
+const getWebsiteOptionScope = (website = {}) => ({
+  websiteId: website.websiteId || '',
+  websiteSlug: website.websiteSlug || '',
+  websiteName: website.websiteName || '',
+  label: website.label || website.websiteName || website.websiteSlug || website.websiteId || '',
+})
+
+const hasWebsiteScope = (scope = {}) =>
+  Boolean(scope.websiteId || scope.websiteSlug || scope.websiteName)
+
+const getWebsiteScopeKey = (scope = {}) =>
+  [scope.websiteId || '', scope.websiteSlug || '', scope.websiteName || ''].join('::')
+
+const normalizeWebsiteScopes = (scopes = []) => {
+  const source = Array.isArray(scopes) ? scopes : scopes ? [scopes] : []
+  const unique = new Map()
+
+  source.forEach((item) => {
+    const scope = normalizeWebsiteScope(item)
+    if (!hasWebsiteScope(scope)) return
+    unique.set(getWebsiteScopeKey(scope).toLowerCase(), scope)
+  })
+
+  return Array.from(unique.values())
+}
+
+const getWebsiteAudienceLabel = (scopes = []) => {
+  const normalizedScopes = normalizeWebsiteScopes(scopes)
+
+  if (!normalizedScopes.length) {
+    return 'All eligible subscribers'
+  }
+
+  return normalizedScopes.map((scope) => scope.label || scope.websiteName || scope.websiteSlug || scope.websiteId).join(', ')
 }
 
 function StepEditor({ step, index, templates, onChange, onRemove }) {
@@ -406,6 +472,7 @@ function AutomationFormPage() {
   const toast = useContext(ToastContext)
   const [form, setForm] = useState(createInitialForm())
   const [meta, setMeta] = useState({ triggers: [], statuses: [], templates: [], segments: [], ecommerceHooks: null })
+  const [websites, setWebsites] = useState([])
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -416,24 +483,37 @@ function AutomationFormPage() {
     () => dripCampaignPresets.find((preset) => preset.key === presetKey) || null,
     [presetKey],
   )
+  const selectedWebsiteScopes = normalizeWebsiteScopes(form.websiteScopes?.length ? form.websiteScopes : form.websiteScope)
+  const selectedWebsiteKeys = new Set(selectedWebsiteScopes.map((scope) => getWebsiteScopeKey(scope)))
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [metaResponse, workflowResponse] = await Promise.all([
+        const [metaResponse, workflowResponse, summaryResponse] = await Promise.all([
           api.get('/automations/meta'),
           id ? api.get(`/automations/${id}`) : Promise.resolve({ data: null }),
+          api.get('/subscribers/summary'),
         ])
 
         setMeta(metaResponse.data)
+        const websiteOptions = summaryResponse.data?.websites || []
+        const defaultWebsiteScope = websiteOptions[0] ? getWebsiteOptionScope(websiteOptions[0]) : emptyWebsiteScope
+        setWebsites(websiteOptions)
 
         if (workflowResponse.data) {
+          const savedWebsiteScopes = normalizeWebsiteScopes(
+            workflowResponse.data.websiteScopes?.length
+              ? workflowResponse.data.websiteScopes
+              : workflowResponse.data.websiteScope || workflowResponse.data.entrySegmentId?.websiteScope || {},
+          )
           setForm({
             name: workflowResponse.data.name || '',
             description: workflowResponse.data.description || '',
             trigger: workflowResponse.data.trigger || 'welcome_signup',
             status: workflowResponse.data.status || 'draft',
-            entrySegmentId: workflowResponse.data.entrySegmentId?._id || '',
+            entrySegmentId: '',
+            websiteScope: savedWebsiteScopes[0] || defaultWebsiteScope,
+            websiteScopes: savedWebsiteScopes.length ? savedWebsiteScopes : defaultWebsiteScope ? [defaultWebsiteScope] : [],
             triggerConfig: {
               delayWindow: workflowResponse.data.triggerConfig?.delayWindow || '',
               notes: workflowResponse.data.triggerConfig?.notes || '',
@@ -445,8 +525,21 @@ function AutomationFormPage() {
           const nextPreset = buildDripCampaignPreset(selectedPreset.key, presetTemplateId)
 
           if (nextPreset) {
-            setForm(nextPreset)
+            setForm({
+              ...createInitialForm(),
+              ...nextPreset,
+              websiteScope: defaultWebsiteScope,
+              websiteScopes: defaultWebsiteScope ? [defaultWebsiteScope] : [],
+            })
           }
+        } else {
+          setForm((current) => ({
+            ...current,
+            websiteScope: normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope)[0] || defaultWebsiteScope,
+            websiteScopes: normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope).length
+              ? normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope)
+              : defaultWebsiteScope ? [defaultWebsiteScope] : [],
+          }))
         }
       } catch (requestError) {
         setError(requestError.response?.data?.message || 'Unable to load workflow editor')
@@ -492,6 +585,10 @@ function AutomationFormPage() {
       return 'Add at least one step to this workflow'
     }
 
+    if (!normalizeWebsiteScopes(form.websiteScopes?.length ? form.websiteScopes : form.websiteScope).length) {
+      return 'Select at least one website audience'
+    }
+
     return ''
   }
 
@@ -512,7 +609,9 @@ function AutomationFormPage() {
         ...form,
         status: nextStatus,
         isActive: nextStatus === 'active',
-        entrySegmentId: form.entrySegmentId || null,
+        entrySegmentId: null,
+        websiteScopes: normalizeWebsiteScopes(form.websiteScopes || []),
+        websiteScope: normalizeWebsiteScopes(form.websiteScopes || [])[0] || emptyWebsiteScope,
       }
 
       if (id) {
@@ -689,19 +788,54 @@ function AutomationFormPage() {
                 </select>
               </div>
               <div>
-                <FieldLabel label="Audience" help="Choose who can enter this workflow." />
-                <select
-                  className="field"
-                  value={form.entrySegmentId}
-                  onChange={(event) => setForm((current) => ({ ...current, entrySegmentId: event.target.value }))}
-                >
-                  <option value="">All eligible subscribers</option>
-                  {meta.segments.map((segment) => (
-                    <option key={segment._id} value={segment._id}>
-                      {segment.name}
-                    </option>
-                  ))}
-                </select>
+                <FieldLabel label="Audience" help="Choose your website to enter this workflow." />
+                <div className="space-y-2">
+                  <details className="group relative">
+                    <summary className="field flex cursor-pointer list-none items-center justify-between gap-3">
+                      <span className="min-w-0 truncate">{getWebsiteAudienceLabel(selectedWebsiteScopes)}</span>
+                      <span className="text-xs text-slate-400 transition group-open:rotate-180">⌄</span>
+                    </summary>
+                    <div className="absolute left-0 right-0 z-30 mt-2 max-h-56 space-y-2 overflow-y-auto border border-[#ddd4f2] bg-white p-3 shadow-[0_18px_40px_rgba(47,43,61,0.16)]">
+                      {websites.length ? (
+                        websites.map((website) => {
+                          const scope = getWebsiteOptionScope(website)
+                          const key = getWebsiteScopeKey(scope)
+                          const checked = selectedWebsiteKeys.has(key)
+
+                          return (
+                            <label key={website.id} className="flex cursor-pointer items-center justify-between gap-3 border border-slate-100 bg-slate-50 px-3 py-2 text-sm hover:bg-white">
+                              <span className="min-w-0">
+                                <span className="block truncate font-semibold text-slate-900">{website.label}</span>
+                                <span className="text-xs text-slate-500">{website.count || 0} subscribers</span>
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(event) => {
+                                  setForm((current) => {
+                                    const currentScopes = normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope)
+                                    const nextScopes = event.target.checked
+                                      ? normalizeWebsiteScopes([...currentScopes, scope])
+                                      : currentScopes.filter((item) => getWebsiteScopeKey(item) !== key)
+
+                                    return {
+                                      ...current,
+                                      websiteScope: nextScopes[0] || emptyWebsiteScope,
+                                      websiteScopes: nextScopes,
+                                      entrySegmentId: '',
+                                    }
+                                  })
+                                }}
+                              />
+                            </label>
+                          )
+                        })
+                      ) : (
+                        <p className="px-3 py-2 text-sm text-slate-500">No websites found</p>
+                      )}
+                    </div>
+                  </details>
+                </div>
               </div>
               <div>
                 <FieldLabel label="Delay window hint" help="A small note about timing, if needed." />

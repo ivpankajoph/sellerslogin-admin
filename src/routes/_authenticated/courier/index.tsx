@@ -345,6 +345,14 @@ function CourierDeskPage() {
               <Button
                 variant='outline'
                 className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                onClick={() => void navigate({ to: '/courier/manual' })}
+              >
+                Create Manual Order
+                <ArrowUpRight className='h-4 w-4' />
+              </Button>
+              <Button
+                variant='outline'
+                className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
                 onClick={() => void navigate({ to: '/courier/list' })}
               >
                 Courier List

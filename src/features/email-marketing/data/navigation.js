@@ -90,6 +90,14 @@
     permission: "view_reports",
   },
   {
+    label: "Billing / Credits",
+    path: "/billing",
+    description: "Review wallet credits, usage, credit packs, transactions, and invoices.",
+    group: "Workspace",
+    icon: "billing",
+    permission: "view_billing",
+  },
+  {
     label: "Invite Users",
     path: "/team-users",
     description: "Grant limited dashboard access to teammates and collaborators.",

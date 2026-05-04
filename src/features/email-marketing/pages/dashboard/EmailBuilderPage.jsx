@@ -26,15 +26,16 @@ const imageUrlToPng = async (value = "") => {
     return source;
   }
 
-  try {
-    const { data } = await api.post("/uploads/image", {
-      dataUrl: source,
-      filename: "template-image",
-    });
-    return data?.url || source;
-  } catch {
-    return source;
+  const { data } = await api.post("/uploads/image", {
+    dataUrl: source,
+    filename: "template-image",
+  });
+
+  if (!data?.url) {
+    throw new Error("Unable to upload image");
   }
+
+  return data.url;
 };
 
 const fileToPngDataUrl = async (file) => {
@@ -1352,7 +1353,9 @@ const BlockInspector = ({
   onMoveDown,
   canMoveUp,
   canMoveDown,
+  onUploadError,
 }) => {
+  const imageFileInputRef = useRef(null);
   const logoFileInputRef = useRef(null);
 
   if (!block) return null;
@@ -1481,10 +1484,35 @@ const BlockInspector = ({
   }
 
   if (block.type === "image") {
+    const handleImageFilePick = (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      (async () => {
+        try {
+          const pngDataUrl = await fileToPngDataUrl(file);
+          update({ imageUrl: pngDataUrl });
+        } catch (uploadError) {
+          onUploadError?.(uploadError);
+        } finally {
+          event.target.value = "";
+        }
+      })();
+    };
+
     return wrap(
       <div className="space-y-4">
         <Field label="Image URL">
           <input className="field" value={block.props.imageUrl || ""} onChange={(event) => update({ imageUrl: event.target.value })} />
+        </Field>
+        <Field label="Upload image">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="secondary-button px-4 py-2 text-sm" onClick={() => imageFileInputRef.current?.click()}>
+              Choose file
+            </button>
+            <span className="text-xs text-slate-500">PNG, JPG, or SVG from your computer</span>
+          </div>
+          <input ref={imageFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageFilePick} />
         </Field>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Alt text">
@@ -1641,9 +1669,14 @@ const BlockInspector = ({
       if (!file) return;
 
       (async () => {
-        const pngDataUrl = await fileToPngDataUrl(file);
-        update({ imageUrl: pngDataUrl });
-        event.target.value = "";
+        try {
+          const pngDataUrl = await fileToPngDataUrl(file);
+          update({ imageUrl: pngDataUrl });
+        } catch (uploadError) {
+          onUploadError?.(uploadError);
+        } finally {
+          event.target.value = "";
+        }
       })();
     };
 
@@ -2290,27 +2323,34 @@ function EmailBuilderPage() {
     const subject = form.subject.trim() || form.name.trim() || "Untitled template";
     setIsSaving(true);
     try {
-      const htmlContent = await buildRenderableHtml();
+      const normalizedForm = await normalizeTemplateImageUrls(form);
+      const htmlContent =
+        showAdvanced && normalizedForm.advancedHtml.trim()
+          ? normalizedForm.advancedHtml.trim()
+          : buildTemplateHtml(normalizedForm);
       const payload = {
-        name: form.name.trim(),
+        name: normalizedForm.name.trim(),
         subject,
-        previewText: form.previewText.trim(),
+        previewText: normalizedForm.previewText.trim(),
         htmlContent,
         designJson: {
           editor: "drag-drop",
-          accentColor: form.accentColor,
-          styleSettings: form.styleSettings,
-          blocks: form.blocks,
+          accentColor: normalizedForm.accentColor,
+          styleSettings: normalizedForm.styleSettings,
+          blocks: normalizedForm.blocks,
         },
       };
 
-      const persistTemplate = async (nextPayload, { suppressSuccessToast = false } = {}) => {
+      const persistTemplate = async (nextPayload, { suppressSuccessToast = false, savedForm = normalizedForm } = {}) => {
+        const savedSignature = JSON.stringify(savedForm);
+
         if (id) {
           await api.put(`/templates/${id}`, nextPayload);
           if (!suppressSuccessToast) {
             toast.success("Template saved");
           }
-          setLastSavedSignature(serializedForm);
+          setForm(savedForm);
+          setLastSavedSignature(savedSignature);
           if (quit) navigate("/templates");
           return true;
         }
@@ -2319,7 +2359,8 @@ function EmailBuilderPage() {
         if (!suppressSuccessToast) {
           toast.success("Template created");
         }
-        setLastSavedSignature(serializedForm);
+        setForm(savedForm);
+        setLastSavedSignature(savedSignature);
 
         if (quit) {
           navigate("/templates");
@@ -2340,9 +2381,9 @@ function EmailBuilderPage() {
           const uniqueName = buildUniqueTemplateName(payload.name, existingNames, id);
 
           if (uniqueName && uniqueName !== payload.name) {
+            const retryForm = { ...normalizedForm, name: uniqueName };
             const retryPayload = { ...payload, name: uniqueName };
-            setForm((current) => ({ ...current, name: uniqueName }));
-            await persistTemplate(retryPayload, { suppressSuccessToast: true });
+            await persistTemplate(retryPayload, { suppressSuccessToast: true, savedForm: retryForm });
             toast.success(
               id
                 ? `Template name already exists. Saved as "${uniqueName}".`
@@ -2458,9 +2499,14 @@ function EmailBuilderPage() {
     const file = event.target.files?.[0];
     if (!file) return;
     (async () => {
-      const pngDataUrl = await fileToPngDataUrl(file);
-      updateStyle("background", "imageUrl", pngDataUrl);
-      event.target.value = "";
+      try {
+        const pngDataUrl = await fileToPngDataUrl(file);
+        updateStyle("background", "imageUrl", pngDataUrl);
+      } catch (uploadError) {
+        toast.error(uploadError.response?.data?.message || uploadError.message || "Unable to upload image");
+      } finally {
+        event.target.value = "";
+      }
     })();
   };
 
@@ -2675,6 +2721,9 @@ function EmailBuilderPage() {
                   onMoveDown={() => selectedBlock && moveBlock(selectedBlock.id, 1)}
                   canMoveUp={Boolean(selectedBlock && form.blocks.findIndex((block) => block.id === selectedBlock.id) > 0)}
                   canMoveDown={Boolean(selectedBlock && form.blocks.findIndex((block) => block.id === selectedBlock.id) < form.blocks.length - 1)}
+                  onUploadError={(uploadError) =>
+                    toast.error(uploadError.response?.data?.message || uploadError.message || "Unable to upload image")
+                  }
                 />
               ) : contentTab === "blocks" ? (
                 <ControlCard title="Blocks" description="Drag blocks into the canvas or tap one to add it.">

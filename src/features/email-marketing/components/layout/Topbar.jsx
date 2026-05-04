@@ -8,10 +8,10 @@ function IconButton({ children, isActive = false, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex h-11 w-11 items-center justify-center rounded-full border transition ${
+      className={`relative flex h-10 w-10 items-center justify-center border transition ${
         isActive
-          ? 'border-[rgba(21,128,61,0.2)] bg-[#eef7e8] text-[#166534] shadow-[0_6px_18px_rgba(21,128,61,0.08)]'
-          : 'border-[var(--border-soft)] bg-white/80 text-[#475467] hover:border-[rgba(21,128,61,0.2)] hover:bg-[#f4f8ef]'
+          ? 'border-[#cbb6ee] bg-[#f0e6ff] text-[#5a189a] shadow-[0_6px_18px_rgba(131,56,236,0.08)]'
+          : 'border-[#ded7ef] bg-white text-[#5a4380] hover:border-[#cbb6ee] hover:bg-[#f5efff]'
       }`}
     >
       {children}
@@ -43,13 +43,12 @@ function Topbar() {
   }
 
   return (
-    <header className="topbar-panel flex flex-col gap-4 px-5 py-5 md:flex-row md:items-center md:justify-between md:px-6">
+    <header className="topbar-panel sticky top-0 z-20 flex flex-col gap-4 border-b border-[#ddd7e8] bg-white/95 px-4 py-3 backdrop-blur md:flex-row md:items-center md:justify-between md:px-5">
       <div>
-        {/* <p className="text-xs font-semibold uppercase tracking-[0.24em] text-ui-muted">Marketing Workspace</p> */}
-        <h2 className="mt-2 text-[34px] font-semibold tracking-tight text-ui-strong">
+        <h2 className="text-[20px] font-semibold tracking-tight text-[#21192d]">
           {currentPage.path === '/overview' ? 'Dashboard' : currentPage.label}
         </h2>
-        <p className="mt-1 max-w-2xl text-[15px] text-ui-body">{currentPage.description}</p>
+        <p className="mt-0.5 max-w-2xl text-[13px] text-[#7f6f96]">{currentPage.description}</p>
       </div>
 
       <div className="relative flex items-center gap-3">
@@ -59,7 +58,7 @@ function Topbar() {
           </IconButton>
 
           {openMenu === 'theme' ? (
-            <div className="absolute right-0 top-[52px] z-30 w-[170px] overflow-hidden rounded-[18px] border border-ui bg-[var(--bg-card-strong)] shadow-[var(--shadow-strong)]">
+            <div className="absolute right-0 top-12 z-30 w-[170px] overflow-hidden border border-[#ded7ef] bg-white shadow-[var(--shadow-strong)]">
               {[
                 ['light', 'Light'],
                 ['dark', 'Dark'],
@@ -69,10 +68,10 @@ function Topbar() {
                   key={label}
                   type="button"
                   onClick={() => setThemeMode(label)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-ui-strong transition hover:bg-[var(--bg-subtle)]"
+                  className="flex w-full items-center justify-between px-4 py-3 text-left text-[13px] text-[#21192d] transition hover:bg-[#f5efff]"
                 >
                   <span>{active}</span>
-                  <span className="text-ui-muted">{themeMode === label ? 'OK' : ''}</span>
+                  <span className="text-[#8d7fa3]">{themeMode === label ? 'OK' : ''}</span>
                 </button>
               ))}
             </div>

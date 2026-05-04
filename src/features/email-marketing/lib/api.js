@@ -16,19 +16,20 @@ const getStoredToken = () => {
 }
 
 const resolveApiBaseUrl = () => {
-  const envBaseUrl = import.meta.env.VITE_E_MARKETING_API_URL?.trim()
-  const adminApiBaseUrl = import.meta.env.VITE_PUBLIC_API_URL?.trim()
+  const envBaseUrl =
+    import.meta.env.VITE_E_MARKETING_API_URL?.trim()
+  const publicApiUrl = import.meta.env.VITE_PUBLIC_API_URL?.trim()
 
   if (isLocalHost) {
-    return envBaseUrl || (adminApiBaseUrl ? `${adminApiBaseUrl}/v1/e-marketing` : 'http://localhost:8081/api/v1/e-marketing')
+    return envBaseUrl || `${publicApiUrl || 'http://localhost:8081/api'}/v1/e-marketing`
   }
 
   if (envBaseUrl) {
     return envBaseUrl
   }
 
-  if (adminApiBaseUrl) {
-    return `${adminApiBaseUrl}/v1/e-marketing`
+  if (publicApiUrl) {
+    return `${publicApiUrl.replace(/\/+$/, '')}/v1/e-marketing`
   }
 
   if (isBrowser) {

@@ -69,6 +69,16 @@ const formatSourceLocation = (subscriber) => {
     .join(" • ");
 };
 
+const getSubscriberWebsiteLabel = (subscriber = {}) => {
+  const fields = subscriber.customFields || {};
+  return (
+    fields.audienceSourceWebsiteName ||
+    fields.audienceSourceWebsiteSlug ||
+    fields.audienceSourceWebsiteId ||
+    ""
+  );
+};
+
 const parseCsvPreview = (content = "") => {
   const lines = content
     .split(/\r?\n/)
@@ -261,7 +271,10 @@ function AudienceListPage() {
     totalSpent: 0,
     byStatus: {},
     bySource: [],
+    websites: [],
   });
+  const [websites, setWebsites] = useState([]);
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkTags, setBulkTags] = useState("");
   const [csvContent, setCsvContent] = useState("");
@@ -285,8 +298,23 @@ function AudienceListPage() {
 
   const selectedCount = selectedIds.length;
 
-  const loadSubscribers = async (page = 1, nextFilters = filters) => {
+  const loadSubscribers = async (
+    page = 1,
+    nextFilters = filters,
+    nextWebsiteId = selectedWebsiteId,
+  ) => {
     setIsLoading(true);
+    const website = websites.find((item) => item.id === nextWebsiteId);
+    const websiteParams = website
+      ? {
+          websiteId: website.websiteId || undefined,
+          websiteSlug: website.websiteId ? undefined : website.websiteSlug || undefined,
+          websiteName:
+            website.websiteId || website.websiteSlug
+              ? undefined
+              : website.websiteName || undefined,
+        }
+      : {};
 
     try {
       const [listResult, summaryResult] = await Promise.allSettled([
@@ -298,9 +326,14 @@ function AudienceListPage() {
             status: nextFilters.status || undefined,
             source: nextFilters.source || undefined,
             tags: nextFilters.tags || undefined,
+            ...websiteParams,
           },
         }),
-        api.get("/subscribers/summary"),
+        api.get("/subscribers/summary", {
+          params: {
+            ...websiteParams,
+          },
+        }),
       ]);
 
       if (listResult.status === "fulfilled") {
@@ -315,6 +348,7 @@ function AudienceListPage() {
 
       if (summaryResult.status === "fulfilled") {
         setSummary(summaryResult.value.data);
+        setWebsites(summaryResult.value.data.websites || []);
       } else {
         console.warn("Subscriber summary failed to load", summaryResult.reason);
       }
@@ -347,6 +381,11 @@ function AudienceListPage() {
     () =>
       subscribers.filter((subscriber) => selectedIds.includes(subscriber._id)),
     [selectedIds, subscribers],
+  );
+
+  const selectedWebsite = useMemo(
+    () => websites.find((website) => website.id === selectedWebsiteId),
+    [selectedWebsiteId, websites],
   );
 
   useEffect(() => {
@@ -387,7 +426,7 @@ function AudienceListPage() {
       toast.success(
         `Subscriber marked as ${formatLabel(status).toLowerCase()}`,
       );
-      loadSubscribers(pagination.page);
+      loadSubscribers(pagination.page, filters, selectedWebsiteId);
     } catch (error) {
       toast.error(
         error.response?.data?.message || "Unable to update subscriber status",
@@ -401,7 +440,7 @@ function AudienceListPage() {
         reason: "manual",
       });
       toast.success("Subscriber suppressed");
-      loadSubscribers(pagination.page);
+      loadSubscribers(pagination.page, filters, selectedWebsiteId);
     } catch (error) {
       toast.error(
         error.response?.data?.message || "Unable to suppress subscriber",
@@ -413,7 +452,7 @@ function AudienceListPage() {
     try {
       await api.post(`/email/subscribers/${subscriberId}/block`);
       toast.success("Subscriber blocked");
-      loadSubscribers(pagination.page);
+      loadSubscribers(pagination.page, filters, selectedWebsiteId);
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to block subscriber");
     }
@@ -423,7 +462,7 @@ function AudienceListPage() {
     try {
       await api.post(`/email/subscribers/${subscriberId}/unblock`);
       toast.success("Subscriber unblocked");
-      loadSubscribers(pagination.page);
+      loadSubscribers(pagination.page, filters, selectedWebsiteId);
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to unblock subscriber");
     }
@@ -434,11 +473,54 @@ function AudienceListPage() {
   const applyQuickFilter = (nextFilters) => {
     setFilters(nextFilters);
     setSelectedIds([]);
-    loadSubscribers(1, nextFilters);
+    loadSubscribers(1, nextFilters, selectedWebsiteId);
   };
 
-  const handleRefreshAudience = () => {
-    loadSubscribers(pagination.page || 1);
+  const handleWebsiteChange = (event) => {
+    const websiteId = event.target.value;
+    setSelectedWebsiteId(websiteId);
+    setSelectedIds([]);
+    loadSubscribers(1, filters, websiteId);
+  };
+
+  const handleSyncSellersLoginAudience = async () => {
+    setIsLoading(true);
+
+    try {
+      const { data } = await api.post("/subscribers/sync/sellerslogin", {
+        websiteId: selectedWebsite?.websiteId || undefined,
+      });
+      const result = data.result || {};
+
+      if (result.skipped) {
+        toast.error(result.error || "Unable to sync SellersLogin customers");
+      } else {
+        const details = [
+          result.sourceCount && result.sourceCount !== result.total
+            ? `${result.sourceCount} source records`
+            : "",
+          result.duplicateEmailRows
+            ? `${result.duplicateEmailRows} duplicate email records merged`
+            : "",
+          result.skippedWithoutEmail
+            ? `${result.skippedWithoutEmail} without email skipped`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(", ");
+
+        toast.success(
+          `Synced ${result.total || 0} SellersLogin contacts${details ? ` (${details})` : ""}`,
+        );
+      }
+
+      await loadSubscribers(1, filters, selectedWebsiteId);
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Unable to sync SellersLogin customers",
+      );
+      setIsLoading(false);
+    }
   };
 
   const toggleSelection = (subscriberId) => {
@@ -502,7 +584,7 @@ function AudienceListPage() {
       }
 
       setSelectedIds([]);
-      loadSubscribers(pagination.page);
+      loadSubscribers(pagination.page, filters, selectedWebsiteId);
     } catch (error) {
       toast.error(error.response?.data?.message || "Bulk action failed");
     }
@@ -539,7 +621,7 @@ function AudienceListPage() {
         validCount: 0,
       });
       setIsPreviewExpanded(false);
-      loadSubscribers(1);
+      loadSubscribers(1, filters, selectedWebsiteId);
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to import CSV");
     }
@@ -561,7 +643,23 @@ function AudienceListPage() {
               </span>
             </div>
           </div>
-          <div className="flex flex-nowrap items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="min-w-[220px]">
+              <span className="sr-only">Website</span>
+              <select
+                className="h-11 min-w-[220px] rounded-xl border border-[#ddd4f2] bg-white px-4 text-sm font-semibold text-[#5f5878] outline-none transition hover:bg-[#f8f5ff] focus:border-[#7c3aed] focus:ring-2 focus:ring-[#ede7ff]"
+                value={selectedWebsiteId}
+                onChange={handleWebsiteChange}
+                aria-label="Filter audience by website"
+              >
+                <option value="">All websites</option>
+                {websites.map((website) => (
+                  <option key={website.id} value={website.id}>
+                    {website.label} ({website.count})
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
@@ -577,6 +675,16 @@ function AudienceListPage() {
             </Link>
           </div>
         </div>
+        {selectedWebsite ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="soft-pill">
+              Showing {selectedWebsite.label}
+            </span>
+            {selectedWebsite.websiteSlug ? (
+              <span className="soft-pill">{selectedWebsite.websiteSlug}</span>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -621,10 +729,10 @@ function AudienceListPage() {
             <button
               type="button"
               className="rounded-xl border border-[#ddd4f2] px-4 py-2 text-sm font-medium text-[#5f5878]"
-              onClick={handleRefreshAudience}
-            >
-              Refresh
-            </button>
+                onClick={handleSyncSellersLoginAudience}
+              >
+                Sync audience
+              </button>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -811,6 +919,11 @@ function AudienceListPage() {
                         <StatusBadge status={subscriber.status} />
                       </td>
                       <td className="px-6 py-5 text-[#5f5878]">
+                        {getSubscriberWebsiteLabel(subscriber) ? (
+                          <p className="mb-2 text-sm font-semibold text-[#2f2b3d]">
+                            {getSubscriberWebsiteLabel(subscriber)}
+                          </p>
+                        ) : null}
                         <p>{formatSourceLocation(subscriber)}</p>
                         <p className="mt-2 text-xs text-[#9a94b2]">
                           {formatLabel(subscriber.source) || "No source"}
@@ -981,7 +1094,9 @@ function AudienceListPage() {
                   type="button"
                   className="rounded-xl border border-[#ddd4f2] px-4 py-2 disabled:opacity-50"
                   disabled={pagination.page <= 1}
-                  onClick={() => loadSubscribers(pagination.page - 1)}
+                  onClick={() =>
+                    loadSubscribers(pagination.page - 1, filters, selectedWebsiteId)
+                  }
                 >
                   Previous
                 </button>
@@ -992,7 +1107,9 @@ function AudienceListPage() {
                   type="button"
                   className="rounded-xl border border-[#ddd4f2] px-4 py-2 disabled:opacity-50"
                   disabled={pagination.page >= pagination.totalPages}
-                  onClick={() => loadSubscribers(pagination.page + 1)}
+                  onClick={() =>
+                    loadSubscribers(pagination.page + 1, filters, selectedWebsiteId)
+                  }
                 >
                   Next
                 </button>

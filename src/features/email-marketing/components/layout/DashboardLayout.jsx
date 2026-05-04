@@ -23,15 +23,15 @@ function DashboardLayout() {
   const isSidebarExpanded = !isDesktop || isSidebarHovered
 
   return (
-    <div className="h-screen overflow-hidden bg-transparent">
-      <div className="grid h-full overflow-hidden bg-[var(--bg-page-soft)] lg:grid-cols-[auto_minmax(0,1fr)]">
+    <div className="vendor-dashboard-shell h-screen overflow-hidden bg-[#fbf9ff]">
+      <div className="grid h-full overflow-hidden bg-[#fbf9ff] lg:grid-cols-[auto_minmax(0,1fr)]">
         <Sidebar
           expanded={isSidebarExpanded}
           onHoverChange={setIsSidebarHovered}
         />
-        <main className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-transparent">
+        <main className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#fbf9ff]">
           <Topbar />
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6 xl:p-7">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
             <Outlet />
           </div>
         </main>

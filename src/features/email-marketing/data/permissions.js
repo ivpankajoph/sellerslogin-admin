@@ -1,5 +1,6 @@
 export const roleLabels = {
   super_admin: 'Super Admin',
+  vendor: 'Vendor',
   marketing_manager: 'Marketing Manager',
   content_editor: 'Content Editor',
   analyst: 'Analyst',
@@ -19,6 +20,18 @@ export const rolePermissions = {
     'export_reports',
     'manage_team_access',
     'manage_settings',
+    'view_billing',
+  ],
+  vendor: [
+    'view_dashboard',
+    'manage_campaigns',
+    'edit_content',
+    'manage_audience',
+    'manage_automations',
+    'view_analytics',
+    'view_reports',
+    'export_reports',
+    'view_billing',
   ],
   marketing_manager: [
     'view_dashboard',

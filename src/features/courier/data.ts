@@ -37,6 +37,10 @@ export type CourierOrderSummary = {
   trackingUrl: string
   externalDeliveryId: string
   websiteLabel: string
+  manualCourier?: {
+    shipment_overrides?: Record<string, unknown>
+    [key: string]: unknown
+  }
   items: Array<{
     productId: string
     variantId: string
@@ -374,6 +378,7 @@ export const normalizeCourierOrder = (
         order?.shadowfax?.order_id
     ),
     websiteLabel,
+    manualCourier: order?.manual_courier,
     items: items.map((item: any) => ({
       productId: toText(item?.product_id?._id || item?.product_id),
       variantId: toText(item?.variant_id?._id || item?.variant_id),

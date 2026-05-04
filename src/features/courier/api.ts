@@ -64,6 +64,23 @@ export const loadCourierOrders = async (isVendor: boolean) => {
   return dedupedOrders
 }
 
+export const loadManualCourierOrders = async () => {
+  const res = await api.get('/orders/manual')
+  const rows = Array.isArray(res?.data?.orders) ? res.data.orders : []
+  return rows
+    .map((order: unknown) => normalizeCourierOrder(order, 'orders'))
+    .filter(Boolean) as CourierOrderSummary[]
+}
+
+export const createManualCourierOrder = async (payload: Record<string, unknown>) => {
+  const res = await api.post('/orders/manual', payload)
+  const order = normalizeCourierOrder(res?.data?.order, 'orders')
+  return {
+    ...res?.data,
+    order,
+  }
+}
+
 export const getAssignedCourierForOrder = (order: CourierOrderSummary | null) => {
   if (!order) return null
   return (

@@ -387,8 +387,10 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   if (isCourierWorkspace) {
     const deliveryActiveSection = pathname.startsWith('/courier/list')
       ? 'courier-list'
-      : pathname.startsWith('/courier/warehouses')
-        ? 'warehouses'
+      : pathname.startsWith('/courier/manual')
+        ? 'manual'
+        : pathname.startsWith('/courier/warehouses')
+          ? 'warehouses'
           : pathname.startsWith('/courier/tracking')
             ? 'tracking'
             : pathname.startsWith('/courier/delhivery')

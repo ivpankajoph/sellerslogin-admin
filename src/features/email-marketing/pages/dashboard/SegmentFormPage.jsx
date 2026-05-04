@@ -110,6 +110,39 @@ const sanitizeConditions = (conditions = []) =>
     })
     .filter(Boolean);
 
+const emptyWebsiteScope = {
+  websiteId: "",
+  websiteSlug: "",
+  websiteName: "",
+  label: "",
+};
+
+const normalizeWebsiteScope = (scope = {}) => ({
+  websiteId: String(scope.websiteId || scope.website_id || "").trim(),
+  websiteSlug: String(scope.websiteSlug || scope.website_slug || "").trim(),
+  websiteName: String(scope.websiteName || scope.website_name || "").trim(),
+  label: String(
+    scope.label ||
+      scope.websiteName ||
+      scope.website_name ||
+      scope.websiteSlug ||
+      scope.website_slug ||
+      scope.websiteId ||
+      scope.website_id ||
+      "",
+  ).trim(),
+});
+
+const getWebsiteOptionScope = (website = {}) => ({
+  websiteId: website.websiteId || "",
+  websiteSlug: website.websiteSlug || "",
+  websiteName: website.websiteName || "",
+  label: website.label || website.websiteName || website.websiteSlug || website.websiteId || "",
+});
+
+const getWebsiteScopeKey = (scope = {}) =>
+  [scope.websiteId || "", scope.websiteSlug || "", scope.websiteName || ""].join("::");
+
 function SegmentFormPage() {
   const { id } = useParams();
   const location = useLocation();
@@ -126,6 +159,8 @@ function SegmentFormPage() {
   };
 
   const [name, setName] = useState(() => preset?.name || "");
+  const [websiteScope, setWebsiteScope] = useState(emptyWebsiteScope);
+  const [websites, setWebsites] = useState([]);
   const [logic, setLogic] = useState(() => initialDefinition.logic || "and");
   const [conditions, setConditions] = useState(() =>
     (initialDefinition.filters?.length ? initialDefinition.filters : [createBlankCondition()]).map(
@@ -142,6 +177,7 @@ function SegmentFormPage() {
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const selectedWebsiteKey = getWebsiteScopeKey(normalizeWebsiteScope(websiteScope));
 
   useEffect(() => {
     if (id || !preset) {
@@ -151,6 +187,7 @@ function SegmentFormPage() {
     const nextDefinition = preset.definition || { logic: "and", filters: [createBlankCondition()] };
 
     setName(preset.name || "");
+    setWebsiteScope(emptyWebsiteScope);
     setLogic(nextDefinition.logic || "and");
     setConditions(
       (nextDefinition.filters?.length ? nextDefinition.filters : [createBlankCondition()]).map(
@@ -165,6 +202,19 @@ function SegmentFormPage() {
   }, [id, preset]);
 
   useEffect(() => {
+    const loadWebsiteOptions = async () => {
+      try {
+        const { data } = await api.get("/subscribers/summary");
+        setWebsites(data?.websites || []);
+      } catch {
+        setWebsites([]);
+      }
+    };
+
+    loadWebsiteOptions();
+  }, []);
+
+  useEffect(() => {
     if (!id) {
       return;
     }
@@ -175,6 +225,7 @@ function SegmentFormPage() {
         const nextDefinition = data.definition || { logic: "and", filters: data.rules || [] };
 
         setName(data.name || "");
+        setWebsiteScope(normalizeWebsiteScope(data.websiteScope || {}));
         setLogic(nextDefinition.logic || "and");
         setConditions(
           (nextDefinition.filters?.length ? nextDefinition.filters : [createBlankCondition()]).map(
@@ -201,13 +252,18 @@ function SegmentFormPage() {
 
   const cleanConditions = useMemo(() => sanitizeConditions(conditions), [conditions]);
 
-  const refreshPreview = async (nextLogic = logic, nextConditions = cleanConditions) => {
+  const refreshPreview = async (
+    nextLogic = logic,
+    nextConditions = cleanConditions,
+    nextWebsiteScope = websiteScope,
+  ) => {
     try {
       const { data } = await api.post("/segments/preview", {
         definition: {
           logic: nextLogic,
           filters: nextConditions,
         },
+        websiteScope: normalizeWebsiteScope(nextWebsiteScope || {}),
       });
 
       setPreviewCount(Number(data.previewCount || 0));
@@ -228,7 +284,7 @@ function SegmentFormPage() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [cleanConditions, isLoading, logic]);
+  }, [cleanConditions, isLoading, logic, websiteScope]);
 
   const handleConditionChange = (index, key, value) => {
     setConditions((current) =>
@@ -311,6 +367,7 @@ function SegmentFormPage() {
 
     const payload = {
       name: name.trim(),
+      websiteScope: normalizeWebsiteScope(websiteScope || {}),
       definition: {
         logic,
         filters: cleanConditions,
@@ -464,6 +521,21 @@ function SegmentFormPage() {
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
+            <select
+              className="field"
+              value={selectedWebsiteKey}
+              onChange={(event) => {
+                const website = websites.find((item) => item.id === event.target.value);
+                setWebsiteScope(website ? getWebsiteOptionScope(website) : emptyWebsiteScope);
+              }}
+            >
+              <option value={getWebsiteScopeKey(emptyWebsiteScope)}>All websites</option>
+              {websites.map((website) => (
+                <option key={website.id} value={website.id}>
+                  {website.label} ({website.count || 0})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-4">
