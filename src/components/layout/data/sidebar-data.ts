@@ -27,9 +27,6 @@ export const ROLES = {
   VENDOR: 'vendor',
 } as const
 
-const emailMarketingUrl =
-  import.meta.env.VITE_EMAIL_MARKETING_URL || 'http://localhost:5174/login'
-
 export const sidebarData: Pick<SidebarData, 'navGroups'> = {
   navGroups: [
     {
@@ -528,9 +525,9 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
       items: [
         {
           title: 'Email Marketing',
-          url: emailMarketingUrl,
+          url: '/email-marketing',
           icon: Mail,
-          roles: [ROLES.VENDOR],
+          roles: [ROLES.ADMIN, ROLES.VENDOR],
         },
         {
           title: 'SEO Manager',

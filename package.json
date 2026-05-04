@@ -67,6 +67,7 @@
     "react-hook-form": "^7.65.0",
     "react-hot-toast": "^2.6.0",
     "react-redux": "^9.2.0",
+    "react-router-dom": "^7.14.0",
     "react-top-loading-bar": "^3.0.2",
     "recharts": "^3.2.1",
     "redux-persist": "^6.0.0",

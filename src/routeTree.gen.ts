@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProductPreviewRouteImport } from './routes/product-preview'
 import { Route as ClerkRouteRouteImport } from './routes/clerk/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as EmailMarketingIndexRouteImport } from './routes/email-marketing/index'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as EmailMarketingSplatRouteImport } from './routes/email-marketing/$'
 import { Route as AuthenticatedDeliverySystemRouteImport } from './routes/_authenticated/delivery-system'
 import { Route as AuthenticatedConnectBrevoRouteImport } from './routes/_authenticated/connect-brevo'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
@@ -131,10 +133,20 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmailMarketingIndexRoute = EmailMarketingIndexRouteImport.update({
+  id: '/email-marketing/',
+  path: '/email-marketing/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const EmailMarketingSplatRoute = EmailMarketingSplatRouteImport.update({
+  id: '/email-marketing/$',
+  path: '/email-marketing/$',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedDeliverySystemRoute =
   AuthenticatedDeliverySystemRouteImport.update({
@@ -736,6 +748,7 @@ export interface FileRoutesByFullPath {
   '/product-preview': typeof ProductPreviewRoute
   '/analytics': typeof AuthenticatedAnalyticsRouteRouteWithChildren
   '/meta-pixel': typeof AuthenticatedMetaPixelRouteRouteWithChildren
+  '/clerk/': typeof ClerkauthRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
@@ -748,7 +761,9 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/connect-brevo': typeof AuthenticatedConnectBrevoRoute
   '/delivery-system': typeof AuthenticatedDeliverySystemRoute
+  '/email-marketing/$': typeof EmailMarketingSplatRoute
   '/': typeof AuthenticatedIndexRoute
+  '/email-marketing': typeof EmailMarketingIndexRoute
   '/analytics/behavior': typeof AuthenticatedAnalyticsBehaviorRoute
   '/analytics/ecommerce': typeof AuthenticatedAnalyticsEcommerceRoute
   '/analytics/funnel': typeof AuthenticatedAnalyticsFunnelRoute
@@ -838,8 +853,8 @@ export interface FileRoutesByFullPath {
   '/products/create-products': typeof AuthenticatedProductsCreateProductsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/product-preview': typeof ProductPreviewRoute
+  '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
@@ -852,7 +867,9 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/connect-brevo': typeof AuthenticatedConnectBrevoRoute
   '/delivery-system': typeof AuthenticatedDeliverySystemRoute
+  '/email-marketing/$': typeof EmailMarketingSplatRoute
   '/': typeof AuthenticatedIndexRoute
+  '/email-marketing': typeof EmailMarketingIndexRoute
   '/analytics/behavior': typeof AuthenticatedAnalyticsBehaviorRoute
   '/analytics/ecommerce': typeof AuthenticatedAnalyticsEcommerceRoute
   '/analytics/funnel': typeof AuthenticatedAnalyticsFunnelRoute
@@ -962,7 +979,9 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/connect-brevo': typeof AuthenticatedConnectBrevoRoute
   '/_authenticated/delivery-system': typeof AuthenticatedDeliverySystemRoute
+  '/email-marketing/$': typeof EmailMarketingSplatRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/email-marketing/': typeof EmailMarketingIndexRoute
   '/_authenticated/analytics/behavior': typeof AuthenticatedAnalyticsBehaviorRoute
   '/_authenticated/analytics/ecommerce': typeof AuthenticatedAnalyticsEcommerceRoute
   '/_authenticated/analytics/funnel': typeof AuthenticatedAnalyticsFunnelRoute
@@ -1058,6 +1077,7 @@ export interface FileRouteTypes {
     | '/product-preview'
     | '/analytics'
     | '/meta-pixel'
+    | '/clerk/'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
@@ -1070,7 +1090,9 @@ export interface FileRouteTypes {
     | '/503'
     | '/connect-brevo'
     | '/delivery-system'
+    | '/email-marketing/$'
     | '/'
+    | '/email-marketing'
     | '/analytics/behavior'
     | '/analytics/ecommerce'
     | '/analytics/funnel'
@@ -1160,8 +1182,8 @@ export interface FileRouteTypes {
     | '/products/create-products'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/clerk'
     | '/product-preview'
+    | '/clerk'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
@@ -1174,7 +1196,9 @@ export interface FileRouteTypes {
     | '/503'
     | '/connect-brevo'
     | '/delivery-system'
+    | '/email-marketing/$'
     | '/'
+    | '/email-marketing'
     | '/analytics/behavior'
     | '/analytics/ecommerce'
     | '/analytics/funnel'
@@ -1283,7 +1307,9 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/connect-brevo'
     | '/_authenticated/delivery-system'
+    | '/email-marketing/$'
     | '/_authenticated/'
+    | '/email-marketing/'
     | '/_authenticated/analytics/behavior'
     | '/_authenticated/analytics/ecommerce'
     | '/_authenticated/analytics/funnel'
@@ -1387,6 +1413,8 @@ export interface RootRouteChildren {
   errors404Route: typeof errors404Route
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
+  EmailMarketingSplatRoute: typeof EmailMarketingSplatRoute
+  EmailMarketingIndexRoute: typeof EmailMarketingIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1412,12 +1440,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/email-marketing/': {
+      id: '/email-marketing/'
+      path: '/email-marketing'
+      fullPath: '/email-marketing'
+      preLoaderRoute: typeof EmailMarketingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/': {
       id: '/_authenticated/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/email-marketing/$': {
+      id: '/email-marketing/$'
+      path: '/email-marketing/$'
+      fullPath: '/email-marketing/$'
+      preLoaderRoute: typeof EmailMarketingSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/delivery-system': {
       id: '/_authenticated/delivery-system'
@@ -1512,8 +1554,8 @@ declare module '@tanstack/react-router' {
     }
     '/clerk/(auth)': {
       id: '/clerk/(auth)'
-      path: ''
-      fullPath: '/clerk'
+      path: '/'
+      fullPath: '/clerk/'
       preLoaderRoute: typeof ClerkauthRouteRouteImport
       parentRoute: typeof ClerkRouteRoute
     }
@@ -2437,6 +2479,8 @@ const rootRouteChildren: RootRouteChildren = {
   errors404Route: errors404Route,
   errors500Route: errors500Route,
   errors503Route: errors503Route,
+  EmailMarketingSplatRoute: EmailMarketingSplatRoute,
+  EmailMarketingIndexRoute: EmailMarketingIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
