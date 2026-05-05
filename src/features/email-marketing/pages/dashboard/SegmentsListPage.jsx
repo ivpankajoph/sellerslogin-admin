@@ -1,14 +1,12 @@
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import EmptyState from "../../components/ui/EmptyState.jsx";
 import PageHeader from "../../components/ui/PageHeader.jsx";
-import { ToastContext } from "../../context/ToastContext.jsx";
 import { api } from "../../lib/api.js";
 
 const defaultSegmentUsage = { used: 0, limit: 0, remaining: 0, isExhausted: false };
 
 function SegmentsListPage() {
-  const toast = useContext(ToastContext);
   const [segments, setSegments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [segmentUsage, setSegmentUsage] = useState(defaultSegmentUsage);
@@ -37,17 +35,6 @@ function SegmentsListPage() {
     loadSegments();
   };
 
-  const isSegmentLimitReached = segmentUsage.isExhausted;
-
-  const guardSegmentCreate = (event) => {
-    if (!isSegmentLimitReached) {
-      return;
-    }
-
-    event.preventDefault();
-    toast.error("Segment limit reached. Upgrade your plan to create more segments.");
-  };
-
   return (
     <div className="space-y-6">
       <section className="shell-card-strong p-6 md:p-8">
@@ -62,19 +49,13 @@ function SegmentsListPage() {
           <div className="flex flex-wrap gap-3">
             <Link
               to="/segments/new?mode=ready-made"
-              onClick={guardSegmentCreate}
-              className={`rounded-full border border-[#ddd4f2] bg-white px-4 py-2 text-sm font-semibold text-[#5f5878] ${
-                isSegmentLimitReached ? "pointer-events-auto opacity-60" : ""
-              }`}
+              className="rounded-full border border-[#ddd4f2] bg-white px-4 py-2 text-sm font-semibold text-[#5f5878]"
             >
               Ready-made segment
             </Link>
             <Link
               to="/segments/new?mode=create"
-              onClick={guardSegmentCreate}
-              className={`rounded-full border border-[#ddd4f2] bg-white px-4 py-2 text-sm font-semibold text-[#5f5878] ${
-                isSegmentLimitReached ? "pointer-events-auto opacity-60" : ""
-              }`}
+              className="rounded-full border border-[#ddd4f2] bg-white px-4 py-2 text-sm font-semibold text-[#5f5878]"
             >
               Create from scratch
             </Link>
@@ -85,18 +66,16 @@ function SegmentsListPage() {
       <section className="grid gap-3 rounded-[20px] border border-[#e7def8] bg-white px-5 py-4 shadow-[0_10px_24px_rgba(43,29,75,0.04)] md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div>
           <p className="text-sm font-semibold text-[#2f2b3d]">
-            Segments used: {segmentUsage.used} / {segmentUsage.limit}
+            Segments created: {segmentUsage.used}
           </p>
           <p className="mt-1 text-sm text-[#6e6787]">
-            {segmentUsage.remaining} segments remaining in your current plan.
+            Segment creation is unlimited. Credits are checked only before a full send.
           </p>
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-[#eee9f8] md:w-56">
           <div
-            className={`h-full ${isSegmentLimitReached ? "bg-rose-500" : "bg-[#8338ec]"}`}
-            style={{
-              width: `${segmentUsage.limit ? Math.min((segmentUsage.used / segmentUsage.limit) * 100, 100) : 0}%`,
-            }}
+            className="h-full bg-[#8338ec]"
+            style={{ width: "100%" }}
           />
         </div>
       </section>
@@ -182,7 +161,7 @@ function SegmentsListPage() {
               title="No segments yet"
               description="Create a preset or build a new audience segment in a few simple steps."
               action={
-                <Link to="/segments/new?mode=create" onClick={guardSegmentCreate} className="primary-button">
+                <Link to="/segments/new?mode=create" className="primary-button">
                   Create segment
                 </Link>
               }

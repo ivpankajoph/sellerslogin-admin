@@ -1789,7 +1789,7 @@ const billingViewHelpText = {
   invoices:
     "View invoices generated for vendor payments. These invoices are linked to plans or credit purchases and can be used for billing and GST records.",
   plans:
-    "Create and edit subscription plans for vendors. Plans control pricing, billing cycle options, and feature limits such as templates, automations, segments, or team members.",
+    "Create and edit subscription plans for vendors. Plans control pricing, billing cycle options, and team member limits. Email sending is controlled by credits.",
   subscriptions:
     "Manage which plan is assigned to each vendor. You can update the vendor's plan, subscription status, billing cycle, and manual billing details.",
 };
@@ -1983,7 +1983,7 @@ function AdminBillingView({
                 <h3 className="text-[15px] font-semibold text-[#21192d]">
                   {planForm.id ? "Edit Plan" : "Create Plan"}
                 </h3>
-                <p className="mt-1 text-[12px] text-[#9b8caf]">Define quota, pricing, and features.</p>
+                <p className="mt-1 text-[12px] text-[#9b8caf]">Define pricing, email quota display, team seats, and features.</p>
               </div>
               {[
                 ["name", "Plan name"],
@@ -1993,10 +1993,7 @@ function AdminBillingView({
                 ["yearlyPrice", "Yearly price"],
                 ["emailsPerDay", "Emails per day"],
                 ["emailsPerMonth", "Emails per month"],
-                ["automations", "Automation limit"],
                 ["teamMembers", "Team members"],
-                ["templates", "Template limit"],
-                ["segments", "Segment limit"],
                 ["sortOrder", "Sort order"],
               ].map(([key, label]) => (
                 <label key={key} className="block">

@@ -468,6 +468,25 @@ function AudienceListPage() {
     }
   };
 
+  const handleDeleteSubscriber = async (subscriberId) => {
+    const confirmed = window.confirm(
+      "Delete this subscriber permanently from audience?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await api.delete(`/subscribers/${subscriberId}`);
+      toast.success("Subscriber deleted");
+      setSelectedIds((current) => current.filter((id) => id !== subscriberId));
+      loadSubscribers(pagination.page, filters, selectedWebsiteId);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to delete subscriber");
+    }
+  };
+
   const closeActionMenu = () => setOpenActionMenuId(null);
 
   const applyQuickFilter = (nextFilters) => {
@@ -1076,6 +1095,17 @@ function AudienceListPage() {
                                     Suppress
                                   </button>
                                 ) : null}
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="flex min-h-11 w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-red-700 transition hover:bg-red-50"
+                                  onClick={() => {
+                                    closeActionMenu();
+                                    handleDeleteSubscriber(subscriber._id);
+                                  }}
+                                >
+                                  Delete
+                                </button>
                               </div>
                             </div>
                           ) : null}

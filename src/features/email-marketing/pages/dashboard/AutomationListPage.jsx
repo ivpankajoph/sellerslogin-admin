@@ -118,32 +118,12 @@ function AutomationListPage() {
     }
   }
 
-  const isAutomationLimitReached = automationUsage.isExhausted
-
-  const guardAutomationCreate = (event) => {
-    if (!isAutomationLimitReached) {
-      return false
-    }
-
-    event?.preventDefault?.()
-    toast.error('Automation limit reached. Upgrade your plan to create more workflows.')
-    return true
-  }
-
   const handleChooseReadyMade = () => {
-    if (guardAutomationCreate()) {
-      return
-    }
-
     setShowCreateChooser(false)
     setShowRecipeGallery(true)
   }
 
   const handleChooseCustom = () => {
-    if (guardAutomationCreate()) {
-      return
-    }
-
     setShowCreateChooser(false)
     navigate('/automations/new')
   }
@@ -206,16 +186,10 @@ function AutomationListPage() {
           </div>
           <button
             type="button"
-            className="primary-button disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isAutomationLimitReached}
-            onClick={() => {
-              if (guardAutomationCreate()) {
-                return
-              }
-              setShowCreateChooser(true)
-            }}
+            className="primary-button"
+            onClick={() => setShowCreateChooser(true)}
           >
-            {isAutomationLimitReached ? 'Automation Limit Reached' : 'Create Automation'}
+            Create Automation
           </button>
         </div>
       </section>
@@ -223,18 +197,16 @@ function AutomationListPage() {
       <section className="grid gap-3 rounded-[20px] border border-[#e7def8] bg-white px-5 py-4 shadow-[0_10px_24px_rgba(43,29,75,0.04)] md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div>
           <p className="text-sm font-semibold text-[#2f2b3d]">
-            Automations used: {automationUsage.used} / {automationUsage.limit}
+            Automations created: {automationUsage.used}
           </p>
           <p className="mt-1 text-sm text-[#6e6787]">
-            {automationUsage.remaining} automations remaining in your current plan.
+            Automation creation is unlimited. Email credits are enforced when messages send.
           </p>
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-[#eee9f8] md:w-56">
           <div
-            className={`h-full ${isAutomationLimitReached ? 'bg-rose-500' : 'bg-[#8338ec]'}`}
-            style={{
-              width: `${automationUsage.limit ? Math.min((automationUsage.used / automationUsage.limit) * 100, 100) : 0}%`,
-            }}
+            className="h-full bg-[#8338ec]"
+            style={{ width: '100%' }}
           />
         </div>
       </section>
@@ -455,7 +427,7 @@ function AutomationListPage() {
               title="No workflows match these filters"
               description="Create a workflow, switch status tabs, or widen the filters to continue building your automation layer."
               action={
-                <Link to="/automations/new" onClick={guardAutomationCreate} className="primary-button">
+                <Link to="/automations/new" className="primary-button">
                   Create Automation
 
                 </Link>
@@ -525,10 +497,7 @@ function AutomationListPage() {
               <Link
                 key={preset.key}
                 to={`/automations/new?preset=${preset.key}`}
-                onClick={(event) => {
-                  if (guardAutomationCreate(event)) {
-                    return
-                  }
+                onClick={() => {
                   setShowRecipeGallery(false)
                 }}
                 className="rounded-[24px] border border-[var(--border-soft)] bg-white p-4 transition hover:border-[rgba(21,128,61,0.2)] hover:bg-[#f7f9f1]"

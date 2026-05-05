@@ -6,11 +6,11 @@ import DashboardLayout from "./components/layout/DashboardLayout.jsx";
 import { AuthContext } from "./context/AuthContext.jsx";
 import CampaignDetailsPage from "./pages/dashboard/CampaignDetailsPage.jsx";
 import CampaignFormPage from "./pages/dashboard/CampaignFormPage.jsx";
+import CampaignAnalyticsPage from "./pages/dashboard/CampaignAnalyticsPage.jsx";
 import CampaignsListPage from "./pages/dashboard/CampaignsListPage.jsx";
 import { navigationItems } from "./data/navigation.js";
 import AdminDashboardPage from "./pages/AdminDashboardPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
-import AnalyticsPage from "./pages/dashboard/AnalyticsPage.jsx";
 import AutomationDetailsPage from "./pages/dashboard/AutomationDetailsPage.jsx";
 import AutomationExecutionsPage from "./pages/dashboard/AutomationExecutionsPage.jsx";
 import AutomationFormPage from "./pages/dashboard/AutomationFormPage.jsx";
@@ -18,6 +18,9 @@ import AutomationListPage from "./pages/dashboard/AutomationListPage.jsx";
 import AudienceListPage from "./pages/dashboard/AudienceListPage.jsx";
 import BillingPlanPage from "./pages/dashboard/BillingPlanPage.jsx";
 import DeliverabilityPage from "./pages/dashboard/DeliverabilityPage.jsx";
+import DeviceLocationTrackingPage from "./pages/dashboard/DeviceLocationTrackingPage.jsx";
+import EmailOpenedClickedPage from "./pages/dashboard/EmailOpenedClickedPage.jsx";
+import ConversionRevenuePage from "./pages/dashboard/ConversionRevenuePage.jsx";
 import EmailBuilderPage from "./pages/dashboard/EmailBuilderPage.jsx";
 import OverviewPage from "./pages/dashboard/OverviewPage.jsx";
 import PlaceholderPage from "./pages/dashboard/PlaceholderPage.jsx";
@@ -27,6 +30,7 @@ import SimpleEmailEditorPage from "./pages/dashboard/SimpleEmailEditorPage.jsx";
 import SegmentFormPage from "./pages/dashboard/SegmentFormPage.jsx";
 import SegmentsListPage from "./pages/dashboard/SegmentsListPage.jsx";
 import TeamUsersPage from "./pages/dashboard/TeamUsersPage.jsx";
+import TimeAnalyticsPage from "./pages/dashboard/TimeAnalyticsPage.jsx";
 import SubscriberDetailsPage from "./pages/dashboard/SubscriberDetailsPage.jsx";
 import SubscriberFormPage from "./pages/dashboard/SubscriberFormPage.jsx";
 import SuppressionListPage from "./pages/dashboard/SuppressionListPage.jsx";
@@ -94,10 +98,42 @@ function App() {
           <Route index element={<Navigate to="/overview" replace />} />
           <Route path="overview" element={<OverviewPage />} />
           <Route
-            path="analytics"
+            path="analytics/email-opened-clicked"
             element={
               <PermissionGate permission="view_analytics">
-                <AnalyticsPage />
+                <EmailOpenedClickedPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="analytics/conversion-revenue"
+            element={
+              <PermissionGate permission="view_analytics">
+                <ConversionRevenuePage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="analytics/device-location"
+            element={
+              <PermissionGate permission="view_analytics">
+                <DeviceLocationTrackingPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="analytics/time-analytics"
+            element={
+              <PermissionGate permission="view_analytics">
+                <TimeAnalyticsPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="analytics/campaign-analytics"
+            element={
+              <PermissionGate permission="view_analytics">
+                <CampaignAnalyticsPage />
               </PermissionGate>
             }
           />
