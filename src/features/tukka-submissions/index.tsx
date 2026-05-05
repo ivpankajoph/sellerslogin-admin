@@ -21,6 +21,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { buildApiUrl } from '../analytics-hub/lib/api'
 import { getQueryFn } from '../analytics-hub/lib/query'
 import { format } from 'date-fns'
+import { Download } from 'lucide-react'
+import { buildDatedFilename, downloadExcelFile, type ExcelColumn } from '@/lib/excel-export'
 
 interface TukkaVendor {
   _id: string
@@ -35,6 +37,22 @@ interface TukkaVendor {
   createdAt: string
 }
 
+const tukkaExportColumns: ExcelColumn<TukkaVendor>[] = [
+  { header: 'Registration ID', value: '_id' },
+  { header: 'Date', value: (vendor) => format(new Date(vendor.createdAt), 'dd MMM yyyy HH:mm') },
+  { header: 'Name', value: 'name' },
+  { header: 'Company', value: 'registrar_name' },
+  { header: 'Email', value: 'email' },
+  { header: 'Phone', value: 'phone' },
+  { header: 'City', value: 'city' },
+  { header: 'Goals', value: (vendor) => vendor.business_nature?.[0] || '' },
+  { header: 'Sold Online', value: (vendor) => vendor.business_nature?.[1] || '' },
+  { header: 'Business Nature', value: (vendor) => vendor.business_nature?.join(', ') || '' },
+  { header: 'Payment Status', value: (vendor) => (vendor.is_active ? 'Paid' : 'Pending') },
+  { header: 'Verified', value: (vendor) => vendor.is_verified },
+  { header: 'Active', value: (vendor) => vendor.is_active },
+]
+
 export default function TukkaSubmissions() {
   const queryFn = getQueryFn<{ success: boolean; vendors: TukkaVendor[] }>()
   
@@ -45,12 +63,30 @@ export default function TukkaSubmissions() {
 
   const vendors = data?.vendors || []
 
+  const handleDownloadExcel = () => {
+    downloadExcelFile({
+      filename: buildDatedFilename('tukka-registrations'),
+      sheetName: 'Tukka Registrations',
+      columns: tukkaExportColumns,
+      rows: vendors,
+    })
+  }
+
   return (
     <div className='flex flex-col h-full'>
       <Main className='flex-1 gap-4 overflow-auto'>
         <Card className='rounded-none'>
-          <CardHeader>
+          <CardHeader className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
             <CardTitle>Recent Submissions</CardTitle>
+            <Button
+              variant='outline'
+              className='rounded-none'
+              disabled={isLoading || !vendors.length}
+              onClick={handleDownloadExcel}
+            >
+              <Download className='h-4 w-4' />
+              Download Excel
+            </Button>
           </CardHeader>
           <CardContent>
             {isLoading ? (
