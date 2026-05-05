@@ -146,6 +146,9 @@ const buildTrackingPath = (shipment: ShipmentRow) => {
     params.set('orderId', shipment.order.id)
     params.set('source', shipment.order.source)
     if (shipment.trackingCode) params.set('tracking', shipment.trackingCode)
+    if (shipment.partner.id === 'shadowfax') {
+      return `/courier/shadowfax?${params.toString()}`
+    }
     return `/courier/tracking?${params.toString()}`
   }
 

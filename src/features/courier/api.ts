@@ -309,6 +309,7 @@ export const updateDelhiveryWarehouse = async (
 
 export type DelhiveryWarehouse = {
   id: string
+  provider?: 'delhivery'
   name: string
   registered_name?: string
   phone?: string
@@ -328,9 +329,82 @@ export type DelhiveryWarehouse = {
   updatedAt?: string | null
 }
 
+export type ShadowfaxWarehouse = {
+  id: string
+  provider: 'shadowfax'
+  name: string
+  contact?: string
+  phone?: string
+  email?: string
+  address_line_1?: string
+  address_line_2?: string
+  address?: string
+  city?: string
+  state?: string
+  pincode?: string
+  pin?: string
+  latitude?: string
+  longitude?: string
+  unique_code?: string
+  working_days?: string[]
+  synced_at?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export type CourierWarehouse = (DelhiveryWarehouse & { provider: 'delhivery' }) | ShadowfaxWarehouse
+
 export const fetchDelhiveryWarehouses = async (params: Record<string, unknown> = {}) => {
   const res = await api.get('/delhivery/warehouses', { params })
   return res?.data as { success?: boolean; warehouses?: DelhiveryWarehouse[] }
+}
+
+export const fetchShadowfaxWarehouses = async (params: Record<string, unknown> = {}) => {
+  const res = await api.get('/shadowfax/warehouses', { params })
+  return res?.data as { success?: boolean; warehouses?: ShadowfaxWarehouse[] }
+}
+
+export const fetchCourierWarehouses = async () => {
+  const [delhiveryResult, shadowfaxResult] = await Promise.allSettled([
+    fetchDelhiveryWarehouses(),
+    fetchShadowfaxWarehouses(),
+  ])
+
+  const delhivery =
+    delhiveryResult.status === 'fulfilled'
+      ? (delhiveryResult.value?.warehouses || []).map((warehouse) => ({
+          ...warehouse,
+          provider: 'delhivery' as const,
+        }))
+      : []
+  const shadowfax =
+    shadowfaxResult.status === 'fulfilled'
+      ? shadowfaxResult.value?.warehouses || []
+      : []
+
+  if (!delhivery.length && !shadowfax.length) {
+    const rejected = [delhiveryResult, shadowfaxResult].find(
+      (result) => result.status === 'rejected'
+    ) as PromiseRejectedResult | undefined
+    if (rejected) throw rejected.reason
+  }
+
+  return [...delhivery, ...shadowfax] as CourierWarehouse[]
+}
+
+export const createShadowfaxWarehouse = async (
+  payload: Record<string, unknown>
+) => {
+  const res = await api.post('/shadowfax/warehouse', payload)
+  return res?.data
+}
+
+export const updateShadowfaxWarehouse = async (
+  warehouseId: string,
+  payload: Record<string, unknown>
+) => {
+  const res = await api.post(`/shadowfax/warehouses/${warehouseId}/edit`, payload)
+  return res?.data
 }
 
 

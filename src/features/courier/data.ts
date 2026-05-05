@@ -294,6 +294,19 @@ const hasRealDelhiveryWaybill = (
   return candidates.some((entry) => !isUploadReference(entry))
 }
 
+export const getRealShadowfaxReference = (
+  shadowfax?: CourierOrderSummary['shadowfax']
+) => {
+  const trackingNumber = toText(shadowfax?.tracking_number)
+  if (trackingNumber) return trackingNumber
+
+  const orderId = toText(shadowfax?.order_id)
+  const clientOrderId = toText(shadowfax?.client_order_id)
+  if (orderId && orderId !== clientOrderId) return orderId
+
+  return ''
+}
+
 export const isCancelledCourierState = (value: unknown) => {
   const state = toText(value).toLowerCase()
   return ['cancelled', 'canceled', 'shipment cancelled'].includes(state)
@@ -588,7 +601,7 @@ export const getActiveCourierPartnerIds = (
   }
 
   if (
-    (toText(order.shadowfax?.order_id) || toText(order.shadowfax?.tracking_number)) &&
+    getRealShadowfaxReference(order.shadowfax) &&
     !isClosedCourierState(order.shadowfax?.status)
   ) {
     next.add('shadowfax')
@@ -644,9 +657,10 @@ export const getRemoteCourierAssignment = (
   }
 
   if (
-    (toText(order.shadowfax?.order_id) || toText(order.shadowfax?.tracking_number)) &&
+    getRealShadowfaxReference(order.shadowfax) &&
     !isClosedCourierState(order.shadowfax?.status)
   ) {
+    const trackingCode = getRealShadowfaxReference(order.shadowfax)
     return {
       orderId: order.id,
       orderNumber: order.orderNumber,
@@ -657,10 +671,7 @@ export const getRemoteCourierAssignment = (
       etaLabel: COURIER_PARTNER_MAP.shadowfax.etaLabel,
       assignedAt: order.shadowfax?.updated_at || order.createdAt,
       trackingStatus: order.shadowfax?.status || trackingStatusByPartner.shadowfax,
-      trackingCode:
-        toText(order.shadowfax?.tracking_number) ||
-        toText(order.shadowfax?.order_id) ||
-        `${trackingPrefixByPartner.shadowfax}-${order.id.slice(-6).toUpperCase()}`,
+      trackingCode,
       trackingUrl: '',
       customerName: order.customerName,
       customerPhone: order.customerPhone,

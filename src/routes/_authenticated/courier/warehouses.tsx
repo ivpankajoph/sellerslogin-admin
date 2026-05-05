@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { LoaderCircle, Plus, RefreshCcw, Warehouse } from 'lucide-react'
+import type { Dispatch, SetStateAction } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,9 +26,11 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import {
   createDelhiveryWarehouse,
-  fetchDelhiveryWarehouses,
+  createShadowfaxWarehouse,
+  fetchCourierWarehouses,
   updateDelhiveryWarehouse,
-  type DelhiveryWarehouse,
+  updateShadowfaxWarehouse,
+  type CourierWarehouse,
 } from '@/features/courier/api'
 import type { RootState } from '@/store'
 
@@ -51,6 +55,21 @@ type WarehouseForm = {
   working_days: string[]
 }
 
+type ShadowfaxWarehouseForm = {
+  name: string
+  contact: string
+  email: string
+  address_line_1: string
+  address_line_2: string
+  city: string
+  state: string
+  pincode: string
+  latitude: string
+  longitude: string
+  unique_code: string
+  working_days: string[]
+}
+
 const readText = (value: unknown) => String(value ?? '').trim()
 
 const defaultForm: WarehouseForm = {
@@ -67,6 +86,21 @@ const defaultForm: WarehouseForm = {
   return_pin: '',
   return_state: '',
   return_country: 'India',
+  working_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+}
+
+const defaultShadowfaxForm: ShadowfaxWarehouseForm = {
+  name: '',
+  contact: '',
+  email: '',
+  address_line_1: '',
+  address_line_2: '',
+  city: '',
+  state: '',
+  pincode: '',
+  latitude: '',
+  longitude: '',
+  unique_code: '',
   working_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
 }
 
@@ -87,21 +121,24 @@ function CourierWarehouseManagePage() {
     }
   }, [isVendor, navigate, user])
 
-  const [warehouses, setWarehouses] = useState<DelhiveryWarehouse[]>([])
+  const [warehouses, setWarehouses] = useState<CourierWarehouse[]>([])
   const [loading, setLoading] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [busy, setBusy] = useState<'create' | 'edit' | ''>('')
+  const [createProvider, setCreateProvider] = useState<'delhivery' | 'shadowfax' | ''>('')
   const [createForm, setCreateForm] = useState<WarehouseForm>(defaultForm)
+  const [shadowfaxForm, setShadowfaxForm] = useState<ShadowfaxWarehouseForm>(defaultShadowfaxForm)
   const [editForm, setEditForm] = useState<WarehouseForm>(defaultForm)
-  const [selected, setSelected] = useState<DelhiveryWarehouse | null>(null)
+  const [editShadowfaxForm, setEditShadowfaxForm] = useState<ShadowfaxWarehouseForm>(defaultShadowfaxForm)
+  const [selected, setSelected] = useState<CourierWarehouse | null>(null)
   const [returnSameAsAbove, setReturnSameAsAbove] = useState(false)
 
   const loadWarehouses = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetchDelhiveryWarehouses()
-      setWarehouses(Array.isArray(response?.warehouses) ? response.warehouses : [])
+      const response = await fetchCourierWarehouses()
+      setWarehouses(response)
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to load warehouses')
     } finally {
@@ -124,6 +161,31 @@ function CourierWarehouseManagePage() {
   )
 
   const onCreate = async () => {
+    if (createProvider === 'shadowfax') {
+      if (!readText(shadowfaxForm.name)) return toast.error('Warehouse name is required')
+      if (!readText(shadowfaxForm.contact)) return toast.error('Contact is required')
+      if (!readText(shadowfaxForm.address_line_1)) return toast.error('Address line 1 is required')
+      if (!readText(shadowfaxForm.city)) return toast.error('City is required')
+      if (!readText(shadowfaxForm.state)) return toast.error('State is required')
+      if (!readText(shadowfaxForm.pincode)) return toast.error('Pincode is required')
+      if (!readText(shadowfaxForm.unique_code)) return toast.error('Shadowfax unique code is required')
+
+      try {
+        setBusy('create')
+        await createShadowfaxWarehouse(shadowfaxForm)
+        toast.success('Shadowfax warehouse created')
+        setCreateOpen(false)
+        setCreateProvider('')
+        setShadowfaxForm(defaultShadowfaxForm)
+        await loadWarehouses()
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Failed to create Shadowfax warehouse')
+      } finally {
+        setBusy('')
+      }
+      return
+    }
+
     if (!readText(createForm.name)) return toast.error('Warehouse name is required')
     if (!readText(createForm.phone)) return toast.error('Phone is required')
     if (!readText(createForm.pin)) return toast.error('Pin is required')
@@ -146,8 +208,9 @@ function CourierWarehouseManagePage() {
     try {
       setBusy('create')
       await createDelhiveryWarehouse(payload)
-      toast.success('Warehouse created')
+      toast.success('Delhivery warehouse created')
       setCreateOpen(false)
+      setCreateProvider('')
       setCreateForm(defaultForm)
       setReturnSameAsAbove(false)
       await loadWarehouses()
@@ -160,6 +223,22 @@ function CourierWarehouseManagePage() {
 
   const onEdit = async () => {
     if (!selected) return
+
+    if (selected.provider === 'shadowfax') {
+      try {
+        setBusy('edit')
+        await updateShadowfaxWarehouse(selected.id, editShadowfaxForm)
+        toast.success('Shadowfax warehouse updated')
+        setEditOpen(false)
+        await loadWarehouses()
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Failed to update Shadowfax warehouse')
+      } finally {
+        setBusy('')
+      }
+      return
+    }
+
     if (!readText(editForm.address) && !readText(editForm.pin) && !readText(editForm.phone)) {
       return toast.error('Provide address, pin, or phone to update')
     }
@@ -173,7 +252,7 @@ function CourierWarehouseManagePage() {
         phone: readText(editForm.phone) || undefined,
         working_days: editForm.working_days,
       })
-      toast.success('Warehouse updated')
+      toast.success('Delhivery warehouse updated')
       setEditOpen(false)
       await loadWarehouses()
     } catch (err: any) {
@@ -189,9 +268,9 @@ function CourierWarehouseManagePage() {
         <div className='rounded-none border border-border bg-card p-4 md:p-5'>
           <div className='flex flex-wrap items-center justify-between gap-3'>
             <div>
-              <h1 className='text-2xl font-semibold tracking-tight'>Delhivery Warehouse Manage</h1>
+              <h1 className='text-2xl font-semibold tracking-tight'>Courier Warehouse Manage</h1>
               <p className='text-sm text-muted-foreground'>
-                Create and edit vendor warehouses synced with Delhivery.
+                Create and edit vendor warehouses for Delhivery and Shadowfax.
               </p>
             </div>
             <div className='flex items-center gap-2'>
@@ -199,7 +278,12 @@ function CourierWarehouseManagePage() {
                 <RefreshCcw className='h-4 w-4' />
                 Refresh
               </Button>
-              <Button onClick={() => setCreateOpen(true)}>
+              <Button
+                onClick={() => {
+                  setCreateProvider('')
+                  setCreateOpen(true)
+                }}
+              >
                 <Plus className='h-4 w-4' />
                 Create Warehouse
               </Button>
@@ -219,6 +303,7 @@ function CourierWarehouseManagePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Provider</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Pin</TableHead>
                   <TableHead>Address</TableHead>
@@ -231,6 +316,17 @@ function CourierWarehouseManagePage() {
                 {orderedWarehouses.map((warehouse) => (
                   <TableRow key={warehouse.id}>
                     <TableCell className='font-medium'>{warehouse.name}</TableCell>
+                    <TableCell>
+                      <Badge
+                        className={
+                          warehouse.provider === 'shadowfax'
+                            ? 'border-orange-500/20 bg-orange-500/10 text-orange-700'
+                            : 'border-sky-500/20 bg-sky-500/10 text-sky-700'
+                        }
+                      >
+                        {warehouse.provider === 'shadowfax' ? 'Shadowfax' : 'Delhivery'}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{warehouse.phone || 'N/A'}</TableCell>
                     <TableCell>{warehouse.pin || 'N/A'}</TableCell>
                     <TableCell className='max-w-[320px] whitespace-normal'>
@@ -250,17 +346,38 @@ function CourierWarehouseManagePage() {
                         size='sm'
                         onClick={() => {
                           setSelected(warehouse)
-                          setEditForm({
-                            ...defaultForm,
-                            name: warehouse.name || '',
-                            address: warehouse.address || '',
-                            pin: warehouse.pin || '',
-                            phone: warehouse.phone || '',
-                            working_days:
-                              Array.isArray(warehouse.working_days) && warehouse.working_days.length
-                                ? warehouse.working_days
-                                : defaultForm.working_days,
-                          })
+                          if (warehouse.provider === 'shadowfax') {
+                            setEditShadowfaxForm({
+                              ...defaultShadowfaxForm,
+                              name: warehouse.name || '',
+                              contact: warehouse.contact || warehouse.phone || '',
+                              email: warehouse.email || '',
+                              address_line_1: warehouse.address_line_1 || warehouse.address || '',
+                              address_line_2: warehouse.address_line_2 || '',
+                              city: warehouse.city || '',
+                              state: warehouse.state || '',
+                              pincode: warehouse.pincode || warehouse.pin || '',
+                              latitude: warehouse.latitude || '',
+                              longitude: warehouse.longitude || '',
+                              unique_code: warehouse.unique_code || '',
+                              working_days:
+                                Array.isArray(warehouse.working_days) && warehouse.working_days.length
+                                  ? warehouse.working_days
+                                  : defaultShadowfaxForm.working_days,
+                            })
+                          } else {
+                            setEditForm({
+                              ...defaultForm,
+                              name: warehouse.name || '',
+                              address: warehouse.address || '',
+                              pin: warehouse.pin || '',
+                              phone: warehouse.phone || '',
+                              working_days:
+                                Array.isArray(warehouse.working_days) && warehouse.working_days.length
+                                  ? warehouse.working_days
+                                  : defaultForm.working_days,
+                            })
+                          }
                           setEditOpen(true)
                         }}
                       >
@@ -279,114 +396,165 @@ function CourierWarehouseManagePage() {
         open={createOpen}
         onOpenChange={(open) => {
           setCreateOpen(open)
-          if (!open) setReturnSameAsAbove(false)
+          if (!open) {
+            setReturnSameAsAbove(false)
+            setCreateProvider('')
+          }
         }}
       >
         <DialogContent className='w-[min(96vw,860px)] max-h-[90vh] overflow-y-auto rounded-none'>
           <DialogHeader className='text-left'>
-            <DialogTitle>Create Delhivery Warehouse</DialogTitle>
-            <DialogDescription>Delhivery create warehouse API + Mongo sync.</DialogDescription>
+            <DialogTitle>
+              {createProvider === 'shadowfax'
+                ? 'Create Shadowfax Warehouse'
+                : createProvider === 'delhivery'
+                  ? 'Create Delhivery Warehouse'
+                  : 'Choose Warehouse Provider'}
+            </DialogTitle>
+            <DialogDescription>
+              {createProvider === 'shadowfax'
+                ? 'Stores Shadowfax pickup details after checking the pincode with Shadowfax serviceability API.'
+                : createProvider === 'delhivery'
+                  ? 'Calls Delhivery create warehouse API and syncs the response.'
+                  : 'Select the delivery app first. The form changes based on the provider API.'}
+            </DialogDescription>
           </DialogHeader>
-          <div className='grid gap-3 sm:grid-cols-2'>
-            <Input placeholder='Warehouse name*' value={createForm.name} onChange={(e) => setCreateForm((c) => ({ ...c, name: e.target.value }))} />
-            <Input placeholder='Registered name' value={createForm.registered_name} onChange={(e) => setCreateForm((c) => ({ ...c, registered_name: e.target.value }))} />
-            <Input placeholder='Phone*' value={createForm.phone} onChange={(e) => setCreateForm((c) => ({ ...c, phone: e.target.value }))} />
-            <Input placeholder='Email' value={createForm.email} onChange={(e) => setCreateForm((c) => ({ ...c, email: e.target.value }))} />
-            <Textarea className='sm:col-span-2 min-h-[78px] rounded-none' placeholder='Address' value={createForm.address} onChange={(e) => setCreateForm((c) => ({ ...c, address: e.target.value }))} />
-            <Input placeholder='City' value={createForm.city} onChange={(e) => setCreateForm((c) => ({ ...c, city: e.target.value }))} />
-            <Input placeholder='Pin*' value={createForm.pin} onChange={(e) => setCreateForm((c) => ({ ...c, pin: e.target.value }))} />
-            <Input placeholder='Country' value={createForm.country} onChange={(e) => setCreateForm((c) => ({ ...c, country: e.target.value }))} />
-            <div className='sm:col-span-2 space-y-2'>
-              <p className='text-sm font-medium'>Working Days</p>
-              <div className='flex flex-wrap gap-2'>
-                {WORKING_DAYS.map((day) => {
-                  const active = createForm.working_days.includes(day)
-                  return (
-                    <button
-                      key={day}
-                      type='button'
-                      onClick={() =>
-                        setCreateForm((c) => ({ ...c, working_days: toggleDay(c.working_days, day) }))
-                      }
-                      className={`rounded-none border px-3 py-1.5 text-sm ${
-                        active ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-border bg-background text-foreground'
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  )
-                })}
-              </div>
+          {!createProvider ? (
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <button
+                type='button'
+                className='rounded-none border border-sky-200 bg-sky-50 p-5 text-left hover:bg-sky-100'
+                onClick={() => setCreateProvider('delhivery')}
+              >
+                <p className='text-lg font-semibold text-sky-900'>Delhivery</p>
+                <p className='mt-2 text-sm leading-6 text-sky-800'>
+                  Create a client warehouse through Delhivery API.
+                </p>
+              </button>
+              <button
+                type='button'
+                className='rounded-none border border-orange-200 bg-orange-50 p-5 text-left hover:bg-orange-100'
+                onClick={() => setCreateProvider('shadowfax')}
+              >
+                <p className='text-lg font-semibold text-orange-900'>Shadowfax</p>
+                <p className='mt-2 text-sm leading-6 text-orange-800'>
+                  Create Shadowfax pickup details and validate pincode through Shadowfax API.
+                </p>
+              </button>
             </div>
-            <label className='sm:col-span-2 flex items-center gap-2 text-sm'>
-              <input
-                type='checkbox'
-                checked={returnSameAsAbove}
-                onChange={(e) => setReturnSameAsAbove(e.target.checked)}
-              />
-              Return as same above address
-            </label>
-            {!returnSameAsAbove ? (
-              <>
-                <Textarea className='sm:col-span-2 min-h-[78px] rounded-none' placeholder='Return address*' value={createForm.return_address} onChange={(e) => setCreateForm((c) => ({ ...c, return_address: e.target.value }))} />
-                <Input placeholder='Return city' value={createForm.return_city} onChange={(e) => setCreateForm((c) => ({ ...c, return_city: e.target.value }))} />
-                <Input placeholder='Return pin' value={createForm.return_pin} onChange={(e) => setCreateForm((c) => ({ ...c, return_pin: e.target.value }))} />
-                <Input placeholder='Return state' value={createForm.return_state} onChange={(e) => setCreateForm((c) => ({ ...c, return_state: e.target.value }))} />
-                <Input placeholder='Return country' value={createForm.return_country} onChange={(e) => setCreateForm((c) => ({ ...c, return_country: e.target.value }))} />
-              </>
-            ) : null}
-          </div>
+          ) : createProvider === 'delhivery' ? (
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <Input placeholder='Warehouse name*' value={createForm.name} onChange={(e) => setCreateForm((c) => ({ ...c, name: e.target.value }))} />
+              <Input placeholder='Registered name' value={createForm.registered_name} onChange={(e) => setCreateForm((c) => ({ ...c, registered_name: e.target.value }))} />
+              <Input placeholder='Phone*' value={createForm.phone} onChange={(e) => setCreateForm((c) => ({ ...c, phone: e.target.value }))} />
+              <Input placeholder='Email' value={createForm.email} onChange={(e) => setCreateForm((c) => ({ ...c, email: e.target.value }))} />
+              <Textarea className='sm:col-span-2 min-h-[78px] rounded-none' placeholder='Address' value={createForm.address} onChange={(e) => setCreateForm((c) => ({ ...c, address: e.target.value }))} />
+              <Input placeholder='City' value={createForm.city} onChange={(e) => setCreateForm((c) => ({ ...c, city: e.target.value }))} />
+              <Input placeholder='Pin*' value={createForm.pin} onChange={(e) => setCreateForm((c) => ({ ...c, pin: e.target.value }))} />
+              <Input placeholder='Country' value={createForm.country} onChange={(e) => setCreateForm((c) => ({ ...c, country: e.target.value }))} />
+              <div className='sm:col-span-2 space-y-2'>
+                <p className='text-sm font-medium'>Working Days</p>
+                <div className='flex flex-wrap gap-2'>
+                  {WORKING_DAYS.map((day) => {
+                    const active = createForm.working_days.includes(day)
+                    return (
+                      <button
+                        key={day}
+                        type='button'
+                        onClick={() =>
+                          setCreateForm((c) => ({ ...c, working_days: toggleDay(c.working_days, day) }))
+                        }
+                        className={`rounded-none border px-3 py-1.5 text-sm ${
+                          active ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-border bg-background text-foreground'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <label className='sm:col-span-2 flex items-center gap-2 text-sm'>
+                <input
+                  type='checkbox'
+                  checked={returnSameAsAbove}
+                  onChange={(e) => setReturnSameAsAbove(e.target.checked)}
+                />
+                Return as same above address
+              </label>
+              {!returnSameAsAbove ? (
+                <>
+                  <Textarea className='sm:col-span-2 min-h-[78px] rounded-none' placeholder='Return address*' value={createForm.return_address} onChange={(e) => setCreateForm((c) => ({ ...c, return_address: e.target.value }))} />
+                  <Input placeholder='Return city' value={createForm.return_city} onChange={(e) => setCreateForm((c) => ({ ...c, return_city: e.target.value }))} />
+                  <Input placeholder='Return pin' value={createForm.return_pin} onChange={(e) => setCreateForm((c) => ({ ...c, return_pin: e.target.value }))} />
+                  <Input placeholder='Return state' value={createForm.return_state} onChange={(e) => setCreateForm((c) => ({ ...c, return_state: e.target.value }))} />
+                  <Input placeholder='Return country' value={createForm.return_country} onChange={(e) => setCreateForm((c) => ({ ...c, return_country: e.target.value }))} />
+                </>
+              ) : null}
+            </div>
+          ) : (
+            <ShadowfaxWarehouseFields form={shadowfaxForm} setForm={setShadowfaxForm} />
+          )}
           <DialogFooter>
             <Button
               variant='outline'
               onClick={() => {
                 setCreateOpen(false)
                 setReturnSameAsAbove(false)
+                setCreateProvider('')
               }}
             >
               Cancel
             </Button>
-            <Button onClick={() => void onCreate()} disabled={busy === 'create'}>
-              {busy === 'create' ? <LoaderCircle className='h-4 w-4 animate-spin' /> : <Warehouse className='h-4 w-4' />}
-              {busy === 'create' ? 'Creating' : 'Create'}
-            </Button>
+            {createProvider ? (
+              <Button onClick={() => void onCreate()} disabled={busy === 'create'}>
+                {busy === 'create' ? <LoaderCircle className='h-4 w-4 animate-spin' /> : <Warehouse className='h-4 w-4' />}
+                {busy === 'create' ? 'Creating' : 'Create'}
+              </Button>
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className='max-w-lg rounded-none'>
+        <DialogContent className='w-[min(96vw,760px)] max-h-[90vh] overflow-y-auto rounded-none'>
           <DialogHeader className='text-left'>
             <DialogTitle>Edit Warehouse</DialogTitle>
-            <DialogDescription>{selected?.name || 'Warehouse'}</DialogDescription>
+            <DialogDescription>
+              {selected?.name || 'Warehouse'} | {selected?.provider === 'shadowfax' ? 'Shadowfax' : 'Delhivery'}
+            </DialogDescription>
           </DialogHeader>
-          <div className='grid gap-3'>
-            <Textarea className='min-h-[78px] rounded-none' placeholder='Address' value={editForm.address} onChange={(e) => setEditForm((c) => ({ ...c, address: e.target.value }))} />
-            <Input placeholder='Pin' value={editForm.pin} onChange={(e) => setEditForm((c) => ({ ...c, pin: e.target.value }))} />
-            <Input placeholder='Phone' value={editForm.phone} onChange={(e) => setEditForm((c) => ({ ...c, phone: e.target.value }))} />
-            <div className='space-y-2'>
-              <p className='text-sm font-medium'>Working Days</p>
-              <div className='flex flex-wrap gap-2'>
-                {WORKING_DAYS.map((day) => {
-                  const active = editForm.working_days.includes(day)
-                  return (
-                    <button
-                      key={day}
-                      type='button'
-                      onClick={() =>
-                        setEditForm((c) => ({ ...c, working_days: toggleDay(c.working_days, day) }))
-                      }
-                      className={`rounded-none border px-3 py-1.5 text-sm ${
-                        active ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-border bg-background text-foreground'
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  )
-                })}
+          {selected?.provider === 'shadowfax' ? (
+            <ShadowfaxWarehouseFields form={editShadowfaxForm} setForm={setEditShadowfaxForm} />
+          ) : (
+            <div className='grid gap-3'>
+              <Textarea className='min-h-[78px] rounded-none' placeholder='Address' value={editForm.address} onChange={(e) => setEditForm((c) => ({ ...c, address: e.target.value }))} />
+              <Input placeholder='Pin' value={editForm.pin} onChange={(e) => setEditForm((c) => ({ ...c, pin: e.target.value }))} />
+              <Input placeholder='Phone' value={editForm.phone} onChange={(e) => setEditForm((c) => ({ ...c, phone: e.target.value }))} />
+              <div className='space-y-2'>
+                <p className='text-sm font-medium'>Working Days</p>
+                <div className='flex flex-wrap gap-2'>
+                  {WORKING_DAYS.map((day) => {
+                    const active = editForm.working_days.includes(day)
+                    return (
+                      <button
+                        key={day}
+                        type='button'
+                        onClick={() =>
+                          setEditForm((c) => ({ ...c, working_days: toggleDay(c.working_days, day) }))
+                        }
+                        className={`rounded-none border px-3 py-1.5 text-sm ${
+                          active ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-border bg-background text-foreground'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          )}
           <DialogFooter>
             <Button variant='outline' onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button onClick={() => void onEdit()} disabled={busy === 'edit'}>
@@ -397,5 +565,51 @@ function CourierWarehouseManagePage() {
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+function ShadowfaxWarehouseFields({
+  form,
+  setForm,
+}: {
+  form: ShadowfaxWarehouseForm
+  setForm: Dispatch<SetStateAction<ShadowfaxWarehouseForm>>
+}) {
+  return (
+    <div className='grid gap-3 sm:grid-cols-2'>
+      <Input placeholder='Warehouse name*' value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} />
+      <Input placeholder='Unique code*' value={form.unique_code} onChange={(e) => setForm((c) => ({ ...c, unique_code: e.target.value }))} />
+      <Input placeholder='Contact*' value={form.contact} onChange={(e) => setForm((c) => ({ ...c, contact: e.target.value }))} />
+      <Input placeholder='Email' value={form.email} onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))} />
+      <Textarea className='sm:col-span-2 min-h-[78px] rounded-none' placeholder='Address line 1*' value={form.address_line_1} onChange={(e) => setForm((c) => ({ ...c, address_line_1: e.target.value }))} />
+      <Textarea className='sm:col-span-2 min-h-[64px] rounded-none' placeholder='Address line 2' value={form.address_line_2} onChange={(e) => setForm((c) => ({ ...c, address_line_2: e.target.value }))} />
+      <Input placeholder='City*' value={form.city} onChange={(e) => setForm((c) => ({ ...c, city: e.target.value }))} />
+      <Input placeholder='State*' value={form.state} onChange={(e) => setForm((c) => ({ ...c, state: e.target.value }))} />
+      <Input placeholder='Pincode*' value={form.pincode} onChange={(e) => setForm((c) => ({ ...c, pincode: e.target.value }))} />
+      <Input placeholder='Latitude' value={form.latitude} onChange={(e) => setForm((c) => ({ ...c, latitude: e.target.value }))} />
+      <Input placeholder='Longitude' value={form.longitude} onChange={(e) => setForm((c) => ({ ...c, longitude: e.target.value }))} />
+      <div className='sm:col-span-2 space-y-2'>
+        <p className='text-sm font-medium'>Working Days</p>
+        <div className='flex flex-wrap gap-2'>
+          {WORKING_DAYS.map((day) => {
+            const active = form.working_days.includes(day)
+            return (
+              <button
+                key={day}
+                type='button'
+                onClick={() =>
+                  setForm((c) => ({ ...c, working_days: toggleDay(c.working_days, day) }))
+                }
+                className={`rounded-none border px-3 py-1.5 text-sm ${
+                  active ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-border bg-background text-foreground'
+                }`}
+              >
+                {day}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }

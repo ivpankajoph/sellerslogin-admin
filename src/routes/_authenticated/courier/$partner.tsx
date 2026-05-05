@@ -1,12 +1,19 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   ArrowUpRight,
+  Ban,
   Clock3,
+  ClipboardCheck,
+  Edit3,
   ExternalLink,
+  FileText,
+  KeyRound,
   LoaderCircle,
+  MapPinned,
   Package2,
   RefreshCcw,
   Search,
+  ShieldAlert,
   Truck,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -203,6 +210,16 @@ type ShadowfaxPodResult = {
   raw?: unknown
 }
 
+type ShadowfaxActionId =
+  | 'track'
+  | 'update'
+  | 'cancel'
+  | 'pod'
+  | 'serviceability'
+  | 'awb'
+  | 'escalation'
+  | 'warehouse'
+
 type DelhiveryWarehouseForm = {
   name: string
   registered_name: string
@@ -395,12 +412,13 @@ function CourierPartnerPage() {
   const isShadowfax = partnerId === 'shadowfax'
   const usesLiveOrders = partnerId === 'delhivery' || partnerId === 'shadowfax'
   const initialLane = useMemo(() => {
-    if (typeof window === 'undefined') return { origin: '', destination: '' }
+    if (typeof window === 'undefined') return { orderId: '', origin: '', destination: '', tracking: '' }
     const params = new URLSearchParams(window.location.search)
     return {
       orderId: readText(params.get('orderId')),
       origin: readText(params.get('origin')),
       destination: readText(params.get('destination')),
+      tracking: readText(params.get('tracking')),
     }
   }, [])
   const [refreshKey, setRefreshKey] = useState(0)
@@ -475,10 +493,11 @@ function CourierPartnerPage() {
   )
   const [shadowfaxTrackingBusy, setShadowfaxTrackingBusy] = useState(false)
   const [shadowfaxTrackingForm, setShadowfaxTrackingForm] = useState({
-    awbNumber: '',
+    awbNumber: initialLane.tracking,
   })
   const [shadowfaxTrackingResult, setShadowfaxTrackingResult] =
     useState<ShadowfaxTrackingResult | null>(null)
+  const [shadowfaxTrackingAutoRun, setShadowfaxTrackingAutoRun] = useState(false)
   const [shadowfaxUpdateBusy, setShadowfaxUpdateBusy] = useState(false)
   const [shadowfaxUpdateForm, setShadowfaxUpdateForm] =
     useState<ShadowfaxUpdateForm>(defaultShadowfaxUpdateForm)
@@ -499,6 +518,7 @@ function CourierPartnerPage() {
     useState<ShadowfaxPodForm>(defaultShadowfaxPodForm)
   const [shadowfaxPodResult, setShadowfaxPodResult] =
     useState<ShadowfaxPodResult | null>(null)
+  const [shadowfaxAction, setShadowfaxAction] = useState<ShadowfaxActionId>('track')
 
   const profileOriginPincode = useMemo(
     () => resolveVendorProfilePincode(user, vendorProfile),
@@ -507,6 +527,65 @@ function CourierPartnerPage() {
   const defaultPickupLocation = useMemo(
     () => readText(integrationsData?.providers?.delhivery?.config?.pickup_location),
     [integrationsData?.providers?.delhivery?.config?.pickup_location]
+  )
+  const shadowfaxActionItems = useMemo(
+    () =>
+      [
+        {
+          id: 'track',
+          label: 'Track Order',
+          description: 'Check live status',
+          Icon: Search,
+        },
+        {
+          id: 'update',
+          label: 'Update Order',
+          description: 'Change address or status',
+          Icon: Edit3,
+        },
+        {
+          id: 'cancel',
+          label: 'Cancel Request',
+          description: 'Stop an order',
+          Icon: Ban,
+        },
+        {
+          id: 'pod',
+          label: 'POD Details',
+          description: 'Proof of delivery',
+          Icon: ClipboardCheck,
+        },
+        {
+          id: 'serviceability',
+          label: 'Check Pincode',
+          description: 'Verify serviceability',
+          Icon: MapPinned,
+        },
+        {
+          id: 'awb',
+          label: 'Generate AWB',
+          description: 'Create tracking codes',
+          Icon: KeyRound,
+        },
+        {
+          id: 'escalation',
+          label: 'Raise Issue',
+          description: 'Support escalation',
+          Icon: ShieldAlert,
+        },
+        {
+          id: 'warehouse',
+          label: 'Create Order',
+          description: 'Warehouse model',
+          Icon: FileText,
+        },
+      ] satisfies {
+        id: ShadowfaxActionId
+        label: string
+        description: string
+        Icon: typeof Search
+      }[],
+    []
   )
 
   useEffect(() => {
@@ -676,6 +755,7 @@ function CourierPartnerPage() {
 
     const candidateAwb = readText(
       shadowfaxTrackingForm.awbNumber ||
+        initialLane.tracking ||
         assignments[0]?.assignment?.trackingCode ||
         liveOrders.find((order) => readText(order.shadowfax?.tracking_number || order.shadowfax?.order_id))
           ?.shadowfax?.tracking_number ||
@@ -691,7 +771,7 @@ function CourierPartnerPage() {
       ...current,
       awbNumber: current.awbNumber || candidateAwb,
     }))
-  }, [assignments, isShadowfax, liveOrders, shadowfaxTrackingForm.awbNumber])
+  }, [assignments, initialLane.tracking, isShadowfax, liveOrders, shadowfaxTrackingForm.awbNumber])
 
   useEffect(() => {
     if (!isShadowfax) return
@@ -1471,6 +1551,21 @@ function CourierPartnerPage() {
     }
   }
 
+  useEffect(() => {
+    if (!isShadowfax || shadowfaxTrackingAutoRun || !initialLane.tracking) return
+    if (!readText(shadowfaxTrackingForm.awbNumber)) return
+
+    setShadowfaxTrackingAutoRun(true)
+    setShadowfaxAction('track')
+    void handleRunShadowfaxTracking()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    initialLane.tracking,
+    isShadowfax,
+    shadowfaxTrackingAutoRun,
+    shadowfaxTrackingForm.awbNumber,
+  ])
+
   const handleUpdateShadowfaxOrder = async () => {
     if (!isShadowfax) return
 
@@ -1586,6 +1681,7 @@ function CourierPartnerPage() {
             : 'Shadowfax cancellation response received.'),
         rows: bookingRows([
           `Request ID: ${readText(cancellation?.request_id) || requestId}`,
+          response?.endpoint ? `Endpoint used: ${response.endpoint}` : '',
           `Remote status code: ${statusCode || 'Not returned'}`,
           `Cancellation state: ${queueState || 'Not returned'}`,
           `Remarks: ${readText(cancellation?.cancel_remarks) || cancelRemarks}`,
@@ -1886,6 +1982,7 @@ function CourierPartnerPage() {
   return (
     <>
       <div className='space-y-5'>
+        {isDelhivery ? (
         <div className='overflow-hidden rounded-3xl border border-border bg-card shadow-sm'>
           <div className='bg-[linear-gradient(135deg,color-mix(in_srgb,var(--card)_94%,#cbd5e1_6%)_0%,color-mix(in_srgb,var(--background)_92%,#67e8f9_8%)_45%,color-mix(in_srgb,var(--card)_92%,#fdba74_8%)_100%)] p-6 md:p-8'>
             <div className='flex flex-wrap items-start justify-between gap-4'>
@@ -1920,9 +2017,8 @@ function CourierPartnerPage() {
                         {partnerMeta.title}
                       </h1>
                       <p className='mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base'>
-                        Dedicated request board for {partnerMeta.title}. Live courier records are
-                        shown for integrated apps, while static partners still read from the local
-                        courier desk assignment store.
+                        Use one Shadowfax action at a time. Pick a button below, enter the required
+                        details, and run the connected API.
                       </p>
                     </div>
                   </div>
@@ -1980,21 +2076,19 @@ function CourierPartnerPage() {
             ) : null}
           </div>
         </div>
+        ) : null}
 
+        {!isShadowfax ? (
         <Card className='border-border bg-card shadow-sm'>
           <CardHeader>
             <CardTitle className='text-lg'>
               {partnerId === 'delhivery'
                 ? 'Create shipment API'
-                : partnerId === 'shadowfax'
-                  ? 'Shadowfax desk'
                 : `${partnerMeta.title} booking flow`}
             </CardTitle>
             <CardDescription>
               {partnerId === 'delhivery'
                 ? 'Use Delhivery manifest create API for an order that is not already assigned.'
-                : partnerId === 'shadowfax'
-                  ? 'Shadowfax marketplace orders are created from the delivery dashboard, and this page also supports warehouse-model creation, serviceability checks, AWB generation, and routed-order status.'
                 : 'Use this app page for partner-specific monitoring. Booking is not enabled here yet.'}
             </CardDescription>
           </CardHeader>
@@ -2288,7 +2382,9 @@ function CourierPartnerPage() {
             )}
           </CardContent>
         </Card>
+        ) : null}
 
+        {!isShadowfax ? (
         <Card className='border-border bg-card shadow-sm'>
           <CardHeader>
             <CardTitle className='text-lg'>
@@ -2468,6 +2564,7 @@ function CourierPartnerPage() {
             )}
           </CardContent>
         </Card>
+        ) : null}
 
         {isDelhivery ? (
           <div className='grid gap-4 xl:grid-cols-2'>
@@ -2571,11 +2668,6 @@ function CourierPartnerPage() {
                         <p key={row}>{row}</p>
                       ))}
                     </div>
-                    {delhiveryLaneResult.raw ? (
-                      <pre className='mt-4 overflow-x-auto rounded-xl bg-white p-3 text-xs text-slate-600'>
-                        {JSON.stringify(delhiveryLaneResult.raw, null, 2)}
-                      </pre>
-                    ) : null}
                   </div>
                 ) : null}
               </CardContent>
@@ -2647,11 +2739,6 @@ function CourierPartnerPage() {
                         <p key={row}>{row}</p>
                       ))}
                     </div>
-                    {delhiveryWaybillResult.raw ? (
-                      <pre className='mt-4 overflow-x-auto rounded-xl bg-white p-3 text-xs text-slate-600'>
-                        {JSON.stringify(delhiveryWaybillResult.raw, null, 2)}
-                      </pre>
-                    ) : null}
                   </div>
                 ) : null}
               </CardContent>
@@ -2770,11 +2857,6 @@ function CourierPartnerPage() {
                           <p key={row}>{row}</p>
                         ))}
                       </div>
-                      {delhiveryWarehouseResult.raw ? (
-                        <pre className='mt-4 overflow-x-auto rounded-xl bg-slate-50 p-3 text-xs text-slate-600'>
-                          {JSON.stringify(delhiveryWarehouseResult.raw, null, 2)}
-                        </pre>
-                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -2786,8 +2868,82 @@ function CourierPartnerPage() {
         {!isDelhivery ? (
           <div className='space-y-4'>
             {isShadowfax ? (
-              <div className='grid gap-4 xl:grid-cols-2 2xl:grid-cols-8'>
-                <Card className='border-border bg-card shadow-sm'>
+              <div className='space-y-4'>
+                <div className='flex flex-wrap items-end justify-between gap-3 border border-border bg-card p-5 shadow-sm'>
+                  <div>
+                    <h1 className='text-2xl font-semibold tracking-tight text-foreground'>
+                      Shadowfax
+                    </h1>
+                    <p className='mt-1 text-sm text-muted-foreground'>
+                      Select one action, fill its fields, and run the connected Shadowfax API.
+                    </p>
+                  </div>
+                  <div className='flex flex-wrap gap-2'>
+                    <Button
+                      variant='outline'
+                      className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                      onClick={() => setRefreshKey((current) => current + 1)}
+                    >
+                      <RefreshCcw className='h-4 w-4' />
+                      Refresh
+                    </Button>
+                    <Button
+                      variant='outline'
+                      className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                      asChild
+                    >
+                      <Link to='/courier/list'>Requests</Link>
+                    </Button>
+                  </div>
+                </div>
+                <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
+                  {shadowfaxActionItems.map(({ id, label, description, Icon }) => {
+                    const isActive = shadowfaxAction === id
+
+                    return (
+                      <button
+                        key={id}
+                        type='button'
+                        onClick={() => setShadowfaxAction(id)}
+                        className={[
+                          'flex min-h-[86px] items-center gap-3 border p-4 text-left shadow-sm transition',
+                          isActive
+                            ? 'border-teal-700 bg-teal-700 text-white'
+                            : 'border-border bg-card text-foreground hover:border-teal-700 hover:bg-teal-50',
+                        ].join(' ')}
+                      >
+                        <span
+                          className={[
+                            'flex h-11 w-11 shrink-0 items-center justify-center border',
+                            isActive
+                              ? 'border-white/30 bg-white/15 text-white'
+                              : 'border-border bg-background text-teal-700',
+                          ].join(' ')}
+                        >
+                          <Icon className='h-5 w-5' />
+                        </span>
+                        <span className='min-w-0'>
+                          <span className='block text-sm font-semibold'>{label}</span>
+                          <span
+                            className={[
+                              'mt-1 block text-xs',
+                              isActive ? 'text-white/80' : 'text-muted-foreground',
+                            ].join(' ')}
+                          >
+                            {description}
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <Card
+                  className={[
+                    'border-border bg-card shadow-sm',
+                    shadowfaxAction === 'warehouse' ? '' : 'hidden',
+                  ].join(' ')}
+                >
                   <CardHeader>
                     <CardTitle className='text-base'>Warehouse Order API</CardTitle>
                     <CardDescription>
@@ -2861,11 +3017,6 @@ function CourierPartnerPage() {
                                 <p key={row}>{row}</p>
                               ))}
                             </div>
-                            {shadowfaxOrderResult.raw ? (
-                              <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
-                                {JSON.stringify(shadowfaxOrderResult.raw, null, 2)}
-                              </pre>
-                            ) : null}
                           </div>
                         ) : null}
                       </>
@@ -2873,7 +3024,12 @@ function CourierPartnerPage() {
                   </CardContent>
                 </Card>
 
-                <Card className='border-border bg-card shadow-sm'>
+                <Card
+                  className={[
+                    'border-border bg-card shadow-sm',
+                    shadowfaxAction === 'serviceability' ? '' : 'hidden',
+                  ].join(' ')}
+                >
                   <CardHeader>
                     <CardTitle className='text-base'>Serviceability API</CardTitle>
                     <CardDescription>
@@ -2961,17 +3117,17 @@ function CourierPartnerPage() {
                             <p key={row}>{row}</p>
                           ))}
                         </div>
-                        {shadowfaxServiceabilityResult.raw ? (
-                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
-                            {JSON.stringify(shadowfaxServiceabilityResult.raw, null, 2)}
-                          </pre>
-                        ) : null}
                       </div>
                     ) : null}
                   </CardContent>
                 </Card>
 
-                <Card className='border-border bg-card shadow-sm'>
+                <Card
+                  className={[
+                    'border-border bg-card shadow-sm',
+                    shadowfaxAction === 'awb' ? '' : 'hidden',
+                  ].join(' ')}
+                >
                   <CardHeader>
                     <CardTitle className='text-base'>AWB API</CardTitle>
                     <CardDescription>
@@ -3031,17 +3187,17 @@ function CourierPartnerPage() {
                             <p key={row}>{row}</p>
                           ))}
                         </div>
-                        {shadowfaxAwbResult.raw ? (
-                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
-                            {JSON.stringify(shadowfaxAwbResult.raw, null, 2)}
-                          </pre>
-                        ) : null}
                       </div>
                     ) : null}
                   </CardContent>
                 </Card>
 
-                <Card className='border-border bg-card shadow-sm'>
+                <Card
+                  className={[
+                    'border-border bg-card shadow-sm',
+                    shadowfaxAction === 'track' ? '' : 'hidden',
+                  ].join(' ')}
+                >
                   <CardHeader>
                     <CardTitle className='text-base'>Tracking API V4</CardTitle>
                     <CardDescription>
@@ -3086,17 +3242,17 @@ function CourierPartnerPage() {
                             <p key={row}>{row}</p>
                           ))}
                         </div>
-                        {shadowfaxTrackingResult.raw ? (
-                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
-                            {JSON.stringify(shadowfaxTrackingResult.raw, null, 2)}
-                          </pre>
-                        ) : null}
                       </div>
                     ) : null}
                   </CardContent>
                 </Card>
 
-                <Card className='border-border bg-card shadow-sm'>
+                <Card
+                  className={[
+                    'border-border bg-card shadow-sm',
+                    shadowfaxAction === 'update' ? '' : 'hidden',
+                  ].join(' ')}
+                >
                   <CardHeader>
                     <CardTitle className='text-base'>Update Order Data</CardTitle>
                     <CardDescription>
@@ -3280,17 +3436,17 @@ function CourierPartnerPage() {
                             <p key={row}>{row}</p>
                           ))}
                         </div>
-                        {shadowfaxUpdateResult.raw ? (
-                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
-                            {JSON.stringify(shadowfaxUpdateResult.raw, null, 2)}
-                          </pre>
-                        ) : null}
                       </div>
                     ) : null}
                   </CardContent>
                 </Card>
 
-                <Card className='border-border bg-card shadow-sm'>
+                <Card
+                  className={[
+                    'border-border bg-card shadow-sm',
+                    shadowfaxAction === 'cancel' ? '' : 'hidden',
+                  ].join(' ')}
+                >
                   <CardHeader>
                     <CardTitle className='text-base'>Order Cancellation</CardTitle>
                     <CardDescription>
@@ -3353,17 +3509,17 @@ function CourierPartnerPage() {
                             <p key={row}>{row}</p>
                           ))}
                         </div>
-                        {shadowfaxCancelResult.raw ? (
-                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
-                            {JSON.stringify(shadowfaxCancelResult.raw, null, 2)}
-                          </pre>
-                        ) : null}
                       </div>
                     ) : null}
                   </CardContent>
                 </Card>
 
-                <Card className='border-border bg-card shadow-sm'>
+                <Card
+                  className={[
+                    'border-border bg-card shadow-sm',
+                    shadowfaxAction === 'escalation' ? '' : 'hidden',
+                  ].join(' ')}
+                >
                   <CardHeader>
                     <CardTitle className='text-base'>Escalation API</CardTitle>
                     <CardDescription>
@@ -3438,17 +3594,17 @@ function CourierPartnerPage() {
                             <p key={row}>{row}</p>
                           ))}
                         </div>
-                        {shadowfaxEscalationResult.raw ? (
-                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
-                            {JSON.stringify(shadowfaxEscalationResult.raw, null, 2)}
-                          </pre>
-                        ) : null}
                       </div>
                     ) : null}
                   </CardContent>
                 </Card>
 
-                <Card className='border-border bg-card shadow-sm'>
+                <Card
+                  className={[
+                    'border-border bg-card shadow-sm',
+                    shadowfaxAction === 'pod' ? '' : 'hidden',
+                  ].join(' ')}
+                >
                   <CardHeader>
                     <CardTitle className='text-base'>Get POD Details</CardTitle>
                     <CardDescription>
@@ -3501,11 +3657,6 @@ function CourierPartnerPage() {
                             <p key={row}>{row}</p>
                           ))}
                         </div>
-                        {shadowfaxPodResult.raw ? (
-                          <pre className='mt-4 overflow-x-auto rounded-xl bg-background p-3 text-xs text-muted-foreground'>
-                            {JSON.stringify(shadowfaxPodResult.raw, null, 2)}
-                          </pre>
-                        ) : null}
                       </div>
                     ) : null}
                   </CardContent>
@@ -3513,6 +3664,7 @@ function CourierPartnerPage() {
               </div>
             ) : null}
 
+            {!isShadowfax ? (
             <div className='grid gap-4 lg:grid-cols-2'>
               <Card className='border-border bg-card shadow-sm'>
                 <CardHeader>
@@ -3586,6 +3738,7 @@ function CourierPartnerPage() {
                 </CardContent>
               </Card>
             </div>
+            ) : null}
           </div>
         ) : null}
       </div>

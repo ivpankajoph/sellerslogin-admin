@@ -36,6 +36,7 @@ import {
   type ExternalDelhiveryShipment,
 } from '@/features/courier/api'
 import {
+  getRealShadowfaxReference,
   hasAnyActiveCourierAssignment,
   type CourierOrderSummary,
 } from '@/features/courier/data'
@@ -76,7 +77,7 @@ const getDelhiveryCode = (order: CourierOrderSummary) =>
   readText(order.externalDeliveryId)
 
 const getShadowfaxCode = (order: CourierOrderSummary) =>
-  readText(order.shadowfax?.tracking_number) || readText(order.shadowfax?.order_id)
+  getRealShadowfaxReference(order.shadowfax)
 
 const getShadowfaxLabel = (order: CourierOrderSummary) => {
   const model = readText(order.shadowfax?.order_model).toLowerCase()
@@ -441,6 +442,13 @@ export function DeliveryWorkspaceShell({
             />
             <RailButton
               collapsed={collapsed}
+              active={activeSection === 'courier-list'}
+              icon={PackageCheck}
+              label='Requests'
+              onClick={() => openPath('/courier/list')}
+            />
+            <RailButton
+              collapsed={collapsed}
               active={activeSection === 'manual'}
               icon={PackageOpen}
               label='Manual Orders'
@@ -466,13 +474,6 @@ export function DeliveryWorkspaceShell({
               icon={Warehouse}
               label='Warehouses'
               onClick={() => openPath('/courier/warehouses')}
-            />
-            <RailButton
-              collapsed={collapsed}
-              active={activeSection === 'tracking'}
-              icon={ClipboardList}
-              label='Tracking'
-              onClick={() => openPath('/courier/tracking')}
             />
             <div className='mt-auto w-full'>
               <RailButton
