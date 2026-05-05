@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { AuthContext } from '../../context/AuthContext.jsx'
 import { navigationItems } from '../../data/navigation.js'
@@ -16,18 +16,6 @@ function KeyIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
       <path d="M14 10a4 4 0 1 1-1.2-2.8L21 15v2h-2v2h-2v2h-2l-3.2-3.2A4 4 0 0 1 14 10Z" />
-    </svg>
-  )
-}
-
-function ChevronIcon({ open = false }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={`h-4 w-4 fill-none stroke-current transition-transform ${open ? 'rotate-180' : ''}`}
-      strokeWidth="1.8"
-    >
-      <path d="m6 9 6 6 6-6" />
     </svg>
   )
 }
@@ -125,6 +113,18 @@ function ChartIcon() {
   )
 }
 
+function ChevronIcon({ open }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`h-4 w-4 fill-none stroke-current transition-transform ${open ? 'rotate-180' : ''}`}
+      strokeWidth="1.8"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
 function SettingsIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
@@ -146,16 +146,13 @@ function TeamUsersIcon() {
   )
 }
 
-function MarketingIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-      <path d="M4.5 7.5h15l-1.2 3.5H5.7L4.5 7.5Z" />
-      <path d="M6 11v6.5h12V11" />
-      <path d="M9 18v-3h6v3" />
-      <path d="M8 4.5h8l1 3H7l1-3Z" />
-    </svg>
-  )
-}
+const analyticsSubItems = [
+  { label: 'Email Opened/Clicked', path: '/analytics/email-opened-clicked' },
+  { label: 'Conversion/Revenue', path: '/analytics/conversion-revenue' },
+  { label: 'Device & Location Tracking', path: '/analytics/device-location' },
+  { label: 'Time Analytics', path: '/analytics/time-analytics' },
+  { label: 'Campaign Analytics', path: '/analytics/campaign-analytics' },
+]
 
 function iconForItem(item) {
   const iconMap = {
@@ -181,22 +178,11 @@ function iconForItem(item) {
 function Sidebar({ expanded = true, onHoverChange = () => {} }) {
   const { admin, can } = useContext(AuthContext)
   const location = useLocation()
+  const [analyticsOpen, setAnalyticsOpen] = useState(true)
   const visibleItems = navigationItems.filter((item) => can(item.permission))
-  const [marketingOpen, setMarketingOpen] = useState(true)
-
-  useEffect(() => {
-    const isMarketingRoute = ['/campaigns', '/templates'].some(
-      (path) => location.pathname === path || location.pathname.startsWith(`${path}/`),
-    )
-
-    if (isMarketingRoute) {
-      setMarketingOpen(true)
-    }
-  }, [location.pathname])
 
   const homeItems = visibleItems.filter((item) => item.path === '/overview')
-  const marketingItems = visibleItems.filter((item) => ['/campaigns', '/templates'].includes(item.path))
-  const otherItems = visibleItems.filter((item) => !['/overview', '/campaigns', '/templates'].includes(item.path))
+  const otherItems = visibleItems.filter((item) => item.path !== '/overview')
   const isItemActive = (item) =>
     location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
 
@@ -252,59 +238,68 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
             )
           })}
 
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => setMarketingOpen((current) => !current)}
-              className={`nav-link w-full ${marketingOpen ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
-              title={expanded ? undefined : 'Marketing'}
-            >
-              <span className="flex items-center gap-3">
-                <span className={`flex h-6 w-6 items-center justify-center ${marketingOpen ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
-                  <MarketingIcon />
-                </span>
-                {expanded ? <span>Marketing</span> : null}
-              </span>
-              {expanded ? <ChevronIcon open={marketingOpen} /> : null}
-            </button>
-          </div>
+          {otherItems.map((item) => {
+            const Icon = iconForItem(item)
+            const active = isItemActive(item)
 
-          {marketingOpen ? (
-            <div className={`space-y-2 ${expanded ? 'pl-3' : ''}`}>
-              {marketingItems.map((item) => {
-                const Icon = iconForItem(item)
-
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className={`nav-link ${isItemActive(item) ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
+            if (item.path === '/analytics') {
+              return (
+                <div key={item.path} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setAnalyticsOpen((current) => !current)}
+                    className={`nav-link w-full ${active ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
                     title={expanded ? undefined : item.label}
                   >
                     <span className="flex items-center gap-3">
-                      <span className={`flex h-6 w-6 items-center justify-center ${isItemActive(item) ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
+                      <span className={`flex h-6 w-6 items-center justify-center ${active ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
                         <Icon />
                       </span>
                       {expanded ? <span>{item.label}</span> : null}
                     </span>
-                  </NavLink>
-                )
-              })}
-            </div>
-          ) : null}
+                    {expanded ? <ChevronIcon open={analyticsOpen} /> : null}
+                  </button>
 
-          {otherItems.map((item) => {
-            const Icon = iconForItem(item)
+                  {expanded && analyticsOpen ? (
+                    <div className="ml-9 space-y-1 border-l border-[#d8ccef] pl-3">
+                      {analyticsSubItems.map((subItem) => (
+                        subItem.path ? (
+                          <NavLink
+                            key={subItem.label}
+                            to={subItem.path}
+                            className={({ isActive }) =>
+                              `block w-full px-3 py-2 text-left text-[13px] font-medium transition hover:bg-[#f1e7ff] hover:text-[#5a189a] ${
+                                isActive ? 'bg-[#f1e7ff] text-[#5a189a]' : 'text-[#5d437b]'
+                              }`
+                            }
+                          >
+                            {subItem.label}
+                          </NavLink>
+                        ) : (
+                          <button
+                            key={subItem.label}
+                            type="button"
+                            className="block w-full px-3 py-2 text-left text-[13px] font-medium text-[#5d437b] transition hover:bg-[#f1e7ff] hover:text-[#5a189a]"
+                          >
+                            {subItem.label}
+                          </button>
+                        )
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            }
 
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
-                className={`nav-link ${isItemActive(item) ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
+                className={`nav-link ${active ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
                 title={expanded ? undefined : item.label}
               >
                 <span className="flex items-center gap-3">
-                  <span className={`flex h-6 w-6 items-center justify-center ${isItemActive(item) ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
+                  <span className={`flex h-6 w-6 items-center justify-center ${active ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
                     <Icon />
                   </span>
                   {expanded ? <span>{item.label}</span> : null}

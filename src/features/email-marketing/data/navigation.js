@@ -58,9 +58,9 @@
     permission: "manage_audience",
   },
   {
-    label: "Analytics",
+    label: "Analytics & Reporting",
     path: "/analytics",
-    description: "Track opens, clicks, and conversion signals at a glance.",
+    // description: "Track opens, clicks, and conversion signals at a glance.",
     group: "Insights",
     icon: "analytics",
     permission: "view_analytics",

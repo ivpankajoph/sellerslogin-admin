@@ -323,14 +323,7 @@ function TemplatesListPage() {
     }
   };
 
-  const isTemplateLimitReached = templateUsage.isExhausted;
-
   const handleOpenChooser = () => {
-    if (isTemplateLimitReached) {
-      toast.error("Template limit reached. Upgrade your plan to create more templates.");
-      return;
-    }
-
     setShowChooser(true);
   };
 
@@ -350,11 +343,6 @@ function TemplatesListPage() {
   const handleCreateFromScratch = () => setShowCreateFromScratchMenu((current) => !current);
 
   const handleCreateFromScratchAction = (action) => {
-    if (isTemplateLimitReached) {
-      toast.error("Template limit reached. Upgrade your plan to create more templates.");
-      return;
-    }
-
     setShowCreateFromScratchMenu(false);
     handleCloseEmailGallery();
 
@@ -377,11 +365,6 @@ function TemplatesListPage() {
     if (galleryTab === "your") {
       handleCloseEmailGallery();
       navigate(`/email-builder/${item._id}`);
-      return;
-    }
-
-    if (isTemplateLimitReached) {
-      toast.error("Template limit reached. Upgrade your plan to create more templates.");
       return;
     }
 
@@ -544,28 +527,25 @@ function TemplatesListPage() {
         <button
           type="button"
           onClick={handleOpenChooser}
-          disabled={isTemplateLimitReached}
-          className="primary-button shrink-0 px-5 disabled:cursor-not-allowed disabled:opacity-60"
+          className="primary-button shrink-0 px-5"
         >
-          {isTemplateLimitReached ? "Template Limit Reached" : "Create Template"}
+          Create Template
         </button>
       </section>
 
       <section className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center rounded-[20px] border border-[#e7def8] bg-white px-5 py-4 shadow-[0_10px_24px_rgba(43,29,75,0.04)]">
         <div>
           <p className="text-sm font-semibold text-[#2f2b3d]">
-            Templates used: {templateUsage.used} / {templateUsage.limit}
+            Templates created: {templateUsage.used}
           </p>
           <p className="mt-1 text-sm text-[#6e6787]">
-            {templateUsage.remaining} templates remaining in your current plan.
+            Template creation is unlimited. Credits are used only when emails are sent.
           </p>
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-[#eee9f8] md:w-56">
           <div
-            className={`h-full ${isTemplateLimitReached ? "bg-rose-500" : "bg-[#8338ec]"}`}
-            style={{
-              width: `${templateUsage.limit ? Math.min((templateUsage.used / templateUsage.limit) * 100, 100) : 0}%`,
-            }}
+            className="h-full bg-[#8338ec]"
+            style={{ width: "100%" }}
           />
         </div>
       </section>

@@ -3,6 +3,32 @@ import { useLocation } from 'react-router-dom'
 import { ThemeContext } from '../../context/ThemeContext.jsx'
 import { navigationItems } from '../../data/navigation.js'
 
+const routePageMeta = {
+  '/analytics/email-opened-clicked': {
+    label: 'Email Opened/Clicked',
+    // description:
+    //   'Track sent messages, inbox deliveries, unique opens, and unique clicks.',
+  },
+  '/analytics/conversion-revenue': {
+    label: 'Conversion/Revenue',
+    description:
+      'Review conversion count, revenue, click-to-open rate, and list growth.',
+  },
+  '/analytics/device-location': {
+    label: 'Device & Location Tracking',
+    description:
+      'Track recipient-level device, location, open, and click activity for campaigns and automations.',
+  },
+  '/analytics/time-analytics': {
+    label: 'Time Based Analytics',
+    description: 'Review best send-time signals from the latest open and click activity.',
+  },
+  '/analytics/campaign-analytics': {
+    label: 'Campaign Analytics',
+    description: 'Compare campaign delivery, engagement, and cost performance.',
+  },
+}
+
 function IconButton({ children, isActive = false, onClick }) {
   return (
     <button
@@ -33,7 +59,8 @@ function Topbar() {
   const location = useLocation()
   const [openMenu, setOpenMenu] = useState(null)
 
-  const currentPage =
+  const currentPageOverride = routePageMeta[location.pathname]
+  const currentPage = currentPageOverride ||
     navigationItems.find(
       (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`),
     ) || navigationItems[0]

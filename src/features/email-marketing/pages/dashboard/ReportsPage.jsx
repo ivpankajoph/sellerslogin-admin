@@ -40,6 +40,19 @@ const formatRate = (numerator, denominator) =>
 
 const formatPercentValue = (value) => `${Number(value || 0).toFixed(2)}%`;
 
+const formatExportLabel = (format) => {
+  if (format === "excel") {
+    return "excel";
+  }
+
+  return format.replaceAll("_", " ");
+};
+
+const getFilenameFromDisposition = (contentDisposition, fallback) => {
+  const match = contentDisposition?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+  return match?.[1] ? decodeURIComponent(match[1]) : fallback;
+};
+
 function ReportsPage() {
   const toast = useContext(ToastContext);
   const [reports, setReports] = useState(initialReportState);
@@ -182,16 +195,30 @@ function ReportsPage() {
 
   const handleExport = async (report, format) => {
     try {
-      const { data } = await api.get("/reports/export", {
+      const response = await api.get("/reports/export", {
         params: {
           report,
           format,
           ...exportRangeParams,
         },
+        responseType: "blob",
       });
-      toast.success(data.message);
+      const extension = format === "excel" ? "xlsx" : format.replace("pdf_placeholder", "pdf");
+      const filename = getFilenameFromDisposition(
+        response.headers["content-disposition"],
+        `${report}.${extension}`,
+      );
+      const blobUrl = URL.createObjectURL(new Blob([response.data]));
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      toast.success("Report downloaded");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Unable to start export");
+      toast.error(error.response?.data?.message || "Unable to download report");
     }
   };
 
@@ -211,7 +238,7 @@ function ReportsPage() {
               </span>
               <span className="soft-pill">Campaign comparison ready</span>
               <span className="soft-pill">
-                CSV, Excel, and PDF placeholders
+                CSV, Excel, and PDF downloads
               </span>
             </div>
           </div>
@@ -493,182 +520,6 @@ function ReportsPage() {
                   "Best day appears once timing data builds up."}
               </p>
             </div>
-          </div>
-        </AnalyticsWidgetShell>
-      </section>
-
-      <section className="space-y-6">
-        <AnalyticsWidgetShell
-          eyebrow="Campaign report"
-          title="Campaign performance snapshot"
-          
-          actions={
-            <div className="flex flex-wrap gap-2">
-              <select
-                className="field min-w-[190px]"
-                value={exportTarget}
-                onChange={(event) => setExportTarget(event.target.value)}
-              >
-                {exportTargetOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              {reports.exportFormats.map((format) => (
-                <button
-                  key={format}
-                  type="button"
-                  onClick={() => handleExport(exportTarget, format)}
-                  className="secondary-button"
-                >
-                  Export {format.replaceAll("_", " ")}
-                </button>
-              ))}
-            </div>
-          }
-        >
-          {reports.campaignReport.length ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-[var(--bg-subtle)] text-ui-muted">
-                  <tr>
-                    <th className="px-6 py-4 font-medium">Campaign</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                    <th className="px-6 py-4 font-medium">Sent</th>
-                    <th className="px-6 py-4 font-medium">Delivered</th>
-                    <th className="px-6 py-4 font-medium">Opens</th>
-                    <th className="px-6 py-4 font-medium">Clicks</th>
-                    <th className="px-6 py-4 font-medium">Cost</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.campaignReport.map((row) => (
-                    <tr key={row._id} className="border-t border-ui">
-                      <td className="px-6 py-4 text-ui-strong">{row.name}</td>
-                      <td className="px-6 py-4 capitalize text-ui-body">
-                        {row.status}
-                      </td>
-                      <td className="px-6 py-4 text-ui-body">{row.sent}</td>
-                      <td className="px-6 py-4 text-ui-body">
-                        {row.delivered}
-                      </td>
-                      <td className="px-6 py-4 text-ui-body">{row.opens}</td>
-                      <td className="px-6 py-4 text-ui-body">{row.clicks}</td>
-                      <td className="px-6 py-4 text-ui-body">
-                        {formatCurrency(row.estimatedCost || 0)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-6">
-              <EmptyState
-                title="No campaign report rows"
-                description="Campaign rows will appear once campaign activity is available."
-              />
-            </div>
-          )}
-        </AnalyticsWidgetShell>
-
-        <AnalyticsWidgetShell
-          eyebrow="Campaign comparison"
-          title="Compare two campaigns"
-          description="Select any two campaigns from the current report window to compare delivery and engagement."
-        >
-          <div className="grid gap-4 p-6">
-            <div className="grid gap-3 md:grid-cols-2">
-              <select
-                className="field"
-                value={comparisonLeftId}
-                onChange={(event) => setComparisonLeftId(event.target.value)}
-              >
-                {reports.campaignReport.map((campaign) => (
-                  <option key={campaign._id} value={campaign._id}>
-                    {campaign.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="field"
-                value={comparisonRightId}
-                onChange={(event) => setComparisonRightId(event.target.value)}
-              >
-                {reports.campaignReport.map((campaign) => (
-                  <option key={campaign._id} value={campaign._id}>
-                    {campaign.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {comparison.left && comparison.right ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {[comparison.left, comparison.right].map((campaign) => {
-                  const openRate = formatRate(
-                    campaign.opens || 0,
-                    campaign.sent || 0,
-                  );
-                  const clickRate = formatRate(
-                    campaign.clicks || 0,
-                    campaign.sent || 0,
-                  );
-
-                  return (
-                    <article
-                      key={campaign._id}
-                      className="rounded-[24px] border border-ui bg-[var(--bg-subtle)] p-4"
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ui-muted">
-                        {campaign.name}
-                      </p>
-                      <p className="mt-2 text-sm text-ui-body capitalize">
-                        {campaign.status}
-                      </p>
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <p className="text-xs text-ui-muted">Sent</p>
-                          <p className="mt-1 text-xl font-semibold text-ui-strong">
-                            {campaign.sent || 0}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-ui-muted">Delivered</p>
-                          <p className="mt-1 text-xl font-semibold text-ui-strong">
-                            {campaign.delivered || 0}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-ui-muted">Open rate</p>
-                          <p className="mt-1 text-xl font-semibold text-ui-strong">
-                            {openRate}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-ui-muted">Click rate</p>
-                          <p className="mt-1 text-xl font-semibold text-ui-strong">
-                            {clickRate}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-ui-muted">Estimated cost</p>
-                          <p className="mt-1 text-xl font-semibold text-ui-strong">
-                            {formatCurrency(campaign.estimatedCost || 0)}
-                          </p>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState
-                title="Comparison needs two campaigns"
-                description="Pick two campaigns from the report window to see a side-by-side breakdown."
-              />
-            )}
           </div>
         </AnalyticsWidgetShell>
       </section>
