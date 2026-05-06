@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import OverviewMetricCard from '../../components/dashboard/OverviewMetricCard.jsx'
 import OverviewTrendChart from '../../components/dashboard/OverviewTrendChart.jsx'
 import EmptyState from '../../components/ui/EmptyState.jsx'
@@ -90,9 +90,34 @@ function OverviewPage() {
   const [filters, setFilters] = useState(getPresetRange('last7'))
   const [overview, setOverview] = useState(initialOverview)
   const [isLoading, setIsLoading] = useState(true)
+  const backgroundRefreshTimerRef = useRef(null)
+  const backgroundRefreshAttemptsRef = useRef(0)
 
-  const loadOverview = async (nextFilters = filters) => {
-    setIsLoading(true)
+  const clearBackgroundRefresh = () => {
+    if (backgroundRefreshTimerRef.current) {
+      clearTimeout(backgroundRefreshTimerRef.current)
+      backgroundRefreshTimerRef.current = null
+    }
+  }
+
+  const scheduleBackgroundRefresh = (nextFilters) => {
+    if (backgroundRefreshAttemptsRef.current >= 3) {
+      return
+    }
+
+    clearBackgroundRefresh()
+    backgroundRefreshAttemptsRef.current += 1
+    backgroundRefreshTimerRef.current = setTimeout(() => {
+      loadOverview(nextFilters, { background: true })
+    }, 2500)
+  }
+
+  const loadOverview = async (nextFilters = filters, options = {}) => {
+    if (!options.background) {
+      setIsLoading(true)
+      backgroundRefreshAttemptsRef.current = 0
+      clearBackgroundRefresh()
+    }
 
     try {
       const { data } = await api.get('/email/overview', {
@@ -103,16 +128,29 @@ function OverviewPage() {
       })
 
       setOverview({ ...initialOverview, ...data })
+
+      if (data.cache?.status === 'stale' || data.cache?.status === 'fallback') {
+        scheduleBackgroundRefresh(nextFilters)
+      } else {
+        backgroundRefreshAttemptsRef.current = 0
+        clearBackgroundRefresh()
+      }
     } catch {
       setOverview(initialOverview)
     } finally {
-      setIsLoading(false)
+      if (!options.background) {
+        setIsLoading(false)
+      }
     }
   }
 
   useEffect(() => {
     const nextFilters = getPresetRange('last7')
     loadOverview(nextFilters)
+
+    return () => {
+      clearBackgroundRefresh()
+    }
   }, [])
 
   const handlePresetChange = (nextPreset) => {

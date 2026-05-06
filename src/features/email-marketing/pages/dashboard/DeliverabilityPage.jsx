@@ -2,315 +2,279 @@ import { useEffect, useState } from 'react'
 import DateRangeFilter from '../../components/ui/DateRangeFilter.jsx'
 import EmptyState from '../../components/ui/EmptyState.jsx'
 import LoadingState from '../../components/ui/LoadingState.jsx'
-import PageHeader from '../../components/ui/PageHeader.jsx'
-import StatCard from '../../components/ui/StatCard.jsx'
 import { api } from '../../lib/api.js'
 
 const initialFilters = {
   startDate: '',
   endDate: '',
+  search: '',
+  metric: 'totalEmails',
 }
 
-const initialSummary = {
-  sent: 0,
-  delivered: 0,
-  opens: 0,
-  clicks: 0,
-  bounceRate: 0,
-  complaintRate: 0,
-  unsubscribeRate: 0,
-  hardBounceCount: 0,
-  softBounceCount: 0,
-  rejectCount: 0,
-  deliveryDelayCount: 0,
-  renderingFailureCount: 0,
-  suppressedCount: 0,
+const initialPagination = {
+  page: 1,
+  limit: 25,
+  total: 0,
+  totalPages: 1,
 }
 
-const stateStyles = {
-  good: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  warning: 'border-amber-200 bg-amber-50 text-amber-700',
-  critical: 'border-rose-200 bg-rose-50 text-rose-700',
+const pageConfig = {
+  bounces: {
+    title: 'Bounce Emails',
+    description:
+      "Emails that were not delivered because the recipient address does not exist or the recipient's mail server rejected the message.",
+    endpoint: '/email/deliverability/bounces',
+    emptyTitle: 'No bounced emails found',
+    emptyDescription: 'Bounced and rejected emails will appear here after delivery events are received.',
+    totalLabel: 'Total bounced emails',
+    totalMetric: 'totalEmails',
+    secondaryStats: [
+      ['hardBounces', 'Hard bounce'],
+      ['softBounces', 'Soft bounce'],
+      ['rejected', 'Rejected'],
+    ],
+  },
+  'complaints-suppressions': {
+    title: 'Complaints & Suppressions',
+    description:
+      'Recipients who marked email as spam, or email addresses blocked from future sending by suppression rules.',
+    endpoint: '/email/deliverability/complaints-suppressions',
+    emptyTitle: 'No complaint or suppression records found',
+    emptyDescription: 'Spam complaint and suppression records will appear here as they are tracked.',
+    totalLabel: 'Total complaint/suppression emails',
+    totalMetric: 'totalEmails',
+    secondaryStats: [
+      ['complaints', 'Spam complaints'],
+      ['suppressions', 'Suppressed emails'],
+    ],
+  },
+  unsubscribes: {
+    title: 'Unsubscribe Emails',
+    description:
+      'Recipients who unsubscribed from email communication, including the device, location, and time when available.',
+    endpoint: '/email/deliverability/unsubscribes',
+    emptyTitle: 'No unsubscribe emails found',
+    emptyDescription: 'Unsubscribed email records will appear here after users unsubscribe.',
+    totalLabel: 'Total unsubscribe emails',
+    totalMetric: 'totalEmails',
+    secondaryStats: [
+      ['eventUnsubscribes', 'Unsubscribe clicks'],
+      ['suppressionUnsubscribes', 'Blocked from future emails'],
+    ],
+  },
 }
 
-function ComplaintTrendWidget({ data }) {
-  const maxValue = Math.max(...data.map((item) => item.complaints), 1)
+const formatDateTime = (value) => {
+  if (!value) {
+    return 'Unknown'
+  }
 
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown'
+  }
+
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function StatTile({ label, value, active = false, onClick }) {
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
-          Complaint trend
-        </p>
-        <h3 className="mt-1 text-xl font-semibold text-slate-950">Daily complaint pressure</h3>
-      </div>
-
-      {data.length ? (
-        <div className="space-y-3">
-          {data.map((item) => (
-            <div key={item.date} className="grid grid-cols-[84px_minmax(0,1fr)_40px] items-center gap-3">
-              <span className="text-xs font-medium text-slate-500">
-                {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </span>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-rose-400"
-                  style={{ width: `${Math.max((item.complaints / maxValue) * 100, item.complaints ? 8 : 0)}%` }}
-                />
-              </div>
-              <span className="text-right text-xs font-semibold text-slate-600">{item.complaints}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <EmptyState
-          title="No complaint trend yet"
-          description="Complaint trend data will appear after live complaint events are received."
-        />
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`border p-4 text-left transition ${
+        active
+          ? 'border-[#7c3aed] bg-[#7c3aed] shadow-[0_12px_24px_rgba(124,58,237,0.22)]'
+          : 'border-[#d8ccef] bg-white hover:border-[#b794f4]'
+      }`}
+    >
+      <p className={`text-[13px] font-semibold ${active ? 'text-white' : 'text-[#6d4b90]'}`}>{label}</p>
+      <p className={`mt-3 text-2xl font-semibold ${active ? 'text-white' : 'text-[#21192d]'}`}>
+        {Number(value || 0).toLocaleString()}
+      </p>
+    </button>
   )
 }
 
-function DeliverabilityPage() {
+function DeliverabilityPage({ type = 'bounces' }) {
+  const config = pageConfig[type] || pageConfig.bounces
   const [filters, setFilters] = useState(initialFilters)
-  const [summary, setSummary] = useState(initialSummary)
-  const [breakdown, setBreakdown] = useState({
-    bounceBreakdown: [],
-    complaintBreakdown: [],
-    complaintTrend: [],
-  })
-  const [campaigns, setCampaigns] = useState({ data: [], totals: { campaigns: 0, activeIssues: 0 } })
-  const [senderHealth, setSenderHealth] = useState({
-    state: 'good',
-    label: 'Good',
-    score: 100,
-    message: '',
-    metrics: {},
-    domainHealth: { label: 'Pending DNS telemetry', message: '' },
-    ispStats: [],
-    recommendations: [],
-  })
+  const [rows, setRows] = useState([])
+  const [totals, setTotals] = useState({ totalEmails: 0 })
+  const [pagination, setPagination] = useState(initialPagination)
   const [isLoading, setIsLoading] = useState(true)
+  const statOptions = [[config.totalMetric, config.totalLabel], ...config.secondaryStats]
+  const activeStatLabel =
+    statOptions.find(([key]) => key === filters.metric)?.[1] || config.totalLabel
 
-  const loadData = async () => {
+  const loadRows = async (page = 1, nextFilters = filters) => {
     setIsLoading(true)
 
     try {
-      const params = {
-        startDate: filters.startDate || undefined,
-        endDate: filters.endDate || undefined,
-      }
+      const { data } = await api.get(config.endpoint, {
+        params: {
+          page,
+          limit: pagination.limit,
+          startDate: nextFilters.startDate || undefined,
+          endDate: nextFilters.endDate || undefined,
+          search: nextFilters.search || undefined,
+          metric: nextFilters.metric === config.totalMetric ? undefined : nextFilters.metric,
+        },
+      })
 
-      const [summaryResponse, breakdownResponse, campaignResponse, senderHealthResponse] =
-        await Promise.all([
-          api.get('/email/deliverability/summary', { params }),
-          api.get('/email/deliverability/breakdown', { params }),
-          api.get('/email/deliverability/campaigns', { params }),
-          api.get('/email/deliverability/sender-health', { params }),
-        ])
-
-      setSummary({ ...initialSummary, ...summaryResponse.data })
-      setBreakdown(breakdownResponse.data)
-      setCampaigns(campaignResponse.data)
-      setSenderHealth(senderHealthResponse.data)
+      setRows(data.data || [])
+      setTotals(data.totals || { totalEmails: 0 })
+      setPagination(data.pagination || initialPagination)
     } finally {
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    setFilters(initialFilters)
+    setRows([])
+    setTotals({ totalEmails: 0 })
+    setPagination(initialPagination)
+    loadRows(1, initialFilters)
+  }, [type])
 
-  if (isLoading && !campaigns.data.length) {
-    return <LoadingState message="Loading deliverability center..." />
+  const handleSearchSubmit = (event) => {
+    event.preventDefault()
+    loadRows(1)
+  }
+
+  const handleStatClick = (metric) => {
+    const nextFilters = { ...filters, metric }
+    setFilters(nextFilters)
+    loadRows(1, nextFilters)
+  }
+
+  if (isLoading && !rows.length) {
+    return <LoadingState message={`Loading ${config.title.toLowerCase()}...`} />
   }
 
   return (
     <div className="space-y-6">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <StatTile
+          label={config.totalLabel}
+          value={totals.totalEmails || pagination.total}
+          active={filters.metric === config.totalMetric}
+          onClick={() => handleStatClick(config.totalMetric)}
+        />
+        {config.secondaryStats.map(([key, label]) => (
+          <StatTile
+            key={key}
+            label={label}
+            value={totals[key]}
+            active={filters.metric === key}
+            onClick={() => handleStatClick(key)}
+          />
+        ))}
+      </section>
 
       <section className="shell-card p-6">
-        <DateRangeFilter
-          filters={filters}
-          onChange={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
-          onApply={loadData}
-        />
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Sent" value={summary.sent} hint="Tracked send events" />
-        <StatCard label="Delivered" value={summary.delivered} hint={`${summary.deliveryRate || 0}% delivery rate`} />
-        <StatCard label="Opens" value={summary.opens} hint={`${summary.clicks} clicks recorded`} />
-        <StatCard label="Suppressed" value={summary.suppressedCount} hint="Active suppression entries" />
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Bounce rate" value={`${summary.bounceRate}%`} hint={`${summary.hardBounceCount} hard / ${summary.softBounceCount} soft`} />
-        <StatCard label="Complaint rate" value={`${summary.complaintRate}%`} hint={`${breakdown.complaintBreakdown.length} complaint categories`} />
-        <StatCard label="Unsubscribe rate" value={`${summary.unsubscribeRate}%`} hint={`${summary.unsubscribeCount} unsubscribes`} />
-        <StatCard label="Rejects" value={summary.rejectCount} hint="Rejected before delivery" />
-        <StatCard label="Delivery issues" value={summary.deliveryDelayCount + summary.renderingFailureCount} hint={`${summary.deliveryDelayCount} delays / ${summary.renderingFailureCount} render failures`} />
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <article className="shell-card-strong p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Sender health
-              </p>
-              <h3 className="mt-2 text-2xl font-semibold text-slate-950">{senderHealth.label}</h3>
-            </div>
-            <div className={`rounded-full border px-4 py-2 text-sm font-semibold ${stateStyles[senderHealth.state] || stateStyles.good}`}>
-              Score {senderHealth.score}
-            </div>
-          </div>
-
-          <p className="mt-4 text-sm leading-6 text-slate-500">{senderHealth.message}</p>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-[24px] border border-slate-100 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Primary risk</p>
-              <p className="mt-2 text-sm text-slate-900">
-                Bounce rate {senderHealth.metrics?.bounceRate || 0}% and complaint rate {senderHealth.metrics?.complaintRate || 0}%.
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-slate-100 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Domain health</p>
-              <p className="mt-2 text-sm text-slate-900">{senderHealth.domainHealth?.label}</p>
-              <p className="mt-2 text-sm text-slate-500">{senderHealth.domainHealth?.message}</p>
-            </div>
-          </div>
-
-          <div className="mt-6 space-y-3">
-            {senderHealth.recommendations?.map((item) => (
-              <div key={item} className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
-                {item}
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="shell-card-strong p-6">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Bounce breakdown
-            </p>
-            <h3 className="mt-1 text-xl font-semibold text-slate-950">Root cause categories</h3>
-          </div>
-
-          {breakdown.bounceBreakdown.length ? (
-            <div className="mt-5 space-y-3">
-              {breakdown.bounceBreakdown.map((item) => (
-                <div key={`${item.bounceType}-${item.bounceSubType}`} className="flex items-center justify-between rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{item.bounceType}</p>
-                    <p className="text-xs text-slate-500">{item.bounceSubType}</p>
-                  </div>
-                  <span className="text-lg font-semibold text-slate-900">{item.count}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-5">
-              <EmptyState
-                title="No bounce categories yet"
-                description="Bounce diagnostics will populate once SES bounce events are received."
-              />
-            </div>
-          )}
-        </article>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <article className="shell-card-strong p-6">
-          <ComplaintTrendWidget data={breakdown.complaintTrend || []} />
-        </article>
-
-        <article className="shell-card-strong p-6">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Complaint feedback
-            </p>
-            <h3 className="mt-1 text-xl font-semibold text-slate-950">Complaint reason mix</h3>
-          </div>
-
-          {breakdown.complaintBreakdown.length ? (
-            <div className="mt-5 space-y-3">
-              {breakdown.complaintBreakdown.map((item) => (
-                <div key={item.feedbackType} className="flex items-center justify-between rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-3">
-                  <p className="text-sm font-medium text-slate-900">{item.feedbackType}</p>
-                  <span className="text-lg font-semibold text-slate-900">{item.count}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-5">
-              <EmptyState
-                title="No complaint feedback yet"
-                description="Complaint categories will appear once SES complaint events are tracked."
-              />
-            </div>
-          )}
-        </article>
+        <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
+          <DateRangeFilter
+            filters={filters}
+            onChange={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
+            onApply={() => loadRows(1)}
+          />
+          <form className="flex gap-3" onSubmit={handleSearchSubmit}>
+            <input
+              className="field min-w-0 flex-1"
+              value={filters.search}
+              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+              placeholder="Search email"
+              type="search"
+            />
+            <button type="submit" className="primary-button">
+              Search
+            </button>
+          </form>
+        </div>
       </section>
 
       <section className="shell-card-strong overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+        <div className="flex flex-col gap-2 border-b border-[#e4d8f3] px-5 py-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Campaign-wise deliverability
-            </p>
-            <h3 className="mt-1 text-xl font-semibold text-slate-950">Operational campaign view</h3>
+            <h3 className="text-lg font-semibold text-[#21192d]">{activeStatLabel} table</h3>
+            <p className="text-sm text-[#7f6f96]">{pagination.total} emails matched current filters</p>
           </div>
-          <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500">
-            {campaigns.totals.campaigns} campaigns, {campaigns.totals.activeIssues} with active issues
+          <div className="flex items-center gap-3 text-sm font-semibold text-[#5d437b]">
+            <span>Page {pagination.page} of {pagination.totalPages}</span>
           </div>
         </div>
 
-        {campaigns.data.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="px-6 py-4 font-medium">Campaign</th>
-                  <th className="px-6 py-4 font-medium">Status</th>
-                  <th className="px-6 py-4 font-medium">Sent</th>
-                  <th className="px-6 py-4 font-medium">Delivered</th>
-                  <th className="px-6 py-4 font-medium">Open rate</th>
-                  <th className="px-6 py-4 font-medium">Click rate</th>
-                  <th className="px-6 py-4 font-medium">Bounce rate</th>
-                  <th className="px-6 py-4 font-medium">Complaint rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.data.map((campaign) => (
-                  <tr key={campaign._id} className="border-t border-slate-100">
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-slate-900">{campaign.name}</p>
-                      <p className="text-xs text-slate-500">{campaign.type} / {campaign.goal}</p>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-[#eadff6] text-left text-sm">
+            <thead className="bg-[#fbf8ff] text-xs uppercase tracking-[0.12em] text-[#7f6f96]">
+              <tr>
+                <th className="px-5 py-4 font-semibold">Recipient</th>
+                <th className="px-5 py-4 font-semibold">Device</th>
+                <th className="px-5 py-4 font-semibold">Location</th>
+                <th className="px-5 py-4 font-semibold">Time / Date</th>
+                <th className="px-5 py-4 font-semibold">Reason</th>
+                <th className="px-5 py-4 font-semibold">Campaign / Source</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#f0e6fb] bg-white text-[#21192d]">
+              {rows.length ? (
+                rows.map((row) => (
+                  <tr key={`${row.source}-${row.id}`} className="align-top">
+                    <td className="px-5 py-4">
+                      <p className="font-semibold">{row.email || 'Unknown'}</p>
+                      <p className="mt-1 text-xs text-[#8c7aa4]">{row.issueType || row.category}</p>
                     </td>
-                    <td className="px-6 py-4 capitalize text-slate-600">{campaign.status}</td>
-                    <td className="px-6 py-4 text-slate-600">{campaign.sent}</td>
-                    <td className="px-6 py-4 text-slate-600">{campaign.delivered}</td>
-                    <td className="px-6 py-4 text-slate-600">{campaign.openRate}%</td>
-                    <td className="px-6 py-4 text-slate-600">{campaign.clickRate}%</td>
-                    <td className="px-6 py-4 text-slate-600">{campaign.bounceRate}%</td>
-                    <td className="px-6 py-4 text-slate-600">{campaign.complaintRate}%</td>
+                    <td className="px-5 py-4 text-[#5d437b]">{row.device || 'Unknown'}</td>
+                    <td className="px-5 py-4 text-[#5d437b]">{row.location || 'Unknown'}</td>
+                    <td className="px-5 py-4 text-[#5d437b]">{formatDateTime(row.occurredAt)}</td>
+                    <td className="px-5 py-4 text-[#5d437b]">{row.reason || 'Unknown'}</td>
+                    <td className="px-5 py-4">
+                      <p className="font-medium text-[#21192d]">{row.campaignName || 'Not linked'}</p>
+                      <p className="mt-1 text-xs capitalize text-[#8c7aa4]">{row.source || 'event'}</p>
+                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-5 py-6">
+                    <EmptyState title={config.emptyTitle} description={config.emptyDescription} />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-[#e4d8f3] px-5 py-4 text-sm text-[#5d437b] md:flex-row md:items-center md:justify-between">
+          <span>{pagination.total} total emails</span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={pagination.page <= 1 || isLoading}
+              onClick={() => loadRows(pagination.page - 1)}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={pagination.page >= pagination.totalPages || isLoading}
+              onClick={() => loadRows(pagination.page + 1)}
+            >
+              Next
+            </button>
           </div>
-        ) : (
-          <div className="p-6">
-            <EmptyState
-              title="No campaign deliverability data yet"
-              description="Campaign rows will populate after live sends and SES event ingestion."
-            />
-          </div>
-        )}
+        </div>
       </section>
     </div>
   )

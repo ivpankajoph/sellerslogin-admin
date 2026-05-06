@@ -18,6 +18,7 @@ import AutomationListPage from "./pages/dashboard/AutomationListPage.jsx";
 import AudienceListPage from "./pages/dashboard/AudienceListPage.jsx";
 import BillingPlanPage from "./pages/dashboard/BillingPlanPage.jsx";
 import DeliverabilityPage from "./pages/dashboard/DeliverabilityPage.jsx";
+import DomainConnectionPage from "./pages/dashboard/DomainConnectionPage.jsx";
 import DeviceLocationTrackingPage from "./pages/dashboard/DeviceLocationTrackingPage.jsx";
 import EmailOpenedClickedPage from "./pages/dashboard/EmailOpenedClickedPage.jsx";
 import ConversionRevenuePage from "./pages/dashboard/ConversionRevenuePage.jsx";
@@ -181,7 +182,71 @@ function App() {
             path="deliverability"
             element={
               <PermissionGate permission="view_analytics">
-                <DeliverabilityPage />
+                <Navigate to="/deliverability/bounces" replace />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="deliverability/bounces"
+            element={
+              <PermissionGate permission="view_analytics">
+                <DeliverabilityPage type="bounces" />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="deliverability/complaints-suppressions"
+            element={
+              <PermissionGate permission="view_analytics">
+                <DeliverabilityPage type="complaints-suppressions" />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="deliverability/unsubscribes"
+            element={
+              <PermissionGate permission="view_analytics">
+                <DeliverabilityPage type="unsubscribes" />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="connect-domain"
+            element={
+              <PermissionGate permission="manage_settings">
+                <Navigate to="/connect-domain/my-domains" replace />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="connect-domain/my-domains"
+            element={
+              <PermissionGate permission="manage_settings">
+                <DomainConnectionPage view="domains" />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="connect-domain/dns-records"
+            element={
+              <PermissionGate permission="manage_settings">
+                <DomainConnectionPage view="dns" />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="connect-domain/domain-health"
+            element={
+              <PermissionGate permission="manage_settings">
+                <DomainConnectionPage view="health" />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="connect-domain/dedicated-ip"
+            element={
+              <PermissionGate permission="manage_settings">
+                <DomainConnectionPage view="dedicated-ip" />
               </PermissionGate>
             }
           />
@@ -345,6 +410,7 @@ function App() {
                   "/analytics",
                   "/billing",
                   "/deliverability",
+                  "/connect-domain",
                   "/suppressions",
                   "/reports",
                 ].includes(item.path),
