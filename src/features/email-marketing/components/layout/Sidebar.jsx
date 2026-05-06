@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { AuthContext } from '../../context/AuthContext.jsx'
 import { navigationItems } from '../../data/navigation.js'
@@ -113,6 +113,18 @@ function ChartIcon() {
   )
 }
 
+function DomainIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+      <path d="M4 7h16" />
+      <path d="M6 7V5h12v2" />
+      <path d="M5 7h14v12H5V7Z" />
+      <path d="M8 11h8M8 15h5" />
+      <path d="M17 15.5l1.5 1.5 2.5-3" />
+    </svg>
+  )
+}
+
 function ChevronIcon({ open }) {
   return (
     <svg
@@ -154,6 +166,19 @@ const analyticsSubItems = [
   { label: 'Campaign Analytics', path: '/analytics/campaign-analytics' },
 ]
 
+const deliverabilitySubItems = [
+  { label: 'Bounce Emails', path: '/deliverability/bounces' },
+  { label: 'Complaints & Suppressions', path: '/deliverability/complaints-suppressions' },
+  { label: 'Unsubscribe Emails', path: '/deliverability/unsubscribes' },
+]
+
+const connectDomainSubItems = [
+  { label: 'My Domains', path: '/connect-domain/my-domains' },
+  { label: 'Setup DNS Records', path: '/connect-domain/dns-records' },
+  { label: 'Domain Health', path: '/connect-domain/domain-health' },
+  { label: 'Dedicated IP', path: '/connect-domain/dedicated-ip' },
+]
+
 function iconForItem(item) {
   const iconMap = {
     home: HomeIcon,
@@ -165,6 +190,7 @@ function iconForItem(item) {
     suppression: BubbleIcon,
     analytics: ChartIcon,
     deliverability: ChartIcon,
+    domain: DomainIcon,
     automation: FlowIcon,
     reports: ChartIcon,
     billing: ReceiptIcon,
@@ -178,13 +204,52 @@ function iconForItem(item) {
 function Sidebar({ expanded = true, onHoverChange = () => {} }) {
   const { admin, can } = useContext(AuthContext)
   const location = useLocation()
-  const [analyticsOpen, setAnalyticsOpen] = useState(true)
+  const [analyticsOpen, setAnalyticsOpen] = useState(location.pathname.startsWith('/analytics'))
+  const [deliverabilityOpen, setDeliverabilityOpen] = useState(location.pathname.startsWith('/deliverability'))
+  const [connectDomainOpen, setConnectDomainOpen] = useState(location.pathname.startsWith('/connect-domain'))
+  const [segmentsOpen, setSegmentsOpen] = useState(location.pathname.startsWith('/segments'))
   const visibleItems = navigationItems.filter((item) => can(item.permission))
 
   const homeItems = visibleItems.filter((item) => item.path === '/overview')
   const otherItems = visibleItems.filter((item) => item.path !== '/overview')
   const isItemActive = (item) =>
     location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
+  const isExactRouteActive = (path) => {
+    const [pathname, search = ''] = path.split('?')
+    const normalizedSearch = search ? `?${search}` : ''
+
+    return location.pathname === pathname && location.search === normalizedSearch
+  }
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/analytics')) {
+      setAnalyticsOpen(true)
+      setDeliverabilityOpen(false)
+      setConnectDomainOpen(false)
+      setSegmentsOpen(false)
+    }
+
+    if (location.pathname.startsWith('/deliverability')) {
+      setDeliverabilityOpen(true)
+      setAnalyticsOpen(false)
+      setConnectDomainOpen(false)
+      setSegmentsOpen(false)
+    }
+
+    if (location.pathname.startsWith('/connect-domain')) {
+      setConnectDomainOpen(true)
+      setAnalyticsOpen(false)
+      setDeliverabilityOpen(false)
+      setSegmentsOpen(false)
+    }
+
+    if (location.pathname.startsWith('/segments')) {
+      setSegmentsOpen(true)
+      setAnalyticsOpen(false)
+      setDeliverabilityOpen(false)
+      setConnectDomainOpen(false)
+    }
+  }, [location.pathname])
 
   return (
     <aside
@@ -243,16 +308,22 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
             const active = isItemActive(item)
 
             if (item.path === '/analytics') {
+              const parentActive = location.pathname === item.path
+
               return (
                 <div key={item.path} className="space-y-1">
                   <button
                     type="button"
-                    onClick={() => setAnalyticsOpen((current) => !current)}
-                    className={`nav-link w-full ${active ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
+                    onClick={() => {
+                      setAnalyticsOpen((current) => !current)
+                      setDeliverabilityOpen(false)
+                      setConnectDomainOpen(false)
+                    }}
+                    className={`nav-link w-full ${parentActive ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
                     title={expanded ? undefined : item.label}
                   >
                     <span className="flex items-center gap-3">
-                      <span className={`flex h-6 w-6 items-center justify-center ${active ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
+                      <span className={`flex h-6 w-6 items-center justify-center ${parentActive ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
                         <Icon />
                       </span>
                       {expanded ? <span>{item.label}</span> : null}
@@ -268,8 +339,8 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
                             key={subItem.label}
                             to={subItem.path}
                             className={({ isActive }) =>
-                              `block w-full px-3 py-2 text-left text-[13px] font-medium transition hover:bg-[#f1e7ff] hover:text-[#5a189a] ${
-                                isActive ? 'bg-[#f1e7ff] text-[#5a189a]' : 'text-[#5d437b]'
+                              `block w-full px-3 py-2 text-left text-[13px] font-medium transition ${
+                                isActive ? 'bg-[#7c3aed] !text-white shadow-[0_8px_20px_rgba(124,58,237,0.18)] hover:bg-[#7c3aed] hover:!text-white' : 'text-[#5d437b]'
                               }`
                             }
                           >
@@ -279,11 +350,146 @@ function Sidebar({ expanded = true, onHoverChange = () => {} }) {
                           <button
                             key={subItem.label}
                             type="button"
-                            className="block w-full px-3 py-2 text-left text-[13px] font-medium text-[#5d437b] transition hover:bg-[#f1e7ff] hover:text-[#5a189a]"
+                            className="block w-full px-3 py-2 text-left text-[13px] font-medium text-[#5d437b] transition"
                           >
                             {subItem.label}
                           </button>
                         )
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            }
+
+            if (item.path === '/segments' && item.children?.length) {
+              return (
+                <div key={item.path} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSegmentsOpen((current) => !current)
+                      setAnalyticsOpen(false)
+                      setDeliverabilityOpen(false)
+                      setConnectDomainOpen(false)
+                    }}
+                    className={`nav-link w-full ${expanded ? '' : 'justify-center px-3'}`}
+                    title={expanded ? undefined : item.label}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center bg-[#f8ddec] text-[#9f2d6a]">
+                        <Icon />
+                      </span>
+                      {expanded ? <span>{item.label}</span> : null}
+                    </span>
+                    {expanded ? <ChevronIcon open={segmentsOpen} /> : null}
+                  </button>
+
+                  {expanded && segmentsOpen ? (
+                    <div className="ml-9 space-y-1 border-l border-[#d8ccef] pl-3">
+                      {item.children.map((subItem) => (
+                        <NavLink
+                          key={subItem.label}
+                          to={subItem.path}
+                          className={() =>
+                            `block w-full px-3 py-2 text-left text-[13px] font-medium transition ${
+                              isExactRouteActive(subItem.path) ? 'bg-[#7c3aed] !text-white shadow-[0_8px_20px_rgba(124,58,237,0.18)] hover:bg-[#7c3aed] hover:!text-white' : 'bg-transparent text-[#5d437b] hover:bg-[#f3ecff] hover:text-[#4c1d95]'
+                            }`
+                          }
+                        >
+                          {subItem.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            }
+
+            if (item.path === '/deliverability') {
+              const parentActive = location.pathname === item.path
+
+              return (
+                <div key={item.path} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeliverabilityOpen((current) => !current)
+                      setAnalyticsOpen(false)
+                      setConnectDomainOpen(false)
+                    }}
+                    className={`nav-link w-full ${parentActive ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
+                    title={expanded ? undefined : item.label}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className={`flex h-6 w-6 items-center justify-center ${parentActive ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
+                        <Icon />
+                      </span>
+                      {expanded ? <span>{item.label}</span> : null}
+                    </span>
+                    {expanded ? <ChevronIcon open={deliverabilityOpen} /> : null}
+                  </button>
+
+                  {expanded && deliverabilityOpen ? (
+                    <div className="ml-9 space-y-1 border-l border-[#d8ccef] pl-3">
+                      {deliverabilitySubItems.map((subItem) => (
+                        <NavLink
+                          key={subItem.label}
+                          to={subItem.path}
+                          className={({ isActive }) =>
+                            `block w-full px-3 py-2 text-left text-[13px] font-medium transition ${
+                              isActive ? 'bg-[#7c3aed] !text-white shadow-[0_8px_20px_rgba(124,58,237,0.18)] hover:bg-[#7c3aed] hover:!text-white' : 'text-[#5d437b]'
+                            }`
+                          }
+                        >
+                          {subItem.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            }
+
+            if (item.path === '/connect-domain') {
+              const parentActive = location.pathname === item.path
+
+              return (
+                <div key={item.path} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConnectDomainOpen((current) => !current)
+                      setAnalyticsOpen(false)
+                      setDeliverabilityOpen(false)
+                      setSegmentsOpen(false)
+                    }}
+                    className={`nav-link w-full ${parentActive ? 'nav-link-active' : ''} ${expanded ? '' : 'justify-center px-3'}`}
+                    title={expanded ? undefined : item.label}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className={`flex h-6 w-6 items-center justify-center ${parentActive ? 'bg-[#eadcfb] text-[#5a189a]' : 'bg-[#f8ddec] text-[#9f2d6a]'}`}>
+                        <Icon />
+                      </span>
+                      {expanded ? <span>{item.label}</span> : null}
+                    </span>
+                    {expanded ? <ChevronIcon open={connectDomainOpen} /> : null}
+                  </button>
+
+                  {expanded && connectDomainOpen ? (
+                    <div className="ml-9 space-y-1 border-l border-[#d8ccef] pl-3">
+                      {connectDomainSubItems.map((subItem) => (
+                        <NavLink
+                          key={subItem.label}
+                          to={subItem.path}
+                          className={({ isActive }) =>
+                            `block w-full px-3 py-2 text-left text-[13px] font-medium transition ${
+                              isActive ? 'bg-[#7c3aed] !text-white shadow-[0_8px_20px_rgba(124,58,237,0.18)] hover:bg-[#7c3aed] hover:!text-white' : 'text-[#5d437b]'
+                            }`
+                          }
+                        >
+                          {subItem.label}
+                        </NavLink>
                       ))}
                     </div>
                   ) : null}

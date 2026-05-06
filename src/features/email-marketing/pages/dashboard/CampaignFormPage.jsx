@@ -4,6 +4,7 @@ import LoadingState from "../../components/ui/LoadingState.jsx";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import { ToastContext } from "../../context/ToastContext.jsx";
 import PreviewAndTestModal from "../../components/dashboard/PreviewAndTestModal.jsx";
+import AudiencePickerModal from "../../components/dashboard/AudiencePickerModal.jsx";
 import {
   campaignGoals,
   campaignStatuses,
@@ -35,7 +36,9 @@ const createInitialForm = () => ({
     label: "",
   },
   websiteScopes: [],
-  status: "",
+  audienceSources: ["website"],
+  importedAudienceListIds: [],
+  status: "draft",
   scheduledAt: "",
   isRecurring: false,
   recurrenceInterval: 1,
@@ -46,18 +49,21 @@ const campaignHelperText = {
   name: "Internal name for this campaign. Customers will not see this.",
   type: "Choose how this campaign should behave, like one-time broadcast or lifecycle campaign.",
   goal: "Select the main purpose of this campaign, so reports are easier to understand later.",
-  status: "Choose whether this campaign should stay draft, be scheduled, or become active.",
+  status: "Choose whether this campaign should stay draft or be scheduled for sending.",
   subject: "This is the email title customers see in their inbox. Keep it clear and short.",
-  previewText: "Small text shown beside the subject in inboxes. Use it to add a quick reason to open.",
+  // previewText: "Small text shown beside the subject in inboxes. Use it to add a quick reason to open.",
   fromName: "Name customers will see as the sender of the email.",
   fromEmail: "Email address used to send this campaign. Use a trusted business email.",
   replyTo: "Optional email where customer replies should go. Leave blank if replies can use the sender email.",
   sendTime: "Choose when this campaign should be sent. For recurring campaigns, this is the first send time.",
   template: "Pick the email design and content that will be sent in this campaign.",
-  audience: "Choose which website audience should receive this campaign.",
+  audience: "Choose CSV contacts, website audience, or both.",
   recurring: "Turn this on if this campaign should send again automatically on a schedule.",
   repeatEvery: "Set how often the recurring campaign should run, like every 1 day, week, or month.",
 };
+
+const campaignFormStatuses = ["draft", "scheduled"];
+const systemManagedCampaignStatuses = ["sending", "sent", "failed", "paused", "archived"];
 
 const HelpTooltip = ({ text }) => {
   const [position, setPosition] = useState(null);
@@ -257,6 +263,7 @@ function CampaignFormPage() {
   const [form, setForm] = useState(createInitialForm());
   const [templates, setTemplates] = useState([]);
   const [websites, setWebsites] = useState([]);
+  const [importedAudienceLists, setImportedAudienceLists] = useState([]);
   const [meta, setMeta] = useState({
     types: campaignTypes,
     goals: campaignGoals,
@@ -267,12 +274,26 @@ function CampaignFormPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  const [isAudienceModalOpen, setIsAudienceModalOpen] = useState(false);
   const broadcastPreset =
     new URLSearchParams(location.search).get("type") === "broadcast";
   const isBroadcastCampaign =
     form.type === "broadcast" || (!id && broadcastPreset);
+  const isSystemManagedStatus = systemManagedCampaignStatuses.includes(form.status);
+  const canEditSchedule = form.isRecurring || form.status === "scheduled";
   const selectedWebsiteScopes = normalizeWebsiteScopes(form.websiteScopes?.length ? form.websiteScopes : form.websiteScope);
   const audienceLabel = formatAudienceLabel(selectedWebsiteScopes);
+  const selectedImportedAudienceLists = importedAudienceLists.filter((list) =>
+    (form.importedAudienceListIds || []).includes(list._id),
+  );
+  const audienceSummary = [
+    form.audienceSources?.includes("website") && selectedWebsiteScopes.length
+      ? formatAudienceLabel(selectedWebsiteScopes)
+      : "",
+    form.audienceSources?.includes("csv") && selectedImportedAudienceLists.length
+      ? `${selectedImportedAudienceLists.reduce((total, list) => total + Number(list.recipientCount || 0), 0)} CSV recipients`
+      : "",
+  ].filter(Boolean).join(" + ") || "No audience selected";
   const selectedWebsiteKeys = new Set(selectedWebsiteScopes.map((scope) => getWebsiteScopeKey(scope)));
   const selectedTemplate = useMemo(
     () => templates.find((template) => template._id === form.templateId),
@@ -286,11 +307,12 @@ function CampaignFormPage() {
   useEffect(() => {
     const loadDependencies = async () => {
       try {
-        const [metaResponse, templatesResponse, summaryResponse] =
+        const [metaResponse, templatesResponse, summaryResponse, importedAudienceResponse] =
           await Promise.all([
             api.get("/campaigns/meta"),
             api.get("/templates"),
             api.get("/subscribers/summary"),
+            api.get("/imported-audiences"),
           ]);
 
         setMeta(metaResponse.data);
@@ -301,8 +323,12 @@ function CampaignFormPage() {
 
         if (id) {
           const { data } = await api.get(`/campaigns/${id}`);
+          const savedImportedAudienceListIds = (data.importedAudienceListIds || []).map((item) => String(item._id || item));
           const savedWebsiteScopes = normalizeWebsiteScopes(
             data.websiteScopes?.length ? data.websiteScopes : data.websiteScope || data.segmentId?.websiteScope || {},
+          );
+          setImportedAudienceLists(
+            (importedAudienceResponse.data || []).filter((list) => savedImportedAudienceListIds.includes(String(list._id))),
           );
           setForm({
             name: data.name || "",
@@ -317,6 +343,8 @@ function CampaignFormPage() {
             segmentId: "",
             websiteScope: savedWebsiteScopes[0] || defaultWebsiteScope,
             websiteScopes: savedWebsiteScopes.length ? savedWebsiteScopes : defaultWebsiteScope ? [defaultWebsiteScope] : [],
+            audienceSources: data.audienceSources?.length ? data.audienceSources : ["website"],
+            importedAudienceListIds: savedImportedAudienceListIds,
             status: data.status || "draft",
             scheduledAt: toDateTimeLocalInput(data.scheduledAt),
             isRecurring: Boolean(data.isRecurring),
@@ -324,6 +352,7 @@ function CampaignFormPage() {
             recurrenceUnit: data.recurrenceUnit || "week",
           });
         } else if (broadcastPreset) {
+          setImportedAudienceLists([]);
           setForm((current) => ({
             ...current,
             type: "broadcast",
@@ -333,15 +362,18 @@ function CampaignFormPage() {
             websiteScopes: normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope).length
               ? normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope)
               : defaultWebsiteScope ? [defaultWebsiteScope] : [],
+            audienceSources: current.audienceSources?.length ? current.audienceSources : ["website"],
             isRecurring: false,
           }));
         } else {
+          setImportedAudienceLists([]);
           setForm((current) => ({
             ...current,
             websiteScope: normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope)[0] || defaultWebsiteScope,
             websiteScopes: normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope).length
               ? normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope)
               : defaultWebsiteScope ? [defaultWebsiteScope] : [],
+            audienceSources: current.audienceSources?.length ? current.audienceSources : ["website"],
           }));
         }
       } catch (requestError) {
@@ -378,12 +410,19 @@ function CampaignFormPage() {
       return "Please select a template for this campaign";
     }
 
-    if (!normalizeWebsiteScopes(form.websiteScopes?.length ? form.websiteScopes : form.websiteScope).length) {
+    const hasWebsiteAudience = form.audienceSources?.includes("website")
+      && normalizeWebsiteScopes(form.websiteScopes?.length ? form.websiteScopes : form.websiteScope).length;
+    const hasImportedAudience = form.audienceSources?.includes("csv")
+      && form.importedAudienceListIds?.length;
+
+    if (!hasWebsiteAudience && !hasImportedAudience) {
       return "Please select at least one website audience";
     }
 
-    if (form.isRecurring && !toIsoStringFromLocalInput(form.scheduledAt)) {
-      return "Please choose the first send time for this recurring campaign";
+    if (canEditSchedule && !toIsoStringFromLocalInput(form.scheduledAt)) {
+      return form.isRecurring
+        ? "Please choose the first send time for this recurring campaign"
+        : "Please choose when this campaign should be sent";
     }
 
     return "";
@@ -406,13 +445,26 @@ function CampaignFormPage() {
       const effectiveStatus = form.isRecurring
         ? "scheduled"
         : nextStatus || "draft";
+      const shouldSendOnSchedule = form.isRecurring || effectiveStatus === "scheduled";
+      const selectedPendingImportedAudiences = importedAudienceLists
+        .filter((list) => list.isPending && (form.importedAudienceListIds || []).includes(list._id))
+        .map((list) => ({
+          tempId: list._id,
+          name: list.name,
+          recipients: list.recipients || [],
+        }));
       const payload = {
         ...form,
         status: effectiveStatus,
         segmentId: null,
         websiteScopes: normalizeWebsiteScopes(form.websiteScopes || []),
         websiteScope: normalizeWebsiteScopes(form.websiteScopes || [])[0] || emptyWebsiteScope,
-        scheduledAt: toIsoStringFromLocalInput(form.scheduledAt) || null,
+        audienceSources: form.audienceSources || [],
+        importedAudienceListIds: form.importedAudienceListIds || [],
+        pendingImportedAudiences: selectedPendingImportedAudiences,
+        scheduledAt: shouldSendOnSchedule
+          ? toIsoStringFromLocalInput(form.scheduledAt) || null
+          : null,
         isRecurring: Boolean(form.isRecurring),
         recurrenceInterval: Number(form.recurrenceInterval || 1),
         recurrenceUnit: form.recurrenceUnit || "week",
@@ -624,21 +676,30 @@ function CampaignFormPage() {
               <select
                 className="field"
                 value={form.status}
+                disabled={isSystemManagedStatus || form.isRecurring}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
                     status: event.target.value,
+                    scheduledAt:
+                      event.target.value === "scheduled"
+                        ? current.scheduledAt
+                        : "",
                   }))
                 }
               >
-                <option value="">Not selected yet</option>
-                {meta.statuses
-                  .filter((status) => status !== "archived")
+                {campaignFormStatuses
+                  .filter((status) => meta.statuses.includes(status))
                   .map((status) => (
                     <option key={status} value={status}>
                       {status}
                     </option>
                   ))}
+                {isSystemManagedStatus ? (
+                  <option value={form.status}>
+                    {form.status} (managed by system)
+                  </option>
+                ) : null}
               </select>
             </FormField>
 
@@ -660,11 +721,11 @@ function CampaignFormPage() {
               />
             </FormField>
 
-            <FormField
+            {/* <FormField
               label="Preview text"
               help={campaignHelperText.previewText}
               className="md:col-span-2"
-            >
+             >
               <input
                 className="field"
                 placeholder="For example: One small update and a helpful link"
@@ -676,7 +737,7 @@ function CampaignFormPage() {
                   }))
                 }
               />
-            </FormField>
+            </FormField> */}
 
             <FormField label="From name" help={campaignHelperText.fromName}>
               <input
@@ -722,22 +783,24 @@ function CampaignFormPage() {
               />
             </FormField>
 
-            <FormField
-              label={form.isRecurring ? "First send time" : "Send time"}
-              help={campaignHelperText.sendTime}
-            >
-              <input
-                className="field"
-                type="datetime-local"
-                value={form.scheduledAt}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    scheduledAt: event.target.value,
-                  }))
-                }
-              />
-            </FormField>
+            {canEditSchedule ? (
+              <FormField
+                label={form.isRecurring ? "First send time" : "Send time"}
+                help={campaignHelperText.sendTime}
+              >
+                <input
+                  className="field"
+                  type="datetime-local"
+                  value={form.scheduledAt}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      scheduledAt: event.target.value,
+                    }))
+                  }
+                />
+              </FormField>
+            ) : null}
 
             <FormField label="Template" help={campaignHelperText.template}>
               <select
@@ -759,54 +822,15 @@ function CampaignFormPage() {
               </select>
             </FormField>
 
-            <FormField label="Audience" help={campaignHelperText.audience}>
-              <div className="space-y-2">
-                <details className="group relative">
-                  <summary className="field flex cursor-pointer list-none items-center justify-between gap-3">
-                    <span className="min-w-0 truncate">{audienceLabel}</span>
-                    <span className="text-xs text-[#8a93a6] transition group-open:rotate-180">⌄</span>
-                  </summary>
-                  <div className="absolute left-0 right-0 z-30 mt-2 max-h-56 space-y-2 overflow-y-auto border border-[#ddd4f2] bg-white p-3 shadow-[0_18px_40px_rgba(47,43,61,0.16)]">
-                    {websites.length ? (
-                      websites.map((website) => {
-                        const scope = getWebsiteOptionScope(website);
-                        const key = getWebsiteScopeKey(scope);
-                        const checked = selectedWebsiteKeys.has(key);
-
-                        return (
-                          <label key={website.id} className="flex cursor-pointer items-center justify-between gap-3 border border-[#ece6f8] bg-[#faf7ff] px-3 py-2 text-sm hover:bg-white">
-                            <span className="min-w-0">
-                              <span className="block truncate font-semibold text-[#2f2b3d]">{website.label}</span>
-                              <span className="text-xs text-[#8a93a6]">{website.count || 0} subscribers</span>
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(event) => {
-                                setForm((current) => {
-                                  const currentScopes = normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope);
-                                  const nextScopes = event.target.checked
-                                    ? normalizeWebsiteScopes([...currentScopes, scope])
-                                    : currentScopes.filter((item) => getWebsiteScopeKey(item) !== key);
-
-                                  return {
-                                    ...current,
-                                    websiteScope: nextScopes[0] || emptyWebsiteScope,
-                                    websiteScopes: nextScopes,
-                                    segmentId: "",
-                                  };
-                                });
-                              }}
-                            />
-                          </label>
-                        );
-                      })
-                    ) : (
-                      <p className="px-3 py-2 text-sm text-[#8a93a6]">No websites found</p>
-                    )}
-                  </div>
-                </details>
-              </div>
+            <FormField label="Choose Your audience" help={campaignHelperText.audience}>
+              <button
+                type="button"
+                className="field flex w-full items-center justify-between gap-3 text-left"
+                onClick={() => setIsAudienceModalOpen(true)}
+              >
+                <span className="min-w-0 truncate">{audienceSummary}</span>
+                <span className="text-xs text-[#8a93a6]">Choose</span>
+              </button>
             </FormField>
 
             {!isBroadcastCampaign ? (
@@ -834,6 +858,7 @@ function CampaignFormPage() {
                         setForm((current) => ({
                           ...current,
                           isRecurring: event.target.checked,
+                          status: event.target.checked ? "scheduled" : current.status,
                         }))
                       }
                     />
@@ -1023,6 +1048,21 @@ function CampaignFormPage() {
         bodyWidth={760}
         onClose={() => setIsTestModalOpen(false)}
         onSendTest={handleSendTest}
+      />
+      <AudiencePickerModal
+        isOpen={isAudienceModalOpen}
+        onClose={() => setIsAudienceModalOpen(false)}
+        websites={websites}
+        selectedWebsiteScopes={selectedWebsiteScopes}
+        selectedWebsiteKeys={selectedWebsiteKeys}
+        getWebsiteOptionScope={getWebsiteOptionScope}
+        getWebsiteScopeKey={getWebsiteScopeKey}
+        normalizeWebsiteScopes={normalizeWebsiteScopes}
+        emptyWebsiteScope={emptyWebsiteScope}
+        importedAudienceLists={importedAudienceLists}
+        onImportedAudienceListsChange={setImportedAudienceLists}
+        form={form}
+        setForm={setForm}
       />
     </div>
   );

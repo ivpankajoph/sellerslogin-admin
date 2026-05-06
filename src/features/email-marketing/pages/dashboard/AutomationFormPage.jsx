@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import AutomationPreviewTestModal from '../../components/dashboard/AutomationPreviewTestModal.jsx'
+import AudiencePickerModal from '../../components/dashboard/AudiencePickerModal.jsx'
 import LoadingState from '../../components/ui/LoadingState.jsx'
 import PageHeader from '../../components/ui/PageHeader.jsx'
 import { ToastContext } from '../../context/ToastContext.jsx'
@@ -26,6 +27,8 @@ const createInitialForm = () => ({
     label: '',
   },
   websiteScopes: [],
+  audienceSources: ['website'],
+  importedAudienceListIds: [],
   triggerConfig: {
     delayWindow: '',
     notes: '',
@@ -473,10 +476,12 @@ function AutomationFormPage() {
   const [form, setForm] = useState(createInitialForm())
   const [meta, setMeta] = useState({ triggers: [], statuses: [], templates: [], segments: [], ecommerceHooks: null })
   const [websites, setWebsites] = useState([])
+  const [importedAudienceLists, setImportedAudienceLists] = useState([])
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [isAudienceModalOpen, setIsAudienceModalOpen] = useState(false)
   const [previewEmail, setPreviewEmail] = useState(null)
   const presetKey = searchParams.get('preset') || ''
   const selectedPreset = useMemo(
@@ -485,14 +490,26 @@ function AutomationFormPage() {
   )
   const selectedWebsiteScopes = normalizeWebsiteScopes(form.websiteScopes?.length ? form.websiteScopes : form.websiteScope)
   const selectedWebsiteKeys = new Set(selectedWebsiteScopes.map((scope) => getWebsiteScopeKey(scope)))
+  const selectedImportedAudienceLists = importedAudienceLists.filter((list) =>
+    (form.importedAudienceListIds || []).includes(list._id),
+  )
+  const audienceSummary = [
+    form.audienceSources?.includes('website') && selectedWebsiteScopes.length
+      ? getWebsiteAudienceLabel(selectedWebsiteScopes)
+      : '',
+    form.audienceSources?.includes('csv') && selectedImportedAudienceLists.length
+      ? `${selectedImportedAudienceLists.reduce((total, list) => total + Number(list.recipientCount || 0), 0)} CSV recipients`
+      : '',
+  ].filter(Boolean).join(' + ') || 'No audience selected'
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [metaResponse, workflowResponse, summaryResponse] = await Promise.all([
+        const [metaResponse, workflowResponse, summaryResponse, importedAudienceResponse] = await Promise.all([
           api.get('/automations/meta'),
           id ? api.get(`/automations/${id}`) : Promise.resolve({ data: null }),
           api.get('/subscribers/summary'),
+          api.get('/imported-audiences'),
         ])
 
         setMeta(metaResponse.data)
@@ -501,10 +518,14 @@ function AutomationFormPage() {
         setWebsites(websiteOptions)
 
         if (workflowResponse.data) {
+          const savedImportedAudienceListIds = (workflowResponse.data.importedAudienceListIds || []).map((item) => String(item._id || item))
           const savedWebsiteScopes = normalizeWebsiteScopes(
             workflowResponse.data.websiteScopes?.length
               ? workflowResponse.data.websiteScopes
               : workflowResponse.data.websiteScope || workflowResponse.data.entrySegmentId?.websiteScope || {},
+          )
+          setImportedAudienceLists(
+            (importedAudienceResponse.data || []).filter((list) => savedImportedAudienceListIds.includes(String(list._id))),
           )
           setForm({
             name: workflowResponse.data.name || '',
@@ -514,6 +535,8 @@ function AutomationFormPage() {
             entrySegmentId: '',
             websiteScope: savedWebsiteScopes[0] || defaultWebsiteScope,
             websiteScopes: savedWebsiteScopes.length ? savedWebsiteScopes : defaultWebsiteScope ? [defaultWebsiteScope] : [],
+            audienceSources: workflowResponse.data.audienceSources?.length ? workflowResponse.data.audienceSources : ['website'],
+            importedAudienceListIds: savedImportedAudienceListIds,
             triggerConfig: {
               delayWindow: workflowResponse.data.triggerConfig?.delayWindow || '',
               notes: workflowResponse.data.triggerConfig?.notes || '',
@@ -521,6 +544,7 @@ function AutomationFormPage() {
             steps: workflowResponse.data.steps?.length ? workflowResponse.data.steps : [createWorkflowStep('send_email')],
           })
         } else if (selectedPreset) {
+          setImportedAudienceLists([])
           const presetTemplateId = resolvePresetTemplateId(metaResponse.data.templates, selectedPreset.key)
           const nextPreset = buildDripCampaignPreset(selectedPreset.key, presetTemplateId)
 
@@ -530,15 +554,18 @@ function AutomationFormPage() {
               ...nextPreset,
               websiteScope: defaultWebsiteScope,
               websiteScopes: defaultWebsiteScope ? [defaultWebsiteScope] : [],
+              audienceSources: ['website'],
             })
           }
         } else {
+          setImportedAudienceLists([])
           setForm((current) => ({
             ...current,
             websiteScope: normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope)[0] || defaultWebsiteScope,
             websiteScopes: normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope).length
               ? normalizeWebsiteScopes(current.websiteScopes?.length ? current.websiteScopes : current.websiteScope)
               : defaultWebsiteScope ? [defaultWebsiteScope] : [],
+            audienceSources: current.audienceSources?.length ? current.audienceSources : ['website'],
           }))
         }
       } catch (requestError) {
@@ -585,8 +612,13 @@ function AutomationFormPage() {
       return 'Add at least one step to this workflow'
     }
 
-    if (!normalizeWebsiteScopes(form.websiteScopes?.length ? form.websiteScopes : form.websiteScope).length) {
-      return 'Select at least one website audience'
+    const hasWebsiteAudience = form.audienceSources?.includes('website')
+      && normalizeWebsiteScopes(form.websiteScopes?.length ? form.websiteScopes : form.websiteScope).length
+    const hasImportedAudience = form.audienceSources?.includes('csv')
+      && form.importedAudienceListIds?.length
+
+    if (!hasWebsiteAudience && !hasImportedAudience) {
+      return 'Select at least one audience'
     }
 
     return ''
@@ -605,6 +637,13 @@ function AutomationFormPage() {
     setIsSubmitting(true)
 
     try {
+      const selectedPendingImportedAudiences = importedAudienceLists
+        .filter((list) => list.isPending && (form.importedAudienceListIds || []).includes(list._id))
+        .map((list) => ({
+          tempId: list._id,
+          name: list.name,
+          recipients: list.recipients || [],
+        }))
       const payload = {
         ...form,
         status: nextStatus,
@@ -612,6 +651,9 @@ function AutomationFormPage() {
         entrySegmentId: null,
         websiteScopes: normalizeWebsiteScopes(form.websiteScopes || []),
         websiteScope: normalizeWebsiteScopes(form.websiteScopes || [])[0] || emptyWebsiteScope,
+        audienceSources: form.audienceSources || [],
+        importedAudienceListIds: form.importedAudienceListIds || [],
+        pendingImportedAudiences: selectedPendingImportedAudiences,
       }
 
       if (id) {
@@ -788,8 +830,16 @@ function AutomationFormPage() {
                 </select>
               </div>
               <div>
-                <FieldLabel label="Audience" help="Choose your website to enter this workflow." />
-                <div className="space-y-2">
+                <FieldLabel label="Choose Your audience" help="Choose CSV contacts, website audience, or both." />
+                <button
+                  type="button"
+                  className="field flex w-full items-center justify-between gap-3 text-left"
+                  onClick={() => setIsAudienceModalOpen(true)}
+                >
+                  <span className="min-w-0 truncate">{audienceSummary}</span>
+                  <span className="text-xs text-slate-400">Choose</span>
+                </button>
+                <div className="hidden">
                   <details className="group relative">
                     <summary className="field flex cursor-pointer list-none items-center justify-between gap-3">
                       <span className="min-w-0 truncate">{getWebsiteAudienceLabel(selectedWebsiteScopes)}</span>
@@ -1014,6 +1064,21 @@ function AutomationFormPage() {
           setPreviewEmail(null)
         }}
         onRunSample={handlePreviewTestRun}
+      />
+      <AudiencePickerModal
+        isOpen={isAudienceModalOpen}
+        onClose={() => setIsAudienceModalOpen(false)}
+        websites={websites}
+        selectedWebsiteScopes={selectedWebsiteScopes}
+        selectedWebsiteKeys={selectedWebsiteKeys}
+        getWebsiteOptionScope={getWebsiteOptionScope}
+        getWebsiteScopeKey={getWebsiteScopeKey}
+        normalizeWebsiteScopes={normalizeWebsiteScopes}
+        emptyWebsiteScope={emptyWebsiteScope}
+        importedAudienceLists={importedAudienceLists}
+        onImportedAudienceListsChange={setImportedAudienceLists}
+        form={form}
+        setForm={setForm}
       />
     </div>
   )

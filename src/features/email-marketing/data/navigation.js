@@ -41,13 +41,27 @@
     permission: "manage_audience",
   },
   {
-    label: "Segments",
+    label: "Segmentation",
     path: "/segments",
     // description:
       // "Define audience rules for sharper targeting and personalization.",
     group: "Audience",
     icon: "segments",
     permission: "manage_audience",
+    children: [
+      {
+        label: "All segment",
+        path: "/segments",
+      },
+      {
+        label: "Create New Segments",
+        path: "/segments/new?mode=create",
+      },
+      {
+        label: "Ready made segments",
+        path: "/segments/new?mode=ready-made",
+      },
+    ],
   },
   {
     label: "Suppressions",
@@ -66,12 +80,38 @@
     permission: "view_analytics",
   },
   {
-    label: "Deliverability",
+    label: "Deliverability Metrics",
     path: "/deliverability",
-    description: "Monitor sender health, bounce patterns, and inbox placement.",
+    description: "Review bounced, complained, suppressed, and unsubscribed email records.",
     group: "Insights",
     icon: "deliverability",
     permission: "view_analytics",
+  },
+  {
+    label: "Connect Your Domain",
+    path: "/connect-domain",
+    description: "Connect and verify your business domain for trusted email sending.",
+    group: "Insights",
+    icon: "domain",
+    permission: "manage_settings",
+    children: [
+      {
+        label: "My Domains",
+        path: "/connect-domain/my-domains",
+      },
+      {
+        label: "Setup DNS Records",
+        path: "/connect-domain/dns-records",
+      },
+      {
+        label: "Domain Health",
+        path: "/connect-domain/domain-health",
+      },
+      {
+        label: "Dedicated IP",
+        path: "/connect-domain/dedicated-ip",
+      },
+    ],
   },
   {
     label: "Automations",

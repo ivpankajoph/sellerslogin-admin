@@ -218,16 +218,22 @@ function EmailOpenedClickedPage() {
               key={card.key}
               type="button"
               onClick={() => handleMetricClick(card.key)}
-              className={`metric-card bg-gradient-to-br from-[rgba(131,56,236,0.07)] to-transparent text-left transition hover:-translate-y-0.5 hover:border-[#b999ff] ${
-                isActive ? 'border-[#8338ec] shadow-[0_16px_38px_rgba(131,56,236,0.16)]' : ''
+              className={`border p-4 text-left transition ${
+                isActive
+                  ? 'border-[#7c3aed] bg-[#7c3aed] shadow-[0_12px_24px_rgba(124,58,237,0.22)]'
+                  : 'border-[#d8ccef] bg-white hover:border-[#b794f4]'
               }`}
             >
-              <div className="p-4">
-                <p className="text-[13px] font-medium text-[#715d9a]">{card.label}</p>
-                <p className="mt-5 text-[23px] font-semibold leading-none text-[#21192d]">
+              <div>
+                <p className={`text-[13px] font-semibold ${isActive ? 'text-white' : 'text-[#6d4b90]'}`}>
+                  {card.label}
+                </p>
+                <p className={`mt-3 text-2xl font-semibold leading-none ${isActive ? 'text-white' : 'text-[#21192d]'}`}>
                   {value}
                 </p>
-                <p className="mt-2 text-[13px] text-[#9b8caf]">{hint}</p>
+                <p className={`mt-2 text-[13px] ${isActive ? 'text-[#efe7ff]' : 'text-[#9b8caf]'}`}>
+                  {hint}
+                </p>
               </div>
             </button>
           )

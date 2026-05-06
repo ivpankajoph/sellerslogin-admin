@@ -41,23 +41,23 @@ function SegmentsListPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="space-y-3">
             <PageHeader
-              eyebrow="Segments"
-              title="Choose how to create a segment"
-              description="Start with a ready-made segment or build one from scratch in a simple flow."
+              eyebrow="Segmentation"
+              title="All segment"
+              description="View, edit, and manage every segment created from scratch or ready-made presets."
             />
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
-              to="/segments/new?mode=ready-made"
-              className="rounded-full border border-[#ddd4f2] bg-white px-4 py-2 text-sm font-semibold text-[#5f5878]"
-            >
-              Ready-made segment
-            </Link>
-            <Link
               to="/segments/new?mode=create"
               className="rounded-full border border-[#ddd4f2] bg-white px-4 py-2 text-sm font-semibold text-[#5f5878]"
             >
-              Create from scratch
+              Create New Segments
+            </Link>
+            <Link
+              to="/segments/new?mode=ready-made"
+              className="rounded-full border border-[#ddd4f2] bg-white px-4 py-2 text-sm font-semibold text-[#5f5878]"
+            >
+              Ready made segments
             </Link>
           </div>
         </div>

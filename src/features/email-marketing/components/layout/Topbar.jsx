@@ -27,6 +27,34 @@ const routePageMeta = {
     label: 'Campaign Analytics',
     description: 'Compare campaign delivery, engagement, and cost performance.',
   },
+  '/deliverability/bounces': {
+    label: 'Bounce Emails',
+    description: 'Emails that were not delivered because the address or recipient server rejected them.',
+  },
+  '/deliverability/complaints-suppressions': {
+    label: 'Complaints & Suppressions',
+    description: 'Emails marked as spam or blocked from future sends by suppression rules.',
+  },
+  '/deliverability/unsubscribes': {
+    label: 'Unsubscribe Emails',
+    description: 'Recipients who unsubscribed from email communication.',
+  },
+  '/connect-domain/my-domains': {
+    label: 'My Domains',
+    description: 'Add, review, and manage verified business domains for email sending.',
+  },
+  '/connect-domain/dns-records': {
+    label: 'Setup DNS Records',
+    description: 'Copy SPF, DKIM, DMARC, and tracking records into your domain provider.',
+  },
+  '/connect-domain/domain-health': {
+    label: 'Domain Health',
+    description: 'Monitor domain reputation, delivery rate, bounce rate, and complaint signals.',
+  },
+  '/connect-domain/dedicated-ip': {
+    label: 'Dedicated IP',
+    description: 'Review the advanced dedicated IP option for high-volume email sending.',
+  },
 }
 
 function IconButton({ children, isActive = false, onClick }) {
