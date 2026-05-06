@@ -91,13 +91,6 @@ const getDelhiveryCode = (order: CourierOrderSummary) =>
 const getShadowfaxCode = (order: CourierOrderSummary) =>
   getRealShadowfaxReference(order.shadowfax)
 
-const getShadowfaxLabel = (order: CourierOrderSummary) => {
-  const model = readText(order.shadowfax?.order_model).toLowerCase()
-  if (model === 'warehouse') return 'Shadowfax Warehouse'
-  if (model === 'marketplace') return 'Shadowfax Marketplace'
-  return 'Shadowfax'
-}
-
 const getTrackingCode = (order: CourierOrderSummary) =>
   getShadowfaxCode(order) || getDelhiveryCode(order)
 
@@ -321,18 +314,11 @@ function QuickAction({
 export function DeliveryWorkspaceShell({
   children,
   activeSection,
-  searchValue = '',
-  onSearchChange,
-  onSearchFocus,
 }: {
   children: ReactNode
   activeSection?: 'dashboard' | 'orders' | 'courier-list' | 'apps' | 'manual' | 'delhivery' | 'shadowfax' | 'warehouses' | 'tracking'
-  searchValue?: string
-  onSearchChange?: (value: string) => void
-  onSearchFocus?: () => void
 }) {
   const navigate = useNavigate()
-  const [internalSearch, setInternalSearch] = useState(searchValue)
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.localStorage.getItem('delivery-sidebar-collapsed') !== 'false'
@@ -420,24 +406,6 @@ export function DeliveryWorkspaceShell({
 
   const openPath = (path: string) => {
     void navigate({ to: path })
-  }
-
-  const handleSearchChange = (value: string) => {
-    if (onSearchChange) {
-      onSearchChange(value)
-      return
-    }
-    setInternalSearch(value)
-  }
-
-  const openSearchResults = () => {
-    const value = onSearchChange ? searchValue : internalSearch
-    const params = new URLSearchParams()
-    params.set('view', 'orders')
-    if (value.trim()) {
-      params.set('q', value.trim())
-    }
-    void navigate({ to: `/delivery-system?${params.toString()}` })
   }
 
   return (
@@ -764,9 +732,6 @@ export function DeliverySystemDashboard() {
   return (
     <DeliveryWorkspaceShell
       activeSection={activeView === 'orders' ? 'orders' : 'dashboard'}
-      searchValue={query}
-      onSearchChange={setQuery}
-      onSearchFocus={() => setActiveView('orders')}
     >
           {error ? (
             <div className='mb-4 rounded-[6px] border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700'>
@@ -905,7 +870,6 @@ export function DeliverySystemDashboard() {
                     </thead>
                     <tbody>
                       {filteredOrders.map((order) => {
-                        const awb = getTrackingCode(order)
                         const hasShadowfax = Boolean(getShadowfaxCode(order))
                         const hasDelhivery = Boolean(getDelhiveryCode(order))
                         const hasActiveShipment = hasAnyActiveCourierAssignment(order)

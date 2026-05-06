@@ -54,6 +54,7 @@ type Transaction = {
     gross_amount?: number
     net_amount?: number
     source?: string
+    notes?: string
   }
 }
 
