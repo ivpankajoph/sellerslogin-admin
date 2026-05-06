@@ -14,6 +14,7 @@ interface Props {
   aiLoading: boolean
   onSpecChange: (key: string, value: string) => void
   onAddKey: (key: string) => void
+  onRemoveKey?: (key: string) => void
 }
 
 const toLabel = (value: string) =>
@@ -54,29 +55,27 @@ const Step3Specifications: React.FC<Props> = ({
   aiLoading,
   onSpecChange,
   onAddKey,
+  onRemoveKey,
 }) => {
   const [newKey, setNewKey] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
 
+  const excludedKeysList = useMemo(
+    () => ['size', 'brand', 'material', 'type', 'dispatch time', 'delivery time'],
+    []
+  )
+
   const activeSpecs = useMemo(() => {
     const raw = specifications[0] || {}
     const filtered: Record<string, string> = {}
-    const excludedKeys = [
-      'size',
-      'brand',
-      'material',
-      'type',
-      'dispatch time',
-      'delivery time',
-    ]
 
     Object.keys(raw).forEach((key) => {
-      if (!excludedKeys.includes(key.toLowerCase().trim())) {
+      if (!excludedKeysList.includes(key.toLowerCase().trim())) {
         filtered[key] = raw[key]
       }
     })
     return filtered
-  }, [specifications])
+  }, [specifications, excludedKeysList])
 
   const activeSpecKeys = useMemo(() => Object.keys(activeSpecs), [activeSpecs])
   const selectedKeySet = useMemo(
@@ -100,8 +99,8 @@ const Step3Specifications: React.FC<Props> = ({
 
     return Array.from(
       new Set(sourceKeys.map((key) => key.trim()).filter(Boolean))
-    ).filter((key) => !activeKeySet.has(normalizeKey(key)))
-  }, [displayActiveSpecKeys, suggestedKeys])
+    ).filter((key) => !activeKeySet.has(normalizeKey(key)) && !excludedKeysList.includes(normalizeKey(key)))
+  }, [displayActiveSpecKeys, suggestedKeys, excludedKeysList])
 
   const sortedActiveSpecKeys = useMemo(
     () =>
@@ -140,10 +139,19 @@ const Step3Specifications: React.FC<Props> = ({
       value.length > 80 || key.toLowerCase().includes('instruction')
 
     return (
-      <div key={key} className={studioCardClass}>
-        <label className='text-foreground text-sm font-medium'>
-          {toLabel(key)}
-        </label>
+      <div key={key} className={studioCardClass + ' relative'}>
+        <div className='flex items-center justify-between mb-2'>
+          <label className='text-foreground text-sm font-medium'>
+            {toLabel(key)}
+          </label>
+          <button
+            type='button'
+            onClick={() => onRemoveKey?.(key)}
+            className='text-muted-foreground hover:text-red-500 rounded-full p-1 hover:bg-red-50 transition-colors'
+          >
+            <X className='h-4 w-4' />
+          </button>
+        </div>
         {isLongField ||
         key.toLowerCase().includes('features') ||
         key.toLowerCase().includes('package') ||

@@ -107,6 +107,7 @@ interface Props {
   onVariantImageDelete: (variantIndex: number, imageIndex: number) => void
   onSpecificationChange: (key: string, value: string) => void
   onAddSpecificationKey: (key: string) => void
+  onRemoveSpecificationKey: (key: string) => void
   onReplaceVariants: (variants: Variant[]) => void
 }
 
@@ -978,6 +979,7 @@ const Step5Variants: React.FC<Props> = ({
   onVariantImageDelete,
   onSpecificationChange,
   onAddSpecificationKey,
+  onRemoveSpecificationKey,
   onReplaceVariants,
 }) => {
   const [rows, setRows] = useState<VariantRow[]>(() => {
@@ -1502,6 +1504,7 @@ const Step5Variants: React.FC<Props> = ({
         aiLoading={specificationAiLoading}
         onSpecChange={onSpecificationChange}
         onAddKey={onAddSpecificationKey}
+        onRemoveKey={onRemoveSpecificationKey}
       />
     </div>
   )

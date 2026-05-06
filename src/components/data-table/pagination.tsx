@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
   DoubleArrowLeftIcon,
   DoubleArrowRightIcon,
 } from '@radix-ui/react-icons'
+import { Download } from 'lucide-react'
 import { type Table } from '@tanstack/react-table'
 import { cn, getPageNumbers } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -27,6 +30,57 @@ export function DataTablePagination<TData>({
   const currentPage = table.getState().pagination.pageIndex + 1
   const totalPages = table.getPageCount()
   const pageNumbers = getPageNumbers(currentPage, totalPages)
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    // Look for the portal element placed by TablePageHeader
+    const target = document.getElementById('table-export-portal')
+    if (target) {
+      setPortalTarget(target)
+    }
+  }, [])
+
+  const exportToCsv = () => {
+    const columns = table.getAllLeafColumns().filter(
+      (col) => col.getIsVisible() && col.id !== 'select' && col.id !== 'actions'
+    )
+
+    const headers = columns.map((col) => {
+      if (typeof col.columnDef.header === 'string') {
+        return col.columnDef.header
+      }
+      return col.id
+    })
+
+    const rows = table.getFilteredRowModel().rows.map((row) => {
+      return columns.map((col) => {
+        let value = row.getValue(col.id)
+        if (value === null || value === undefined) {
+          value = ''
+        } else if (typeof value === 'object') {
+          value = JSON.stringify(value)
+        } else {
+          value = String(value)
+        }
+        value = String(value).replace(/"/g, '""')
+        return `"${value}"`
+      })
+    })
+
+    const csvContent = [
+      headers.map((h) => `"${h}"`).join(','),
+      ...rows.map((r) => r.join(',')),
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', 'data_export.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   return (
     <div
@@ -60,6 +114,17 @@ export function DataTablePagination<TData>({
             </SelectContent>
           </Select>
           <p className='hidden text-sm font-medium sm:block'>Rows per page</p>
+          {!portalTarget && (
+            <Button
+              variant='outline'
+              size='sm'
+              className='h-8 ml-4'
+              onClick={exportToCsv}
+            >
+              <Download className='mr-2 h-4 w-4' />
+              Excel
+            </Button>
+          )}
         </div>
       </div>
 
@@ -125,6 +190,20 @@ export function DataTablePagination<TData>({
           </Button>
         </div>
       </div>
+      
+      {portalTarget
+        ? createPortal(
+            <Button
+              variant='outline'
+              className='shrink-0 h-10 gap-2 shadow-sm'
+              onClick={exportToCsv}
+            >
+              <Download className='h-4 w-4' />
+              <span className='hidden sm:inline'>Excel</span>
+            </Button>,
+            portalTarget
+          )
+        : null}
     </div>
   )
 }

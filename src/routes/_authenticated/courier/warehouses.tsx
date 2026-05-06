@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { LoaderCircle, Plus, RefreshCcw, Warehouse } from 'lucide-react'
+import { LoaderCircle, MapPin, Plus, RefreshCcw, Warehouse } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
@@ -15,6 +15,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -106,8 +114,59 @@ const defaultShadowfaxForm: ShadowfaxWarehouseForm = {
 
 const WORKING_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
+const INDIAN_STATES = [
+  'Andaman and Nicobar Islands',
+  'Andhra Pradesh',
+  'Arunachal Pradesh',
+  'Assam',
+  'Bihar',
+  'Chandigarh',
+  'Chhattisgarh',
+  'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi',
+  'Goa',
+  'Gujarat',
+  'Haryana',
+  'Himachal Pradesh',
+  'Jammu and Kashmir',
+  'Jharkhand',
+  'Karnataka',
+  'Kerala',
+  'Ladakh',
+  'Lakshadweep',
+  'Madhya Pradesh',
+  'Maharashtra',
+  'Manipur',
+  'Meghalaya',
+  'Mizoram',
+  'Nagaland',
+  'Odisha',
+  'Puducherry',
+  'Punjab',
+  'Rajasthan',
+  'Sikkim',
+  'Tamil Nadu',
+  'Telangana',
+  'Tripura',
+  'Uttar Pradesh',
+  'Uttarakhand',
+  'West Bengal',
+]
+
 const toggleDay = (days: string[], day: string) =>
   days.includes(day) ? days.filter((entry) => entry !== day) : [...days, day]
+
+const greenButtonClass = 'bg-emerald-700 text-white hover:bg-emerald-800'
+const greenOutlineButtonClass =
+  'border-emerald-700 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800'
+const activeDayClass = 'border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800'
+const inactiveDayClass = 'border-border bg-background text-foreground hover:bg-muted'
+
+const buildShadowfaxPayload = (form: ShadowfaxWarehouseForm) => ({
+  ...form,
+  latitude: readText(form.latitude) || undefined,
+  longitude: readText(form.longitude) || undefined,
+})
 
 function CourierWarehouseManagePage() {
   const navigate = useNavigate()
@@ -172,7 +231,7 @@ function CourierWarehouseManagePage() {
 
       try {
         setBusy('create')
-        await createShadowfaxWarehouse(shadowfaxForm)
+        await createShadowfaxWarehouse(buildShadowfaxPayload(shadowfaxForm))
         toast.success('Shadowfax warehouse created')
         setCreateOpen(false)
         setCreateProvider('')
@@ -227,7 +286,7 @@ function CourierWarehouseManagePage() {
     if (selected.provider === 'shadowfax') {
       try {
         setBusy('edit')
-        await updateShadowfaxWarehouse(selected.id, editShadowfaxForm)
+        await updateShadowfaxWarehouse(selected.id, buildShadowfaxPayload(editShadowfaxForm))
         toast.success('Shadowfax warehouse updated')
         setEditOpen(false)
         await loadWarehouses()
@@ -274,11 +333,17 @@ function CourierWarehouseManagePage() {
               </p>
             </div>
             <div className='flex items-center gap-2'>
-              <Button variant='outline' onClick={() => void loadWarehouses()} disabled={loading}>
+              <Button
+                variant='outline'
+                className={greenOutlineButtonClass}
+                onClick={() => void loadWarehouses()}
+                disabled={loading}
+              >
                 <RefreshCcw className='h-4 w-4' />
                 Refresh
               </Button>
               <Button
+                className={greenButtonClass}
                 onClick={() => {
                   setCreateProvider('')
                   setCreateOpen(true)
@@ -427,9 +492,7 @@ function CourierWarehouseManagePage() {
                 onClick={() => setCreateProvider('delhivery')}
               >
                 <p className='text-lg font-semibold text-sky-900'>Delhivery</p>
-                <p className='mt-2 text-sm leading-6 text-sky-800'>
-                  Create a client warehouse through Delhivery API.
-                </p>
+               
               </button>
               <button
                 type='button'
@@ -437,23 +500,21 @@ function CourierWarehouseManagePage() {
                 onClick={() => setCreateProvider('shadowfax')}
               >
                 <p className='text-lg font-semibold text-orange-900'>Shadowfax</p>
-                <p className='mt-2 text-sm leading-6 text-orange-800'>
-                  Create Shadowfax pickup details and validate pincode through Shadowfax API.
-                </p>
+                
               </button>
             </div>
           ) : createProvider === 'delhivery' ? (
             <div className='grid gap-3 sm:grid-cols-2'>
-              <Input placeholder='Warehouse name*' value={createForm.name} onChange={(e) => setCreateForm((c) => ({ ...c, name: e.target.value }))} />
-              <Input placeholder='Registered name' value={createForm.registered_name} onChange={(e) => setCreateForm((c) => ({ ...c, registered_name: e.target.value }))} />
-              <Input placeholder='Phone*' value={createForm.phone} onChange={(e) => setCreateForm((c) => ({ ...c, phone: e.target.value }))} />
-              <Input placeholder='Email' value={createForm.email} onChange={(e) => setCreateForm((c) => ({ ...c, email: e.target.value }))} />
-              <Textarea className='sm:col-span-2 min-h-[78px] rounded-none' placeholder='Address' value={createForm.address} onChange={(e) => setCreateForm((c) => ({ ...c, address: e.target.value }))} />
-              <Input placeholder='City' value={createForm.city} onChange={(e) => setCreateForm((c) => ({ ...c, city: e.target.value }))} />
-              <Input placeholder='Pin*' value={createForm.pin} onChange={(e) => setCreateForm((c) => ({ ...c, pin: e.target.value }))} />
-              <Input placeholder='Country' value={createForm.country} onChange={(e) => setCreateForm((c) => ({ ...c, country: e.target.value }))} />
+              <div><Label>Warehouse name*</Label><Input placeholder='Warehouse name*' value={createForm.name} onChange={(e) => setCreateForm((c) => ({ ...c, name: e.target.value }))} /></div>
+              <div><Label>Registered name</Label><Input placeholder='Registered name' value={createForm.registered_name} onChange={(e) => setCreateForm((c) => ({ ...c, registered_name: e.target.value }))} /></div>
+              <div><Label>Phone*</Label><Input placeholder='Phone*' value={createForm.phone} onChange={(e) => setCreateForm((c) => ({ ...c, phone: e.target.value }))} /></div>
+              <div><Label>Email</Label><Input placeholder='Email' value={createForm.email} onChange={(e) => setCreateForm((c) => ({ ...c, email: e.target.value }))} /></div>
+              <div className='sm:col-span-2'><Label>Address</Label><Textarea className='min-h-[78px] rounded-none' placeholder='Address' value={createForm.address} onChange={(e) => setCreateForm((c) => ({ ...c, address: e.target.value }))} /></div>
+              <div><Label>City</Label><Input placeholder='City' value={createForm.city} onChange={(e) => setCreateForm((c) => ({ ...c, city: e.target.value }))} /></div>
+              <div><Label>Pin*</Label><Input placeholder='Pin*' value={createForm.pin} onChange={(e) => setCreateForm((c) => ({ ...c, pin: e.target.value }))} /></div>
+              <div><Label>Country</Label><Input placeholder='Country' value={createForm.country} onChange={(e) => setCreateForm((c) => ({ ...c, country: e.target.value }))} /></div>
               <div className='sm:col-span-2 space-y-2'>
-                <p className='text-sm font-medium'>Working Days</p>
+                <Label className='mb-0'>Working Days</Label>
                 <div className='flex flex-wrap gap-2'>
                   {WORKING_DAYS.map((day) => {
                     const active = createForm.working_days.includes(day)
@@ -465,7 +526,7 @@ function CourierWarehouseManagePage() {
                           setCreateForm((c) => ({ ...c, working_days: toggleDay(c.working_days, day) }))
                         }
                         className={`rounded-none border px-3 py-1.5 text-sm ${
-                          active ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-border bg-background text-foreground'
+                          active ? activeDayClass : inactiveDayClass
                         }`}
                       >
                         {day}
@@ -484,11 +545,11 @@ function CourierWarehouseManagePage() {
               </label>
               {!returnSameAsAbove ? (
                 <>
-                  <Textarea className='sm:col-span-2 min-h-[78px] rounded-none' placeholder='Return address*' value={createForm.return_address} onChange={(e) => setCreateForm((c) => ({ ...c, return_address: e.target.value }))} />
-                  <Input placeholder='Return city' value={createForm.return_city} onChange={(e) => setCreateForm((c) => ({ ...c, return_city: e.target.value }))} />
-                  <Input placeholder='Return pin' value={createForm.return_pin} onChange={(e) => setCreateForm((c) => ({ ...c, return_pin: e.target.value }))} />
-                  <Input placeholder='Return state' value={createForm.return_state} onChange={(e) => setCreateForm((c) => ({ ...c, return_state: e.target.value }))} />
-                  <Input placeholder='Return country' value={createForm.return_country} onChange={(e) => setCreateForm((c) => ({ ...c, return_country: e.target.value }))} />
+                  <div className='sm:col-span-2'><Label>Return address*</Label><Textarea className='min-h-[78px] rounded-none' placeholder='Return address*' value={createForm.return_address} onChange={(e) => setCreateForm((c) => ({ ...c, return_address: e.target.value }))} /></div>
+                  <div><Label>Return city</Label><Input placeholder='Return city' value={createForm.return_city} onChange={(e) => setCreateForm((c) => ({ ...c, return_city: e.target.value }))} /></div>
+                  <div><Label>Return pin</Label><Input placeholder='Return pin' value={createForm.return_pin} onChange={(e) => setCreateForm((c) => ({ ...c, return_pin: e.target.value }))} /></div>
+                  <div><Label>Return state</Label><Input placeholder='Return state' value={createForm.return_state} onChange={(e) => setCreateForm((c) => ({ ...c, return_state: e.target.value }))} /></div>
+                  <div><Label>Return country</Label><Input placeholder='Return country' value={createForm.return_country} onChange={(e) => setCreateForm((c) => ({ ...c, return_country: e.target.value }))} /></div>
                 </>
               ) : null}
             </div>
@@ -507,7 +568,11 @@ function CourierWarehouseManagePage() {
               Cancel
             </Button>
             {createProvider ? (
-              <Button onClick={() => void onCreate()} disabled={busy === 'create'}>
+              <Button
+                className={greenButtonClass}
+                onClick={() => void onCreate()}
+                disabled={busy === 'create'}
+              >
                 {busy === 'create' ? <LoaderCircle className='h-4 w-4 animate-spin' /> : <Warehouse className='h-4 w-4' />}
                 {busy === 'create' ? 'Creating' : 'Create'}
               </Button>
@@ -528,11 +593,11 @@ function CourierWarehouseManagePage() {
             <ShadowfaxWarehouseFields form={editShadowfaxForm} setForm={setEditShadowfaxForm} />
           ) : (
             <div className='grid gap-3'>
-              <Textarea className='min-h-[78px] rounded-none' placeholder='Address' value={editForm.address} onChange={(e) => setEditForm((c) => ({ ...c, address: e.target.value }))} />
-              <Input placeholder='Pin' value={editForm.pin} onChange={(e) => setEditForm((c) => ({ ...c, pin: e.target.value }))} />
-              <Input placeholder='Phone' value={editForm.phone} onChange={(e) => setEditForm((c) => ({ ...c, phone: e.target.value }))} />
+              <div><Label>Address</Label><Textarea className='min-h-[78px] rounded-none' placeholder='Address' value={editForm.address} onChange={(e) => setEditForm((c) => ({ ...c, address: e.target.value }))} /></div>
+              <div><Label>Pin</Label><Input placeholder='Pin' value={editForm.pin} onChange={(e) => setEditForm((c) => ({ ...c, pin: e.target.value }))} /></div>
+              <div><Label>Phone</Label><Input placeholder='Phone' value={editForm.phone} onChange={(e) => setEditForm((c) => ({ ...c, phone: e.target.value }))} /></div>
               <div className='space-y-2'>
-                <p className='text-sm font-medium'>Working Days</p>
+                <Label className='mb-0'>Working Days</Label>
                 <div className='flex flex-wrap gap-2'>
                   {WORKING_DAYS.map((day) => {
                     const active = editForm.working_days.includes(day)
@@ -544,7 +609,7 @@ function CourierWarehouseManagePage() {
                           setEditForm((c) => ({ ...c, working_days: toggleDay(c.working_days, day) }))
                         }
                         className={`rounded-none border px-3 py-1.5 text-sm ${
-                          active ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-border bg-background text-foreground'
+                          active ? activeDayClass : inactiveDayClass
                         }`}
                       >
                         {day}
@@ -557,7 +622,7 @@ function CourierWarehouseManagePage() {
           )}
           <DialogFooter>
             <Button variant='outline' onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={() => void onEdit()} disabled={busy === 'edit'}>
+            <Button className={greenButtonClass} onClick={() => void onEdit()} disabled={busy === 'edit'}>
               {busy === 'edit' ? <LoaderCircle className='h-4 w-4 animate-spin' /> : null}
               {busy === 'edit' ? 'Updating' : 'Update'}
             </Button>
@@ -575,21 +640,93 @@ function ShadowfaxWarehouseFields({
   form: ShadowfaxWarehouseForm
   setForm: Dispatch<SetStateAction<ShadowfaxWarehouseForm>>
 }) {
+  const [locating, setLocating] = useState(false)
+  const stateOptions = useMemo(
+    () =>
+      form.state && !INDIAN_STATES.includes(form.state)
+        ? [form.state, ...INDIAN_STATES]
+        : INDIAN_STATES,
+    [form.state]
+  )
+
+  useEffect(() => {
+    setForm((c) => {
+      if (!c.unique_code) {
+        return { ...c, unique_code: 'WH-' + Math.random().toString(36).substring(2, 8).toUpperCase() }
+      }
+      return c
+    })
+  }, [setForm])
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Location tracking is not supported in this browser')
+      return
+    }
+
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setForm((c) => ({
+          ...c,
+          latitude: position.coords.latitude.toFixed(6),
+          longitude: position.coords.longitude.toFixed(6),
+        }))
+        toast.success('Current location added')
+        setLocating(false)
+      },
+      (error) => {
+        toast.error(error.message || 'Unable to get current location')
+        setLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    )
+  }
+
   return (
     <div className='grid gap-3 sm:grid-cols-2'>
-      <Input placeholder='Warehouse name*' value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} />
-      <Input placeholder='Unique code*' value={form.unique_code} onChange={(e) => setForm((c) => ({ ...c, unique_code: e.target.value }))} />
-      <Input placeholder='Contact*' value={form.contact} onChange={(e) => setForm((c) => ({ ...c, contact: e.target.value }))} />
-      <Input placeholder='Email' value={form.email} onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))} />
-      <Textarea className='sm:col-span-2 min-h-[78px] rounded-none' placeholder='Address line 1*' value={form.address_line_1} onChange={(e) => setForm((c) => ({ ...c, address_line_1: e.target.value }))} />
-      <Textarea className='sm:col-span-2 min-h-[64px] rounded-none' placeholder='Address line 2' value={form.address_line_2} onChange={(e) => setForm((c) => ({ ...c, address_line_2: e.target.value }))} />
-      <Input placeholder='City*' value={form.city} onChange={(e) => setForm((c) => ({ ...c, city: e.target.value }))} />
-      <Input placeholder='State*' value={form.state} onChange={(e) => setForm((c) => ({ ...c, state: e.target.value }))} />
-      <Input placeholder='Pincode*' value={form.pincode} onChange={(e) => setForm((c) => ({ ...c, pincode: e.target.value }))} />
-      <Input placeholder='Latitude' value={form.latitude} onChange={(e) => setForm((c) => ({ ...c, latitude: e.target.value }))} />
-      <Input placeholder='Longitude' value={form.longitude} onChange={(e) => setForm((c) => ({ ...c, longitude: e.target.value }))} />
+      <div><Label>Warehouse name*</Label><Input placeholder='Warehouse name*' value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} /></div>
+      <div><Label>Unique code*</Label><Input placeholder='Unique code*' value={form.unique_code} onChange={(e) => setForm((c) => ({ ...c, unique_code: e.target.value }))} /></div>
+      <div><Label>Contact*</Label><Input placeholder='Contact*' value={form.contact} onChange={(e) => setForm((c) => ({ ...c, contact: e.target.value }))} /></div>
+      <div><Label>Email</Label><Input placeholder='Email' value={form.email} onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))} /></div>
+      <div className='sm:col-span-2'><Label>Address line 1*</Label><Textarea className='min-h-[78px] rounded-none' placeholder='Address line 1*' value={form.address_line_1} onChange={(e) => setForm((c) => ({ ...c, address_line_1: e.target.value }))} /></div>
+      <div className='sm:col-span-2'><Label>Address line 2</Label><Textarea className='min-h-[64px] rounded-none' placeholder='Address line 2' value={form.address_line_2} onChange={(e) => setForm((c) => ({ ...c, address_line_2: e.target.value }))} /></div>
+      <div><Label>City*</Label><Input placeholder='City*' value={form.city} onChange={(e) => setForm((c) => ({ ...c, city: e.target.value }))} /></div>
+      <div>
+        <Label>State*</Label>
+        <Select
+          value={form.state}
+          onValueChange={(value) => setForm((c) => ({ ...c, state: value }))}
+        >
+          <SelectTrigger className='h-11 w-full rounded-none'>
+            <SelectValue placeholder='Select state' />
+          </SelectTrigger>
+          <SelectContent>
+            {stateOptions.map((state) => (
+              <SelectItem key={state} value={state}>
+                {state}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div><Label>Pincode*</Label><Input placeholder='Pincode*' value={form.pincode} onChange={(e) => setForm((c) => ({ ...c, pincode: e.target.value }))} /></div>
+      <div><Label>Latitude (optional)</Label><Input placeholder='Latitude' value={form.latitude} onChange={(e) => setForm((c) => ({ ...c, latitude: e.target.value }))} /></div>
+      <div><Label>Longitude (optional)</Label><Input placeholder='Longitude' value={form.longitude} onChange={(e) => setForm((c) => ({ ...c, longitude: e.target.value }))} /></div>
+      <div className='sm:col-span-2'>
+        <Button
+          type='button'
+          variant='outline'
+          className={greenOutlineButtonClass}
+          onClick={useCurrentLocation}
+          disabled={locating}
+        >
+          {locating ? <LoaderCircle className='h-4 w-4 animate-spin' /> : <MapPin className='h-4 w-4' />}
+          {locating ? 'Getting location' : 'Use current location'}
+        </Button>
+      </div>
       <div className='sm:col-span-2 space-y-2'>
-        <p className='text-sm font-medium'>Working Days</p>
+        <Label className='mb-0'>Working Days</Label>
         <div className='flex flex-wrap gap-2'>
           {WORKING_DAYS.map((day) => {
             const active = form.working_days.includes(day)
@@ -601,7 +738,7 @@ function ShadowfaxWarehouseFields({
                   setForm((c) => ({ ...c, working_days: toggleDay(c.working_days, day) }))
                 }
                 className={`rounded-none border px-3 py-1.5 text-sm ${
-                  active ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-border bg-background text-foreground'
+                  active ? activeDayClass : inactiveDayClass
                 }`}
               >
                 {day}

@@ -153,6 +153,12 @@ export const sidebarData: Pick<SidebarData, 'navGroups'> = {
           roles: [ROLES.ADMIN, ROLES.VENDOR],
           pageKey: 'orders',
         },
+        {
+          title: 'Delivery Markup',
+          url: '/delivery-markup',
+          icon: ReceiptText,
+          roles: [ROLES.ADMIN],
+        },
       ],
     },
     {

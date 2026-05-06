@@ -178,6 +178,33 @@ function WalletPage() {
     }, 0)
   }, [transactions])
 
+  const downloadCSV = () => {
+    if (!filtered.length) return
+
+    const headers = ['Order', 'Vendor/Source', 'Product', 'Commission', 'Amount', 'Type', 'Balance After', 'Date']
+    const rows = filtered.map(tx => {
+      const order = tx.meta?.order_number || 'Order credit'
+      const source = tx.meta?.vendor_id || tx.meta?.source || 'Wallet entry'
+      const product = tx.meta?.product_name || 'Product'
+      const comm = tx.meta?.commission_percent ? `${tx.meta.commission_percent}%` : ''
+      const amount = tx.amount
+      const type = tx.direction
+      const bal = tx.balance_after
+      const date = new Date(tx.createdAt).toLocaleString()
+      
+      return [order, source, product, comm, amount, type, bal, date]
+        .map(v => `"${String(v).replace(/"/g, '""')}"`)
+        .join(',')
+    })
+
+    const csv = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `wallet_transactions_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+  }
+
   const statsItems = [
     {
       label: 'Wallet Balance',
@@ -240,6 +267,14 @@ function WalletPage() {
           onClick={() => setStatsOpen(true)}
         >
           Statistics
+        </Button>
+        <Button
+          variant='outline'
+          className='shrink-0'
+          onClick={downloadCSV}
+          disabled={!filtered.length}
+        >
+          Export CSV
         </Button>
         <Button className='shrink-0' onClick={fetchWallet} disabled={loading}>
           {loading ? 'Refreshing...' : 'Refresh'}
@@ -365,9 +400,13 @@ function WalletPage() {
             <div className='space-y-5'>
               <div className='flex flex-wrap items-center justify-between gap-3'>
                 <div>
-                  <p className='text-muted-foreground text-xs'>Order number</p>
+                  <p className='text-muted-foreground text-xs'>
+                    {selectedTx.meta?.source === 'wallet-topup' ? 'Transaction type' : 'Order number'}
+                  </p>
                   <p className='text-sm font-semibold text-slate-900'>
-                    {selectedTx.meta?.order_number
+                    {selectedTx.meta?.source === 'wallet-topup' 
+                      ? 'Wallet Top-up'
+                      : selectedTx.meta?.order_number
                       ? `#${selectedTx.meta.order_number}`
                       : 'Order credit'}
                   </p>
@@ -395,57 +434,105 @@ function WalletPage() {
                 </div>
               </div>
 
-              <div className='flex items-start gap-4 rounded-none border border-slate-200 bg-slate-50 p-4'>
-                <div className='h-20 w-20 overflow-hidden rounded-none bg-white'>
-                  <img
-                    src={selectedTx.meta?.image_url || FALLBACK_IMAGE}
-                    alt={selectedTx.meta?.product_name || 'Product'}
-                    className='h-full w-full object-cover'
-                  />
+              {selectedTx.meta?.source === 'wallet-topup' ? (
+                <div className='space-y-4'>
+                  <div className='rounded-none border border-slate-200 bg-slate-50 p-4'>
+                    <p className='text-sm font-semibold text-slate-900 mb-2'>Top-up Details</p>
+                    <p className='text-sm text-slate-700 whitespace-pre-line'>
+                      {selectedTx.meta?.notes || 'Processed via Razorpay Checkout'}
+                    </p>
+                  </div>
+                  <div className='grid gap-3 md:grid-cols-2'>
+                    <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                      <p className='text-muted-foreground text-xs'>Payment Method</p>
+                      <p className='font-semibold text-slate-900'>Razorpay (Online)</p>
+                    </div>
+                    <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                      <p className='text-muted-foreground text-xs'>Balance after</p>
+                      <p className='font-semibold text-slate-900'>
+                        {formatMoney(selectedTx.balance_after)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className='min-w-0 flex-1'>
-                  <p className='text-sm font-semibold text-slate-900'>
-                    {selectedTx.meta?.product_name || 'Product'}
-                  </p>
-                  <p className='text-muted-foreground text-xs'>
-                    Qty: {selectedTx.meta?.quantity || 0}
-                  </p>
-                  <p className='text-muted-foreground text-xs'>
-                    Unit price: {formatMoney(selectedTx.meta?.unit_price)}
-                  </p>
-                  <p className='text-muted-foreground text-xs'>
-                    Item total: {formatMoney(selectedTx.meta?.total_price)}
-                  </p>
+              ) : selectedTx.meta?.source?.includes('shipment') ? (
+                <div className='space-y-4'>
+                  <div className='rounded-none border border-slate-200 bg-slate-50 p-4'>
+                    <p className='text-sm font-semibold text-slate-900 mb-2'>Shipment Details</p>
+                    <p className='text-sm text-slate-700'>
+                      {selectedTx.meta?.product_name || 'Courier Label'}
+                    </p>
+                  </div>
+                  <div className='grid gap-3 md:grid-cols-2'>
+                    <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                      <p className='text-muted-foreground text-xs'>Courier Fee</p>
+                      <p className='font-semibold text-slate-900'>
+                        {formatMoney(selectedTx.meta?.total_price || selectedTx.amount)}
+                      </p>
+                    </div>
+                    <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                      <p className='text-muted-foreground text-xs'>Balance after</p>
+                      <p className='font-semibold text-slate-900'>
+                        {formatMoney(selectedTx.balance_after)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className='flex items-start gap-4 rounded-none border border-slate-200 bg-slate-50 p-4'>
+                    <div className='h-20 w-20 overflow-hidden rounded-none bg-white'>
+                      <img
+                        src={selectedTx.meta?.image_url || FALLBACK_IMAGE}
+                        alt={selectedTx.meta?.product_name || 'Product'}
+                        className='h-full w-full object-cover'
+                      />
+                    </div>
+                    <div className='min-w-0 flex-1'>
+                      <p className='text-sm font-semibold text-slate-900'>
+                        {selectedTx.meta?.product_name || 'Product'}
+                      </p>
+                      <p className='text-muted-foreground text-xs'>
+                        Qty: {selectedTx.meta?.quantity || 0}
+                      </p>
+                      <p className='text-muted-foreground text-xs'>
+                        Unit price: {formatMoney(selectedTx.meta?.unit_price)}
+                      </p>
+                      <p className='text-muted-foreground text-xs'>
+                        Item total: {formatMoney(selectedTx.meta?.total_price)}
+                      </p>
+                    </div>
+                  </div>
 
-              <div className='grid gap-3 md:grid-cols-2'>
-                <div className='rounded-none border border-slate-200 p-3 text-sm'>
-                  <p className='text-muted-foreground text-xs'>Gross amount</p>
-                  <p className='font-semibold text-slate-900'>
-                    {formatMoney(selectedTx.meta?.gross_amount)}
-                  </p>
-                </div>
-                <div className='rounded-none border border-slate-200 p-3 text-sm'>
-                  <p className='text-muted-foreground text-xs'>Commission</p>
-                  <p className='font-semibold text-slate-900'>
-                    {selectedTx.meta?.commission_percent ?? 0}% •{' '}
-                    {formatMoney(selectedTx.meta?.commission_amount)}
-                  </p>
-                </div>
-                <div className='rounded-none border border-slate-200 p-3 text-sm'>
-                  <p className='text-muted-foreground text-xs'>Vendor payout</p>
-                  <p className='font-semibold text-slate-900'>
-                    {formatMoney(selectedTx.meta?.net_amount)}
-                  </p>
-                </div>
-                <div className='rounded-none border border-slate-200 p-3 text-sm'>
-                  <p className='text-muted-foreground text-xs'>Balance after</p>
-                  <p className='font-semibold text-slate-900'>
-                    {formatMoney(selectedTx.balance_after)}
-                  </p>
-                </div>
-              </div>
+                  <div className='grid gap-3 md:grid-cols-2'>
+                    <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                      <p className='text-muted-foreground text-xs'>Gross amount</p>
+                      <p className='font-semibold text-slate-900'>
+                        {formatMoney(selectedTx.meta?.gross_amount)}
+                      </p>
+                    </div>
+                    <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                      <p className='text-muted-foreground text-xs'>Commission</p>
+                      <p className='font-semibold text-slate-900'>
+                        {selectedTx.meta?.commission_percent ?? 0}% •{' '}
+                        {formatMoney(selectedTx.meta?.commission_amount)}
+                      </p>
+                    </div>
+                    <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                      <p className='text-muted-foreground text-xs'>Vendor payout</p>
+                      <p className='font-semibold text-slate-900'>
+                        {formatMoney(selectedTx.meta?.net_amount)}
+                      </p>
+                    </div>
+                    <div className='rounded-none border border-slate-200 p-3 text-sm'>
+                      <p className='text-muted-foreground text-xs'>Balance after</p>
+                      <p className='font-semibold text-slate-900'>
+                        {formatMoney(selectedTx.balance_after)}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </DialogContent>

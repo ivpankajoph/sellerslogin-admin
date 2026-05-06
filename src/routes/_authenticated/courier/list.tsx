@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ExternalLink, Truck } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { CalendarPlus, Download, ExternalLink, LoaderCircle, RefreshCcw, Truck } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,14 +21,17 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
+  createDelhiveryPickupRequest,
   fetchExternalDelhiveryShipments,
+  generateDelhiveryLabel,
   getAssignedCourierForOrder,
   loadCourierOrders,
+  trackDelhiveryShipment,
   type ExternalDelhiveryShipment,
 } from '@/features/courier/api'
 import {
   COURIER_PARTNER_MAP,
-  hasAnyActiveCourierAssignment,
+  hasAnyCourierAssignment,
   type CourierPartner,
   type CourierPartnerId,
   type CourierOrderSummary,
@@ -75,6 +79,11 @@ type ExternalShipmentRow = {
 
 type ShipmentRow = OrderShipmentRow | ExternalShipmentRow
 
+type LabelPreview = {
+  title: string
+  url: string
+}
+
 const readText = (value: unknown) => String(value ?? '').trim()
 const FALLBACK_IMAGE =
   'data:image/svg+xml;utf8,' +
@@ -112,6 +121,48 @@ const resolveItemImage = (value?: string) => {
 
 const formatDateTime = (value?: string) =>
   value ? new Date(value).toLocaleString('en-IN') : 'Not available'
+
+const isClosedShipmentStatus = (value: unknown) => {
+  const text = readText(value).toLowerCase()
+  return ['cancel', 'canceled', 'cancelled', 'fail', 'failed', 'rto'].some((entry) =>
+    text.includes(entry)
+  )
+}
+
+const hasOrderCourierHistory = (order: CourierOrderSummary) => {
+  const provider = readText(order.deliveryProvider).toLowerCase()
+  return (
+    hasAnyCourierAssignment(order) ||
+    Boolean(order.delhivery) ||
+    Boolean(order.shadowfax) ||
+    Boolean(order.borzo?.order_id) ||
+    ['delhivery', 'shadowfax', 'borzo', 'porter'].some((entry) => provider.includes(entry))
+  )
+}
+
+const getPartnerIdForOrderRow = (order: CourierOrderSummary, assignmentPartner?: CourierPartnerId) => {
+  const provider = readText(order.deliveryProvider).toLowerCase()
+  if (assignmentPartner) return assignmentPartner
+  if (order.delhivery || provider.includes('delhivery')) return 'delhivery'
+  if (order.shadowfax || provider.includes('shadowfax')) return 'shadowfax'
+  if (order.borzo?.order_id || provider.includes('borzo')) return 'borzo'
+  return 'borzo'
+}
+
+const getOrderDeliveryCostLabel = (order: CourierOrderSummary) => {
+  const charged = Number(order.deliveryCost || 0)
+  if (!charged) return `Order ${formatINR(order.total)}`
+  return `Order ${formatINR(order.total)} | Delivery ${formatINR(charged)}`
+}
+
+const getTomorrowDate = () => {
+  const date = new Date()
+  date.setDate(date.getDate() + 1)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 const DetailKV = ({ label, value }: { label: string; value: string }) => (
   <div className='flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-white/80 px-3 py-2'>
@@ -168,85 +219,73 @@ function CourierListPage() {
   const [error, setError] = useState('')
   const [selectedShipment, setSelectedShipment] = useState<ShipmentRow | null>(null)
   const [resolvedItemImages, setResolvedItemImages] = useState<Record<string, string>>({})
+  const [actionBusy, setActionBusy] = useState('')
+  const [labelPreview, setLabelPreview] = useState<LabelPreview | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
+  const loadShipments = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError('')
 
-    const load = async () => {
-      try {
-        setLoading(true)
-        setError('')
+      const [ordersResult, externalResult] = await Promise.allSettled([
+        loadCourierOrders(isVendor),
+        isVendor
+          ? fetchExternalDelhiveryShipments()
+          : Promise.resolve({ success: true, shipments: [] as ExternalDelhiveryShipment[] }),
+      ])
 
-        const [ordersResult, externalResult] = await Promise.allSettled([
-          loadCourierOrders(isVendor),
-          isVendor
-            ? fetchExternalDelhiveryShipments()
-            : Promise.resolve({ success: true, shipments: [] as ExternalDelhiveryShipment[] }),
-        ])
-
-        if (cancelled) return
-
-        if (ordersResult.status === 'fulfilled') {
-          setOrders(ordersResult.value)
-        } else {
-          setOrders([])
-        }
-
-        if (externalResult.status === 'fulfilled') {
-          setExternalShipments(
-            Array.isArray(externalResult.value?.shipments) ? externalResult.value.shipments : []
-          )
-        } else {
-          setExternalShipments([])
-        }
-
-        if (ordersResult.status === 'rejected' && externalResult.status === 'rejected') {
-          setError(
-            getErrorMessage(
-              ordersResult.reason,
-              getErrorMessage(externalResult.reason, 'Failed to load courier shipments')
-            )
-          )
-          return
-        }
-
-        if (ordersResult.status === 'rejected') {
-          setError(getErrorMessage(ordersResult.reason, 'Failed to load order-linked courier shipments'))
-          return
-        }
-
-        if (externalResult.status === 'rejected') {
-          setError(
-            getErrorMessage(
-              externalResult.reason,
-              'Order-linked shipments loaded, but Delhivery panel imports could not be loaded'
-            )
-          )
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+      if (ordersResult.status === 'fulfilled') {
+        setOrders(ordersResult.value)
+      } else {
+        setOrders([])
       }
-    }
 
-    void load()
+      if (externalResult.status === 'fulfilled') {
+        setExternalShipments(
+          Array.isArray(externalResult.value?.shipments) ? externalResult.value.shipments : []
+        )
+      } else {
+        setExternalShipments([])
+      }
 
-    return () => {
-      cancelled = true
+      if (ordersResult.status === 'rejected' && externalResult.status === 'rejected') {
+        setError(
+          getErrorMessage(
+            ordersResult.reason,
+            getErrorMessage(externalResult.reason, 'Failed to load courier shipments')
+          )
+        )
+        return
+      }
+
+      if (ordersResult.status === 'rejected') {
+        setError(getErrorMessage(ordersResult.reason, 'Failed to load order-linked courier shipments'))
+        return
+      }
+
+      if (externalResult.status === 'rejected') {
+        setError(
+          getErrorMessage(
+            externalResult.reason,
+            'Order-linked shipments loaded, but Delhivery panel imports could not be loaded'
+          )
+        )
+      }
+    } finally {
+      setLoading(false)
     }
   }, [isVendor])
 
+  useEffect(() => {
+    void loadShipments()
+  }, [loadShipments])
+
   const shipmentRows = useMemo(() => {
     const orderRows = orders
-      .filter((order) => hasAnyActiveCourierAssignment(order))
+      .filter((order) => hasOrderCourierHistory(order))
       .map<ShipmentRow>((order) => {
-        const assignment = getAssignedCourierForOrder(order)
-        const partnerId: CourierPartnerId = assignment
-          ? assignment.partnerId
-          : order.delhivery?.waybill || order.delhivery?.waybills?.length
-            ? 'delhivery'
-            : 'borzo'
+        const assignment = getAssignedCourierForOrder(order, false)
+        const partnerId: CourierPartnerId = getPartnerIdForOrderRow(order, assignment?.partnerId)
         const partner = COURIER_PARTNER_MAP[partnerId]
 
         const trackingCode =
@@ -258,6 +297,9 @@ function CourierListPage() {
         const trackingStatus =
           assignment?.trackingStatus ||
           order.delhivery?.status ||
+          order.delhivery?.status_description ||
+          order.shadowfax?.status ||
+          order.shadowfax?.status_description ||
           order.borzo?.status ||
           'Active'
 
@@ -274,7 +316,7 @@ function CourierListPage() {
           id: `${partner.id}-${order.id}`,
           kind: 'order',
           title: order.orderNumber,
-          priceLabel: formatINR(order.total),
+          priceLabel: getOrderDeliveryCostLabel(order),
           customerPrimary: order.customerName || 'No customer',
           customerSecondary: order.pincode || 'No pincode',
           partner,
@@ -395,6 +437,67 @@ function CourierListPage() {
     return resolveItemImage(fallback)
   }
 
+  const isDelhiveryOrderShipment = (shipment: ShipmentRow | null): shipment is OrderShipmentRow =>
+    Boolean(shipment && shipment.kind === 'order' && shipment.partner.id === 'delhivery')
+
+  const runDelhiveryAction = async (
+    shipment: ShipmentRow,
+    action: 'track' | 'label' | 'pickup'
+  ) => {
+    if (!isDelhiveryOrderShipment(shipment)) return
+    const busyKey = `${action}-${shipment.order.id}`
+    try {
+      setActionBusy(busyKey)
+      if (action === 'track') {
+        await trackDelhiveryShipment(shipment.order)
+        toast.success('Delhivery status synced')
+        await loadShipments()
+        return
+      }
+
+      if (action === 'label') {
+        const response = await generateDelhiveryLabel(shipment.order, {
+          pdf: true,
+          pdf_size: 'A4',
+        })
+        const labelUrl = readText(response?.label?.label_url || response?.order?.delhivery?.label_url)
+        setLabelPreview({
+          title: `Delhivery label response - ${shipment.title}`,
+          url: labelUrl,
+        })
+        toast.success('Shipping label generated')
+        await loadShipments()
+        if (labelUrl) {
+          window.open(labelUrl, '_blank', 'noopener,noreferrer')
+        } else {
+          toast.info('Delhivery did not return a direct download URL.')
+        }
+        return
+      }
+
+      await createDelhiveryPickupRequest(shipment.order, {
+        pickup_date: getTomorrowDate(),
+        pickup_time: '14:00:00',
+        expected_package_count: Math.max(shipment.order.itemsCount || 1, 1),
+      })
+      toast.success('Delhivery pickup request created')
+      await loadShipments()
+    } catch (err) {
+      toast.error(
+        getErrorMessage(
+          err,
+          action === 'track'
+            ? 'Failed to sync Delhivery status'
+            : action === 'label'
+              ? 'Failed to generate shipping label'
+              : 'Failed to add shipment to pickup'
+        )
+      )
+    } finally {
+      setActionBusy('')
+    }
+  }
+
   return (
     <>
       <div className='space-y-5'>
@@ -412,11 +515,11 @@ function CourierListPage() {
           </div>
         ) : shipmentRows.length === 0 ? (
           <div className='rounded-2xl border border-dashed border-border bg-muted/40 p-8 text-sm text-muted-foreground'>
-            No active courier shipments found.
+            No courier shipments found.
           </div>
         ) : (
           <div className='overflow-x-auto rounded-none border-border bg-transparent shadow-none'>
-              <Table>
+              <Table className='min-w-[1360px]'>
                 <TableHeader className='bg-muted/40'>
                   <TableRow>
                     <TableHead className='px-4 py-3'>Order</TableHead>
@@ -427,7 +530,7 @@ function CourierListPage() {
                     <TableHead className='px-4 py-3'>Tracking</TableHead>
                     <TableHead className='px-4 py-3'>Products</TableHead>
                     <TableHead className='px-4 py-3'>Updated</TableHead>
-                    <TableHead className='px-4 py-3 text-right'>Action</TableHead>
+                    <TableHead className='w-[420px] px-4 py-3 text-right'>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -458,10 +561,16 @@ function CourierListPage() {
                         </p>
                       </TableCell>
                       <TableCell className='px-4 py-4'>
-                        <span className='inline-flex items-center gap-2 text-sm text-muted-foreground'>
-                          <Truck className='h-4 w-4 text-muted-foreground' />
-                          {shipment.trackingStatus}
-                        </span>
+                          <span
+                            className={
+                              isClosedShipmentStatus(shipment.trackingStatus)
+                                ? 'inline-flex items-center gap-2 text-sm font-medium text-rose-700'
+                                : 'inline-flex items-center gap-2 text-sm text-muted-foreground'
+                            }
+                          >
+                            <Truck className='h-4 w-4 text-muted-foreground' />
+                            {shipment.trackingStatus}
+                          </span>
                       </TableCell>
                       <TableCell className='px-4 py-4'>
                         {shipment.trackingCode ? (
@@ -483,20 +592,56 @@ function CourierListPage() {
                             : 'Not available'}
                         </span>
                       </TableCell>
-                      <TableCell className='px-4 py-4 text-right'>
-                        <div className='flex justify-end gap-2'>
-                          <button
+                      <TableCell className='w-[420px] px-4 py-4 text-right align-middle'>
+                        <div className='inline-flex flex-nowrap items-center justify-end gap-1 border border-border bg-background p-1 shadow-sm'>
+                          <Button
+                            size='sm'
+                            variant='outline'
                             onClick={() => setSelectedShipment(shipment)}
-                            className="bg-primary text-primary-foreground px-4 py-2 hover:bg-primary/90 text-sm font-medium"
+                            className='h-8 rounded-none border-0 px-3 shadow-none'
                           >
                             Detail
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            size='sm'
+                            variant='outline'
                             onClick={() => window.location.assign(buildTrackingPath(shipment))}
-                            className="border border-border bg-background text-foreground px-4 py-2 hover:bg-accent text-sm font-medium inline-flex items-center gap-2"
+                            className='h-8 rounded-none border-0 px-3 shadow-none'
                           >
-                            Tracking
-                          </button>
+                            Track
+                          </Button>
+                          {isDelhiveryOrderShipment(shipment) ? (
+                            <>
+                              <Button
+                                size='sm'
+                                variant='outline'
+                                className='h-8 rounded-none border-0 px-3 shadow-none'
+                                disabled={Boolean(actionBusy)}
+                                onClick={() => void runDelhiveryAction(shipment, 'track')}
+                              >
+                                {actionBusy === `track-${shipment.order.id}` ? (
+                                  <LoaderCircle className='h-4 w-4 animate-spin' />
+                                ) : (
+                                  <RefreshCcw className='h-4 w-4' />
+                                )}
+                                Sync
+                              </Button>
+                              <Button
+                                size='sm'
+                                variant='outline'
+                                className='h-8 rounded-none border-0 px-3 shadow-none'
+                                disabled={Boolean(actionBusy)}
+                                onClick={() => void runDelhiveryAction(shipment, 'label')}
+                              >
+                                {actionBusy === `label-${shipment.order.id}` ? (
+                                  <LoaderCircle className='h-4 w-4 animate-spin' />
+                                ) : (
+                                  <Download className='h-4 w-4' />
+                                )}
+                                Label
+                              </Button>
+                            </>
+                          ) : null}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -541,12 +686,33 @@ function CourierListPage() {
                       <DetailKV label='Status' value={selectedShipment.trackingStatus} />
                       <DetailKV label='Tracking' value={selectedShipment.trackingCode || 'Not available'} />
                       <DetailKV label='Source' value={selectedShipment.sourceLabel} />
+                      <DetailKV label='Wallet deduction' value={formatINR(selectedShipment.order.deliveryCost || 0)} />
                       <DetailKV label='Updated' value={formatDateTime(selectedShipment.updatedAt)} />
                       {selectedShipment.order.delhivery?.pickup_request_date ? (
                         <DetailKV
                           label='Pickup request'
                           value={`${selectedShipment.order.delhivery.pickup_request_date} ${selectedShipment.order.delhivery.pickup_request_time || ''}`.trim()}
                         />
+                      ) : null}
+                      {selectedShipment.order.delhivery?.status_description ? (
+                        <DetailKV label='Status details' value={selectedShipment.order.delhivery.status_description} />
+                      ) : null}
+                      {selectedShipment.order.delhivery?.pickup_request_status ? (
+                        <DetailKV label='Pickup status' value={selectedShipment.order.delhivery.pickup_request_status} />
+                      ) : null}
+                      {selectedShipment.order.delhivery?.pickup_request_message ? (
+                        <DetailKV label='Pickup message' value={selectedShipment.order.delhivery.pickup_request_message} />
+                      ) : null}
+                      {selectedShipment.order.delhivery?.label_url ? (
+                        <a
+                          href={selectedShipment.order.delhivery.label_url}
+                          target='_blank'
+                          rel='noreferrer'
+                          className='inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline'
+                        >
+                          Open saved shipping label
+                          <ExternalLink className='h-3.5 w-3.5' />
+                        </a>
                       ) : null}
                     </div>
                   </div>
@@ -605,6 +771,48 @@ function CourierListPage() {
                 </div>
 
                 <div className='flex flex-wrap justify-end gap-2'>
+                  {isDelhiveryOrderShipment(selectedShipment) ? (
+                    <>
+                      <Button
+                        variant='outline'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                        disabled={Boolean(actionBusy)}
+                        onClick={() => void runDelhiveryAction(selectedShipment, 'track')}
+                      >
+                        {actionBusy === `track-${selectedShipment.order.id}` ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : (
+                          <RefreshCcw className='h-4 w-4' />
+                        )}
+                        Sync Delhivery Status
+                      </Button>
+                      <Button
+                        variant='outline'
+                        className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
+                        disabled={Boolean(actionBusy)}
+                        onClick={() => void runDelhiveryAction(selectedShipment, 'label')}
+                      >
+                        {actionBusy === `label-${selectedShipment.order.id}` ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : (
+                          <Download className='h-4 w-4' />
+                        )}
+                        Print Shipping Label
+                      </Button>
+                      <Button
+                        className='bg-emerald-700 text-white hover:bg-emerald-800'
+                        disabled={Boolean(actionBusy)}
+                        onClick={() => void runDelhiveryAction(selectedShipment, 'pickup')}
+                      >
+                        {actionBusy === `pickup-${selectedShipment.order.id}` ? (
+                          <LoaderCircle className='h-4 w-4 animate-spin' />
+                        ) : (
+                          <CalendarPlus className='h-4 w-4' />
+                        )}
+                        Add to Pickup
+                      </Button>
+                    </>
+                  ) : null}
                   <Button
                     variant='outline'
                     className='border-border bg-background text-foreground hover:bg-accent hover:text-foreground'
@@ -773,6 +981,39 @@ function CourierListPage() {
                 </div>
               </div>
             ) : null}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={Boolean(labelPreview)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setLabelPreview(null)
+            }
+          }}
+        >
+          <DialogContent className='max-w-xl rounded-none'>
+            <DialogHeader>
+              <DialogTitle>{labelPreview?.title || 'Delhivery label response'}</DialogTitle>
+              <DialogDescription>
+                Label is ready to download
+              </DialogDescription>
+            </DialogHeader>
+            {labelPreview?.url ? (
+              <div className='flex justify-end pt-2'>
+                <Button
+                  className='rounded-none bg-emerald-700 text-white hover:bg-emerald-800'
+                  onClick={() => window.open(labelPreview.url, '_blank', 'noopener,noreferrer')}
+                >
+                  <Download className='h-4 w-4' />
+                  Open label
+                </Button>
+              </div>
+            ) : (
+              <div className='rounded-none border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800'>
+                Delhivery ne direct label URL return nahi kiya.
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

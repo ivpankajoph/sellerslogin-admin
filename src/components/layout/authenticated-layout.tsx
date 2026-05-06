@@ -532,7 +532,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
               >
                 <div className='flex min-h-svh flex-col'>
                   {effectiveRole === 'vendor' || effectiveRole === 'admin' ? (
-                    <Header fixed className='mb-4'>
+                    <Header fixed>
                       <div className='flex flex-1 flex-col gap-3 py-1 md:flex-row md:items-center md:justify-between'>
                         <div className='flex min-w-0 items-center gap-4'>
                           <div className='text-foreground inline-flex max-w-full items-center rounded-lg px-1 py-1 text-xl font-bold tracking-tight'>

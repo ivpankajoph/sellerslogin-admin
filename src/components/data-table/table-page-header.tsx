@@ -53,6 +53,7 @@ export function TablePageHeader({
               )}
             >
               {children}
+              <div id='table-export-portal' className='shrink-0 empty:hidden flex items-center gap-2'></div>
             </div>
             {shouldShowLocalHeaderChrome ? (
               <div className='flex shrink-0 items-center gap-3'>
@@ -95,6 +96,7 @@ export function TablePageHeader({
           )}
         >
           {children}
+          <div id='table-export-portal' className='shrink-0 empty:hidden flex items-center gap-2'></div>
           {shouldShowLocalHeaderChrome ? (
             <>
               <div className='shrink-0'>

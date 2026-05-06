@@ -3119,6 +3119,34 @@ const ProductCreateForm: React.FC = () => {
     applySpecificationKeys([key], 'merge')
   }
 
+  const handleRemoveSpecificationKey = useCallback((key: string) => {
+    const normalizedKey = normalizeComparableKey(key)
+
+    setSelectedSpecificationKeys((current) =>
+      current.filter(
+        (currentKey) => normalizeComparableKey(currentKey) !== normalizedKey
+      )
+    )
+
+    setFormData((prev: ProductFormData) => {
+      const currentSpec = prev.specifications[0] || {}
+      const nextSpec = Object.entries(currentSpec).reduce<ProductSpecification>(
+        (acc, [currentKey, currentValue]) => {
+          if (normalizeComparableKey(currentKey) !== normalizedKey) {
+            acc[currentKey] = String(currentValue)
+          }
+          return acc
+        },
+        {}
+      )
+
+      return {
+        ...prev,
+        specifications: Object.keys(nextSpec).length ? [nextSpec] : [],
+      }
+    })
+  }, [])
+
   useEffect(() => {
     if (!specificationExcludedKeys.length && !formData.specifications.length)
       return
@@ -3750,6 +3778,7 @@ const ProductCreateForm: React.FC = () => {
             onVariantImageDelete={handleVariantImageDelete}
             onSpecificationChange={handleSpecificationChange}
             onAddSpecificationKey={handleAddSpecificationKey}
+            onRemoveSpecificationKey={handleRemoveSpecificationKey}
             onReplaceVariants={(variants) =>
               setFormData((prev: ProductFormData) => ({
                 ...prev,

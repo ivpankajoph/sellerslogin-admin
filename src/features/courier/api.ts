@@ -101,10 +101,10 @@ export const fetchCourierCategoryOptions = async () => {
     .filter((entry: CourierCategoryOption) => entry.id && entry.name)
 }
 
-export const getAssignedCourierForOrder = (order: CourierOrderSummary | null) => {
+export const getAssignedCourierForOrder = (order: CourierOrderSummary | null, activeOnly = true) => {
   if (!order) return null
   return (
-    getRemoteCourierAssignment(order) ||
+    getRemoteCourierAssignment(order, activeOnly) ||
     getCourierAssignmentForOrder(order.id) ||
     null
   ) as CourierAssignment | null
@@ -115,7 +115,9 @@ export const createDelhiveryShipment = async (
   order: CourierOrderSummary,
   payload: Record<string, unknown> = {}
 ) => {
-  const res = await api.post(`${getOrderBasePath(order)}/delhivery/create`, payload)
+  const res = await api.post(`${getOrderBasePath(order)}/delhivery/create`, payload, {
+    timeout: 60000,
+  })
   return res?.data
 }
 
@@ -123,7 +125,9 @@ export const createShadowfaxShipment = async (
   order: CourierOrderSummary,
   payload: Record<string, unknown> = {}
 ) => {
-  const res = await api.post(`${getOrderBasePath(order)}/shadowfax/create`, payload)
+  const res = await api.post(`${getOrderBasePath(order)}/shadowfax/create`, payload, {
+    timeout: 60000,
+  })
   return res?.data
 }
 
@@ -134,6 +138,8 @@ export const createShadowfaxWarehouseShipment = async (
   const res = await api.post(`${getOrderBasePath(order)}/shadowfax/create`, {
     ...payload,
     order_model: 'warehouse',
+  }, {
+    timeout: 60000,
   })
   return res?.data
 }
@@ -185,6 +191,28 @@ export const createDelhiveryPickupRequest = async (
 ) => {
   const res = await api.post(`${getOrderBasePath(order)}/delhivery/pickup-request`, payload)
   return res?.data
+}
+
+export type DeliveryMarkupPreview = {
+  actual_price: number
+  hiked_price: number
+  markup?: {
+    partner_id?: string
+    markup_type?: 'percentage' | 'fixed'
+    markup_value?: number
+    active?: boolean
+  } | null
+}
+
+export const previewDeliveryMarkup = async (payload: {
+  partner_id: string
+  actual_price: number
+  order_id?: string
+  order_number?: string
+  record_history?: boolean
+}) => {
+  const res = await api.post('/delivery-markup/preview', payload)
+  return res?.data as DeliveryMarkupPreview
 }
 
 

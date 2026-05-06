@@ -17,9 +17,16 @@ import {
   ShoppingCart,
   Truck,
   Warehouse,
+  Wallet as WalletIcon,
+  Plus,
 } from 'lucide-react'
 import { type ReactNode } from 'react'
 import { useSelector } from 'react-redux'
+import { loadRazorpayCheckout } from '@/features/plans/shared'
+import { toast } from 'sonner'
+import api from '@/lib/axios'
+import { formatINR } from '@/lib/currency'
+import { Input } from '@/components/ui/input'
 // import delhiveryLogo from '@/assets/toolkit-apps/delhivery.png'
 // import shadowfaxLogo from '@/assets/toolkit-apps/shadowfax.svg'
 import { Button } from '@/components/ui/button'
@@ -31,6 +38,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   fetchExternalDelhiveryShipments,
   loadCourierOrders,
   type ExternalDelhiveryShipment,
@@ -41,7 +54,6 @@ import {
   type CourierOrderSummary,
 } from '@/features/courier/data'
 import { useVendorIntegrations } from '@/context/vendor-integrations-provider'
-import { formatINR } from '@/lib/currency'
 import type { RootState } from '@/store'
 
 type DeliveryView = 'dashboard' | 'orders'
@@ -326,6 +338,79 @@ export function DeliveryWorkspaceShell({
     return window.localStorage.getItem('delivery-sidebar-collapsed') !== 'false'
   })
 
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [topupOpen, setTopupOpen] = useState(false)
+  const [topupAmount, setTopupAmount] = useState('')
+  const [topupLoading, setTopupLoading] = useState(false)
+
+  const fetchWallet = async () => {
+    try {
+      const res = await api.get('/wallet/frontend')
+      setWalletBalance(res.data?.wallet?.balance || 0)
+    } catch (error) {
+      console.error('Failed to fetch wallet balance', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchWallet()
+  }, [])
+
+  const handleTopup = async () => {
+    const amount = Number(topupAmount)
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount')
+      return
+    }
+
+    try {
+      setTopupLoading(true)
+      const initRes = await api.post('/wallet/topup/initiate', { amount })
+      const { order, key } = initRes.data
+
+      const scriptLoaded = await loadRazorpayCheckout()
+      if (!scriptLoaded || !window.Razorpay) {
+        toast.error('Failed to load Razorpay checkout')
+        return
+      }
+
+      const razorpay = new window.Razorpay({
+        key,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'SellersLogin Wallet Top-up',
+        description: 'Add money to your courier wallet',
+        order_id: order.id,
+        handler: async (response: any) => {
+          try {
+            toast.loading('Verifying payment...')
+            await api.post('/wallet/topup/verify', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              amount,
+            })
+            toast.dismiss()
+            toast.success('Wallet topped up successfully')
+            setTopupOpen(false)
+            setTopupAmount('')
+            fetchWallet()
+          } catch (err: any) {
+            toast.dismiss()
+            toast.error(err.response?.data?.message || 'Failed to verify payment')
+          }
+        },
+        theme: { color: '#0d9488' }
+      })
+
+      razorpay.open()
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to initiate topup')
+    } finally {
+      setTopupLoading(false)
+    }
+  }
+
   const setSidebarCollapsed = (value: boolean) => {
     setCollapsed(value)
     if (typeof window !== 'undefined') {
@@ -384,20 +469,40 @@ export function DeliveryWorkspaceShell({
               </span>
             </span>
           </button>
-          <div className='relative hidden flex-1 lg:block'>
-            <Search className='pointer-events-none absolute top-1/2 left-5 h-5 w-5 -translate-y-1/2 text-slate-400' />
-            <input
-              value={onSearchChange ? searchValue : internalSearch}
-              onChange={(event) => handleSearchChange(event.target.value)}
-              onFocus={onSearchFocus}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !onSearchChange) {
-                  openSearchResults()
-                }
-              }}
-              placeholder='Search AWB or Order ID'
-              className='h-14 w-full rounded-[6px] border border-slate-200 bg-slate-100 px-14 text-base outline-none focus:border-teal-500 focus:bg-white'
-            />
+          <div className='relative hidden flex-1 lg:flex items-center justify-end px-5'>
+            <div className='flex items-center gap-3 rounded-full bg-slate-100 p-1.5 pr-4'>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className='flex items-center gap-3 hover:bg-slate-200 rounded-full pr-3 transition-colors text-left'>
+                    <div className='flex items-center justify-center rounded-full bg-teal-100 p-2 text-teal-700'>
+                      <WalletIcon className='h-5 w-5' />
+                    </div>
+                    <div className='flex flex-col'>
+                      <span className='text-[10px] font-bold uppercase tracking-wider text-slate-500'>Wallet Balance</span>
+                      <span className='text-sm font-bold text-slate-800'>
+                        {walletBalance !== null ? formatINR(walletBalance) : '...'}
+                      </span>
+                    </div>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='end' className='w-56'>
+                  <DropdownMenuItem onClick={() => navigate({ to: '/wallet' })} className='cursor-pointer py-2'>
+                    <ClipboardList className='mr-2 h-4 w-4' />
+                    <span>Transaction History</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <div className='ml-3 pl-3 border-l border-slate-300'>
+                <Button 
+                  size='sm' 
+                  className='h-8 rounded-full bg-teal-600 text-xs font-semibold hover:bg-teal-700'
+                  onClick={() => setTopupOpen(true)}
+                >
+                  <Plus className='mr-1 h-3.5 w-3.5' />
+                  Add Money
+                </Button>
+              </div>
+            </div>
           </div>
           <div className='ml-auto flex items-center gap-2'>
             <button
@@ -490,6 +595,50 @@ export function DeliveryWorkspaceShell({
           {children}
         </main>
       </div>
+
+      <Dialog open={topupOpen} onOpenChange={setTopupOpen}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>Top up Wallet</DialogTitle>
+            <DialogDescription>
+              Add funds to your wallet to pay for courier requests.
+            </DialogDescription>
+          </DialogHeader>
+          <div className='py-4'>
+            <div className='mb-2 text-sm font-medium'>Amount to add (₹)</div>
+            <Input
+              type='number'
+              placeholder='Enter amount'
+              value={topupAmount}
+              onChange={(e) => setTopupAmount(e.target.value)}
+              min='1'
+              className='text-lg'
+            />
+            <div className='mt-3 flex gap-2'>
+              {[500, 1000, 2000, 5000].map((amt) => (
+                <Button
+                  key={amt}
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  onClick={() => setTopupAmount(String(amt))}
+                  className='flex-1'
+                >
+                  ₹{amt}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className='flex justify-end gap-3'>
+            <Button variant='outline' onClick={() => setTopupOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleTopup} disabled={topupLoading || !topupAmount}>
+              {topupLoading ? 'Processing...' : 'Proceed to Pay'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -751,8 +900,6 @@ export function DeliverySystemDashboard() {
                         <th className='px-4 py-4'>Destination</th>
                         <th className='px-4 py-4'>Items</th>
                         <th className='px-4 py-4'>Amount</th>
-                        <th className='px-4 py-4'>Status</th>
-                        <th className='px-4 py-4'>AWB</th>
                         <th className='px-4 py-4 text-right'>Action</th>
                       </tr>
                     </thead>
@@ -801,51 +948,14 @@ export function DeliverySystemDashboard() {
                             <td className='px-4 py-4 font-bold text-slate-950'>
                               {formatINR(order.total)}
                             </td>
-                            <td className='px-4 py-4'>
-                              <span className='inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold capitalize text-slate-700'>
-                                {getShipmentStatus(order)}
-                              </span>
-                            </td>
-                            <td className='px-4 py-4'>
-                              <div className='space-y-1'>
-                                <span className='text-sm font-semibold text-slate-700'>
-                                  {awb || 'Not created'}
-                                </span>
-                                {hasShadowfax ? (
-                                  <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-orange-600'>
-                                    {getShadowfaxLabel(order)}
-                                  </p>
-                                ) : hasDelhivery ? (
-                                  <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-600'>
-                                    Delhivery
-                                  </p>
-                                ) : null}
-                              </div>
-                            </td>
                             <td className='px-4 py-4 text-right'>
                               <div className='flex justify-end gap-2' onClick={(event) => event.stopPropagation()}>
-                                {hasDelhivery ? (
-                                  <Button
-                                    variant='outline'
-                                    className='rounded-[6px]'
-                                    onClick={() =>
-                                      openPath(
-                                        `/courier/tracking?kind=order&orderId=${order.id}&source=${order.source}&tracking=${encodeURIComponent(
-                                          awb
-                                        )}`
-                                      )
-                                    }
-                                  >
-                                    Track
-                                  </Button>
-                                ) : null}
                                 {!hasActiveShipment ? (
                                   <Button
                                     className='rounded-[6px] bg-teal-700 text-white hover:bg-teal-800'
                                     onClick={() => openPriceCheckForOrder(order)}
                                   >
-                                    Check price for delivery
-                                    <PackageCheck className='h-4 w-4' />
+                                    Check price
                                   </Button>
                                 ) : hasDelhivery ? (
                                   <Button
@@ -853,7 +963,6 @@ export function DeliverySystemDashboard() {
                                     onClick={() => openPriceCheckForOrder(order)}
                                   >
                                     Check price
-                                    <PackageCheck className='h-4 w-4' />
                                   </Button>
                                 ) : hasShadowfax ? (
                                   <Button

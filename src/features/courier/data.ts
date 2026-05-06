@@ -26,6 +26,8 @@ export type CourierOrderSummary = {
   customerPhone: string
   customerEmail: string
   total: number
+  deliveryCost: number
+  actualDeliveryCost: number
   itemsCount: number
   createdAt: string
   address: string
@@ -309,8 +311,25 @@ export const getRealShadowfaxReference = (
 
 export const isCancelledCourierState = (value: unknown) => {
   const state = toText(value).toLowerCase()
-  return ['cancelled', 'canceled', 'shipment cancelled'].includes(state)
+  return (
+    ['cancelled', 'canceled', 'shipment cancelled'].includes(state) ||
+    state.includes('seller cancelled') ||
+    state.includes('cancelled') ||
+    state.includes('canceled')
+  )
 }
+
+const isCancelledDelhivery = (delhivery?: CourierOrderSummary['delhivery']) =>
+  Boolean(
+    delhivery &&
+      (isCancelledCourierState(delhivery.status) ||
+        isCancelledCourierState(delhivery.status_description) ||
+        isCancelledCourierState(delhivery.pickup_request_status) ||
+        isCancelledCourierState(delhivery.pickup_request_message) ||
+        delhivery.scans?.some(
+          (scan) => isCancelledCourierState(scan.status) || isCancelledCourierState(scan.description)
+        ))
+  )
 
 export const isClosedCourierState = (value: unknown) => {
   const state = toText(value).toLowerCase()
@@ -392,6 +411,8 @@ export const normalizeCourierOrder = (
       toText(manualCustomer?.email) ||
       toText(order?.user_id?.email),
     total: Number(order?.total || order?.subtotal || 0),
+    deliveryCost: Number(order?.delivery_cost || order?.delivery_wallet_debited || 0),
+    actualDeliveryCost: Number(order?.actual_delivery_cost || order?.delivery_markup?.actual_price || 0),
     itemsCount: itemsCount || items.length || 1,
     createdAt: toText(order?.createdAt),
     address,
@@ -563,6 +584,7 @@ export const saveCourierAssignment = (
     partnerName: partner.title,
     amount: quote.amount,
     etaLabel: quote.etaLabel,
+
     assignedAt: timestamp,
     trackingStatus: trackingStatusByPartner[partnerId],
     trackingCode:
@@ -595,7 +617,8 @@ export const getActiveCourierPartnerIds = (
 
   if (
     hasRealDelhiveryWaybill(order.delhivery) &&
-    !isClosedCourierState(order.delhivery?.status)
+    !isClosedCourierState(order.delhivery?.status) &&
+    !isCancelledDelhivery(order.delhivery)
   ) {
     next.add('delhivery')
   }
@@ -606,8 +629,6 @@ export const getActiveCourierPartnerIds = (
   ) {
     next.add('shadowfax')
   }
-
-
 
   const localAssignment = getCourierAssignmentForOrder(order.id)
   if (
@@ -620,16 +641,51 @@ export const getActiveCourierPartnerIds = (
   return Array.from(next)
 }
 
+export const getAllCourierPartnerIds = (
+  order: CourierOrderSummary | null | undefined
+): CourierPartnerId[] => {
+  if (!order) return []
+
+  const next = new Set<CourierPartnerId>()
+
+  if (order.borzo?.order_id) {
+    next.add('borzo')
+  }
+
+  if (hasRealDelhiveryWaybill(order.delhivery)) {
+    next.add('delhivery')
+  }
+
+  if (getRealShadowfaxReference(order.shadowfax)) {
+    next.add('shadowfax')
+  }
+
+  const localAssignment = getCourierAssignmentForOrder(order.id)
+  if (localAssignment?.partnerId === 'porter') {
+    next.add(localAssignment.partnerId)
+  }
+
+  return Array.from(next)
+}
+
 export const hasAnyActiveCourierAssignment = (
   order: CourierOrderSummary | null | undefined
 ) => getActiveCourierPartnerIds(order).length > 0
 
-export const getRemoteCourierAssignment = (
+export const hasAnyCourierAssignment = (
   order: CourierOrderSummary | null | undefined
+) => getAllCourierPartnerIds(order).length > 0
+
+export const getRemoteCourierAssignment = (
+  order: CourierOrderSummary | null | undefined,
+  activeOnly = true
 ): CourierAssignment | null => {
   if (!order) return null
 
-  if (hasRealDelhiveryWaybill(order.delhivery) && !isClosedCourierState(order.delhivery?.status)) {
+  if (
+    hasRealDelhiveryWaybill(order.delhivery) &&
+    (!activeOnly || (!isClosedCourierState(order.delhivery?.status) && !isCancelledDelhivery(order.delhivery)))
+  ) {
     const realWaybill =
       [
         order.delhivery?.waybill,
@@ -658,7 +714,7 @@ export const getRemoteCourierAssignment = (
 
   if (
     getRealShadowfaxReference(order.shadowfax) &&
-    !isClosedCourierState(order.shadowfax?.status)
+    (!activeOnly || !isClosedCourierState(order.shadowfax?.status))
   ) {
     const trackingCode = getRealShadowfaxReference(order.shadowfax)
     return {
@@ -679,8 +735,6 @@ export const getRemoteCourierAssignment = (
       websiteLabel: order.websiteLabel,
     }
   }
-
-
 
   if (order.borzo?.order_id) {
     return {

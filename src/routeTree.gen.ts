@@ -66,6 +66,7 @@ import { Route as AuthenticatedInventoryManagementIndexRouteImport } from './rou
 import { Route as AuthenticatedIntegrationsIndexRouteImport } from './routes/_authenticated/integrations/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedFoodIndexRouteImport } from './routes/_authenticated/food/index'
+import { Route as AuthenticatedDeliveryMarkupIndexRouteImport } from './routes/_authenticated/delivery-markup/index'
 import { Route as AuthenticatedDeliveryChargesIndexRouteImport } from './routes/_authenticated/delivery-charges/index'
 import { Route as AuthenticatedCustomerReviewsIndexRouteImport } from './routes/_authenticated/customer-reviews/index'
 import { Route as AuthenticatedCustomerQueriesIndexRouteImport } from './routes/_authenticated/customer-queries/index'
@@ -437,6 +438,12 @@ const AuthenticatedFoodIndexRoute = AuthenticatedFoodIndexRouteImport.update({
   path: '/food/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDeliveryMarkupIndexRoute =
+  AuthenticatedDeliveryMarkupIndexRouteImport.update({
+    id: '/delivery-markup/',
+    path: '/delivery-markup/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDeliveryChargesIndexRoute =
   AuthenticatedDeliveryChargesIndexRouteImport.update({
     id: '/delivery-charges/',
@@ -762,6 +769,7 @@ export interface FileRoutesByFullPath {
   '/product-preview': typeof ProductPreviewRoute
   '/analytics': typeof AuthenticatedAnalyticsRouteRouteWithChildren
   '/meta-pixel': typeof AuthenticatedMetaPixelRouteRouteWithChildren
+  '/clerk/': typeof ClerkauthRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
@@ -828,6 +836,7 @@ export interface FileRoutesByFullPath {
   '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
+  '/delivery-markup': typeof AuthenticatedDeliveryMarkupIndexRoute
   '/food': typeof AuthenticatedFoodIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
@@ -868,8 +877,8 @@ export interface FileRoutesByFullPath {
   '/products/create-products': typeof AuthenticatedProductsCreateProductsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/product-preview': typeof ProductPreviewRoute
+  '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
@@ -936,6 +945,7 @@ export interface FileRoutesByTo {
   '/customer-queries': typeof AuthenticatedCustomerQueriesIndexRoute
   '/customer-reviews': typeof AuthenticatedCustomerReviewsIndexRoute
   '/delivery-charges': typeof AuthenticatedDeliveryChargesIndexRoute
+  '/delivery-markup': typeof AuthenticatedDeliveryMarkupIndexRoute
   '/food': typeof AuthenticatedFoodIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
@@ -1050,6 +1060,7 @@ export interface FileRoutesById {
   '/_authenticated/customer-queries/': typeof AuthenticatedCustomerQueriesIndexRoute
   '/_authenticated/customer-reviews/': typeof AuthenticatedCustomerReviewsIndexRoute
   '/_authenticated/delivery-charges/': typeof AuthenticatedDeliveryChargesIndexRoute
+  '/_authenticated/delivery-markup/': typeof AuthenticatedDeliveryMarkupIndexRoute
   '/_authenticated/food/': typeof AuthenticatedFoodIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
@@ -1096,6 +1107,7 @@ export interface FileRouteTypes {
     | '/product-preview'
     | '/analytics'
     | '/meta-pixel'
+    | '/clerk/'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
@@ -1162,6 +1174,7 @@ export interface FileRouteTypes {
     | '/customer-queries'
     | '/customer-reviews'
     | '/delivery-charges'
+    | '/delivery-markup'
     | '/food'
     | '/help-center'
     | '/integrations'
@@ -1202,8 +1215,8 @@ export interface FileRouteTypes {
     | '/products/create-products'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/clerk'
     | '/product-preview'
+    | '/clerk'
     | '/forgot-password'
     | '/reset-password'
     | '/sign-in'
@@ -1270,6 +1283,7 @@ export interface FileRouteTypes {
     | '/customer-queries'
     | '/customer-reviews'
     | '/delivery-charges'
+    | '/delivery-markup'
     | '/food'
     | '/help-center'
     | '/integrations'
@@ -1383,6 +1397,7 @@ export interface FileRouteTypes {
     | '/_authenticated/customer-queries/'
     | '/_authenticated/customer-reviews/'
     | '/_authenticated/delivery-charges/'
+    | '/_authenticated/delivery-markup/'
     | '/_authenticated/food/'
     | '/_authenticated/help-center/'
     | '/_authenticated/integrations/'
@@ -1578,8 +1593,8 @@ declare module '@tanstack/react-router' {
     }
     '/clerk/(auth)': {
       id: '/clerk/(auth)'
-      path: ''
-      fullPath: '/clerk'
+      path: '/'
+      fullPath: '/clerk/'
       preLoaderRoute: typeof ClerkauthRouteRouteImport
       parentRoute: typeof ClerkRouteRoute
     }
@@ -1840,6 +1855,13 @@ declare module '@tanstack/react-router' {
       path: '/food'
       fullPath: '/food'
       preLoaderRoute: typeof AuthenticatedFoodIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/delivery-markup/': {
+      id: '/_authenticated/delivery-markup/'
+      path: '/delivery-markup'
+      fullPath: '/delivery-markup'
+      preLoaderRoute: typeof AuthenticatedDeliveryMarkupIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/delivery-charges/': {
@@ -2311,6 +2333,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCustomerQueriesIndexRoute: typeof AuthenticatedCustomerQueriesIndexRoute
   AuthenticatedCustomerReviewsIndexRoute: typeof AuthenticatedCustomerReviewsIndexRoute
   AuthenticatedDeliveryChargesIndexRoute: typeof AuthenticatedDeliveryChargesIndexRoute
+  AuthenticatedDeliveryMarkupIndexRoute: typeof AuthenticatedDeliveryMarkupIndexRoute
   AuthenticatedFoodIndexRoute: typeof AuthenticatedFoodIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
@@ -2404,6 +2427,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedCustomerReviewsIndexRoute,
   AuthenticatedDeliveryChargesIndexRoute:
     AuthenticatedDeliveryChargesIndexRoute,
+  AuthenticatedDeliveryMarkupIndexRoute: AuthenticatedDeliveryMarkupIndexRoute,
   AuthenticatedFoodIndexRoute: AuthenticatedFoodIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,

@@ -24,13 +24,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  createDelhiveryWarehouse,
   createDelhiveryShipment,
+  createShadowfaxWarehouse,
   createShadowfaxShipment,
   fetchDelhiveryB2cServiceability,
   fetchCourierWarehouses,
   fetchDelhiveryShippingEstimate,
   fetchShadowfaxServiceability,
   loadCourierOrders,
+  previewDeliveryMarkup,
   type CourierWarehouse,
   type ShadowfaxWarehouse,
 } from '@/features/courier/api'
@@ -55,6 +58,7 @@ type CheckResult = {
   summary: string
   priceLabel: string
   quotedAmount: number | null
+  actualAmount?: number | null
   rows: string[]
 }
 
@@ -66,19 +70,49 @@ type CreateRequestError = {
 const readText = (value: unknown) => String(value ?? '').trim()
 const isOpenOrderStatus = (value: unknown) => {
   const status = readText(value).toLowerCase()
-  return !['delivered', 'failed', 'cancelled', 'canceled'].includes(status)
+  return !['delivered', 'cancelled', 'canceled'].includes(status)
 }
 const getShadowfaxApiFailure = (response: any) => {
-  const rawStatus = readText(response?.response?.status || response?.status).toLowerCase()
+  const rawStatus = readText(
+    response?.response?.status ||
+      response?.status ||
+      response?.details?.message ||
+      response?.message
+  ).toLowerCase()
   if (!['failed', 'failure', 'error'].includes(rawStatus)) return ''
   return (
+    readText(response?.details?.errors) ||
     readText(response?.response?.message) ||
+    readText(response?.response?.errors) ||
     readText(response?.response?.error) ||
     readText(response?.response?.detail) ||
+    readText(response?.errors) ||
     readText(response?.message) ||
     readText(response?.error) ||
     'Shadowfax API returned a failed response.'
   )
+}
+const getShadowfaxCreateFailure = (data: any): CreateRequestError | null => {
+  const failure = getShadowfaxApiFailure(data)
+  const missingCarrierId =
+    !readText(data?.shipment?.order_id) &&
+    !readText(data?.shipment?.tracking_number) &&
+    !readText(data?.shipment?.awb_number) &&
+    !readText(data?.response?.order_id) &&
+    !readText(data?.response?.tracking_number) &&
+    !readText(data?.response?.awb_number)
+
+  if (!failure && !missingCarrierId && data?.success !== false) return null
+
+  const details = data?.details || {}
+  return {
+    message:
+      failure ||
+      readText(details?.errors) ||
+      readText(data?.message) ||
+      'Shadowfax did not return an order id or AWB, so the request was not saved as created',
+    field: readText(details?.field) || undefined,
+  }
 }
 const getShadowfaxCreateError = (err: any): CreateRequestError => {
   const data = err?.response?.data || {}
@@ -98,8 +132,38 @@ const getShadowfaxCreateError = (err: any): CreateRequestError => {
     field: readText(details?.field) || undefined,
   }
 }
+const isTimeoutError = (err: any) =>
+  readText(err?.code).toUpperCase() === 'ECONNABORTED' ||
+  readText(err?.message).toLowerCase().includes('timeout')
 const isShadowfaxWarehouse = (warehouse: CourierWarehouse): warehouse is ShadowfaxWarehouse =>
   warehouse.provider === 'shadowfax'
+const getWarehousePin = (warehouse: CourierWarehouse | null) =>
+  readText(warehouse?.pin || (warehouse as ShadowfaxWarehouse | null)?.pincode)
+const getWarehouseAddress = (warehouse: CourierWarehouse | null) =>
+  readText(warehouse?.address || (warehouse as ShadowfaxWarehouse | null)?.address_line_1)
+const normalizeMatchText = (value: unknown) => readText(value).toLowerCase().replace(/\s+/g, ' ')
+const normalizePhone = (value: unknown) => {
+  const digits = readText(value).replace(/\D/g, '')
+  if (!digits) return ''
+  return digits.length > 10 ? digits.slice(-10) : digits
+}
+const isSameWarehouseLocation = (left: CourierWarehouse | null, right: CourierWarehouse | null) => {
+  if (!left || !right) return false
+  const leftPin = getWarehousePin(left)
+  const rightPin = getWarehousePin(right)
+  if (!leftPin || leftPin !== rightPin) return false
+  const leftName = normalizeMatchText(left.name)
+  const rightName = normalizeMatchText(right.name)
+  if (leftName && rightName && leftName === rightName) return true
+  const leftAddress = normalizeMatchText(getWarehouseAddress(left))
+  const rightAddress = normalizeMatchText(getWarehouseAddress(right))
+  return Boolean(leftAddress && rightAddress && leftAddress === rightAddress)
+}
+const buildWarehouseUniqueCode = (warehouse: CourierWarehouse) =>
+  `SL-${getWarehousePin(warehouse) || 'WH'}-${readText(warehouse.name)
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24) || 'WAREHOUSE'}`
 const getWarehouseTime = (warehouse: CourierWarehouse) =>
   new Date(warehouse.updatedAt || warehouse.createdAt || 0).getTime()
 const hasShadowfaxPickupDetails = (warehouse: ShadowfaxWarehouse | null) =>
@@ -181,6 +245,7 @@ function CourierDeskPage() {
   const [results, setResults] = useState<CheckResult[]>([])
   const [confirmRequest, setConfirmRequest] = useState<CheckResult | null>(null)
   const [creatingPartnerId, setCreatingPartnerId] = useState<CourierPartnerId | null>(null)
+  const [addingWarehouseFor, setAddingWarehouseFor] = useState<CourierPartnerId | null>(null)
   const [createRequestError, setCreateRequestError] = useState<CreateRequestError | null>(null)
   const [autoCheckDone, setAutoCheckDone] = useState(false)
 
@@ -191,38 +256,66 @@ function CourierDeskPage() {
       }),
     [warehouses]
   )
-  const delhiveryWarehouses = useMemo(
-    () => orderedWarehouses.filter((warehouse) => warehouse.provider !== 'shadowfax'),
-    [orderedWarehouses]
-  )
+  const originWarehouses = useMemo(() => orderedWarehouses, [orderedWarehouses])
   const shadowfaxWarehouses = useMemo(
     () => orderedWarehouses.filter(isShadowfaxWarehouse),
+    [orderedWarehouses]
+  )
+  const delhiveryWarehouses = useMemo(
+    () => orderedWarehouses.filter((warehouse) => warehouse.provider === 'delhivery'),
     [orderedWarehouses]
   )
 
   const selectedWarehouse = useMemo(
     () =>
-      delhiveryWarehouses.find((warehouse) => warehouse.id === selectedWarehouseId) ||
-      delhiveryWarehouses.find((warehouse) => readText(warehouse.pin)) ||
+      originWarehouses.find((warehouse) => warehouse.id === selectedWarehouseId) ||
+      originWarehouses.find((warehouse) => readText(warehouse.pin || (warehouse as ShadowfaxWarehouse).pincode)) ||
       null,
-    [delhiveryWarehouses, selectedWarehouseId]
+    [originWarehouses, selectedWarehouseId]
   )
   const selectedShadowfaxPickup = useMemo(
     () =>
+      shadowfaxWarehouses.find((warehouse) => isSameWarehouseLocation(selectedWarehouse, warehouse)) ||
       shadowfaxWarehouses.find(hasShadowfaxPickupDetails) ||
       shadowfaxWarehouses[0] ||
       null,
-    [shadowfaxWarehouses]
+    [selectedWarehouse, shadowfaxWarehouses]
   )
-  const hasShadowfaxPickup = hasShadowfaxPickupDetails(selectedShadowfaxPickup)
+  const selectedDelhiveryWarehouse = useMemo(
+    () =>
+      selectedWarehouse?.provider === 'delhivery'
+        ? selectedWarehouse
+        : delhiveryWarehouses.find((warehouse) => isSameWarehouseLocation(selectedWarehouse, warehouse)) || null,
+    [delhiveryWarehouses, selectedWarehouse]
+  )
+  const selectedWarehouseInApp = (partnerId: CourierPartnerId) =>
+    partnerId === 'delhivery'
+      ? Boolean(selectedDelhiveryWarehouse)
+      : partnerId === 'shadowfax'
+        ? Boolean(
+            selectedShadowfaxPickup &&
+              isSameWarehouseLocation(selectedWarehouse, selectedShadowfaxPickup) &&
+              hasShadowfaxPickupDetails(selectedShadowfaxPickup)
+          )
+        : true
 
   const warehousePincode = useMemo(
-    () => readText(selectedWarehouse?.pin),
-    [selectedWarehouse?.pin]
+    () => readText(selectedWarehouse?.pin || (selectedWarehouse as ShadowfaxWarehouse)?.pincode),
+    [selectedWarehouse]
   )
   const shadowfaxPickupPincode = useMemo(
     () => readText(selectedShadowfaxPickup?.pincode || selectedShadowfaxPickup?.pin),
     [selectedShadowfaxPickup?.pin, selectedShadowfaxPickup?.pincode]
+  )
+  const availableFallbackRequests = useMemo(
+    () =>
+      results.filter(
+        (item) =>
+          item.id !== confirmRequest?.id &&
+          item.state === 'ok' &&
+          selectedWarehouseInApp(item.id)
+      ),
+    [confirmRequest?.id, results, selectedDelhiveryWarehouse, selectedShadowfaxPickup, selectedWarehouse]
   )
 
   useEffect(() => {
@@ -277,14 +370,90 @@ function CourierDeskPage() {
     }
   }, [])
 
+  const reloadWarehouses = async () => {
+    const rows = await fetchCourierWarehouses()
+    setWarehouses(rows)
+    return rows
+  }
+
+  const addSelectedWarehouseToApp = async (partnerId: CourierPartnerId) => {
+    if (!selectedWarehouse) {
+      toast.error('Select a warehouse first')
+      return
+    }
+    if (partnerId !== 'delhivery' && partnerId !== 'shadowfax') {
+      toast.error('Warehouse sync is not available for this app')
+      return
+    }
+
+    setAddingWarehouseFor(partnerId)
+    try {
+      if (partnerId === 'delhivery') {
+        const shadowfaxWarehouse = selectedWarehouse as ShadowfaxWarehouse
+        const address = getWarehouseAddress(selectedWarehouse)
+        const pin = getWarehousePin(selectedWarehouse)
+        const phone = normalizePhone(shadowfaxWarehouse.contact || shadowfaxWarehouse.phone)
+        if (!phone) {
+          toast.error('Warehouse phone number is required before adding it to Delhivery')
+          return
+        }
+        await createDelhiveryWarehouse({
+          name: readText(selectedWarehouse.name),
+          registered_name: readText(selectedWarehouse.name),
+          phone,
+          email: readText(shadowfaxWarehouse.email),
+          address,
+          city: readText(shadowfaxWarehouse.city),
+          pin,
+          country: 'India',
+          return_address: address,
+          return_city: readText(shadowfaxWarehouse.city),
+          return_pin: pin,
+          return_state: readText(shadowfaxWarehouse.state),
+          return_country: 'India',
+          working_days: selectedWarehouse.working_days || [],
+        })
+      } else {
+        const state = readText((selectedWarehouse as any).state || (selectedWarehouse as any).return_state)
+        await createShadowfaxWarehouse({
+          name: readText(selectedWarehouse.name),
+          contact: readText((selectedWarehouse as any).contact || (selectedWarehouse as any).phone),
+          email: readText((selectedWarehouse as any).email),
+          address_line_1: getWarehouseAddress(selectedWarehouse),
+          address_line_2: readText((selectedWarehouse as any).address_line_2),
+          city: readText((selectedWarehouse as any).city || (selectedWarehouse as any).return_city),
+          state,
+          pincode: getWarehousePin(selectedWarehouse),
+          latitude: readText((selectedWarehouse as any).latitude),
+          longitude: readText((selectedWarehouse as any).longitude),
+          unique_code: readText((selectedWarehouse as any).unique_code) || buildWarehouseUniqueCode(selectedWarehouse),
+          working_days: selectedWarehouse.working_days || [],
+        })
+      }
+
+      await reloadWarehouses()
+      setResults([])
+      toast.success(`Warehouse added to ${COURIER_PARTNER_MAP[partnerId].title}. Check price again.`)
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.details?.message ||
+        err?.message ||
+        `Failed to add warehouse to ${COURIER_PARTNER_MAP[partnerId].title}`
+      toast.error(message)
+    } finally {
+      setAddingWarehouseFor(null)
+    }
+  }
+
   useEffect(() => {
     setSelectedWarehouseId((current) => {
-      if (current && delhiveryWarehouses.some((warehouse) => warehouse.id === current)) {
+      if (current && originWarehouses.some((warehouse) => warehouse.id === current)) {
         return current
       }
-      return delhiveryWarehouses.find((warehouse) => readText(warehouse.pin))?.id || ''
+      return originWarehouses.find((warehouse) => readText(warehouse.pin || (warehouse as ShadowfaxWarehouse).pincode))?.id || ''
     })
-  }, [delhiveryWarehouses])
+  }, [originWarehouses])
 
   const selectableOrders = useMemo(
     () => orders.filter((order) => isOpenOrderStatus(order.status)),
@@ -354,11 +523,23 @@ function CourierDeskPage() {
               delhiveryEstimate.reason?.message ||
               'Delhivery price check failed.'
             : ''
-        const delhiveryPrice = Number(estimate?.estimated_charge || 0)
+        const delhiveryActualPrice = Number(estimate?.estimated_charge || 0)
+        const delhiveryMarkup = delhiveryActualPrice
+          ? await previewDeliveryMarkup({
+              partner_id: 'delhivery',
+              actual_price: delhiveryActualPrice,
+              order_id: selectedOrder.id,
+              order_number: selectedOrder.orderNumber,
+            }).catch(() => null)
+          : null
+        const delhiveryPrice = Number(delhiveryMarkup?.hiked_price || delhiveryActualPrice || 0)
+        const delhiveryWarehouseReady = Boolean(selectedDelhiveryWarehouse)
         next.push({
           id: 'delhivery',
           title: 'Delhivery',
-          state: serviceability?.serviceable
+          state: !delhiveryWarehouseReady
+            ? 'warn'
+            : serviceability?.serviceable
             ? estimateError
               ? 'error'
               : 'ok'
@@ -369,8 +550,11 @@ function CourierDeskPage() {
               ? 'Price unavailable'
               : 'Price not returned',
           quotedAmount: delhiveryPrice || null,
+          actualAmount: delhiveryActualPrice || null,
           summary: estimateError
             ? estimateError
+            : !delhiveryWarehouseReady
+              ? 'This warehouse is not added in Delhivery.'
             : serviceability?.serviceable
               ? 'Customer pincode is serviceable on Delhivery.'
               : 'Delhivery did not return a serviceable record for this pincode.',
@@ -381,7 +565,10 @@ function CourierDeskPage() {
             `Matched records: ${serviceability?.code_count ?? 0}`,
             `Serviceable records: ${serviceability?.serviceable_count ?? 0}`,
             `Chargeable weight: ${estimate?.chargeable_weight ?? '500'} gm`,
-          ],
+            delhiveryWarehouseReady
+              ? `Delhivery warehouse: ${selectedDelhiveryWarehouse?.name || 'Selected warehouse'}`
+              : 'Add this warehouse to Delhivery before creating a Delhivery request.',
+          ].filter(Boolean),
         })
       } else {
         next.push({
@@ -404,7 +591,19 @@ function CourierDeskPage() {
         const shadowfaxQuote = selectedOrder
           ? estimateCourierQuote(selectedOrder, 'shadowfax')
           : null
-        const shadowfaxReady = hasShadowfaxPickup
+        const shadowfaxActualPrice = Number(shadowfaxQuote?.amount || 0)
+        const shadowfaxMarkup = shadowfaxActualPrice
+          ? await previewDeliveryMarkup({
+              partner_id: 'shadowfax',
+              actual_price: shadowfaxActualPrice,
+              order_id: selectedOrder.id,
+              order_number: selectedOrder.orderNumber,
+            }).catch(() => null)
+          : null
+        const shadowfaxPrice = Number(shadowfaxMarkup?.hiked_price || shadowfaxActualPrice || 0)
+        const shadowfaxReady =
+          Boolean(selectedShadowfaxPickup && isSameWarehouseLocation(selectedWarehouse, selectedShadowfaxPickup)) &&
+          hasShadowfaxPickupDetails(selectedShadowfaxPickup)
         next.push({
           id: 'shadowfax',
           title: 'Shadowfax',
@@ -416,9 +615,10 @@ function CourierDeskPage() {
                 ? 'ok'
                 : 'bad',
           priceLabel: shadowfaxQuote
-            ? `${formatINR(shadowfaxQuote.amount)} est.`
+            ? `${formatINR(shadowfaxPrice)} est.`
             : 'Estimate after order selection',
-          quotedAmount: shadowfaxQuote?.amount || null,
+          quotedAmount: shadowfaxPrice || null,
+          actualAmount: shadowfaxActualPrice || null,
           summary: apiFailure
             ? apiFailure
             : !shadowfaxReady
@@ -434,9 +634,9 @@ function CourierDeskPage() {
             `Serviceable records: ${serviceability?.serviceable_count ?? 0}`,
             shadowfaxReady
               ? `Pickup code: ${selectedShadowfaxPickup?.unique_code || 'Not available'}`
-              : 'Create or complete a Shadowfax pickup address in Warehouses.',
+              : 'This warehouse is not added in Shadowfax.',
             shadowfaxQuote ? `ETA: ${shadowfaxQuote.etaLabel}` : 'Select an order for local price estimate.',
-          ],
+          ].filter(Boolean),
         })
       } else {
         next.push({
@@ -472,13 +672,42 @@ function CourierDeskPage() {
     setOrders(nextOrders)
   }
 
+  const recoverCreatedRequestAfterTimeout = async (partnerId: CourierPartnerId) => {
+    if (!selectedOrder) return false
+    const nextOrders = await loadCourierOrders(isVendor)
+    setOrders(nextOrders)
+    const updated = nextOrders.find(
+      (order) => order.id === selectedOrder.id && order.source === selectedOrder.source
+    )
+    const hasDelhivery =
+      partnerId === 'delhivery' &&
+      Boolean(
+        readText(updated?.delhivery?.waybill) ||
+          updated?.delhivery?.waybills?.some((entry) => readText(entry))
+      )
+    const hasShadowfax =
+      partnerId === 'shadowfax' &&
+      Boolean(
+        readText(updated?.shadowfax?.tracking_number) ||
+          readText(updated?.shadowfax?.order_id)
+      )
+    return hasDelhivery || hasShadowfax
+  }
+
   const createCourierRequest = async () => {
     if (!selectedOrder || !confirmRequest) return
     if (confirmRequest.state !== 'ok') {
       toast.error(`${confirmRequest.title} is not serviceable for this pincode`)
       return
     }
-    if (confirmRequest.id === 'shadowfax' && !hasShadowfaxPickup) {
+    if (!selectedWarehouseInApp(confirmRequest.id)) {
+      setCreateRequestError({
+        message: `This warehouse is not added in ${confirmRequest.title}. Add it before creating the request.`,
+      })
+      toast.error(`This warehouse is not added in ${confirmRequest.title}`)
+      return
+    }
+    if (confirmRequest.id === 'shadowfax' && !hasShadowfaxPickupDetails(selectedShadowfaxPickup)) {
       setCreateRequestError({
         message: 'Create a Shadowfax pickup address before creating a Shadowfax request',
         field: 'pickup_details.address_line_1',
@@ -494,9 +723,13 @@ function CourierDeskPage() {
         confirmRequest.id === 'shadowfax' ? shadowfaxPickupPincode : warehousePincode
       const payload = {
         price_quote: confirmRequest.quotedAmount,
+        actual_price_quote: confirmRequest.actualAmount,
         price_label: confirmRequest.priceLabel,
         quoted_from_pincode: quotedFromPincode,
         quoted_to_pincode: readText(selectedOrder.pincode || destination),
+        ...(confirmRequest.id === 'delhivery' && selectedDelhiveryWarehouse
+          ? { pickup_location: selectedDelhiveryWarehouse.name }
+          : {}),
         ...(confirmRequest.id === 'shadowfax' && selectedShadowfaxPickup
           ? buildShadowfaxPickupPayload(selectedShadowfaxPickup)
           : {}),
@@ -506,11 +739,39 @@ function CourierDeskPage() {
           ? await createDelhiveryShipment(selectedOrder, payload)
           : await createShadowfaxShipment(selectedOrder, payload)
 
+      if (confirmRequest.id === 'shadowfax') {
+        const shadowfaxFailure = getShadowfaxCreateFailure(data)
+        if (shadowfaxFailure) {
+          setCreateRequestError(shadowfaxFailure)
+          toast.error(
+            shadowfaxFailure.field
+              ? `${shadowfaxFailure.message} (${shadowfaxFailure.field})`
+              : shadowfaxFailure.message
+          )
+          return
+        }
+      }
+
       await refreshOrderAfterCreate(data?.order)
       toast.success(`${confirmRequest.title} request created and saved to courier dashboard`)
       setConfirmRequest(null)
       void navigate({ to: '/courier/list' })
     } catch (err: any) {
+      if (isTimeoutError(err) && confirmRequest) {
+        const recovered = await recoverCreatedRequestAfterTimeout(confirmRequest.id)
+        if (recovered) {
+          toast.success(`${confirmRequest.title} request created. Redirecting to courier dashboard.`)
+          setConfirmRequest(null)
+          void navigate({ to: '/courier/list' })
+          return
+        }
+        const message =
+          'Request is still processing. Please refresh courier list before trying again.'
+        setCreateRequestError({ message })
+        toast.error(message)
+        return
+      }
+
       if (confirmRequest.id === 'shadowfax') {
         const shadowfaxError = getShadowfaxCreateError(err)
         setCreateRequestError(shadowfaxError)
@@ -520,25 +781,19 @@ function CourierDeskPage() {
             : shadowfaxError.message
         )
       } else {
-        toast.error(
+        const message =
           err?.response?.data?.message ||
-            err?.response?.data?.details?.message ||
-            err?.message ||
-            `${confirmRequest.title} request creation failed`
+          err?.response?.data?.details?.message ||
+          err?.message ||
+          `${confirmRequest.title} request creation failed`
+        setCreateRequestError({ message })
+        toast.error(
+          message
         )
       }
     } finally {
       setCreatingPartnerId(null)
     }
-  }
-
-  const openPartnerPage = (partnerId: CourierPartnerId) => {
-    const params = new URLSearchParams()
-    if (selectedOrderId) params.set('orderId', selectedOrderId)
-    if (warehousePincode) params.set('origin', warehousePincode)
-    const customerPincode = readText(selectedOrder?.pincode || destination)
-    if (customerPincode) params.set('destination', customerPincode)
-    void navigate({ to: `/courier/${partnerId}${params.toString() ? `?${params.toString()}` : ''}` })
   }
 
   useEffect(() => {
@@ -603,7 +858,7 @@ function CourierDeskPage() {
               )}
             </div>
             <div className='space-y-2'>
-              <label className='text-sm font-medium text-foreground'>Delhivery pricing warehouse</label>
+              <label className='text-sm font-medium text-foreground'>Origin warehouse</label>
               <select
                 value={selectedWarehouse?.id || ''}
                 onChange={(e) => {
@@ -611,30 +866,30 @@ function CourierDeskPage() {
                   setResults([])
                 }}
                 className='vendor-field flex h-11 w-full rounded-none border bg-transparent px-4 py-2 text-sm shadow-sm outline-none'
-                disabled={warehousesLoading || !delhiveryWarehouses.length}
+                disabled={warehousesLoading || !originWarehouses.length}
               >
                 <option value=''>
                   {warehousesLoading
                     ? 'Loading warehouses'
-                    : delhiveryWarehouses.length
+                    : originWarehouses.length
                       ? 'Select warehouse'
-                      : 'No Delhivery warehouse created'}
+                      : 'No warehouse created'}
                 </option>
-                {delhiveryWarehouses.map((warehouse) => (
+                {originWarehouses.map((warehouse) => (
                   <option key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name || 'Warehouse'} | {warehouse.pin || 'No pin'}
+                    {warehouse.name || 'Warehouse'} | {warehouse.pin || (warehouse as ShadowfaxWarehouse).pincode || 'No pin'}
                   </option>
                 ))}
               </select>
               {selectedWarehouse ? (
                 <p className='text-sm text-muted-foreground'>
                   Calculating from {selectedWarehouse.name || 'selected warehouse'}
-                  {selectedWarehouse.pin ? `, ${selectedWarehouse.pin}` : ''}
-                  {selectedWarehouse.address ? ` | ${selectedWarehouse.address}` : ''}
+                  {(selectedWarehouse.pin || (selectedWarehouse as ShadowfaxWarehouse).pincode) ? `, ${selectedWarehouse.pin || (selectedWarehouse as ShadowfaxWarehouse).pincode}` : ''}
+                  {selectedWarehouse.address || (selectedWarehouse as ShadowfaxWarehouse).address_line_1 ? ` | ${selectedWarehouse.address || (selectedWarehouse as ShadowfaxWarehouse).address_line_1}` : ''}
                 </p>
               ) : (
                 <p className='text-sm text-muted-foreground'>
-                  Create a Delhivery warehouse before checking price.
+                  Create a warehouse before checking price.
                 </p>
               )}
             </div>
@@ -646,7 +901,7 @@ function CourierDeskPage() {
                     {selectedWarehouse?.name || 'Not selected'}
                   </p>
                   <p className='mt-1 text-sm text-muted-foreground'>
-                    {selectedWarehouse?.pin || 'No pin'}
+                    {selectedWarehouse?.pin || (selectedWarehouse as ShadowfaxWarehouse)?.pincode || 'No pin'}
                   </p>
                 </div>
                 <div className='rounded-none border border-border bg-muted/30 p-4'>
@@ -720,11 +975,11 @@ function CourierDeskPage() {
                   const tone = badgeTone(item.state)
                   const Icon = tone.Icon
                   const partner = COURIER_PARTNER_MAP[item.id]
-                  const needsShadowfaxPickup = item.id === 'shadowfax' && !hasShadowfaxPickup
+                  const warehouseMissingInApp = !selectedWarehouseInApp(item.id)
                   const canCreateRequest =
                     Boolean(selectedOrder) &&
                     item.state === 'ok' &&
-                    !needsShadowfaxPickup &&
+                    !warehouseMissingInApp &&
                     !creatingPartnerId
 
                   return (
@@ -756,17 +1011,15 @@ function CourierDeskPage() {
                             ))}
                           </div>
                         </div>
-                        {needsShadowfaxPickup ? (
+                        {warehouseMissingInApp ? (
                           <div className='rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-100'>
-                            Shadowfax requires a saved pickup address. Create it from Warehouses, then come back to create the request.
+                            This warehouse is not added in {partner.title}. Add it to {partner.title}, then check price again.
                           </div>
                         ) : null}
                         <div className='rounded-2xl border border-border bg-muted/30 p-4'>
                           <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
                             <div>
-                              <p className='text-sm text-muted-foreground'>
-                                Create this request with the connected {partner.title} API. The created shipment is saved back to the courier dashboard.
-                              </p>
+                      
                             </div>
                             <div className='flex flex-wrap gap-2'>
                               <Button
@@ -780,24 +1033,29 @@ function CourierDeskPage() {
                                 <Send className='h-4 w-4' />
                                 Create request
                               </Button>
-                              {needsShadowfaxPickup ? (
+                              {warehouseMissingInApp && (item.id === 'delhivery' || item.id === 'shadowfax') ? (
                                 <Button
                                   variant='outline'
                                   className='rounded-none'
-                                  onClick={() => void navigate({ to: '/courier/warehouses' })}
+                                  disabled={Boolean(addingWarehouseFor)}
+                                  onClick={() => void addSelectedWarehouseToApp(item.id)}
                                 >
-                                  Create Pickup Address
-                                  <ArrowUpRight className='h-4 w-4' />
+                                  {addingWarehouseFor === item.id ? (
+                                    <LoaderCircle className='h-4 w-4 animate-spin' />
+                                  ) : (
+                                    <ArrowUpRight className='h-4 w-4' />
+                                  )}
+                                  Add warehouse to {partner.title}
                                 </Button>
                               ) : null}
-                              <Button
+                              {/* <Button
                                 variant='outline'
                                 className='rounded-none'
                                 disabled={!selectedOrder}
                                 onClick={() => openPartnerPage(item.id)}
                               >
                                 Open {partner.title}
-                              </Button>
+                              </Button> */}
                             </div>
                           </div>
                         </div>
@@ -872,16 +1130,40 @@ function CourierDeskPage() {
                 This will call the connected {confirmRequest.title} create-order API. If the carrier accepts it, the tracking details are stored on this order and it appears under Courier Dashboard and Tracking.
               </div>
 
-              {confirmRequest.id === 'shadowfax' && createRequestError ? (
+              {createRequestError ? (
                 <div className='rounded-none border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-700 dark:text-rose-200'>
                   <div className='flex items-start gap-2'>
                     <AlertTriangle className='mt-0.5 h-4 w-4 shrink-0' />
-                    <div className='space-y-1'>
+                    <div className='space-y-3'>
                       <p className='font-semibold'>{createRequestError.message}</p>
                       {createRequestError.field ? (
                         <p className='text-rose-700/80 dark:text-rose-200/80'>
                           Field: {createRequestError.field}
                         </p>
+                      ) : null}
+                      {availableFallbackRequests.length ? (
+                        <div className='space-y-2'>
+                          <p className='text-rose-700/80 dark:text-rose-200/80'>
+                            Switch to another available delivery app using this order data.
+                          </p>
+                          <div className='flex flex-wrap gap-2'>
+                            {availableFallbackRequests.map((item) => (
+                              <Button
+                                key={item.id}
+                                type='button'
+                                variant='outline'
+                                className='rounded-none border-rose-500/40 bg-background text-foreground hover:bg-rose-50'
+                                disabled={Boolean(creatingPartnerId)}
+                                onClick={() => {
+                                  setCreateRequestError(null)
+                                  setConfirmRequest(item)
+                                }}
+                              >
+                                Switch to {item.title}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
                       ) : null}
                     </div>
                   </div>
